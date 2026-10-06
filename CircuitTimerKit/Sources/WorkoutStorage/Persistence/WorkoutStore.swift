@@ -15,15 +15,16 @@ actor WorkoutStore {
         do {
             try seedSampleIfNeeded()
         } catch {
-            Logger.workoutStore.error("Failed to seed the sample workout: \(String(reflecting: error), privacy: .public)")
             seedingError = error
         }
 
         let records = primaryRecords(in: try allSorted())
-        // With nothing else to show, an empty list would hide the failure; report it so the user can retry.
-        // Otherwise the user's own workouts load and seeding is retried on the next read.
-        if let seedingError, records.primaries.isEmpty, records.hiddenRecordCount == 0 {
-            throw seedingError
+        if let seedingError {
+            // Without a workout to show, an empty list would hide the failure: report it so the user can retry.
+            // Otherwise the user's own workouts load and seeding is retried on the next read.
+            guard !records.primaries.isEmpty else { throw seedingError }
+
+            Logger.workoutStore.error("Failed to seed the sample workout: \(String(reflecting: seedingError), privacy: .public)")
         }
         return StoredWorkouts(workouts: records.primaries.map(\.workout), hiddenRecordCount: records.hiddenRecordCount)
     }
