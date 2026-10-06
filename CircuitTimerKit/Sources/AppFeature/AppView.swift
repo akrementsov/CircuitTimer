@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import DesignSystem
+import Foundation
 import SwiftUI
 import WorkoutDomain
 
@@ -63,12 +64,16 @@ private struct WorkoutRow: View {
                 .font(.token(.headline))
                 .foregroundStyle(.text(.primary))
             Spacer()
-            Text(workout.totalDuration.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated)))
+            Text(duration)
                 .font(.token(.body))
                 .monospacedDigit()
                 .foregroundStyle(.text(.secondary))
         }
         .padding(.vertical, .token(spacing: .xxs))
+    }
+
+    private var duration: String {
+        workout.totalDuration.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
     }
 }
 
