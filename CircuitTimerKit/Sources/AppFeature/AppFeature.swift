@@ -38,6 +38,14 @@ public struct AppFeature: Sendable {
         var deferredEditor: DeferredEditor?
 
         public init() {}
+
+        public var canAddWorkout: Bool {
+            if case .loaded = workouts { true } else { false }
+        }
+
+        public var canEditList: Bool {
+            if case let .loaded(workouts) = workouts { !workouts.isEmpty } else { false }
+        }
     }
 
     public enum Content: Equatable, Sendable {
@@ -78,6 +86,7 @@ public struct AppFeature: Sendable {
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.locale) private var locale
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -184,9 +193,12 @@ public struct AppFeature: Sendable {
     }
 
     private func presentDeferredEditor(_ state: inout State) -> Effect<Action> {
-        guard let request = state.deferredEditor, state.destination == nil else { return .none }
+        guard let request = state.deferredEditor else { return .none }
 
+        // A request that cannot open now is dropped rather than kept for a surprise later.
         state.deferredEditor = nil
+        guard state.destination == nil else { return .none }
+
         switch request {
             case .create:
                 state.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid()))
@@ -216,6 +228,7 @@ public struct AppFeature: Sendable {
                 }
                 await send(.internal(.mutationFinished(outcome)))
             } catch is CancellationError {
+                // Only the root store going away cancels a write, and the queue goes with it.
                 return
             } catch {
                 Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
@@ -225,7 +238,8 @@ public struct AppFeature: Sendable {
     }
 
     private func duplicate(_ workout: Workout) -> Workout {
-        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module))
+        let name = String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module, locale: locale)
+        var copy = Workout(id: uuid(), name: name)
         copy.trainingRounds = workout.trainingRounds
         copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
         copy.pauseAfterTraining = workout.pauseAfterTraining
@@ -271,8 +285,6 @@ extension AlertState where Action == Never {
     static var mutationFailed: Self {
         AlertState {
             TextState("workouts.mutationFailed.title", bundle: .module)
-        } message: {
-            TextState("workouts.mutationFailed.message", bundle: .module)
         }
     }
 }

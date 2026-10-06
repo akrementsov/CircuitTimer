@@ -18,12 +18,12 @@ public struct AppView: View {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
                 .toolbar {
-                    if case let .loaded(workouts) = store.workouts, !workouts.isEmpty {
+                    if store.canEditList {
                         ToolbarItem(placement: .topBarLeading) {
                             EditButton()
                         }
                     }
-                    if case .loaded = store.workouts {
+                    if store.canAddWorkout {
                         ToolbarItem(placement: .primaryAction) {
                             Button {
                                 send(.addButtonTapped)

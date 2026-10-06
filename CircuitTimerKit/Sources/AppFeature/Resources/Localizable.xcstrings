@@ -181,22 +181,6 @@
         }
       }
     },
-    "workouts.mutationFailed.message" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The list now shows what is stored."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Список показывает то, что сохранено."
-          }
-        }
-      }
-    },
     "workouts.mutationFailed.title" : {
       "localizations" : {
         "en" : {
