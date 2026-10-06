@@ -20,15 +20,30 @@ extension Workout {
     /// Whether a manual pause after the warm-up makes it into the schedule:
     /// a pause is kept only between two non-empty parts.
     public var canPauseAfterWarmUp: Bool {
-        !WorkoutLimits.normalizedStages(warmUp).isEmpty && (hasTrainingRounds || !WorkoutLimits.normalizedStages(coolDown).isEmpty)
+        Self.keepsPauseAfterWarmUp(
+            warmUp: WorkoutLimits.normalizedStages(warmUp),
+            trainingRounds: normalizedTrainingRoundsToPlay,
+            coolDown: WorkoutLimits.normalizedStages(coolDown)
+        )
     }
 
     /// Whether a manual pause after the training makes it into the schedule.
     public var canPauseAfterTraining: Bool {
-        hasTrainingRounds && !WorkoutLimits.normalizedStages(coolDown).isEmpty
+        Self.keepsPauseAfterTraining(trainingRounds: normalizedTrainingRoundsToPlay, coolDown: WorkoutLimits.normalizedStages(coolDown))
     }
 
-    private var hasTrainingRounds: Bool {
-        !WorkoutLimits.normalizedStages(training).isEmpty && WorkoutLimits.normalizedTrainingRounds(trainingRounds) > 0
+    /// Training rounds that actually play: none when the training section is empty.
+    var normalizedTrainingRoundsToPlay: Int {
+        WorkoutLimits.normalizedStages(training).isEmpty ? 0 : WorkoutLimits.normalizedTrainingRounds(trainingRounds)
+    }
+
+    // The schedule calls these with the sections it has already normalized.
+
+    static func keepsPauseAfterWarmUp(warmUp: [Stage], trainingRounds: Int, coolDown: [Stage]) -> Bool {
+        !warmUp.isEmpty && (trainingRounds > 0 || !coolDown.isEmpty)
+    }
+
+    static func keepsPauseAfterTraining(trainingRounds: Int, coolDown: [Stage]) -> Bool {
+        trainingRounds > 0 && !coolDown.isEmpty
     }
 }

@@ -16,13 +16,13 @@ public struct WorkoutSchedule: Hashable, Sendable {
 
         var builder = Builder()
         builder.appendRound(warmUp, section: .warmUp, round: 1, roundCount: 1)
-        if workout.pauseAfterWarmUp, workout.canPauseAfterWarmUp {
+        if workout.pauseAfterWarmUp, Workout.keepsPauseAfterWarmUp(warmUp: warmUp, trainingRounds: rounds, coolDown: coolDown) {
             builder.appendPause(after: .warmUp, round: 1, roundCount: 1)
         }
         for round in stride(from: 1, through: rounds, by: 1) {
             builder.appendRound(training, section: .training, round: round, roundCount: rounds)
         }
-        if workout.pauseAfterTraining, workout.canPauseAfterTraining {
+        if workout.pauseAfterTraining, Workout.keepsPauseAfterTraining(trainingRounds: rounds, coolDown: coolDown) {
             builder.appendPause(after: .training, round: rounds, roundCount: rounds)
         }
         builder.appendRound(coolDown, section: .coolDown, round: 1, roundCount: 1)
