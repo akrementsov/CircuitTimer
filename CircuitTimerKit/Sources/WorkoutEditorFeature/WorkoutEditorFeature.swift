@@ -8,6 +8,8 @@ import WorkoutStorage
 /// Edits a draft of one workout and saves it on request. Cancelling with changes asks first.
 @Reducer
 public struct WorkoutEditorFeature: Sendable {
+    // A dialog with actions needs a hand-written `Action`: with a macro-generated one the scoped
+    // binding would drop the user's choice. See AGENTS.md › TCA.
     @Reducer
     public enum Destination {
         @ReducerCaseIgnored
@@ -20,10 +22,10 @@ public struct WorkoutEditorFeature: Sendable {
             case saveFailedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
         }
+    }
 
-        public enum DiscardConfirmation: Equatable, Sendable {
-            case discard
-        }
+    public enum DiscardConfirmation: Equatable, Sendable {
+        case discard
     }
 
     @ObservableState
@@ -52,7 +54,8 @@ public struct WorkoutEditorFeature: Sendable {
         }
 
         private init(mode: Mode, workout: Workout) {
-            // The editor offers 1…99 rounds; lifting a stored 0 in both copies keeps an untouched workout unchanged.
+            // The editor offers 1…maxTrainingRounds rounds; lifting a stored 0 in both copies keeps an untouched
+            // workout unchanged.
             var workout = workout
             workout.trainingRounds = max(1, WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds))
             self.mode = mode
@@ -66,6 +69,16 @@ public struct WorkoutEditorFeature: Sendable {
 
         public var canSave: Bool {
             !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero && !isSaving
+        }
+
+        /// Explains why Save is off; hidden while saving, when Save is off for another reason.
+        public var showsSaveHint: Bool {
+            !canSave && !isSaving
+        }
+
+        /// A swipe down must not drop unsaved changes or cancel a save in flight.
+        public var blocksInteractiveDismiss: Bool {
+            hasChanges || isSaving
         }
 
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
@@ -124,16 +137,13 @@ public struct WorkoutEditorFeature: Sendable {
         Reduce { state, action in
             switch action {
                 case let .view(action):
-                    return reduce(into: &state, action)
+                    reduce(into: &state, action)
                 case let .internal(action):
-                    return reduce(into: &state, action)
+                    reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
-                    // A save in flight must finish; dismissing would cancel it.
-                    guard !state.isSaving else { return .none }
-
-                    return .run { [dismiss] _ in await dismiss() }
+                    discardChanges(state)
                 case .delegate, .destination:
-                    return .none
+                    .none
             }
         }
         .ifLet(\.$destination, action: \.destination)
@@ -188,6 +198,13 @@ public struct WorkoutEditorFeature: Sendable {
                 state.destination = .saveFailedAlert(.saveFailed)
                 return .none
         }
+    }
+
+    private func discardChanges(_ state: State) -> Effect<Action> {
+        // A save in flight must finish; dismissing would cancel it.
+        guard !state.isSaving else { return .none }
+
+        return .run { [dismiss] _ in await dismiss() }
     }
 
     private func save(_ state: inout State) -> Effect<Action> {
@@ -249,7 +266,7 @@ extension AlertState where Action == Never {
     }
 }
 
-extension ConfirmationDialogState where Action == WorkoutEditorFeature.Destination.DiscardConfirmation {
+extension ConfirmationDialogState where Action == WorkoutEditorFeature.DiscardConfirmation {
     static var discardChanges: Self {
         ConfirmationDialogState(titleVisibility: .visible) {
             TextState("editor.discard.title", bundle: .module)

@@ -458,13 +458,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A 0:00 stage is skipped"
+            "value" : "A 0:00 stage is removed when you save"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Этап 0:00 будет пропущен"
+            "value" : "Этап 0:00 удалится при сохранении"
           }
         }
       }

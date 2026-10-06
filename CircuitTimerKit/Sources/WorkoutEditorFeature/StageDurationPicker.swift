@@ -8,9 +8,10 @@ struct StageDurationPicker: View {
 
     var body: some View {
         let (minutes, seconds) = duration.minutesAndSeconds
+        let maxMinutes = WorkoutLimits.maxStageDuration.minutesAndSeconds.minutes
         HStack(spacing: .zero) {
             Picker(selection: Binding(get: { minutes }, set: { onChange(.seconds($0 * 60 + seconds)) })) {
-                ForEach(0...99, id: \.self) { value in
+                ForEach(0...maxMinutes, id: \.self) { value in
                     Text("editor.duration.minutes \(value)", bundle: .module).tag(value)
                 }
             } label: {

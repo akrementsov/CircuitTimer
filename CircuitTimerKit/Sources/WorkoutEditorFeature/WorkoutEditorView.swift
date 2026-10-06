@@ -25,7 +25,7 @@ public struct WorkoutEditorView: View {
                     Text("editor.totalDuration", bundle: .module)
                 }
             } footer: {
-                if !store.canSave, !store.isSaving {
+                if store.showsSaveHint {
                     Text("editor.saveHint", bundle: .module)
                 }
             }
@@ -48,7 +48,7 @@ public struct WorkoutEditorView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
-        .interactiveDismissDisabled(store.hasChanges || store.isSaving)
+        .interactiveDismissDisabled(store.blocksInteractiveDismiss)
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }

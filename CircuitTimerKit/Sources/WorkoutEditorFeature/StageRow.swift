@@ -16,7 +16,7 @@ struct StageRow: View {
             HStack(spacing: .token(spacing: .s)) {
                 Button(action: onIntensityTap) {
                     RoundedRectangle(cornerRadius: .token(radius: .s))
-                        .fill(stage.intensity == .work ? .stage(.work) : .stage(.rest))
+                        .fill(intensityColor)
                         .frame(width: .token(spacing: .l), height: .token(spacing: .l))
                 }
                 .buttonStyle(.borderless)
@@ -46,6 +46,13 @@ struct StageRow: View {
             if isExpanded {
                 StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
             }
+        }
+    }
+
+    private var intensityColor: Color {
+        switch stage.intensity {
+            case .work: .stage(.work)
+            case .rest: .stage(.rest)
         }
     }
 
