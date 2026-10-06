@@ -3,8 +3,9 @@ import Foundation
 /// A single run through a `WorkoutSchedule`.
 ///
 /// The run never counts ticks. It stores the schedule position reached at `since` and derives
-/// everything else from the wall-clock time passed into each call, so it cannot drift and it
-/// catches up correctly after the app spends time in the background.
+/// everything else from the wall-clock time passed into each call, so irregular updates add no
+/// error and it catches up correctly after the app spends time in the background.
+/// The full contract is in `docs/timer-engine.md`.
 ///
 /// Every operation first settles the elapsed time, then applies itself to the resulting phase.
 /// A run that reaches a manual pause stops there and waits for the user, however much time
@@ -100,8 +101,6 @@ public struct WorkoutRun: Hashable, Sendable {
         run.settle(at: now)
         return run.projection()
     }
-
-    // MARK: - Transitions
 
     private mutating func settle(at now: Date) {
         guard case let .running(since) = phase else { return }

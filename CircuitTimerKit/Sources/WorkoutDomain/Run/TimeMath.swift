@@ -30,7 +30,8 @@ extension Date {
     ///
     /// `Date` arithmetic in `Double` lands a hair below an exact millisecond boundary about
     /// half of the time, so a 1 µs tolerance is added before truncating. With it,
-    /// `start.adding(d).elapsed(since: start) == d` holds for every whole-millisecond `d`.
+    /// `start.adding(d).elapsed(since: start) == d` for whole-millisecond `d` and dates of the
+    /// current epoch, where `Double` still resolves well below a microsecond.
     func elapsed(since start: Date) -> Duration {
         let seconds = timeIntervalSince(start)
         guard seconds.isFinite, seconds > 0 else { return .zero }

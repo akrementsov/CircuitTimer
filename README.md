@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The timer keeps exact time in the background and tells you what comes next.
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The foundation — the domain, the timer engine and the app shell — is in place; the timer screen and the editor come next (see the roadmap).
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -26,6 +26,8 @@ graph TD
     AppFeature --> WorkoutStorage
     AppFeature --> WorkoutDomain
     WorkoutStorage --> WorkoutDomain
+    AppFeature -.-> WorkoutTimerFeature["WorkoutTimerFeature (planned)"]
+    WorkoutTimerFeature -.-> WorkoutDomain
     Widget["Widget extension (planned)"] -.-> WorkoutActivity["WorkoutActivity (planned)"]
     Widget -.-> DesignSystem
     WorkoutActivity -.-> WorkoutDomain
@@ -44,17 +46,17 @@ Features never import each other and the domain never imports TCA or SwiftUI. Th
 
 `WorkoutRun` does not count ticks. It stores the schedule position reached at an anchor date and derives everything else from the time passed into each call:
 
-- it cannot drift, however irregular the UI updates are;
+- irregular or missed UI updates add no error; the position stays within about a millisecond of real time;
 - after an hour in the background one call lands on the right stage — or on the first manual pause, which always waits for the user;
 - every transition is a value-type mutation, so the whole contract is unit-testable without clocks or a UI.
 
-Its behavior is pinned by a phase × operation table and nine invariants. Time is kept in whole milliseconds, and `TimeMath` is the only place that converts between `Date` and `Duration`.
+The contract — a phase × operation table, nine invariants, the snapshot projection and the time rules — is written down in [docs/timer-engine.md](docs/timer-engine.md). Time is kept in whole milliseconds, and `TimeMath` is the only place that converts between `Date` and `Duration`.
 
 ### Clock changes
 
 The engine works on wall-clock time because only a date survives an app restart and drives a Live Activity countdown.
 
-- **Clock moved back:** progress is never lost. If the clock goes back past the anchor the run re-anchors at the current time, and `rebase(at:keepingTotalElapsed:)` lets the UI restore the progress it has already shown.
+- **Clock moved back:** the timer does not stall and committed progress is kept. If the clock goes back past the anchor the run re-anchors at the current time, and `rebase(at:keepingTotalElapsed:)` lets the UI restore the progress it has already shown.
 - **Clock moved forward:** this is an accepted compromise. The run cannot tell it apart from time spent in the background, so it advances through timed stages up to the next manual pause.
 
 ## Getting started
