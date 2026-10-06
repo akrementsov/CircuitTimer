@@ -6,7 +6,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 1. **Platform:** iOS 17+, Swift 6 language mode with complete strict concurrency, Xcode 26.5.
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved`; never assume an API exists.
-3. **Design system:** UI uses `DesignSystem` tokens only. Literal colors and font sizes fail lint outside `Sources/DesignSystem/`.
+3. **Design system:** UI uses `DesignSystem` tokens only. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset mirrors the `Brand` token and must change with it.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions.
 6. **Every commit passes `make verify-clean`.**
@@ -29,7 +29,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | Module | Depends on | Owns |
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
-| `DesignSystem` | SwiftUI | Spacing, radius, typography and color tokens |
+| `DesignSystem` | SwiftUI, UIKit | Spacing, radius, typography and color tokens |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies | `WorkoutStorageClient` |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature and `AppView` |
 
