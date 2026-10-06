@@ -67,13 +67,19 @@ public struct WorkoutEditorFeature: Sendable {
             draft != original
         }
 
-        public var canSave: Bool {
-            !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero && !isSaving
+        /// A workout needs a name and something to play.
+        public var isDraftComplete: Bool {
+            !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero
         }
 
-        /// Explains why Save is off; hidden while saving, when Save is off for another reason.
+        /// Saving an untouched workout would write nothing new, so Save waits for a change.
+        public var canSave: Bool {
+            isDraftComplete && hasChanges && !isSaving
+        }
+
+        /// Explains what the draft is missing; an untouched or saving draft needs no hint.
         public var showsSaveHint: Bool {
-            !canSave && !isSaving
+            !isDraftComplete && !isSaving
         }
 
         /// A swipe down must not drop unsaved changes or cancel a save in flight.
