@@ -38,9 +38,6 @@ playground.xcworkspace
 .build/
 .swiftpm/
 
-# Secrets that must never reach the repository
-GoogleService-Info.plist
-
 # Code Injection
 #
 # After new code Injection tools there's a generated folder /iOSInjectionProject
