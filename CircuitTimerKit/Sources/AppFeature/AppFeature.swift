@@ -32,7 +32,7 @@ public struct AppFeature: Sendable {
 
         @CasePathable
         public enum Internal: Equatable, Sendable {
-            case workoutsLoaded([Workout])
+            case workoutsLoaded(StoredWorkouts)
             case workoutsLoadingFailed
         }
     }
@@ -71,8 +71,8 @@ public struct AppFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
-            case let .workoutsLoaded(workouts):
-                state.workouts = .loaded(workouts)
+            case let .workoutsLoaded(stored):
+                state.workouts = .loaded(stored.workouts)
                 return .none
             case .workoutsLoadingFailed:
                 state.workouts = .failed
@@ -84,8 +84,8 @@ public struct AppFeature: Sendable {
         state.workouts = .loading
         return .run { [workoutStorage] send in
             do {
-                let workouts = try await workoutStorage.fetchAll()
-                await send(.internal(.workoutsLoaded(workouts)))
+                let stored = try await workoutStorage.fetchAll()
+                await send(.internal(.workoutsLoaded(stored)))
             } catch is CancellationError {
                 // Superseded by a newer load; not a failure.
                 return

@@ -16,7 +16,7 @@ struct AppFeatureTests {
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
         } withDependencies: {
-            $0.workoutStorage.fetchAll = { [.sample] }
+            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [.sample]) }
         }
 
         await store.send(.view(.task)) {
@@ -37,7 +37,7 @@ struct AppFeatureTests {
         } withDependencies: {
             $0.workoutStorage.fetchAll = {
                 fetchCount.withValue { $0 += 1 }
-                return []
+                return StoredWorkouts(workouts: [])
             }
         }
 
@@ -56,7 +56,7 @@ struct AppFeatureTests {
                 if shouldFail.value {
                     throw LoadingFailure()
                 }
-                return [.sample]
+                return StoredWorkouts(workouts: [.sample])
             }
         }
 
@@ -112,7 +112,7 @@ struct AppFeatureTests {
                 if call == 1 {
                     try await Task.never()
                 }
-                return [.sample]
+                return StoredWorkouts(workouts: [.sample])
             }
         }
 
@@ -142,7 +142,7 @@ struct AppFeatureTests {
                     _ = try? await Task.never()
                     throw LoadingFailure()
                 }
-                return [.sample]
+                return StoredWorkouts(workouts: [.sample])
             }
         }
 

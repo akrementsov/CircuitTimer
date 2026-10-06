@@ -37,7 +37,7 @@ graph TD
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
 | `DesignSystem` | Spacing, radius, typography and color tokens. Lint rejects literal styles anywhere else. |
-| `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency. In-memory today, SwiftData next. |
+| `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `AppFeature` | The root TCA feature: loading, list, empty and retryable error states. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
