@@ -43,6 +43,9 @@ let package = Package(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
