@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned explicitly: concurrency diagnostics and the resolved package graph depend on the
+  # Xcode version, and the runner image's default Xcode changes over time.
+  DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+  DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=26.5
+  SWIFTLINT_VERSION: 0.65.1
+  SWIFTLINT_SHA256: c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0
+
+jobs:
+  lint:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+
+      - name: Install SwiftLint
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/swiftlint.zip" \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+          echo "${SWIFTLINT_SHA256}  $RUNNER_TEMP/swiftlint.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
+
+      - name: Lint
+        run: make lint SWIFTLINT="$RUNNER_TEMP/swiftlint/swiftlint"
+
+  build-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+          xcrun simctl list devices available
+
+      - name: Cache keys
+        id: keys
+        run: |
+          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore package sources
+        id: spm-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/SourcePackages
+          key: xcode26.5-spm-${{ steps.keys.outputs.resolved }}
+
+      - name: Restore DerivedData
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/DerivedData
+          key: xcode26.5-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
+          restore-keys: |
+            xcode26.5-dd-${{ steps.keys.outputs.resolved }}-
+            xcode26.5-dd-
+
+      - name: Check lockfiles, test package, build app
+        run: make check-resolved test build-app
+
+      # Pull requests only restore caches, so their revisions do not evict the main branch caches.
+      - name: Save package sources
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.spm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/SourcePackages
+          key: ${{ steps.spm-cache.outputs.cache-primary-key }}
+
+      - name: Save DerivedData
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: .build/DerivedData
+          key: xcode26.5-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
