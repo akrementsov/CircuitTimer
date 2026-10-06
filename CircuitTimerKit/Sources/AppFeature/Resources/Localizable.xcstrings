@@ -49,6 +49,58 @@
         }
       }
     },
+    "workouts.hidden %lld" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stored record couldn't be shown"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stored records couldn't be shown"
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Не удалось показать %lld сохранённые записи"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Не удалось показать %lld сохранённых записей"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Не удалось показать %lld сохранённую запись"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Не удалось показать %lld сохранённой записи"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "workouts.title" : {
       "localizations" : {
         "en" : {

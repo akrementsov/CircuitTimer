@@ -32,10 +32,18 @@ public struct AppView: View {
                     } icon: {
                         Image(systemName: "figure.run")
                     }
+                } description: {
+                    hiddenRecordsNotice
                 }
             case let .loaded(workouts):
-                List(workouts) { workout in
-                    WorkoutRow(workout: workout)
+                List {
+                    Section {
+                        ForEach(workouts) { workout in
+                            WorkoutRow(workout: workout)
+                        }
+                    } footer: {
+                        hiddenRecordsNotice
+                    }
                 }
             case .failed:
                 ContentUnavailableView {
@@ -51,6 +59,13 @@ public struct AppView: View {
                         Text("workouts.error.retry", bundle: .module)
                     }
                 }
+        }
+    }
+
+    @ViewBuilder
+    private var hiddenRecordsNotice: some View {
+        if store.hiddenRecordCount > 0 {
+            Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
         }
     }
 }

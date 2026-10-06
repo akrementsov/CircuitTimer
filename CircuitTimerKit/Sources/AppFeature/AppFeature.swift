@@ -9,6 +9,8 @@ public struct AppFeature: Sendable {
     @ObservableState
     public struct State: Equatable, Sendable {
         public var workouts: Content = .idle
+        /// Stored records the list cannot show: unreadable workouts and extra copies of shown ones.
+        public var hiddenRecordCount = 0
 
         public init() {}
     }
@@ -73,6 +75,7 @@ public struct AppFeature: Sendable {
         switch action {
             case let .workoutsLoaded(stored):
                 state.workouts = .loaded(stored.workouts)
+                state.hiddenRecordCount = stored.unreadableCount + stored.hiddenDuplicateCount
                 return .none
             case .workoutsLoadingFailed:
                 state.workouts = .failed
