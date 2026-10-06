@@ -86,7 +86,6 @@ public struct AppFeature: Sendable {
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
-    @Dependency(\.locale) private var locale
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -238,8 +237,7 @@ public struct AppFeature: Sendable {
     }
 
     private func duplicate(_ workout: Workout) -> Workout {
-        let name = String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module, locale: locale)
-        var copy = Workout(id: uuid(), name: name)
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module))
         copy.trainingRounds = workout.trainingRounds
         copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
         copy.pauseAfterTraining = workout.pauseAfterTraining
