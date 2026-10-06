@@ -10,6 +10,20 @@ public struct AppFeature: Sendable {
     @Reducer
     public enum Destination {
         case editor(WorkoutEditorFeature)
+        case alert(AlertState<Never>)
+    }
+
+    /// A list change waiting to be written. Writes run one at a time, in the order the user made them.
+    enum ListMutation: Equatable, Sendable {
+        case delete(Workout.ID)
+        case insert(Workout, after: Workout.ID)
+        case reorder([Workout.ID])
+    }
+
+    /// An editor the user asked for while the list was being written or reloaded.
+    enum DeferredEditor: Equatable, Sendable {
+        case create
+        case edit(Workout.ID)
     }
 
     @ObservableState
@@ -18,6 +32,10 @@ public struct AppFeature: Sendable {
         /// Stored records the list cannot show: unreadable workouts and extra copies of shown ones.
         public var hiddenRecordCount = 0
         @Presents public var destination: Destination.State?
+        var pendingMutations: [ListMutation] = []
+        /// Set when a write reports that storage no longer matches the list; reload once the queue drains.
+        var needsReload = false
+        var deferredEditor: DeferredEditor?
 
         public init() {}
     }
@@ -40,12 +58,17 @@ public struct AppFeature: Sendable {
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
+            case deleteButtonTapped(Workout.ID)
+            case duplicateButtonTapped(Workout.ID)
+            case workoutsMoved(IndexSet, Int)
         }
 
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case workoutsLoaded(StoredWorkouts)
             case workoutsLoadingFailed
+            case mutationFinished(WorkoutWriteOutcome)
+            case mutationFailed
         }
     }
 
@@ -85,13 +108,33 @@ public struct AppFeature: Sendable {
             case .retryButtonTapped:
                 return loadWorkouts(&state)
             case .addButtonTapped:
-                state.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid()))
-                return .none
+                return openEditor(.create, &state)
             case let .workoutTapped(id):
-                guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
+                return openEditor(.edit(id), &state)
+            case let .deleteButtonTapped(id):
+                guard case var .loaded(workouts) = state.workouts, workouts.remove(id: id) != nil else { return .none }
 
-                state.destination = .editor(WorkoutEditorFeature.State(editing: workout))
-                return .none
+                state.workouts = .loaded(workouts)
+                if state.deferredEditor == .edit(id) {
+                    state.deferredEditor = nil
+                }
+                return enqueue(.delete(id), &state)
+            case let .duplicateButtonTapped(id):
+                guard
+                    case var .loaded(workouts) = state.workouts,
+                    let index = workouts.index(id: id)
+                else { return .none }
+
+                let copy = duplicate(workouts[index])
+                workouts.insert(copy, at: index + 1)
+                state.workouts = .loaded(workouts)
+                return enqueue(.insert(copy, after: id), &state)
+            case let .workoutsMoved(source, destination):
+                guard case var .loaded(workouts) = state.workouts else { return .none }
+
+                workouts.move(fromOffsets: source, toOffset: destination)
+                state.workouts = .loaded(workouts)
+                return enqueue(.reorder(Array(workouts.ids)), &state)
         }
     }
 
@@ -101,11 +144,97 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.unreadableCount + stored.hiddenDuplicateCount
-                return .none
+                return presentDeferredEditor(&state)
             case .workoutsLoadingFailed:
                 state.workouts = .failed
+                state.deferredEditor = nil
                 return .none
+            case let .mutationFinished(outcome):
+                if outcome == .storeDiverged {
+                    state.needsReload = true
+                }
+                if !state.pendingMutations.isEmpty {
+                    state.pendingMutations.removeFirst()
+                }
+                if let next = state.pendingMutations.first {
+                    return write(next)
+                }
+                if state.needsReload {
+                    // The reload presents a deferred editor once the list is current.
+                    state.needsReload = false
+                    return loadWorkouts(&state)
+                }
+                return presentDeferredEditor(&state)
+            case .mutationFailed:
+                // Later writes were derived from a list that storage did not accept; drop them and resync.
+                state.pendingMutations = []
+                state.needsReload = false
+                state.deferredEditor = nil
+                state.destination = .alert(.mutationFailed)
+                return loadWorkouts(&state)
         }
+    }
+
+    /// Opens the editor now, or once pending writes and reloads are done so it never shows a stale list.
+    private func openEditor(_ request: DeferredEditor, _ state: inout State) -> Effect<Action> {
+        state.deferredEditor = request
+        guard state.pendingMutations.isEmpty, case .loaded = state.workouts else { return .none }
+
+        return presentDeferredEditor(&state)
+    }
+
+    private func presentDeferredEditor(_ state: inout State) -> Effect<Action> {
+        guard let request = state.deferredEditor, state.destination == nil else { return .none }
+
+        state.deferredEditor = nil
+        switch request {
+            case .create:
+                state.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid()))
+            case let .edit(id):
+                // The workout may be gone by now; then there is nothing to edit.
+                guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
+
+                state.destination = .editor(WorkoutEditorFeature.State(editing: workout))
+        }
+        return .none
+    }
+
+    private func enqueue(_ mutation: ListMutation, _ state: inout State) -> Effect<Action> {
+        state.pendingMutations.append(mutation)
+        guard state.pendingMutations.count == 1 else { return .none }
+
+        return write(mutation)
+    }
+
+    private func write(_ mutation: ListMutation) -> Effect<Action> {
+        .run { [workoutStorage] send in
+            do {
+                let outcome = switch mutation {
+                    case let .delete(id): try await workoutStorage.delete(id: id)
+                    case let .insert(workout, anchor): try await workoutStorage.insert(workout: workout, after: anchor)
+                    case let .reorder(ids): try await workoutStorage.reorder(ids: ids)
+                }
+                await send(.internal(.mutationFinished(outcome)))
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
+                await send(.internal(.mutationFailed))
+            }
+        }
+    }
+
+    private func duplicate(_ workout: Workout) -> Workout {
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module))
+        copy.trainingRounds = workout.trainingRounds
+        copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
+        copy.pauseAfterTraining = workout.pauseAfterTraining
+        for section in WorkoutSectionKind.allCases {
+            copy[section] = workout[section].map { stage in
+                Stage(id: uuid(), name: stage.name, duration: stage.duration, intensity: stage.intensity)
+            }
+        }
+        return copy
     }
 
     /// Storage appends a new workout, so a new one goes to the end here too.
@@ -137,3 +266,13 @@ public struct AppFeature: Sendable {
 
 extension AppFeature.Destination.State: Equatable, Sendable {}
 extension AppFeature.Destination.Action: Equatable, Sendable {}
+
+extension AlertState where Action == Never {
+    static var mutationFailed: Self {
+        AlertState {
+            TextState("workouts.mutationFailed.title", bundle: .module)
+        } message: {
+            TextState("workouts.mutationFailed.message", bundle: .module)
+        }
+    }
+}

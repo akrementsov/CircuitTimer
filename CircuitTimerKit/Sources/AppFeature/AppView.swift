@@ -18,6 +18,11 @@ public struct AppView: View {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
                 .toolbar {
+                    if case let .loaded(workouts) = store.workouts, !workouts.isEmpty {
+                        ToolbarItem(placement: .topBarLeading) {
+                            EditButton()
+                        }
+                    }
                     if case .loaded = store.workouts {
                         ToolbarItem(placement: .primaryAction) {
                             Button {
@@ -39,6 +44,7 @@ public struct AppView: View {
                 WorkoutEditorView(store: editorStore)
             }
         }
+        .alert($store.scope(\.$destination, action: \.destination).alert)
     }
 
     @ViewBuilder
@@ -71,7 +77,14 @@ public struct AppView: View {
                             } label: {
                                 WorkoutRow(workout: workout)
                             }
+                            .swipeActions {
+                                rowActions(for: workout.id)
+                            }
+                            .contextMenu {
+                                rowActions(for: workout.id)
+                            }
                         }
+                        .onMove { send(.workoutsMoved($0, $1)) }
                     } footer: {
                         hiddenRecordsNotice
                     }
@@ -91,6 +104,29 @@ public struct AppView: View {
                     }
                 }
         }
+    }
+
+    @ViewBuilder
+    private func rowActions(for id: Workout.ID) -> some View {
+        Button(role: .destructive) {
+            send(.deleteButtonTapped(id))
+        } label: {
+            Label {
+                Text("workouts.delete", bundle: .module)
+            } icon: {
+                Image(systemName: "trash")
+            }
+        }
+        Button {
+            send(.duplicateButtonTapped(id))
+        } label: {
+            Label {
+                Text("workouts.duplicate", bundle: .module)
+            } icon: {
+                Image(systemName: "plus.square.on.square")
+            }
+        }
+        .tint(.brand)
     }
 
     @ViewBuilder
