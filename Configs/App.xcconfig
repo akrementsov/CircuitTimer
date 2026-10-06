@@ -1,8 +1,7 @@
 // The single place for the app's identifiers.
 // CT-4 and CT-5 derive APP_GROUP_ID = group.$(APP_BUNDLE_ID) and ICLOUD_CONTAINER_ID = iCloud.$(APP_BUNDLE_ID) from it.
 
-// TODO: [CT-7] Replace with the owner's bundle id before the first TestFlight upload.
-APP_BUNDLE_ID = dev.local.CircuitTimer
+APP_BUNDLE_ID = com.akrementsov.circuittimer
 
 PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_ID)
-DEVELOPMENT_TEAM =
+DEVELOPMENT_TEAM = R38U4DJ547
