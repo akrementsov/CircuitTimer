@@ -153,3 +153,4 @@ String Catalogs only: `Localizable.xcstrings` in each module that shows text (`T
 - Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`.
 - One logical change per commit, and every commit passes `make verify-clean`.
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
+- `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
