@@ -9,6 +9,15 @@ actor WorkoutStore {
     private static let sampleSeedKey = "sample-workout-v1"
 
     private var isSampleSeedChecked = false
+    private var saveContext: @Sendable (ModelContext) throws -> Void = { try $0.save() }
+
+    /// Replaces the save point, so tests can make a write fail; the app uses the generated
+    /// `init(modelContainer:)`, which saves the context.
+    init(modelContainer: ModelContainer, saveContext: @escaping @Sendable (ModelContext) throws -> Void) {
+        modelExecutor = DefaultSerialModelExecutor(modelContext: ModelContext(modelContainer))
+        self.modelContainer = modelContainer
+        self.saveContext = saveContext
+    }
 
     func fetchAll() throws -> StoredWorkouts {
         var seedingError: (any Error)?
@@ -124,7 +133,7 @@ actor WorkoutStore {
     private func write<Value>(_ body: () throws -> Value) throws -> Value {
         do {
             let result = try body()
-            try modelContext.save()
+            try saveContext(modelContext)
             return result
         } catch {
             modelContext.rollback()

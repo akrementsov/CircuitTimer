@@ -13,9 +13,9 @@ actor WorkoutStoreProvider {
         makeContainer = { try .workouts(isStoredInMemoryOnly: isStoredInMemoryOnly) }
     }
 
-    /// Wraps an existing container, so tests can inspect the store they write through.
-    init(container: ModelContainer) {
-        makeContainer = { container }
+    /// Lets tests supply the container they inspect, or make opening it fail.
+    init(makeContainer: @escaping @Sendable () throws -> ModelContainer) {
+        self.makeContainer = makeContainer
     }
 
     func store() throws -> WorkoutStore {
