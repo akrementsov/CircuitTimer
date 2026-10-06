@@ -91,7 +91,8 @@ extension WorkoutModel {
         for model in current where !keptIDs.contains(ObjectIdentifier(model)) {
             context.delete(model)
         }
-        if current.map(ObjectIdentifier.init) != kept.map(ObjectIdentifier.init) {
+        // The relationship keeps no order, so only a different set of stages is a change.
+        if Set(current.map(ObjectIdentifier.init)) != Set(kept.map(ObjectIdentifier.init)) {
             stages = kept
         }
     }
@@ -100,15 +101,5 @@ extension WorkoutModel {
         let model = StageModel(stageID: id)
         context.insert(model)
         return model
-    }
-}
-
-extension PersistentModel {
-    /// Writes only real changes, so saving an unchanged workout leaves its records untouched
-    /// and gives sync nothing to upload (CT-5).
-    func assign<Value: Equatable>(_ value: Value, to keyPath: ReferenceWritableKeyPath<Self, Value>) {
-        if self[keyPath: keyPath] != value {
-            self[keyPath: keyPath] = value
-        }
     }
 }

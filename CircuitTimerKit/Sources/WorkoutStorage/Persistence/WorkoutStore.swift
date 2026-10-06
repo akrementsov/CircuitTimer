@@ -11,14 +11,20 @@ actor WorkoutStore {
     private var isSampleSeedChecked = false
 
     func fetchAll() throws -> StoredWorkouts {
+        var seedingError: (any Error)?
         do {
             try seedSampleIfNeeded()
         } catch {
-            // The user's own workouts are still readable; seeding is retried on the next read.
             Logger.workoutStore.error("Failed to seed the sample workout: \(String(reflecting: error), privacy: .public)")
+            seedingError = error
         }
 
         let records = primaryRecords(in: try allSorted())
+        // With nothing else to show, an empty list would hide the failure; report it so the user can retry.
+        // Otherwise the user's own workouts load and seeding is retried on the next read.
+        if let seedingError, records.primaries.isEmpty, records.hiddenRecordCount == 0 {
+            throw seedingError
+        }
         return StoredWorkouts(workouts: records.primaries.map(\.workout), hiddenRecordCount: records.hiddenRecordCount)
     }
 
@@ -33,24 +39,30 @@ actor WorkoutStore {
         }
     }
 
-    /// Inserts `workout` right after the visible record of `anchorID` and its hidden copies.
-    /// Without a visible anchor it appends the workout and reports `.storeDiverged`.
+    /// Inserts `workout` right after the visible record of `anchorID`, gathering the anchor's hidden copies
+    /// in between so the visible order matches the caller's list. Without a visible anchor it appends the
+    /// workout and reports `.storeDiverged`.
     func insert(_ workout: Workout, after anchorID: Workout.ID) throws -> WorkoutWriteOutcome {
         try write {
             let all = try allSorted()
             let records = primaryRecords(in: all)
-            guard
-                let anchor = records.model(for: anchorID),
-                let lastAnchorIndex = all.lastIndex(where: { $0.workoutID == anchor.workoutID })
-            else {
+            guard let anchor = records.model(for: anchorID) else {
                 Logger.workoutStore.notice("Insert anchor \(anchorID, privacy: .public) is not visible; appending")
                 try append(workout)
                 return .storeDiverged
             }
 
+            let anchorGroup = records.recordsOfWorkout(anchorID)
+            let anchorGroupIDs = Set(anchorGroup.map(ObjectIdentifier.init))
             let model = makeModel(for: workout)
-            var ordered = all
-            ordered.insert(model, at: lastAnchorIndex + 1)
+            var ordered: [WorkoutModel] = []
+            for record in all where record === anchor || !anchorGroupIDs.contains(ObjectIdentifier(record)) {
+                ordered.append(record)
+                if record === anchor {
+                    ordered += anchorGroup.dropFirst()
+                    ordered.append(model)
+                }
+            }
             renumber(ordered)
             return .applied
         }
