@@ -18,7 +18,8 @@ extension WorkoutStorageClient: DependencyKey {
     // TODO: [CT-2] Replace with SwiftData-backed live value.
     public static let liveValue = Self.inMemory([.sample])
     public static let previewValue = Self.inMemory([.sample])
-    /// Declared explicitly: without it, tests would silently fall back to `liveValue`.
+    /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented,
+    /// instead of any access failing the test while preview data is returned.
     public static let testValue = Self()
 }
 

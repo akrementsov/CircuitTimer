@@ -87,10 +87,10 @@ public struct AppFeature: Sendable {
                 let workouts = try await workoutStorage.fetchAll()
                 await send(.internal(.workoutsLoaded(workouts)))
             } catch is CancellationError {
-                // Superseded by a newer load or the view went away; not a failure.
+                // Superseded by a newer load; not a failure.
                 return
             } catch {
-                Self.logger.error("Failed to load workouts: \(error.localizedDescription, privacy: .public)")
+                Self.logger.error("Failed to load workouts: \(String(reflecting: error), privacy: .public)")
                 await send(.internal(.workoutsLoadingFailed))
             }
         }
