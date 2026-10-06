@@ -16,7 +16,10 @@ extension Duration {
     }
 
     /// Whole milliseconds of a value already inside the domain range.
-    var inMilliseconds: Int64 {
+    ///
+    /// The value must be normalized by `WorkoutLimits` or otherwise far below `Int64.max`
+    /// milliseconds; larger values overflow.
+    public var inMilliseconds: Int64 {
         let (seconds, attoseconds) = components
         return seconds * 1_000 + attoseconds / 1_000_000_000_000_000
     }
