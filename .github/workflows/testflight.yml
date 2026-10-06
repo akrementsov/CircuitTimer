@@ -1,0 +1,82 @@
+name: TestFlight
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: testflight
+  # Uploads run one at a time; a new tag waits instead of replacing a pending run (up to 100 pending).
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+
+jobs:
+  upload:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+
+      - name: Require a commit of main that passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$GITHUB_REF_NAME does not point to a commit of main"; exit 1; }
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main&status=success" --jq .total_count)
+          [ "$passed" -gt 0 ] \
+            || { echo "::error::CI on main has not passed for $GITHUB_SHA; wait for it, then re-run this workflow"; exit 1; }
+
+      - name: Cache keys
+        id: keys
+        run: |
+          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore package sources
+        uses: actions/cache/restore@v6
+        with:
+          path: .build/SourcePackages
+          key: xcode26.5-spm-${{ steps.keys.outputs.resolved }}
+
+      # The build number is the UTC start time, so a re-run of an older run still gets a higher number.
+      - name: Archive
+        run: |
+          build_number=$(date -u +%y%m%d.%H%M%S)
+          echo "Build number: $build_number"
+          make archive BUILD_NUMBER="$build_number"
+
+      - name: Require the tag to match the version
+        run: |
+          version=$(plutil -extract CFBundleShortVersionString raw \
+            .build/CircuitTimer.xcarchive/Products/Applications/CircuitTimer.app/Info.plist)
+          case "$GITHUB_REF_NAME" in
+            "v$version" | "v$version"-?*) ;;
+            *) echo "::error::Tag $GITHUB_REF_NAME does not match MARKETING_VERSION $version"; exit 1 ;;
+          esac
+
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          umask 077
+          printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          make upload ASC_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
