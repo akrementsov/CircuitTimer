@@ -6,15 +6,12 @@ import WorkoutDomain
 public struct StoredWorkouts: Equatable, Sendable {
     /// One visible record per workout, in list order, with unique identifiers.
     public var workouts: [Workout]
-    /// Workouts without any record that reads back without losing data.
-    public var unreadableCount: Int
-    /// Extra records of a workout that is already shown.
-    public var hiddenDuplicateCount: Int
+    /// Records that are not shown: those that would lose data when read, and extra copies of a shown workout.
+    public var hiddenRecordCount: Int
 
-    public init(workouts: [Workout], unreadableCount: Int = 0, hiddenDuplicateCount: Int = 0) {
+    public init(workouts: [Workout], hiddenRecordCount: Int = 0) {
         self.workouts = workouts
-        self.unreadableCount = unreadableCount
-        self.hiddenDuplicateCount = hiddenDuplicateCount
+        self.hiddenRecordCount = hiddenRecordCount
     }
 }
 
@@ -31,8 +28,11 @@ public struct WorkoutStorageClient: Sendable {
     public var fetchAll: @Sendable () async throws -> StoredWorkouts
     /// Updates the workout, or appends it when it is new.
     public var save: @Sendable (_ workout: Workout) async throws -> Void
+    /// Inserts a new workout right after `after`; appends it and reports `.storeDiverged` when `after` is not shown.
     public var insert: @Sendable (_ workout: Workout, _ after: Workout.ID) async throws -> WorkoutWriteOutcome
+    /// Deletes the shown record; reports `.storeDiverged` when it is not shown or hidden copies remain.
     public var delete: @Sendable (_ id: Workout.ID) async throws -> WorkoutWriteOutcome
+    /// Orders the shown workouts; reports `.storeDiverged` unless `ids` are exactly the shown workouts.
     public var reorder: @Sendable (_ ids: [Workout.ID]) async throws -> WorkoutWriteOutcome
 }
 

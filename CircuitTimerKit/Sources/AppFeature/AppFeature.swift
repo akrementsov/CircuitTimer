@@ -143,7 +143,7 @@ public struct AppFeature: Sendable {
             case let .workoutsLoaded(stored):
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
-                state.hiddenRecordCount = stored.unreadableCount + stored.hiddenDuplicateCount
+                state.hiddenRecordCount = stored.hiddenRecordCount
                 return presentDeferredEditor(&state)
             case .workoutsLoadingFailed:
                 state.workouts = .failed

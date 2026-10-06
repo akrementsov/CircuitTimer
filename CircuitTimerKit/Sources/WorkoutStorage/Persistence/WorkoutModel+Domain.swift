@@ -64,10 +64,10 @@ extension WorkoutModel {
     /// sync conflicts small in CT-5. Stages that are gone are deleted explicitly: removing them from
     /// the relationship alone is not guaranteed to delete them.
     func update(from workout: Workout, in context: ModelContext) {
-        name = workout.name
-        trainingRounds = WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
-        pauseAfterWarmUp = workout.pauseAfterWarmUp
-        pauseAfterTraining = workout.pauseAfterTraining
+        assign(workout.name, to: \.name)
+        assign(WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds), to: \.trainingRounds)
+        assign(workout.pauseAfterWarmUp, to: \.pauseAfterWarmUp)
+        assign(workout.pauseAfterTraining, to: \.pauseAfterTraining)
 
         let current = stages ?? []
         var reusable = Dictionary(
@@ -78,11 +78,11 @@ extension WorkoutModel {
         for section in WorkoutSectionKind.allCases {
             for (index, stage) in WorkoutLimits.normalizedStages(workout[section]).enumerated() {
                 let model = reusable.removeValue(forKey: stage.id) ?? makeStage(id: stage.id, in: context)
-                model.section = section.storageToken
-                model.order = index
-                model.name = stage.name
-                model.durationMs = Int(stage.duration.inMilliseconds)
-                model.intensity = stage.intensity.storageToken
+                model.assign(section.storageToken, to: \.section)
+                model.assign(index, to: \.order)
+                model.assign(stage.name, to: \.name)
+                model.assign(Int(stage.duration.inMilliseconds), to: \.durationMs)
+                model.assign(stage.intensity.storageToken, to: \.intensity)
                 kept.append(model)
             }
         }
@@ -91,12 +91,24 @@ extension WorkoutModel {
         for model in current where !keptIDs.contains(ObjectIdentifier(model)) {
             context.delete(model)
         }
-        stages = kept
+        if current.map(ObjectIdentifier.init) != kept.map(ObjectIdentifier.init) {
+            stages = kept
+        }
     }
 
     private func makeStage(id: UUID, in context: ModelContext) -> StageModel {
         let model = StageModel(stageID: id)
         context.insert(model)
         return model
+    }
+}
+
+extension PersistentModel {
+    /// Writes only real changes, so saving an unchanged workout leaves its records untouched
+    /// and gives sync nothing to upload (CT-5).
+    func assign<Value: Equatable>(_ value: Value, to keyPath: ReferenceWritableKeyPath<Self, Value>) {
+        if self[keyPath: keyPath] != value {
+            self[keyPath: keyPath] = value
+        }
     }
 }

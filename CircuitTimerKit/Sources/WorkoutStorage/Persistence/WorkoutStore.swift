@@ -7,19 +7,19 @@ import WorkoutDomain
 @ModelActor
 actor WorkoutStore {
     private static let sampleSeedKey = "sample-workout-v1"
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutStore")
 
     private var isSampleSeedChecked = false
 
     func fetchAll() throws -> StoredWorkouts {
-        try seedSampleIfNeeded()
+        do {
+            try seedSampleIfNeeded()
+        } catch {
+            // The user's own workouts are still readable; seeding is retried on the next read.
+            Logger.workoutStore.error("Failed to seed the sample workout: \(String(reflecting: error), privacy: .public)")
+        }
 
         let records = primaryRecords(in: try allSorted())
-        return StoredWorkouts(
-            workouts: records.primaries.map(\.workout),
-            unreadableCount: records.unreadableCount,
-            hiddenDuplicateCount: records.hiddenDuplicateCount
-        )
+        return StoredWorkouts(workouts: records.primaries.map(\.workout), hiddenRecordCount: records.hiddenRecordCount)
     }
 
     /// Updates the visible record of `workout`, or appends a new one.
@@ -33,58 +33,74 @@ actor WorkoutStore {
         }
     }
 
-    /// Inserts `workout` right after the visible record of `anchorID`; appends it when there is none.
+    /// Inserts `workout` right after the visible record of `anchorID` and its hidden copies.
+    /// Without a visible anchor it appends the workout and reports `.storeDiverged`.
     func insert(_ workout: Workout, after anchorID: Workout.ID) throws -> WorkoutWriteOutcome {
         try write {
             let all = try allSorted()
+            let records = primaryRecords(in: all)
             guard
-                let anchor = primaryRecords(in: all).model(for: anchorID),
-                let anchorIndex = all.firstIndex(where: { $0 === anchor })
+                let anchor = records.model(for: anchorID),
+                let lastAnchorIndex = all.lastIndex(where: { $0.workoutID == anchor.workoutID })
             else {
+                Logger.workoutStore.notice("Insert anchor \(anchorID, privacy: .public) is not visible; appending")
                 try append(workout)
                 return .storeDiverged
             }
 
             let model = makeModel(for: workout)
             var ordered = all
-            ordered.insert(model, at: anchorIndex + 1)
+            ordered.insert(model, at: lastAnchorIndex + 1)
             renumber(ordered)
             return .applied
         }
     }
 
-    /// Deletes the visible record of `id` only. Hidden copies stay: the user deletes exactly what they see.
+    /// Deletes the visible record of `id` only: the user deletes exactly what they see.
+    /// Reports `.storeDiverged` when hidden copies remain, because one of them becomes visible.
     func delete(_ id: Workout.ID) throws -> WorkoutWriteOutcome {
         try write {
             let all = try allSorted()
-            guard let model = primaryRecords(in: all).model(for: id) else { return .storeDiverged }
+            guard let model = primaryRecords(in: all).model(for: id) else {
+                Logger.workoutStore.notice("Workout \(id, privacy: .public) to delete is not visible")
+                return .storeDiverged
+            }
 
             modelContext.delete(model)
-            let hasOtherCopies = all.contains { $0.workoutID == id && $0 !== model }
-            return hasOtherCopies ? .storeDiverged : .applied
+            guard !all.contains(where: { $0.workoutID == id && $0 !== model }) else {
+                Logger.workoutStore.notice("Workout \(id, privacy: .public) has hidden copies left after delete")
+                return .storeDiverged
+            }
+            return .applied
         }
     }
 
-    /// Orders the visible records as `ids`; records the caller did not list keep their relative order after them.
+    /// Orders the visible records as `ids`, each followed by its hidden copies; records the caller did not
+    /// list keep their relative order after them. Reports `.storeDiverged` unless `ids` are exactly the
+    /// visible workouts.
     func reorder(_ ids: [Workout.ID]) throws -> WorkoutWriteOutcome {
         try write {
             let all = try allSorted()
             let records = primaryRecords(in: all)
 
-            var placed: [WorkoutModel] = []
+            var ordered: [WorkoutModel] = []
             var placedIDs: Set<ObjectIdentifier> = []
             for id in ids {
-                guard let model = records.model(for: id), placedIDs.insert(ObjectIdentifier(model)).inserted else { continue }
-                placed.append(model)
+                for model in records.recordsOfWorkout(id) where placedIDs.insert(ObjectIdentifier(model)).inserted {
+                    ordered.append(model)
+                }
             }
-            renumber(placed + all.filter { !placedIDs.contains(ObjectIdentifier($0)) })
+            renumber(ordered + all.filter { !placedIDs.contains(ObjectIdentifier($0)) })
 
-            let visibleIDs = Set(records.primaries.map(\.workout.id))
-            return visibleIDs == Set(ids) ? .applied : .storeDiverged
+            guard Set(records.primaries.map(\.workout.id)) == Set(ids) else {
+                Logger.workoutStore.notice("Reorder listed a different set of workouts than storage shows")
+                return .storeDiverged
+            }
+            return .applied
         }
     }
 
-    private func write<Result>(_ body: () throws -> Result) throws -> Result {
+    private func write<Value>(_ body: () throws -> Value) throws -> Value {
         do {
             let result = try body()
             try modelContext.save()
@@ -155,28 +171,27 @@ actor WorkoutStore {
     /// Reads and writes go through it, so an edit always lands in the record the user sees.
     private func primaryRecords(in sorted: [WorkoutModel]) -> PrimaryRecords {
         var records = PrimaryRecords()
-        var groups: [UUID: [WorkoutModel]] = [:]
         var groupOrder: [UUID] = []
         for model in sorted {
             guard let id = model.workoutID else {
-                Self.logger.error("Skipping a stored workout without an identifier")
-                records.unreadableCount += 1
+                Logger.workoutStore.error("Skipping a stored workout without an identifier")
+                records.hiddenRecordCount += 1
                 continue
             }
-            if groups[id] == nil {
+            if records.groups[id] == nil {
                 groupOrder.append(id)
             }
-            groups[id, default: []].append(model)
+            records.groups[id, default: []].append(model)
         }
 
         for id in groupOrder {
-            let group = groups[id] ?? []
+            let group = records.groups[id] ?? []
             guard let primary = firstReadable(in: group) else {
-                records.unreadableCount += 1
+                records.hiddenRecordCount += group.count
                 continue
             }
             records.primaries.append(primary)
-            records.hiddenDuplicateCount += group.count - 1
+            records.hiddenRecordCount += group.count - 1
         }
         let position = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { (ObjectIdentifier($1), $0) })
         records.primaries.sort { position[ObjectIdentifier($0.model), default: 0] < position[ObjectIdentifier($1.model), default: 0] }
@@ -188,7 +203,7 @@ actor WorkoutStore {
             do {
                 return (model, try model.toDomain())
             } catch {
-                Self.logger.error("Skipping an unreadable stored workout: \(String(describing: error), privacy: .public)")
+                Logger.workoutStore.error("Skipping an unreadable stored workout: \(String(describing: error), privacy: .public)")
             }
         }
         return nil
@@ -197,10 +212,18 @@ actor WorkoutStore {
 
 private struct PrimaryRecords {
     var primaries: [(model: WorkoutModel, workout: Workout)] = []
-    var unreadableCount = 0
-    var hiddenDuplicateCount = 0
+    /// Every record of a workout, in stored order.
+    var groups: [UUID: [WorkoutModel]] = [:]
+    var hiddenRecordCount = 0
 
     func model(for id: Workout.ID) -> WorkoutModel? {
         primaries.first { $0.workout.id == id }?.model
+    }
+
+    /// The visible record of `id` followed by its hidden copies; empty when `id` is not visible.
+    func recordsOfWorkout(_ id: Workout.ID) -> [WorkoutModel] {
+        guard let primary = model(for: id) else { return [] }
+
+        return [primary] + (groups[id] ?? []).filter { $0 !== primary }
     }
 }
