@@ -3,10 +3,11 @@ import DesignSystem
 import Foundation
 import SwiftUI
 import WorkoutDomain
+import WorkoutEditorFeature
 
 @ViewAction(for: AppFeature.self)
 public struct AppView: View {
-    public let store: StoreOf<AppFeature>
+    @Bindable public var store: StoreOf<AppFeature>
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -16,8 +17,28 @@ public struct AppView: View {
         NavigationStack {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
+                .toolbar {
+                    if case .loaded = store.workouts {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                send(.addButtonTapped)
+                            } label: {
+                                Label {
+                                    Text("workouts.add", bundle: .module)
+                                } icon: {
+                                    Image(systemName: "plus")
+                                }
+                            }
+                        }
+                    }
+                }
         }
         .task { send(.task) }
+        .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
+            NavigationStack {
+                WorkoutEditorView(store: editorStore)
+            }
+        }
     }
 
     @ViewBuilder
@@ -34,12 +55,22 @@ public struct AppView: View {
                     }
                 } description: {
                     hiddenRecordsNotice
+                } actions: {
+                    Button {
+                        send(.addButtonTapped)
+                    } label: {
+                        Text("workouts.empty.create", bundle: .module)
+                    }
                 }
             case let .loaded(workouts):
                 List {
                     Section {
                         ForEach(workouts) { workout in
-                            WorkoutRow(workout: workout)
+                            Button {
+                                send(.workoutTapped(workout.id))
+                            } label: {
+                                WorkoutRow(workout: workout)
+                            }
                         }
                     } footer: {
                         hiddenRecordsNotice

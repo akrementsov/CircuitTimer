@@ -34,6 +34,7 @@ let package = Package(
             dependencies: [
                 "DesignSystem",
                 "WorkoutDomain",
+                "WorkoutEditorFeature",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
