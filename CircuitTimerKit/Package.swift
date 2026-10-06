@@ -1,7 +1,13 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-let strictSettings: [SwiftSetting] = [.treatAllWarnings(as: .error)]
+// When the app project builds this package as a dependency, Xcode compiles it with
+// -suppress-warnings, which conflicts with -warnings-as-errors. Strict mode is therefore opt-in
+// for builds of the package itself (`make test`, CI). Those builds use their own DerivedData,
+// because the evaluated manifest is cached there and does not notice an environment change.
+let strictSettings: [SwiftSetting] = Context.environment["CIRCUITTIMER_STRICT_WARNINGS"] == "1"
+    ? [.treatAllWarnings(as: .error)]
+    : []
 
 let package = Package(
     name: "CircuitTimerKit",
