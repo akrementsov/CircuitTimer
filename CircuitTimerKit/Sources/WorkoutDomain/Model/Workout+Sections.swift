@@ -22,22 +22,29 @@ extension Workout {
     public var canPauseAfterWarmUp: Bool {
         Self.keepsPauseAfterWarmUp(
             warmUp: WorkoutLimits.normalizedStages(warmUp),
-            trainingRounds: normalizedTrainingRoundsToPlay,
+            trainingRounds: trainingRoundsToPlay,
             coolDown: WorkoutLimits.normalizedStages(coolDown)
         )
     }
 
     /// Whether a manual pause after the training makes it into the schedule.
     public var canPauseAfterTraining: Bool {
-        Self.keepsPauseAfterTraining(trainingRounds: normalizedTrainingRoundsToPlay, coolDown: WorkoutLimits.normalizedStages(coolDown))
+        Self.keepsPauseAfterTraining(
+            trainingRounds: trainingRoundsToPlay,
+            coolDown: WorkoutLimits.normalizedStages(coolDown)
+        )
     }
 
-    /// Training rounds that actually play: none when the training section is empty.
-    var normalizedTrainingRoundsToPlay: Int {
-        WorkoutLimits.normalizedStages(training).isEmpty ? 0 : WorkoutLimits.normalizedTrainingRounds(trainingRounds)
+    private var trainingRoundsToPlay: Int {
+        Self.trainingRoundsToPlay(training: WorkoutLimits.normalizedStages(training), rounds: trainingRounds)
     }
 
     // The schedule calls these with the sections it has already normalized.
+
+    /// Training rounds that actually play: none when the normalized training section is empty.
+    static func trainingRoundsToPlay(training: [Stage], rounds: Int) -> Int {
+        training.isEmpty ? 0 : WorkoutLimits.normalizedTrainingRounds(rounds)
+    }
 
     static func keepsPauseAfterWarmUp(warmUp: [Stage], trainingRounds: Int, coolDown: [Stage]) -> Bool {
         !warmUp.isEmpty && (trainingRounds > 0 || !coolDown.isEmpty)

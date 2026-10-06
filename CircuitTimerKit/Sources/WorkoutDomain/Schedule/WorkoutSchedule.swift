@@ -11,7 +11,7 @@ public struct WorkoutSchedule: Hashable, Sendable {
     public init(workout: Workout) {
         let warmUp = WorkoutLimits.normalizedStages(workout.warmUp)
         let training = WorkoutLimits.normalizedStages(workout.training)
-        let rounds = training.isEmpty ? 0 : WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
+        let rounds = Workout.trainingRoundsToPlay(training: training, rounds: workout.trainingRounds)
         let coolDown = WorkoutLimits.normalizedStages(workout.coolDown)
 
         var builder = Builder()
