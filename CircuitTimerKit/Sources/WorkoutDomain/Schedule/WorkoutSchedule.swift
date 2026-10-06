@@ -32,7 +32,10 @@ public struct WorkoutSchedule: Hashable, Sendable {
         totalDuration = builder.position
     }
 
+    /// The stage after `stage`, or `nil` for the last one or a stage from another schedule.
     public func next(after stage: ScheduledStage) -> ScheduledStage? {
+        guard stages.indices.contains(stage.index), stages[stage.index] == stage else { return nil }
+
         let index = stage.index + 1
         return stages.indices.contains(index) ? stages[index] : nil
     }
@@ -49,15 +52,15 @@ private struct Builder {
     var segments: [ScheduleSegment] = []
     var position: Duration = .zero
 
-    mutating func appendRound(_ round: [Stage], section: WorkoutSectionKind, round number: Int, roundCount: Int) {
-        guard !round.isEmpty else { return }
+    mutating func appendRound(_ sectionStages: [Stage], section: WorkoutSectionKind, round: Int, roundCount: Int) {
+        guard !sectionStages.isEmpty else { return }
 
-        let placement = Placement(section: section, round: number, roundCount: roundCount)
+        let placement = Placement(section: section, round: round, roundCount: roundCount)
         let start = position
-        for stage in round {
+        for stage in sectionStages {
             append(stageID: stage.id, name: stage.name, kind: stage.intensity.scheduledKind, duration: stage.duration, at: placement)
         }
-        segments.append(ScheduleSegment(section: section, round: number, range: start..<position))
+        segments.append(ScheduleSegment(section: section, round: round, range: start..<position))
     }
 
     mutating func appendPause(after section: WorkoutSectionKind, round: Int, roundCount: Int) {
