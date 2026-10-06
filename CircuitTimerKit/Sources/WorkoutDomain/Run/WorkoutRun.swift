@@ -104,14 +104,11 @@ public struct WorkoutRun: Hashable, Sendable {
 
     private mutating func settle(at now: Date) {
         guard case let .running(since) = phase else { return }
-        guard now >= since else {
-            // The system clock went back past the anchor: keep the progress, restart from now.
-            phase = .running(since: now)
-            return
-        }
 
         let elapsed = min(now.elapsed(since: since), schedule.totalDuration - position)
-        // Clamping to `now` keeps `since <= now` when the 1 µs tolerance rounds `elapsed` up.
+        // Clamping the anchor to `now` covers two cases: if the clock went back past the anchor,
+        // `elapsed` is zero and the run re-anchors at `now` keeping its progress; and when the 1 µs
+        // tolerance rounds `elapsed` up, `since` still never ends up after `now`.
         advance(to: position + elapsed, anchor: min(since.adding(elapsed), now))
     }
 
