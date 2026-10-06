@@ -1,0 +1,58 @@
+import DesignSystem
+import SwiftUI
+import WorkoutDomain
+
+/// One stage of the editor: intensity marker, name, duration and, when expanded, the duration picker.
+struct StageRow: View {
+    let stage: Stage
+    let isExpanded: Bool
+    let name: Binding<String>
+    let onIntensityTap: () -> Void
+    let onDurationTap: () -> Void
+    let onDurationChange: (Duration) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
+            HStack(spacing: .token(spacing: .s)) {
+                Button(action: onIntensityTap) {
+                    RoundedRectangle(cornerRadius: .token(radius: .s))
+                        .fill(stage.intensity == .work ? .stage(.work) : .stage(.rest))
+                        .frame(width: .token(spacing: .l), height: .token(spacing: .l))
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(intensityName)
+                .accessibilityHint(Text("editor.stage.intensity.hint", bundle: .module))
+
+                TextField(text: name, prompt: intensityName) {
+                    Text("editor.stage.name", bundle: .module)
+                }
+
+                Button(action: onDurationTap) {
+                    Text(stage.duration.formatted(.time(pattern: .minuteSecond)))
+                        .font(.token(.body))
+                        .monospacedDigit()
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
+                .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
+            }
+
+            if stage.duration == .zero {
+                Text("editor.stage.skipped", bundle: .module)
+                    .font(.token(.caption))
+                    .foregroundStyle(.text(.secondary))
+            }
+
+            if isExpanded {
+                StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
+            }
+        }
+    }
+
+    private var intensityName: Text {
+        switch stage.intensity {
+            case .work: Text("editor.intensity.work", bundle: .module)
+            case .rest: Text("editor.intensity.rest", bundle: .module)
+        }
+    }
+}
