@@ -32,6 +32,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `DesignSystem` | SwiftUI, UIKit | Spacing, radius, typography and color tokens |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature and `AppView` |
+| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
 
 Layering:
 
@@ -99,6 +100,8 @@ public struct SomeFeature: Sendable {
 ## Domain limits
 
 Anything that edits a workout applies `WorkoutLimits.normalizedStages(_:)` and `normalizedTrainingRounds(_:)`, and UI limits match `WorkoutLimits`. Otherwise the user would see stages that never reach the schedule.
+
+A stage name may be empty; anything that displays a stage shows its intensity name instead. Storage keeps the empty name, so the fallback follows the current language.
 
 ## Identifiers
 
