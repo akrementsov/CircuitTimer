@@ -11,11 +11,36 @@ let package = Package(
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
+        .library(name: "AppFeature", targets: ["AppFeature"]),
     ],
     dependencies: [
+        .package(
+            url: "https://github.com/pointfreeco/swift-composable-architecture",
+            from: "1.26.2",
+            traits: ["ComposableArchitecture2Deprecations"]
+        ),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
     ],
     targets: [
+        .target(
+            name: "AppFeature",
+            dependencies: [
+                "DesignSystem",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "AppFeatureTests",
+            dependencies: [
+                "AppFeature",
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "DesignSystem",
             resources: [.process("Resources")],
