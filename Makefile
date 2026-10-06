@@ -26,7 +26,9 @@ lint:
 
 # The local package inside the app project keeps its own lockfile, so both must pin the same versions.
 check-resolved:
-	@package=$$(jq -cS '$(PINS)' $(PACKAGE_RESOLVED)); \
+	@set -eu; \
+	command -v jq >/dev/null || { echo "check-resolved: jq is required" >&2; exit 1; }; \
+	package=$$(jq -cS '$(PINS)' $(PACKAGE_RESOLVED)); \
 	project=$$(jq -cS '$(PINS)' $(PROJECT_RESOLVED)); \
 	if [ "$$package" != "$$project" ]; then \
 		echo "check-resolved: the two Package.resolved files differ; run 'make resolve' and commit both" >&2; exit 1; \
