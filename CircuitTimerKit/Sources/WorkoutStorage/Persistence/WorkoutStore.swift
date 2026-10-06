@@ -31,6 +31,7 @@ actor WorkoutStore {
 
     /// Updates the visible record of `workout`, or appends a new one.
     func save(_ workout: Workout) throws {
+        try validate(workout)
         try write {
             if let model = primaryRecords(in: try allSorted()).model(for: workout.id) {
                 model.update(from: workout, in: modelContext)
@@ -44,7 +45,8 @@ actor WorkoutStore {
     /// in between so the visible order matches the caller's list. Without a visible anchor it appends the
     /// workout and reports `.storeDiverged`.
     func insert(_ workout: Workout, after anchorID: Workout.ID) throws -> WorkoutWriteOutcome {
-        try write {
+        try validate(workout)
+        return try write {
             let all = try allSorted()
             let records = primaryRecords(in: all)
             guard let anchor = records.model(for: anchorID) else {
@@ -111,6 +113,12 @@ actor WorkoutStore {
             }
             return .applied
         }
+    }
+
+    /// Stages are matched by identifier, so a repeated one would be written as a record that never reads back.
+    private func validate(_ workout: Workout) throws(WorkoutStoreError) {
+        let stageIDs = WorkoutSectionKind.allCases.flatMap { workout[$0].map(\.id) }
+        guard Set(stageIDs).count == stageIDs.count else { throw .repeatedStageIDs }
     }
 
     private func write<Value>(_ body: () throws -> Value) throws -> Value {
@@ -239,4 +247,9 @@ private struct PrimaryRecords {
 
         return [primary] + (groups[id] ?? []).filter { $0 !== primary }
     }
+}
+
+enum WorkoutStoreError: Error, Equatable {
+    /// The workout has two stages with the same identifier.
+    case repeatedStageIDs
 }
