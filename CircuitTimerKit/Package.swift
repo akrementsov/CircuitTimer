@@ -10,6 +10,10 @@ let package = Package(
     products: [
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
+        .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
     ],
     targets: [
         .target(
@@ -19,6 +23,15 @@ let package = Package(
         ),
         .target(
             name: "WorkoutDomain",
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "WorkoutStorage",
+            dependencies: [
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
