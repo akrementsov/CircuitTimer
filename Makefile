@@ -4,6 +4,8 @@ BUILD_DESTINATION := generic/platform=iOS Simulator
 HOST_ARCH := $(shell uname -m)
 SOURCE_PACKAGES ?= $(CURDIR)/.build/SourcePackages
 DERIVED_DATA ?= $(CURDIR)/.build/DerivedData
+ARCHIVE_PATH ?= $(CURDIR)/.build/CircuitTimer.xcarchive
+EXPORT_PATH ?= $(CURDIR)/.build/Export
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -19,7 +21,7 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint check-resolved resolve build-package test build-app ci verify-clean
+.PHONY: lint check-resolved resolve build-package test build-app archive upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -53,6 +55,23 @@ build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
+
+# Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
+archive:
+	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
+	xcodebuild archive -project CircuitTimer.xcodeproj -scheme CircuitTimer -configuration Release \
+		-destination 'generic/platform=iOS' -archivePath "$(ARCHIVE_PATH)" \
+		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
+		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
+
+# Signs the archive with a cloud-managed distribution certificate and uploads it to App Store Connect.
+upload:
+	@test -n "$(ASC_KEY_PATH)" -a -n "$(ASC_KEY_ID)" -a -n "$(ASC_ISSUER_ID)" \
+		|| { echo "upload: ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID are required" >&2; exit 1; }
+	xcodebuild -exportArchive -archivePath "$(ARCHIVE_PATH)" \
+		-exportOptionsPlist Configs/ExportOptions.plist -exportPath "$(EXPORT_PATH)" \
+		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
+		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
 ci: lint check-resolved test build-app
 
