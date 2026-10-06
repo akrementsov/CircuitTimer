@@ -7,7 +7,8 @@ import Testing
 /// 0 work 0–10 s, 1 rest 10–15 s, 2 manual pause at 15 s, 3 work 15–25 s.
 @Suite
 struct WorkoutRunTransitionTests {
-    private let later = moment(3_600)
+    /// A year later: time does not flow while paused or waiting for the user.
+    private let later = moment(31_536_000)
 
     @Test
     func test_operations_emptySchedule_leaveRunFinished() {
@@ -53,7 +54,7 @@ struct WorkoutRunTransitionTests {
         (.start, RunState(.paused, cursor: 0, position: .seconds(3))),
         (.pause, RunState(.paused, cursor: 0, position: .seconds(3))),
         (.rebase(.seconds(7)), RunState(.paused, cursor: 0, position: .seconds(3))),
-        (.resume, RunState(.running(since: moment(3_600)), cursor: 0, position: .seconds(3))),
+        (.resume, RunState(.running(since: moment(31_536_000)), cursor: 0, position: .seconds(3))),
         (.skip, RunState(.paused, cursor: 1, position: .seconds(10))),
     ])
     func test_operations_paused_followTableWhileTimeDoesNotFlow(operation: RunOperation, expected: RunState) {
@@ -68,8 +69,8 @@ struct WorkoutRunTransitionTests {
         (.start, RunState(.awaitingUser, cursor: 2, position: .seconds(15))),
         (.pause, RunState(.awaitingUser, cursor: 2, position: .seconds(15))),
         (.rebase(.seconds(20)), RunState(.awaitingUser, cursor: 2, position: .seconds(15))),
-        (.resume, RunState(.running(since: moment(3_600)), cursor: 3, position: .seconds(15))),
-        (.skip, RunState(.running(since: moment(3_600)), cursor: 3, position: .seconds(15))),
+        (.resume, RunState(.running(since: moment(31_536_000)), cursor: 3, position: .seconds(15))),
+        (.skip, RunState(.running(since: moment(31_536_000)), cursor: 3, position: .seconds(15))),
     ])
     func test_operations_awaitingUser_onlyResumeAndSkipLeaveThePause(operation: RunOperation, expected: RunState) {
         var awaiting = RunOperation.start.applied(to: makeRun(makePausedWorkout()), at: origin)

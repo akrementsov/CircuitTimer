@@ -78,6 +78,7 @@ struct WorkoutScheduleTests {
         let first = try #require(schedule.stages.first)
 
         #expect(schedule.next(after: other.stages[0]) == nil)
+        #expect(schedule.next(after: renamed(schedule.stages[1])) == nil)
         #expect(schedule.next(after: withIndex(first, -1)) == nil)
         #expect(schedule.next(after: withIndex(first, 99)) == nil)
         #expect(WorkoutSchedule(workout: Workout(id: UUID(fixture: 2))).next(after: first) == nil)
@@ -130,6 +131,20 @@ struct WorkoutScheduleTests {
             roundCount: place.roundCount,
             start: .seconds(seconds.lowerBound),
             duration: .seconds(seconds.upperBound - seconds.lowerBound)
+        )
+    }
+
+    private func renamed(_ stage: ScheduledStage) -> ScheduledStage {
+        ScheduledStage(
+            index: stage.index,
+            stageID: stage.stageID,
+            name: "Renamed",
+            kind: stage.kind,
+            section: stage.section,
+            round: stage.round,
+            roundCount: stage.roundCount,
+            start: stage.start,
+            duration: stage.duration
         )
     }
 

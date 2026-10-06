@@ -28,6 +28,20 @@ struct WorkoutRunPropertyTests {
     }
 
     @Test
+    func test_manyOneSecondTicks_matchSingleTickWithinOneMillisecond() {
+        let longStages = (1...10).map { makeStage($0, .seconds(5_999)) }
+        var ticked = RunOperation.start.applied(to: makeRun(Workout(id: UUID(fixture: 0), warmUp: longStages)), at: origin)
+        let untouched = ticked
+        for second in 1...50_000 {
+            ticked.tick(at: moment(Double(second)))
+        }
+
+        let single = RunOperation.tick.applied(to: untouched, at: moment(50_000))
+        let difference = ticked.position > single.position ? ticked.position - single.position : single.position - ticked.position
+        #expect(difference <= .milliseconds(1), "positions differ by \(difference)")
+    }
+
+    @Test
     func test_manyIrregularTicks_stayWithinAboutOneMillisecondOfRealTime() {
         var generator = SeededGenerator(seed: 0xD21F7)
         let longStages = (1...10).map { makeStage($0, .seconds(5_999)) }
