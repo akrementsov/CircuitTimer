@@ -1,0 +1,151 @@
+excluded:
+  - .build
+  - CircuitTimerKit/.build
+  - DerivedData
+
+allow_zero_lintable_files: true
+
+disabled_rules:
+  - todo # replaced by the todo_with_ticket custom rule
+  - nesting # TCA features nest State/Action/View enums by design
+  - trailing_comma
+
+opt_in_rules:
+  - closure_body_length
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - explicit_init
+  - fatal_error_message
+  - final_test_case
+  - first_where
+  - flatmap_over_map_reduce
+  - identical_operands
+  - joined_default_parameter
+  - last_where
+  - literal_expression_end_indentation
+  - lower_acl_than_parent
+  - modifier_order
+  - multiline_arguments
+  - multiline_arguments_brackets
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - multiline_parameters_brackets
+  - operator_usage_whitespace
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - private_over_fileprivate
+  - private_swiftui_state
+  - redundant_nil_coalescing
+  - redundant_sendable
+  - reduce_into
+  - shorthand_optional_binding
+  - sorted_first_last
+  - sorted_imports
+  - static_over_final_class
+  - toggle_bool
+  - unhandled_throwing_task
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+line_length:
+  warning: 140
+  ignores_interpolated_strings: true
+
+file_length:
+  warning: 750
+
+type_body_length:
+  warning: 500
+
+function_body_length:
+  warning: 150
+
+closure_body_length:
+  warning: 150
+
+cyclomatic_complexity:
+  warning: 20
+  ignores_case_statements: true
+
+identifier_name:
+  excluded:
+    - id
+    - xs
+    - s
+    - m
+    - l
+    - xl
+
+switch_case_alignment:
+  indented_cases: true
+
+sorted_imports:
+  grouping: attributes
+
+custom_rules:
+  no_literal_color:
+    name: Literal color
+    regex: '(Color\((red|white|hue):|UIColor\(red:|#colorLiteral)'
+    excluded: '/Sources/DesignSystem/'
+    message: Use DesignSystem color tokens instead of literal colors.
+    severity: error
+
+  no_literal_font_size:
+    name: Literal font size
+    regex: '(\.system\(size:|Font\.custom\()'
+    excluded: '/Sources/DesignSystem/'
+    message: Use DesignSystem typography tokens instead of literal font sizes.
+    severity: error
+
+  no_print:
+    name: Print
+    regex: '\bprint\('
+    match_kinds:
+      - identifier
+    message: Use os.Logger instead of print.
+    severity: error
+
+  no_dispatch_main_async:
+    name: DispatchQueue.main
+    regex: 'DispatchQueue\.main\.async'
+    message: Use @MainActor or MainActor.run instead of DispatchQueue.main.
+    severity: error
+
+  no_direct_date:
+    name: Direct date
+    regex: '\bDate\(\)|\bDate\.now\b'
+    excluded: '/Tests/'
+    message: Read time through @Dependency(\.date) or pass it as a parameter.
+    severity: error
+
+  no_direct_uuid:
+    name: Direct UUID
+    regex: '\bUUID\(\)'
+    excluded: '/Tests/'
+    message: Generate identifiers through @Dependency(\.uuid).
+    severity: error
+
+  no_unstructured_task:
+    name: Unstructured task
+    regex: '\bTask\s*\{'
+    included: '/Sources/'
+    message: Use a TCA effect instead of an unstructured Task.
+    severity: error
+
+  todo_with_ticket:
+    name: TODO without ticket
+    regex: '\b(TODO|FIXME)\b(?!: \[CT-\d+\])'
+    match_kinds:
+      - comment
+    message: 'Reference a ticket: // TODO: [CT-123] ...'
+    severity: error
