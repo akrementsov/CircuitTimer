@@ -95,16 +95,16 @@ sorted_imports:
 custom_rules:
   no_literal_color:
     name: Literal color
-    regex: '(Color\((red|white|hue):|UIColor\(red:|#colorLiteral)'
+    regex: '(\bColor\((red|white|hue|\.sRGB|\.displayP3|uiColor)\b|\bUIColor\b|#colorLiteral|\bColor\.\w+|\.(foregroundStyle|foregroundColor|tint|background|fill|stroke)\(\.(red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|white|gray|black|clear|primary|secondary|tertiary)\b)'
     excluded: '/Sources/DesignSystem/'
-    message: Use DesignSystem color tokens instead of literal colors.
+    message: Use DesignSystem color tokens instead of literal or system colors.
     severity: error
 
-  no_literal_font_size:
-    name: Literal font size
-    regex: '(\.system\(size:|Font\.custom\()'
+  no_literal_font:
+    name: Literal font
+    regex: '(\.system\(size:|\bFont\.(custom|system)\(|\.font\(\.(?!token\())'
     excluded: '/Sources/DesignSystem/'
-    message: Use DesignSystem typography tokens instead of literal font sizes.
+    message: Use DesignSystem typography tokens, .font(.token(_:)), instead of system or literal fonts.
     severity: error
 
   no_print:
@@ -137,7 +137,7 @@ custom_rules:
 
   no_unstructured_task:
     name: Unstructured task
-    regex: '\bTask\s*\{'
+    regex: '\bTask(\.detached)?\s*(\([^)]*\))?\s*\{'
     included: '/Sources/'
     message: Use a TCA effect instead of an unstructured Task.
     severity: error
