@@ -9,8 +9,14 @@ let package = Package(
     platforms: [.iOS(.v17)],
     products: [
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
+        .library(name: "DesignSystem", targets: ["DesignSystem"]),
     ],
     targets: [
+        .target(
+            name: "DesignSystem",
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "WorkoutDomain",
             swiftSettings: strictSettings
