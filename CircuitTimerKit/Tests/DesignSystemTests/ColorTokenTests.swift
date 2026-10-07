@@ -28,11 +28,12 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
     case stage(DesignSystem.Token.StageColor)
     case brand
     case danger
+    case secondaryAction
 
     static let all: [ColorToken] = DesignSystem.Token.TextColor.allCases.map(ColorToken.text)
         + DesignSystem.Token.SurfaceColor.allCases.map(ColorToken.surface)
         + DesignSystem.Token.StageColor.allCases.map(ColorToken.stage)
-        + [.brand, .danger]
+        + [.brand, .danger, .secondaryAction]
 
     var color: Color {
         switch self {
@@ -46,6 +47,8 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 .brand
             case .danger:
                 .danger
+            case .secondaryAction:
+                .secondaryAction
         }
     }
 
@@ -66,6 +69,8 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 Palette.cyan
             case .danger:
                 Palette.danger
+            case .secondaryAction:
+                Palette.secondaryAction
         }
     }
 
@@ -81,6 +86,8 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 "brand"
             case .danger:
                 "danger"
+            case .secondaryAction:
+                "secondaryAction"
         }
     }
 }
@@ -99,4 +106,5 @@ enum Palette {
     static let accent = Value(red: 0.906, green: 0.996, blue: 0.329)
     static let cyan = Value(red: 0.400, green: 0.929, blue: 1)
     static let danger = Value(red: 1, green: 0.118, blue: 0.118)
+    static let secondaryAction = Value(red: 0.286, green: 0.286, blue: 0.310)
 }

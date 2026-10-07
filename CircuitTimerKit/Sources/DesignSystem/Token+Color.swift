@@ -61,4 +61,9 @@ extension ShapeStyle where Self == Color {
     public static var danger: Color {
         Color("Danger", bundle: .module)
     }
+
+    /// Fill of non-destructive actions next to `danger` ones; white glyphs stay readable on it.
+    public static var secondaryAction: Color {
+        Color("SecondaryAction", bundle: .module)
+    }
 }

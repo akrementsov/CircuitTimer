@@ -97,7 +97,7 @@ public struct AppView: View {
                                 }
                                 .labelStyle(.iconOnly)
                             }
-                            .tint(.text(.secondary))
+                            .tint(.secondaryAction)
                         }
                         .workoutListRow()
                         .accessibilityLabel(WorkoutRow.title(for: workout))
