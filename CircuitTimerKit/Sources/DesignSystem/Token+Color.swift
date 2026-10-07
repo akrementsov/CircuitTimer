@@ -14,7 +14,7 @@ extension DesignSystem.Token {
     public enum StageColor: Sendable, CaseIterable {
         case work
         case rest
-        /// Equals `surface(.card)`: it fills the full-screen timer and is never drawn on a card.
+        /// The `surface(.card)` asset: it fills the full-screen timer and is never drawn on a card.
         case pause
     }
 }
@@ -49,7 +49,7 @@ extension ShapeStyle where Self == Color {
             case .rest:
                 Color("StageRest", bundle: .module)
             case .pause:
-                Color("StagePause", bundle: .module)
+                Color("SurfaceCard", bundle: .module)
         }
     }
 

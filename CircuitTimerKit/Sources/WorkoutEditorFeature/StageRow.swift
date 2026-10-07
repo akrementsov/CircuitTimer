@@ -26,6 +26,7 @@ struct StageRow: View {
                 TextField(text: name, prompt: intensityName) {
                     Text("editor.stage.name", bundle: .module)
                 }
+                .font(.token(.body))
 
                 Button(action: onDurationTap) {
                     Text(stage.duration.formatted(.time(pattern: .minuteSecond)))
