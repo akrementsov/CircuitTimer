@@ -126,9 +126,9 @@ struct AppFeatureTests {
         #expect(callCount.value == 2)
     }
 
-    /// A superseded load that ignores cancellation and fails later must not overwrite the newer result.
-    @Test
-    func test_retry_supersededLoadFailingLate_doesNotReportFailure() async {
+    /// A superseded load that ignores cancellation and finishes later, failing or not, must not overwrite the newer result.
+    @Test(arguments: [true, false])
+    func test_retry_supersededLoadFinishingLate_keepsNewerResult(lateLoadFails: Bool) async {
         let callCount = LockIsolated(0)
         let store = TestStore(initialState: AppFeature.State()) {
             AppFeature()
@@ -140,7 +140,10 @@ struct AppFeatureTests {
                 }
                 if call == 1 {
                     _ = try? await Task.never()
-                    throw LoadingFailure()
+                    if lateLoadFails {
+                        throw LoadingFailure()
+                    }
+                    return StoredWorkouts(workouts: [], hiddenRecordCount: 1)
                 }
                 return StoredWorkouts(workouts: [.sample])
             }
