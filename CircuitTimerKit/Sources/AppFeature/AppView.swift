@@ -140,7 +140,7 @@ private struct WorkoutRow: View {
     let workout: Workout
 
     var body: some View {
-        HStack(spacing: .token(spacing: .s)) {
+        HStack(spacing: .token(spacing: .m)) {
             Text(workout.name)
                 .font(.token(.headline))
                 .foregroundStyle(.text(.primary))

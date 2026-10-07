@@ -13,11 +13,11 @@ struct StageRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
-            HStack(spacing: .token(spacing: .s)) {
+            HStack(spacing: .token(spacing: .m)) {
                 Button(action: onIntensityTap) {
                     RoundedRectangle(cornerRadius: .token(radius: .s))
                         .fill(intensityColor)
-                        .frame(width: .token(spacing: .l), height: .token(spacing: .l))
+                        .frame(width: .token(spacing: .xxl), height: .token(spacing: .xxl))
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(intensityName)
@@ -39,7 +39,7 @@ struct StageRow: View {
 
             if stage.duration == .zero {
                 Text("editor.stage.skipped", bundle: .module)
-                    .font(.token(.caption))
+                    .font(.token(.footnote))
                     .foregroundStyle(.text(.secondary))
             }
 
