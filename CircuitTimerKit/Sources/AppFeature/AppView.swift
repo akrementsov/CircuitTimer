@@ -1,4 +1,3 @@
-import Accessibility
 import ComposableArchitecture
 import DesignSystem
 import Foundation
@@ -107,8 +106,6 @@ public struct AppView: View {
                             if workouts.indexMovableUp(workout.id) != nil {
                                 Button {
                                     send(.workoutMovedUp(workout.id))
-                                    // The focused row moves with the workout, so VoiceOver would say nothing.
-                                    AccessibilityNotification.Announcement(String(localized: "workouts.moved.up", bundle: .module)).post()
                                 } label: {
                                     Text("workouts.moveUp", bundle: .module)
                                 }
@@ -116,7 +113,6 @@ public struct AppView: View {
                             if workouts.indexMovableDown(workout.id) != nil {
                                 Button {
                                     send(.workoutMovedDown(workout.id))
-                                    AccessibilityNotification.Announcement(String(localized: "workouts.moved.down", bundle: .module)).post()
                                 } label: {
                                     Text("workouts.moveDown", bundle: .module)
                                 }

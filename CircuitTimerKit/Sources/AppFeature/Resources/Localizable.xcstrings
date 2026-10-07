@@ -197,38 +197,6 @@
         }
       }
     },
-    "workouts.moved.down" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Moved down"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перемещено ниже"
-          }
-        }
-      }
-    },
-    "workouts.moved.up" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Moved up"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перемещено выше"
-          }
-        }
-      }
-    },
     "workouts.mutationFailed.title" : {
       "localizations" : {
         "en" : {
