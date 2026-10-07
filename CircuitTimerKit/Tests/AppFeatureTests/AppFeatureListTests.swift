@@ -56,18 +56,17 @@ struct AppFeatureListTests {
     }
 
     @Test(arguments: [
-        (AppFeature.Content.idle, false, false),
-        (.loading, false, false),
-        (.failed, false, false),
-        (.loaded([]), true, false),
-        (.loaded([makeWorkout(1)]), true, true),
+        (AppFeature.Content.idle, false),
+        (.loading, false),
+        (.failed, false),
+        (.loaded([]), true),
+        (.loaded([makeWorkout(1)]), true),
     ])
-    func test_listFlags_followContent(content: AppFeature.Content, canAdd: Bool, canEdit: Bool) {
+    func test_listFlags_followContent(content: AppFeature.Content, canAdd: Bool) {
         var state = AppFeature.State()
         state.workouts = content
 
         #expect(state.canAddWorkout == canAdd)
-        #expect(state.canEditList == canEdit)
     }
 
     @Test

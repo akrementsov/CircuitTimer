@@ -42,10 +42,6 @@ public struct AppFeature: Sendable {
         public var canAddWorkout: Bool {
             if case .loaded = workouts { true } else { false }
         }
-
-        public var canEditList: Bool {
-            if case let .loaded(workouts) = workouts { !workouts.isEmpty } else { false }
-        }
     }
 
     public enum Content: Equatable, Sendable {
@@ -69,6 +65,8 @@ public struct AppFeature: Sendable {
             case deleteButtonTapped(Workout.ID)
             case duplicateButtonTapped(Workout.ID)
             case workoutsMoved(IndexSet, Int)
+            case workoutMovedUp(Workout.ID)
+            case workoutMovedDown(Workout.ID)
         }
 
         @CasePathable
@@ -138,12 +136,33 @@ public struct AppFeature: Sendable {
                 state.workouts = .loaded(workouts)
                 return enqueue(.insert(copy, after: id), &state)
             case let .workoutsMoved(source, destination):
-                guard case var .loaded(workouts) = state.workouts else { return .none }
+                return move(source, to: destination, &state)
+            case let .workoutMovedUp(id):
+                guard
+                    case let .loaded(workouts) = state.workouts,
+                    workouts.canMoveUp(id),
+                    let index = workouts.index(id: id)
+                else { return .none }
 
-                workouts.move(fromOffsets: source, toOffset: destination)
-                state.workouts = .loaded(workouts)
-                return enqueue(.reorder(Array(workouts.ids)), &state)
+                return move(IndexSet(integer: index), to: index - 1, &state)
+            case let .workoutMovedDown(id):
+                guard
+                    case let .loaded(workouts) = state.workouts,
+                    workouts.canMoveDown(id),
+                    let index = workouts.index(id: id)
+                else { return .none }
+
+                // `move(fromOffsets:toOffset:)` counts the destination before removal.
+                return move(IndexSet(integer: index), to: index + 2, &state)
         }
+    }
+
+    private func move(_ source: IndexSet, to destination: Int, _ state: inout State) -> Effect<Action> {
+        guard case var .loaded(workouts) = state.workouts else { return .none }
+
+        workouts.move(fromOffsets: source, toOffset: destination)
+        state.workouts = .loaded(workouts)
+        return enqueue(.reorder(Array(workouts.ids)), &state)
     }
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
@@ -284,5 +303,20 @@ extension AlertState where Action == Never {
         AlertState {
             TextState("workouts.mutationFailed.title", bundle: .module)
         }
+    }
+}
+
+extension IdentifiedArray where Element == Workout, ID == Workout.ID {
+    /// The list and VoiceOver's move actions share one edge rule.
+    func canMoveUp(_ id: Workout.ID) -> Bool {
+        guard let index = index(id: id) else { return false }
+
+        return index > startIndex
+    }
+
+    func canMoveDown(_ id: Workout.ID) -> Bool {
+        guard let index = index(id: id) else { return false }
+
+        return index < endIndex - 1
     }
 }

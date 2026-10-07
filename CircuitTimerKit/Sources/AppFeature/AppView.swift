@@ -18,11 +18,6 @@ public struct AppView: View {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
                 .toolbar {
-                    if store.canEditList {
-                        ToolbarItem(placement: .topBarLeading) {
-                            EditButton()
-                        }
-                    }
                     if store.canAddWorkout {
                         ToolbarItem(placement: .primaryAction) {
                             Button {
@@ -101,6 +96,24 @@ public struct AppView: View {
                         .workoutListRow()
                         .accessibilityLabel(WorkoutRow.title(for: workout))
                         .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
+                        // Reads the list above, not `store.state`: a row observing the whole state is redrawn
+                        // while a drag settles and shows the wrong workout.
+                        .accessibilityActions {
+                            if workouts.canMoveUp(workout.id) {
+                                Button {
+                                    send(.workoutMovedUp(workout.id))
+                                } label: {
+                                    Text("workouts.moveUp", bundle: .module)
+                                }
+                            }
+                            if workouts.canMoveDown(workout.id) {
+                                Button {
+                                    send(.workoutMovedDown(workout.id))
+                                } label: {
+                                    Text("workouts.moveDown", bundle: .module)
+                                }
+                            }
+                        }
                     }
                     .onMove { send(.workoutsMoved($0, $1)) }
                     if store.hiddenRecordCount > 0 {
