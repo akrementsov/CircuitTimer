@@ -244,7 +244,8 @@ struct AppFeatureListTests {
     @Test
     func test_divergence_reloadsOnceTheQueueDrains() async {
         let clock = TestClock()
-        let store = makeStore(loaded([first, second])) {
+        let third = makeWorkout(3)
+        let store = makeStore(loaded([first, second, third])) {
             $0.workoutStorage.delete = { _ in
                 try await clock.sleep(for: .seconds(1))
                 return .storeDiverged
@@ -257,15 +258,16 @@ struct AppFeatureListTests {
         }
 
         await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([self.second])
+            $0.workouts = .loaded([self.second, third])
             $0.pendingMutations = [.delete(self.first.id)]
         }
-        await store.send(.view(.workoutsMoved(IndexSet(integer: 0), 1))) {
-            $0.pendingMutations = [.delete(self.first.id), .reorder([self.second.id])]
+        await store.send(.view(.workoutsMoved(IndexSet(integer: 1), 0))) {
+            $0.workouts = .loaded([third, self.second])
+            $0.pendingMutations = [.delete(self.first.id), .reorder([third.id, self.second.id])]
         }
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFinished) {
-            $0.pendingMutations = [.reorder([self.second.id])]
+            $0.pendingMutations = [.reorder([third.id, self.second.id])]
             $0.needsReload = true
         }
         await clock.advance(by: .seconds(1))
@@ -283,7 +285,8 @@ struct AppFeatureListTests {
     func test_writeFailure_dropsQueueShowsAlertAndReloads() async {
         let clock = TestClock()
         let reorderCalls = LockIsolated(0)
-        var state = loaded([first, second])
+        let third = makeWorkout(3)
+        var state = loaded([first, second, third])
         state.deferredEditor = .create
         let store = makeStore(state) {
             $0.workoutStorage.delete = { _ in
@@ -298,11 +301,12 @@ struct AppFeatureListTests {
         }
 
         await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([self.second])
+            $0.workouts = .loaded([self.second, third])
             $0.pendingMutations = [.delete(self.first.id)]
         }
-        await store.send(.view(.workoutsMoved(IndexSet(integer: 0), 1))) {
-            $0.pendingMutations = [.delete(self.first.id), .reorder([self.second.id])]
+        await store.send(.view(.workoutsMoved(IndexSet(integer: 1), 0))) {
+            $0.workouts = .loaded([third, self.second])
+            $0.pendingMutations = [.delete(self.first.id), .reorder([third.id, self.second.id])]
         }
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFailed) {

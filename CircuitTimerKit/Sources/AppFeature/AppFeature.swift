@@ -136,33 +136,31 @@ public struct AppFeature: Sendable {
                 state.workouts = .loaded(workouts)
                 return enqueue(.insert(copy, after: id), &state)
             case let .workoutsMoved(source, destination):
-                return move(source, to: destination, &state)
+                guard case var .loaded(workouts) = state.workouts else { return .none }
+
+                let order = workouts.ids
+                workouts.move(fromOffsets: source, toOffset: destination)
+                // A drop in place still reports a move; there is nothing to write.
+                guard workouts.ids != order else { return .none }
+
+                return reorder(workouts, &state)
             case let .workoutMovedUp(id):
                 guard
-                    case let .loaded(workouts) = state.workouts,
-                    workouts.canMoveUp(id),
-                    let index = workouts.index(id: id)
+                    case var .loaded(workouts) = state.workouts,
+                    let index = workouts.indexMovableUp(id)
                 else { return .none }
 
-                return move(IndexSet(integer: index), to: index - 1, &state)
+                workouts.swapAt(index, index - 1)
+                return reorder(workouts, &state)
             case let .workoutMovedDown(id):
                 guard
-                    case let .loaded(workouts) = state.workouts,
-                    workouts.canMoveDown(id),
-                    let index = workouts.index(id: id)
+                    case var .loaded(workouts) = state.workouts,
+                    let index = workouts.indexMovableDown(id)
                 else { return .none }
 
-                // `move(fromOffsets:toOffset:)` counts the destination before removal.
-                return move(IndexSet(integer: index), to: index + 2, &state)
+                workouts.swapAt(index, index + 1)
+                return reorder(workouts, &state)
         }
-    }
-
-    private func move(_ source: IndexSet, to destination: Int, _ state: inout State) -> Effect<Action> {
-        guard case var .loaded(workouts) = state.workouts else { return .none }
-
-        workouts.move(fromOffsets: source, toOffset: destination)
-        state.workouts = .loaded(workouts)
-        return enqueue(.reorder(Array(workouts.ids)), &state)
     }
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
@@ -227,6 +225,11 @@ public struct AppFeature: Sendable {
                 state.destination = .editor(WorkoutEditorFeature.State(editing: workout))
         }
         return .none
+    }
+
+    private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
+        state.workouts = .loaded(workouts)
+        return enqueue(.reorder(Array(workouts.ids)), &state)
     }
 
     private func enqueue(_ mutation: ListMutation, _ state: inout State) -> Effect<Action> {
@@ -306,18 +309,19 @@ extension AlertState where Action == Never {
     }
 }
 
-extension IdentifiedArray where Element == Workout, ID == Workout.ID {
-    /// The list and VoiceOver's move actions share one edge rule.
-    func canMoveUp(_ id: Workout.ID) -> Bool {
-        guard let index = index(id: id) else { return false }
+/// One edge rule for the reducer and the rows' VoiceOver move actions:
+/// the index of `id` when it can move one place, otherwise `nil`.
+extension IdentifiedArray {
+    func indexMovableUp(_ id: ID) -> Int? {
+        guard let index = index(id: id), index > startIndex else { return nil }
 
-        return index > startIndex
+        return index
     }
 
-    func canMoveDown(_ id: Workout.ID) -> Bool {
-        guard let index = index(id: id) else { return false }
+    func indexMovableDown(_ id: ID) -> Int? {
+        guard let index = index(id: id), index < endIndex - 1 else { return nil }
 
-        return index < endIndex - 1
+        return index
     }
 }
 

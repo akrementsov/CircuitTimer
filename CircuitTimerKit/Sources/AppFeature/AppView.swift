@@ -1,3 +1,4 @@
+import Accessibility
 import ComposableArchitecture
 import DesignSystem
 import Foundation
@@ -102,19 +103,22 @@ public struct AppView: View {
                         .workoutListRow()
                         .accessibilityLabel(Text(workout.displayName))
                         .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
-                        // Reads the list above, not `store.state`: a row observing the whole state is redrawn
-                        // while a drag settles and shows the wrong workout.
+                        // Rows read only the list captured above: a row that reads the store observes `workouts`
+                        // on its own and is redrawn apart from the list while a drag settles, showing the wrong workout.
                         .accessibilityActions {
-                            if workouts.canMoveUp(workout.id) {
+                            if workouts.indexMovableUp(workout.id) != nil {
                                 Button {
                                     send(.workoutMovedUp(workout.id))
+                                    // The focused row moves with the workout, so VoiceOver would say nothing.
+                                    AccessibilityNotification.Announcement(String(localized: "workouts.moved.up", bundle: .module)).post()
                                 } label: {
                                     Text("workouts.moveUp", bundle: .module)
                                 }
                             }
-                            if workouts.canMoveDown(workout.id) {
+                            if workouts.indexMovableDown(workout.id) != nil {
                                 Button {
                                     send(.workoutMovedDown(workout.id))
+                                    AccessibilityNotification.Announcement(String(localized: "workouts.moved.down", bundle: .module)).post()
                                 } label: {
                                     Text("workouts.moveDown", bundle: .module)
                                 }
