@@ -100,7 +100,7 @@ public struct AppView: View {
                             .tint(.secondaryAction)
                         }
                         .workoutListRow()
-                        .accessibilityLabel(WorkoutRow.title(for: workout))
+                        .accessibilityLabel(Text(workout.displayName))
                         .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
                         // Reads the list above, not `store.state`: a row observing the whole state is redrawn
                         // while a drag settles and shows the wrong workout.
@@ -212,7 +212,7 @@ private struct WorkoutRow: View {
     private var inline: some View {
         HStack(spacing: .token(spacing: .l)) {
             // The ideal width is capped so a long name truncates instead of pushing the time under it.
-            Self.title(for: workout)
+            Text(workout.displayName)
                 .font(.token(.body))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -224,7 +224,7 @@ private struct WorkoutRow: View {
 
     private var stacked: some View {
         VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
-            Self.title(for: workout)
+            Text(workout.displayName)
                 .font(.token(.body))
                 .lineLimit(2)
             time
@@ -242,14 +242,6 @@ private struct WorkoutRow: View {
                 .monospacedDigit()
             Image(systemName: "clock")
                 .font(.token(.icon))
-        }
-    }
-
-    static func title(for workout: Workout) -> Text {
-        if workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Text("workouts.untitled", bundle: .module)
-        } else {
-            Text(workout.name)
         }
     }
 

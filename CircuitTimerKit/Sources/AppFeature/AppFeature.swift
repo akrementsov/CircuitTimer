@@ -256,7 +256,7 @@ public struct AppFeature: Sendable {
     }
 
     private func duplicate(_ workout: Workout) -> Workout {
-        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module))
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
         copy.trainingRounds = workout.trainingRounds
         copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
         copy.pauseAfterTraining = workout.pauseAfterTraining
@@ -318,5 +318,15 @@ extension IdentifiedArray where Element == Workout, ID == Workout.ID {
         guard let index = index(id: id) else { return false }
 
         return index < endIndex - 1
+    }
+}
+
+extension Workout {
+    /// The name the list shows, and the base of a copy's name: a blank name reads as "Untitled workout"
+    /// in the current language, while storage keeps it blank.
+    var displayName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? String(localized: "workouts.untitled", bundle: .module)
+            : name
     }
 }
