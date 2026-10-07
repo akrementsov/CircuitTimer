@@ -212,6 +212,22 @@
           }
         }
       }
+    },
+    "workouts.untitled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка без названия"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

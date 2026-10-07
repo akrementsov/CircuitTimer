@@ -77,6 +77,8 @@ public struct AppView: View {
                             } label: {
                                 WorkoutRow(workout: workout)
                             }
+                            .accessibilityLabel(WorkoutRow.title(for: workout))
+                            .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
                             .swipeActions {
                                 rowActions(for: workout.id)
                             }
@@ -141,20 +143,36 @@ private struct WorkoutRow: View {
 
     var body: some View {
         HStack(spacing: .token(spacing: .m)) {
-            Text(workout.name)
+            Self.title(for: workout)
                 .font(.token(.headline))
                 .foregroundStyle(.text(.primary))
             Spacer()
-            Text(duration)
-                .font(.token(.body))
-                .monospacedDigit()
-                .foregroundStyle(.text(.secondary))
+            HStack(spacing: .token(spacing: .xs)) {
+                Text(workout.totalDuration.clockText(.hoursMinutesSeconds))
+                    .font(.token(.body))
+                    .monospacedDigit()
+                Image(systemName: "clock")
+                    .font(.token(.icon))
+            }
+            .foregroundStyle(.text(.primary))
         }
         .padding(.vertical, .token(spacing: .xxs))
     }
 
-    private var duration: String {
-        workout.totalDuration.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
+    static func title(for workout: Workout) -> Text {
+        if workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Text("workouts.untitled", bundle: .module)
+        } else {
+            Text(workout.name)
+        }
+    }
+
+    /// VoiceOver reads units in the user's language instead of the clock digits.
+    static func spokenDuration(of workout: Workout) -> Text {
+        Text(
+            workout.totalDuration,
+            format: .units(allowed: [.hours, .minutes, .seconds], width: .wide, fractionalPart: .hide(rounded: .down))
+        )
     }
 }
 
