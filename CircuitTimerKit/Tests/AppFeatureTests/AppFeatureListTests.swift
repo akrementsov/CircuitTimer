@@ -169,9 +169,8 @@ struct AppFeatureListTests {
         #expect(copy.training.map(\.intensity) == [.rest])
         #expect(copy.trainingRounds == 4)
         #expect(copy.pauseAfterWarmUp)
-        #expect(copy.name.contains(original.name))
-        #expect(copy.name != original.name)
-        #expect(!copy.name.contains("workouts.duplicate"))
+        // `make test` runs in English, so the catalog's English variant applies.
+        #expect(copy.name == "Workout copy")
         let call = try #require(inserted.value.first)
         #expect(call.0 == copy)
         #expect(call.1 == original.id)

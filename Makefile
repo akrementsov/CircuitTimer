@@ -44,9 +44,10 @@ build-package:
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS)
 
+# Tests run in English so assertions on localized text do not depend on the machine's language.
 test:
 	cd CircuitTimerKit && $(STRICT) xcodebuild test -scheme CircuitTimerKit-Package \
-		-destination '$(DESTINATION)' \
+		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
 		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS)
 
 build-app:
