@@ -60,6 +60,29 @@ struct WorkoutScheduleTests {
         }
     }
 
+    /// The editor hides a pause toggle by the same rule the schedule uses to keep the pause.
+    @Test(arguments: PauseCase.all)
+    func test_canPause_matchesPausesKeptWithFlagsOn(_ pauseCase: PauseCase) {
+        var flagged = pauseCase.workout
+        flagged.pauseAfterWarmUp = true
+        flagged.pauseAfterTraining = true
+
+        let kept = WorkoutSchedule(workout: flagged).stages.filter { $0.kind == .pause }.map(\.section)
+
+        #expect(pauseCase.workout.canPauseAfterWarmUp == kept.contains(.warmUp))
+        #expect(pauseCase.workout.canPauseAfterTraining == kept.contains(.training))
+    }
+
+    @Test
+    func test_trainingRoundsToPlay_emptyTrainingPlaysNoRounds() {
+        #expect(Workout.trainingRoundsToPlay(training: [], rounds: 5) == 0)
+        #expect(Workout.trainingRoundsToPlay(training: [makeStage(1, .seconds(10))], rounds: 5) == 5)
+        #expect(
+            Workout.trainingRoundsToPlay(training: [makeStage(1, .seconds(10))], rounds: WorkoutLimits.maxTrainingRounds + 1)
+                == WorkoutLimits.maxTrainingRounds
+        )
+    }
+
     @Test
     func test_nextAfter_stagesOfThisSchedule_returnFollowingStage() throws {
         let stages = WorkoutSchedule(workout: makePausedWorkout()).stages
@@ -221,5 +244,6 @@ struct PauseCase: Sendable, CustomStringConvertible {
         PauseCase("sub-millisecond training", [.warmUp, .subMillisecondTraining, .coolDown], rounds: 5, pausesAfter: [.warmUp]),
         PauseCase("no cool-down", [.warmUp, .training], pausesAfter: [.warmUp]),
         PauseCase("empty workout", [], pausesAfter: []),
+        PauseCase("empty workout, zero rounds", [], rounds: 0, pausesAfter: []),
     ]
 }
