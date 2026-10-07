@@ -6,7 +6,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 1. **Platform:** iOS 17+, Swift 6 language mode with complete strict concurrency, Xcode 26.5.
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved`; never assume an API exists.
-3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the legacy palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together. The launch screen lives in `Configs/Info.plist`, which Xcode merges with the generated keys; the file is not a member of any target — Copy Bundle Resources would conflict with the generated plist.
+3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the original app's palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`; how the widget and Live Activity follow the system theme is decided in CT-4. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions.
 6. **Every commit passes `make verify-clean`.**
@@ -66,6 +66,7 @@ Layering:
 
 - CI pins Xcode 26.5. After switching Xcode run `make resolve` and `make check-resolved`, then commit **both** `Package.resolved` files: newer Swift tools pick different package manifests and resolve a different graph.
 - Warnings are errors everywhere we control them. The app target sets `SWIFT_TREAT_WARNINGS_AS_ERRORS`. The package turns on `.treatAllWarnings(as: .error)` only when `CIRCUITTIMER_STRICT_WARNINGS=1`, which `make test` and `make build-package` set: when the app builds the package as a dependency, Xcode passes `-suppress-warnings`, and the two flags conflict. Strict and non-strict builds use separate DerivedData because the evaluated manifest is cached there.
+- The launch screen lives in `Configs/Info.plist`, which Xcode merges with the generated `INFOPLIST_KEY_*` keys. The file is not a member of any target: Copy Bundle Resources would conflict with the generated plist.
 
 ## TCA
 
@@ -144,7 +145,7 @@ Sorted, grouped by attributes: `@testable import` first, an empty line, then pla
 - No file headers; files start with imports.
 - Comments are English and explain constraints that the code cannot. No history, no commented-out code.
 - `// MARK:` only to group five or more related members.
-- `TODO` and `FIXME` carry a ticket: `// TODO: [CT-123] …`.
+- `TODO` and `FIXME` carry a ticket: `// TODO: [CT-123] …` or `// TODO: [CT-UI-2] …`.
 
 ## Lint exceptions
 
@@ -162,7 +163,7 @@ String Catalogs only: `Localizable.xcstrings` in each module that shows text (`T
 
 ## Git
 
-- Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`.
+- Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`. A milestone split into slices uses `CT-<milestone>-<n>` instead of `CT-<n>` (`CT-UI-1-dark-tokens`, `CT-UI-1: …`).
 - One logical change per commit, and every commit passes `make verify-clean`.
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
