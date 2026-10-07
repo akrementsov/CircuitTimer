@@ -80,10 +80,16 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
 
+## Releasing
+
+1. For a new version, bump `MARKETING_VERSION` through a pull request. Wait for CI on `main` to pass.
+2. Tag the commit `vX.Y.Z`, or `vX.Y.Z-rc.N` for another build of the same version, and push the tag.
+3. The TestFlight workflow archives the app, signs it in the cloud with an App Store Connect API key and uploads it. The build is available once App Store Connect finishes processing it.
+
 ## Roadmap
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
-- [ ] **Delivery** — TestFlight builds from GitHub Actions
+- [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions
 - [x] **CT-2** — workout list and editor, SwiftData persistence
 - [ ] **CT-QA** — snapshot tests of the list and editor (light and dark, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names

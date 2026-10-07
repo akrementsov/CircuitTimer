@@ -51,8 +51,16 @@ Layering:
 | `make resolve` | Re-resolves both lockfiles |
 | `make ci` | `lint`, `check-resolved`, `test`, `build-app` |
 | `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit |
+| `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
+| `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
 `SWIFTLINT` must be an absolute path or a command on `PATH`: `verify-clean` runs inside a temporary clone.
+
+## Delivery
+
+- A tag `v<MARKETING_VERSION>` (or `v<MARKETING_VERSION>-<suffix>` for another build of the same version) on a commit of `main` whose CI passed runs `testflight.yml`, which archives and uploads to TestFlight. The build number is the UTC start time, `YYMMDD.HHMMSS`.
+- The archive is unsigned: an App Store Connect API key signs only at export, with a cloud-managed distribution certificate, so the key needs the Admin role. CT-4 and CT-5 must check that the exported app keeps their entitlements.
+- `ExportOptions.plist` repeats the team ID from `App.xcconfig`; change both together.
 
 ## Toolchain
 
