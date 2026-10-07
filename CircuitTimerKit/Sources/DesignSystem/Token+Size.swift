@@ -2,7 +2,7 @@ import CoreGraphics
 
 extension DesignSystem.Token {
     public enum Size: CGFloat, Sendable, CaseIterable {
-        /// Minimum height of a list card.
+        /// Minimum height of a list row.
         case row = 50
         /// Narrowest a row title gets before the content next to it moves under it.
         /// A base value at the default text size; scale it with `@ScaledMetric`.

@@ -57,9 +57,7 @@ public struct AppView: View {
                     Text("workouts.empty.title", bundle: .module)
                         .font(.token(.body))
                         .foregroundStyle(.text(.secondary))
-                    if store.hiddenRecordCount > 0 {
-                        hiddenRecordsNotice
-                    }
+                    hiddenRecordsNotice
                 }
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, .token(spacing: .l))
@@ -126,10 +124,8 @@ public struct AppView: View {
                         }
                     }
                     .onMove { send(.workoutsMoved($0, $1)) }
-                    if store.hiddenRecordCount > 0 {
-                        hiddenRecordsNotice
-                            .workoutListRow()
-                    }
+                    hiddenRecordsNotice
+                        .workoutListRow()
                 }
                 .listStyle(.plain)
                 .listRowSpacing(.token(spacing: .m))
@@ -155,10 +151,13 @@ public struct AppView: View {
         }
     }
 
+    @ViewBuilder
     private var hiddenRecordsNotice: some View {
-        Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
-            .font(.token(.footnote))
-            .foregroundStyle(.text(.secondary))
+        if store.hiddenRecordCount > 0 {
+            Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
+                .font(.token(.footnote))
+                .foregroundStyle(.text(.secondary))
+        }
     }
 }
 
