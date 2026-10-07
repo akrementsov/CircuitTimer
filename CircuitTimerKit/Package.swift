@@ -83,6 +83,11 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "DesignSystemTests",
+            dependencies: ["DesignSystem"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WorkoutEditorFeatureTests",
             dependencies: [
                 "WorkoutDomain",
