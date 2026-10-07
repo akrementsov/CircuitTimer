@@ -83,6 +83,16 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WorkoutEditorFeatureTests",
+            dependencies: [
+                "WorkoutDomain",
+                "WorkoutEditorFeature",
+                "WorkoutStorage",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WorkoutStorageTests",
             dependencies: ["WorkoutDomain", "WorkoutStorage"],
             swiftSettings: strictSettings
