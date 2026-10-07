@@ -78,11 +78,25 @@ public struct AppView: View {
                         .buttonStyle(.plain)
                         // Taps, the menu preview and the drag preview follow the card, not the row with its margins.
                         .contentShape([.interaction, .contextMenuPreview, .dragPreview], .workoutCard)
-                        .swipeActions {
-                            rowActions(for: workout.id)
+                        // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                send(.deleteButtonTapped(workout.id))
+                            } label: {
+                                Text("workouts.delete", bundle: .module)
+                            }
+                            .tint(.danger)
                         }
                         .contextMenu {
-                            rowActions(for: workout.id)
+                            Button {
+                                send(.duplicateButtonTapped(workout.id))
+                            } label: {
+                                Label {
+                                    Text("workouts.duplicate", bundle: .module)
+                                } icon: {
+                                    Image(systemName: "plus.square.on.square")
+                                }
+                            }
                         }
                         .workoutListRow()
                         .accessibilityLabel(WorkoutRow.title(for: workout))
@@ -115,28 +129,6 @@ public struct AppView: View {
                 }
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, .token(spacing: .l))
-        }
-    }
-
-    @ViewBuilder
-    private func rowActions(for id: Workout.ID) -> some View {
-        Button(role: .destructive) {
-            send(.deleteButtonTapped(id))
-        } label: {
-            Label {
-                Text("workouts.delete", bundle: .module)
-            } icon: {
-                Image(systemName: "trash")
-            }
-        }
-        Button {
-            send(.duplicateButtonTapped(id))
-        } label: {
-            Label {
-                Text("workouts.duplicate", bundle: .module)
-            } icon: {
-                Image(systemName: "plus.square.on.square")
-            }
         }
     }
 

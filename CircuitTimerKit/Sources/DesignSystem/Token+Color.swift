@@ -56,4 +56,9 @@ extension ShapeStyle where Self == Color {
     public static var brand: Color {
         Color("Brand", bundle: .module)
     }
+
+    /// Destructive actions.
+    public static var danger: Color {
+        Color("Danger", bundle: .module)
+    }
 }
