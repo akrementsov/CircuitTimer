@@ -29,7 +29,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | Module | Depends on | Owns |
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
-| `DesignSystem` | SwiftUI | Spacing, radius, typography and color tokens; clock text |
+| `DesignSystem` | SwiftUI | Spacing, radius, typography and color tokens; clock text; screen chrome |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the workout list, presenting the editor |

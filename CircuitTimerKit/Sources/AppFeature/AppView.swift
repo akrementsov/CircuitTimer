@@ -31,12 +31,15 @@ public struct AppView: View {
                                 Label {
                                     Text("workouts.add", bundle: .module)
                                 } icon: {
-                                    Image(systemName: "plus")
+                                    Image(systemName: "plus.app.fill")
+                                        .imageScale(.large)
                                 }
                             }
+                            .tint(.brand)
                         }
                     }
                 }
+                .screenChrome()
         }
         .task { send(.task) }
         .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
