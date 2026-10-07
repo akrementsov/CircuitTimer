@@ -75,7 +75,7 @@ public struct AppView: View {
                         } label: {
                             WorkoutRow(workout: workout)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.workoutCard)
                         // Taps, the menu preview and the drag preview follow the card, not the row with its margins.
                         .contentShape([.interaction, .contextMenuPreview, .dragPreview], .workoutCard)
                         // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
@@ -137,6 +137,18 @@ public struct AppView: View {
             .font(.token(.footnote))
             .foregroundStyle(.text(.secondary))
     }
+}
+
+/// The card does not dim while pressed, like the legacy cell: a swipe starts with a press,
+/// and the highlight would flash on every swipe.
+private struct WorkoutCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+    }
+}
+
+private extension ButtonStyle where Self == WorkoutCardButtonStyle {
+    static var workoutCard: Self { WorkoutCardButtonStyle() }
 }
 
 private extension Shape where Self == RoundedRectangle {
