@@ -71,18 +71,22 @@ public struct AppView: View {
                             WorkoutRow(workout: workout)
                         }
                         .buttonStyle(.workoutCard)
-                        // Taps, the menu preview and the drag preview follow the card, not the row with its margins.
-                        .contentShape([.interaction, .contextMenuPreview, .dragPreview], .workoutCard)
+                        // Taps and the drag preview follow the card, not the row with its margins.
+                        .contentShape([.interaction, .dragPreview], .workoutCard)
                         // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
+                        // Duplicate lives here too: a context menu on the row breaks a slow swipe.
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 send(.deleteButtonTapped(workout.id))
                             } label: {
-                                Text("workouts.delete", bundle: .module)
+                                Label {
+                                    Text("workouts.delete", bundle: .module)
+                                } icon: {
+                                    Image(systemName: "trash")
+                                }
+                                .labelStyle(.iconOnly)
                             }
                             .tint(.danger)
-                        }
-                        .contextMenu {
                             Button {
                                 send(.duplicateButtonTapped(workout.id))
                             } label: {
@@ -91,7 +95,9 @@ public struct AppView: View {
                                 } icon: {
                                     Image(systemName: "plus.square.on.square")
                                 }
+                                .labelStyle(.iconOnly)
                             }
+                            .tint(.text(.secondary))
                         }
                         .workoutListRow()
                         .accessibilityLabel(WorkoutRow.title(for: workout))
