@@ -55,24 +55,18 @@ public struct AppView: View {
         switch store.workouts {
             case .idle, .loading:
                 ProgressView()
+                    .tint(.text(.secondary))
             case let .loaded(workouts) where workouts.isEmpty:
-                ContentUnavailableView {
-                    Label {
-                        Text("workouts.empty.title", bundle: .module)
-                    } icon: {
-                        Image(systemName: "figure.run")
-                    }
-                } description: {
+                VStack(spacing: .token(spacing: .m)) {
+                    Text("workouts.empty.title", bundle: .module)
+                        .font(.token(.body))
+                        .foregroundStyle(.text(.secondary))
                     if store.hiddenRecordCount > 0 {
                         hiddenRecordsNotice
                     }
-                } actions: {
-                    Button {
-                        send(.addButtonTapped)
-                    } label: {
-                        Text("workouts.empty.create", bundle: .module)
-                    }
                 }
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, .token(spacing: .l))
             case let .loaded(workouts):
                 List {
                     ForEach(workouts) { workout in
@@ -107,19 +101,20 @@ public struct AppView: View {
                 // The caption row would otherwise grow to the system minimum; cards set their own.
                 .environment(\.defaultMinListRowHeight, .zero)
             case .failed:
-                ContentUnavailableView {
-                    Label {
-                        Text("workouts.error.title", bundle: .module)
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle")
-                    }
-                } actions: {
+                VStack(spacing: .token(spacing: .m)) {
+                    Text("workouts.error.title", bundle: .module)
+                        .font(.token(.body))
+                        .foregroundStyle(.text(.secondary))
                     Button {
                         send(.retryButtonTapped)
                     } label: {
                         Text("workouts.error.retry", bundle: .module)
+                            .font(.token(.headline))
+                            .foregroundStyle(.brand)
                     }
                 }
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, .token(spacing: .l))
         }
     }
 
@@ -276,6 +271,16 @@ private func previewWorkouts(count: Int) -> IdentifiedArrayOf<Workout> {
 
 #Preview("List with hidden records") {
     AppView(store: previewStore(.loaded(previewWorkouts(count: 6)), hiddenRecordCount: 2))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Empty with hidden records") {
+    AppView(store: previewStore(.loaded([]), hiddenRecordCount: 2))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Failed") {
+    AppView(store: previewStore(.failed))
         .preferredColorScheme(.dark)
 }
 

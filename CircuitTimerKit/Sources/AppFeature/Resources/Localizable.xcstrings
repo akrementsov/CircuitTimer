@@ -65,34 +65,18 @@
         }
       }
     },
-    "workouts.empty.create" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create a Workout"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Создать тренировку"
-          }
-        }
-      }
-    },
     "workouts.empty.title" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No saved workouts yet"
+            "value" : "You don't have\nany saved workouts"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "У вас нет сохранённых тренировок"
+            "value" : "У вас нет\nсохранённых тренировок"
           }
         }
       }
