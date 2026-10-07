@@ -126,7 +126,6 @@ public struct AppView: View {
                 Image(systemName: "plus.square.on.square")
             }
         }
-        .tint(.brand)
     }
 
     @ViewBuilder
@@ -141,7 +140,7 @@ private struct WorkoutRow: View {
     let workout: Workout
 
     var body: some View {
-        HStack(spacing: .token(spacing: .s)) {
+        HStack(spacing: .token(spacing: .m)) {
             Text(workout.name)
                 .font(.token(.headline))
                 .foregroundStyle(.text(.primary))
@@ -161,4 +160,5 @@ private struct WorkoutRow: View {
 
 #Preview {
     AppView(store: Store(initialState: AppFeature.State()) { AppFeature() })
+        .preferredColorScheme(.dark)
 }

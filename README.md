@@ -91,7 +91,8 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions
 - [x] **CT-2** — workout list and editor, SwiftData persistence
-- [ ] **CT-QA** — snapshot tests of the list and editor (light and dark, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
+- [ ] **CT-UI** — dark design of the original app: launch screen, tab bar, workout list, editor, settings
+- [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names
 - [ ] **CT-4** — Live Activity and Dynamic Island
 - [ ] **CT-5** — iCloud sync

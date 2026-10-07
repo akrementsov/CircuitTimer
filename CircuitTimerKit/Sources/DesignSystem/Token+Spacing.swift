@@ -4,10 +4,12 @@ extension DesignSystem.Token {
     public enum Spacing: CGFloat, Sendable, CaseIterable {
         case xxs = 4
         case xs = 8
-        case s = 12
-        case m = 16
-        case l = 24
-        case xl = 32
+        case s = 10
+        case m = 12
+        case l = 16
+        case xl = 20
+        case xxl = 24
+        case xxxl = 32
     }
 }
 
