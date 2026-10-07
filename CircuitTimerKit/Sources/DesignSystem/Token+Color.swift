@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 extension DesignSystem.Token {
     public enum TextColor: Sendable, CaseIterable {
@@ -10,26 +9,25 @@ extension DesignSystem.Token {
     public enum SurfaceColor: Sendable, CaseIterable {
         case screen
         case card
-        case grouped
     }
 
     public enum StageColor: Sendable, CaseIterable {
         case work
         case rest
+        /// Equals `surface(.card)`: it fills the full-screen timer and is never drawn on a card.
         case pause
     }
 }
 
-// Text and surfaces follow the system palette; brand and stage colors come from the asset
-// catalog, where each has a light and a dark variant.
+// All colors come from the asset catalog, one universal value each: the app is dark only.
 extension ShapeStyle where Self == Color {
     /// `.foregroundStyle(.text(.secondary))`
     public static func text(_ color: DesignSystem.Token.TextColor) -> Color {
         switch color {
             case .primary:
-                Color(uiColor: .label)
+                Color("TextPrimary", bundle: .module)
             case .secondary:
-                Color(uiColor: .secondaryLabel)
+                Color("TextSecondary", bundle: .module)
         }
     }
 
@@ -37,11 +35,9 @@ extension ShapeStyle where Self == Color {
     public static func surface(_ color: DesignSystem.Token.SurfaceColor) -> Color {
         switch color {
             case .screen:
-                Color(uiColor: .systemBackground)
+                Color("SurfaceScreen", bundle: .module)
             case .card:
-                Color(uiColor: .secondarySystemBackground)
-            case .grouped:
-                Color(uiColor: .systemGroupedBackground)
+                Color("SurfaceCard", bundle: .module)
         }
     }
 

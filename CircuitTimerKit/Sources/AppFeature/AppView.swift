@@ -126,7 +126,6 @@ public struct AppView: View {
                 Image(systemName: "plus.square.on.square")
             }
         }
-        .tint(.brand)
     }
 
     @ViewBuilder
@@ -161,4 +160,5 @@ private struct WorkoutRow: View {
 
 #Preview {
     AppView(store: Store(initialState: AppFeature.State()) { AppFeature() })
+        .preferredColorScheme(.dark)
 }

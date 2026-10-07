@@ -152,6 +152,7 @@ public struct WorkoutEditorView: View {
     NavigationStack {
         WorkoutEditorView(store: Store(initialState: WorkoutEditorFeature.State(editing: .sample)) { WorkoutEditorFeature() })
     }
+    .preferredColorScheme(.dark)
 }
 
 #Preview("New") {
@@ -162,4 +163,5 @@ public struct WorkoutEditorView: View {
             }
         )
     }
+    .preferredColorScheme(.dark)
 }
