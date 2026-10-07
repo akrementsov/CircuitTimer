@@ -3,10 +3,11 @@ import DesignSystem
 import Foundation
 import SwiftUI
 import WorkoutDomain
+import WorkoutEditorFeature
 
 @ViewAction(for: AppFeature.self)
 public struct AppView: View {
-    public let store: StoreOf<AppFeature>
+    @Bindable public var store: StoreOf<AppFeature>
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -16,8 +17,34 @@ public struct AppView: View {
         NavigationStack {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
+                .toolbar {
+                    if store.canEditList {
+                        ToolbarItem(placement: .topBarLeading) {
+                            EditButton()
+                        }
+                    }
+                    if store.canAddWorkout {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button {
+                                send(.addButtonTapped)
+                            } label: {
+                                Label {
+                                    Text("workouts.add", bundle: .module)
+                                } icon: {
+                                    Image(systemName: "plus")
+                                }
+                            }
+                        }
+                    }
+                }
         }
         .task { send(.task) }
+        .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
+            NavigationStack {
+                WorkoutEditorView(store: editorStore)
+            }
+        }
+        .alert($store.scope(\.$destination, action: \.destination).alert)
     }
 
     @ViewBuilder
@@ -32,10 +59,35 @@ public struct AppView: View {
                     } icon: {
                         Image(systemName: "figure.run")
                     }
+                } description: {
+                    hiddenRecordsNotice
+                } actions: {
+                    Button {
+                        send(.addButtonTapped)
+                    } label: {
+                        Text("workouts.empty.create", bundle: .module)
+                    }
                 }
             case let .loaded(workouts):
-                List(workouts) { workout in
-                    WorkoutRow(workout: workout)
+                List {
+                    Section {
+                        ForEach(workouts) { workout in
+                            Button {
+                                send(.workoutTapped(workout.id))
+                            } label: {
+                                WorkoutRow(workout: workout)
+                            }
+                            .swipeActions {
+                                rowActions(for: workout.id)
+                            }
+                            .contextMenu {
+                                rowActions(for: workout.id)
+                            }
+                        }
+                        .onMove { send(.workoutsMoved($0, $1)) }
+                    } footer: {
+                        hiddenRecordsNotice
+                    }
                 }
             case .failed:
                 ContentUnavailableView {
@@ -51,6 +103,36 @@ public struct AppView: View {
                         Text("workouts.error.retry", bundle: .module)
                     }
                 }
+        }
+    }
+
+    @ViewBuilder
+    private func rowActions(for id: Workout.ID) -> some View {
+        Button(role: .destructive) {
+            send(.deleteButtonTapped(id))
+        } label: {
+            Label {
+                Text("workouts.delete", bundle: .module)
+            } icon: {
+                Image(systemName: "trash")
+            }
+        }
+        Button {
+            send(.duplicateButtonTapped(id))
+        } label: {
+            Label {
+                Text("workouts.duplicate", bundle: .module)
+            } icon: {
+                Image(systemName: "plus.square.on.square")
+            }
+        }
+        .tint(.brand)
+    }
+
+    @ViewBuilder
+    private var hiddenRecordsNotice: some View {
+        if store.hiddenRecordCount > 0 {
+            Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
         }
     }
 }

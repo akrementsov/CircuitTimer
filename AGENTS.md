@@ -30,8 +30,9 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
 | `DesignSystem` | SwiftUI, UIKit | Spacing, radius, typography and color tokens |
-| `WorkoutStorage` | `WorkoutDomain`, Dependencies | `WorkoutStorageClient` |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature and `AppView` |
+| `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
+| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the workout list, presenting the editor |
 
 Layering:
 
@@ -91,6 +92,7 @@ public struct SomeFeature: Sendable {
 ```
 
 - Views are `@ViewAction(for:)` and only `send` actions; no logic in `body`.
+- Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
@@ -107,6 +109,8 @@ public struct SomeFeature: Sendable {
 ## Domain limits
 
 Anything that edits a workout applies `WorkoutLimits.normalizedStages(_:)` and `normalizedTrainingRounds(_:)`, and UI limits match `WorkoutLimits`. Otherwise the user would see stages that never reach the schedule.
+
+A stage name may be empty; anything that displays a stage shows its intensity name instead. Storage keeps the empty name, so the fallback follows the current language.
 
 ## Identifiers
 
@@ -161,3 +165,4 @@ String Catalogs only: `Localizable.xcstrings` in each module that shows text (`T
 - Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`.
 - One logical change per commit, and every commit passes `make verify-clean`.
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
+- `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.

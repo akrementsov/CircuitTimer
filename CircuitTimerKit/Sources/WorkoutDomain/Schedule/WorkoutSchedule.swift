@@ -11,18 +11,18 @@ public struct WorkoutSchedule: Hashable, Sendable {
     public init(workout: Workout) {
         let warmUp = WorkoutLimits.normalizedStages(workout.warmUp)
         let training = WorkoutLimits.normalizedStages(workout.training)
-        let rounds = training.isEmpty ? 0 : WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
+        let rounds = Workout.trainingRoundsToPlay(training: training, rounds: workout.trainingRounds)
         let coolDown = WorkoutLimits.normalizedStages(workout.coolDown)
 
         var builder = Builder()
         builder.appendRound(warmUp, section: .warmUp, round: 1, roundCount: 1)
-        if workout.pauseAfterWarmUp, !warmUp.isEmpty, rounds > 0 || !coolDown.isEmpty {
+        if workout.pauseAfterWarmUp, Workout.keepsPauseAfterWarmUp(warmUp: warmUp, trainingRounds: rounds, coolDown: coolDown) {
             builder.appendPause(after: .warmUp, round: 1, roundCount: 1)
         }
         for round in stride(from: 1, through: rounds, by: 1) {
             builder.appendRound(training, section: .training, round: round, roundCount: rounds)
         }
-        if workout.pauseAfterTraining, rounds > 0, !coolDown.isEmpty {
+        if workout.pauseAfterTraining, Workout.keepsPauseAfterTraining(trainingRounds: rounds, coolDown: coolDown) {
             builder.appendPause(after: .training, round: rounds, roundCount: rounds)
         }
         builder.appendRound(coolDown, section: .coolDown, round: 1, roundCount: 1)

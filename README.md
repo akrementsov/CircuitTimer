@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The foundation — the domain, the timer engine and the app shell — is in place; the timer screen and the editor come next (see the roadmap).
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine and the workout list with its editor, stored in SwiftData, are in place; the timer screen comes next (see the roadmap).
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -25,6 +25,10 @@ graph TD
     AppFeature --> DesignSystem
     AppFeature --> WorkoutStorage
     AppFeature --> WorkoutDomain
+    AppFeature --> WorkoutEditorFeature
+    WorkoutEditorFeature --> DesignSystem
+    WorkoutEditorFeature --> WorkoutStorage
+    WorkoutEditorFeature --> WorkoutDomain
     WorkoutStorage --> WorkoutDomain
     AppFeature -.-> WorkoutTimerFeature["WorkoutTimerFeature (planned)"]
     WorkoutTimerFeature -.-> WorkoutDomain
@@ -37,8 +41,9 @@ graph TD
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
 | `DesignSystem` | Spacing, radius, typography and color tokens. Lint rejects literal styles anywhere else. |
-| `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency. In-memory today, SwiftData next. |
-| `AppFeature` | The root TCA feature: loading, list, empty and retryable error states. |
+| `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
+| `WorkoutEditorFeature` | The workout editor: a draft with Save and Cancel, stage editing within `WorkoutLimits`. |
+| `AppFeature` | The root TCA feature: the workout list with loading, empty and retryable error states; presents the editor. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -85,7 +90,8 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions
-- [ ] **CT-2** — workout list and editor, SwiftData persistence
+- [x] **CT-2** — workout list and editor, SwiftData persistence
+- [ ] **CT-QA** — snapshot tests of the list and editor (light and dark, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names
 - [ ] **CT-4** — Live Activity and Dynamic Island
 - [ ] **CT-5** — iCloud sync

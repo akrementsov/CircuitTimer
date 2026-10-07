@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
+        .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
     ],
     dependencies: [
@@ -33,6 +34,7 @@ let package = Package(
             dependencies: [
                 "DesignSystem",
                 "WorkoutDomain",
+                "WorkoutEditorFeature",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
@@ -60,12 +62,39 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .target(
+            name: "WorkoutEditorFeature",
+            dependencies: [
+                "DesignSystem",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
             name: "WorkoutStorage",
             dependencies: [
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "WorkoutEditorFeatureTests",
+            dependencies: [
+                "WorkoutDomain",
+                "WorkoutEditorFeature",
+                "WorkoutStorage",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "WorkoutStorageTests",
+            dependencies: ["WorkoutDomain", "WorkoutStorage"],
             swiftSettings: strictSettings
         ),
         .testTarget(
