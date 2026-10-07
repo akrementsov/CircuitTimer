@@ -63,7 +63,9 @@ public struct AppView: View {
                         Image(systemName: "figure.run")
                     }
                 } description: {
-                    hiddenRecordsNotice
+                    if store.hiddenRecordCount > 0 {
+                        hiddenRecordsNotice
+                    }
                 } actions: {
                     Button {
                         send(.addButtonTapped)
@@ -73,27 +75,37 @@ public struct AppView: View {
                 }
             case let .loaded(workouts):
                 List {
-                    Section {
-                        ForEach(workouts) { workout in
-                            Button {
-                                send(.workoutTapped(workout.id))
-                            } label: {
-                                WorkoutRow(workout: workout)
-                            }
-                            .accessibilityLabel(WorkoutRow.title(for: workout))
-                            .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
-                            .swipeActions {
-                                rowActions(for: workout.id)
-                            }
-                            .contextMenu {
-                                rowActions(for: workout.id)
-                            }
+                    ForEach(workouts) { workout in
+                        Button {
+                            send(.workoutTapped(workout.id))
+                        } label: {
+                            WorkoutRow(workout: workout)
                         }
-                        .onMove { send(.workoutsMoved($0, $1)) }
-                    } footer: {
+                        .buttonStyle(.plain)
+                        // Taps, the menu preview and the drag preview follow the card, not the row with its margins.
+                        .contentShape([.interaction, .contextMenuPreview, .dragPreview], .workoutCard)
+                        .swipeActions {
+                            rowActions(for: workout.id)
+                        }
+                        .contextMenu {
+                            rowActions(for: workout.id)
+                        }
+                        .workoutListRow()
+                        .accessibilityLabel(WorkoutRow.title(for: workout))
+                        .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
+                    }
+                    .onMove { send(.workoutsMoved($0, $1)) }
+                    if store.hiddenRecordCount > 0 {
                         hiddenRecordsNotice
+                            .workoutListRow()
                     }
                 }
+                .listStyle(.plain)
+                .listRowSpacing(.token(spacing: .m))
+                .contentMargins(.vertical, .token(spacing: .m), for: .scrollContent)
+                .scrollIndicators(.hidden)
+                // The caption row would otherwise grow to the system minimum; cards set their own.
+                .environment(\.defaultMinListRowHeight, .zero)
             case .failed:
                 ContentUnavailableView {
                     Label {
@@ -133,33 +145,86 @@ public struct AppView: View {
         }
     }
 
-    @ViewBuilder
     private var hiddenRecordsNotice: some View {
-        if store.hiddenRecordCount > 0 {
-            Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
-        }
+        Text("workouts.hidden \(store.hiddenRecordCount)", bundle: .module)
+            .font(.token(.footnote))
+            .foregroundStyle(.text(.secondary))
+    }
+}
+
+private extension Shape where Self == RoundedRectangle {
+    static var workoutCard: Self {
+        RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
+    }
+}
+
+private extension View {
+    /// A list row without separator or system background, inset like the legacy cards.
+    func workoutListRow() -> some View {
+        listRowInsets(EdgeInsets(top: .zero, leading: .token(spacing: .l), bottom: .zero, trailing: .token(spacing: .l)))
+            .listRowSeparator(.hidden)
+            // A plain list paints rows with the system background, and a clear color is not a token.
+            .listRowBackground(Rectangle().fill(.surface(.screen)))
     }
 }
 
 private struct WorkoutRow: View {
     let workout: Workout
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .subheadline) private var minimumTitleWidth: CGFloat = .token(size: .rowTitleMinWidth)
+
     var body: some View {
-        HStack(spacing: .token(spacing: .m)) {
-            Self.title(for: workout)
-                .font(.token(.headline))
-                .foregroundStyle(.text(.primary))
-            Spacer()
-            HStack(spacing: .token(spacing: .xs)) {
-                Text(workout.totalDuration.clockText(.hoursMinutesSeconds))
-                    .font(.token(.body))
-                    .monospacedDigit()
-                Image(systemName: "clock")
-                    .font(.token(.icon))
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                stacked
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    inline
+                    stacked
+                }
             }
-            .foregroundStyle(.text(.primary))
         }
-        .padding(.vertical, .token(spacing: .xxs))
+        .foregroundStyle(.text(.primary))
+        .padding(.token(spacing: .l))
+        .frame(minHeight: .token(size: .row))
+        .background(.surface(.card), in: .workoutCard)
+    }
+
+    private var inline: some View {
+        HStack(spacing: .token(spacing: .l)) {
+            // The ideal width is capped so a long name truncates instead of pushing the time under it.
+            Self.title(for: workout)
+                .font(.token(.body))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(minWidth: minimumTitleWidth, idealWidth: minimumTitleWidth, maxWidth: .infinity, alignment: .leading)
+            time
+                .fixedSize()
+        }
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
+            Self.title(for: workout)
+                .font(.token(.body))
+                .lineLimit(2)
+            time
+                .lineLimit(1)
+                // Four-digit hours at the largest text sizes.
+                .minimumScaleFactor(0.5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var time: some View {
+        HStack(spacing: .token(spacing: .xs)) {
+            Text(workout.totalDuration.clockText(.hoursMinutesSeconds))
+                .font(.token(.body))
+                .monospacedDigit()
+            Image(systemName: "clock")
+                .font(.token(.icon))
+        }
     }
 
     static func title(for workout: Workout) -> Text {
@@ -179,7 +244,51 @@ private struct WorkoutRow: View {
     }
 }
 
-#Preview {
+@MainActor
+private func previewStore(_ content: AppFeature.Content, hiddenRecordCount: Int = 0) -> StoreOf<AppFeature> {
+    var state = AppFeature.State()
+    state.workouts = content
+    state.hiddenRecordCount = hiddenRecordCount
+    return Store(initialState: state) { AppFeature() }
+}
+
+private func previewWorkouts(count: Int) -> IdentifiedArrayOf<Workout> {
+    IdentifiedArray(
+        uniqueElements: (0..<count).map { index in
+            Workout(
+                id: UUID(index),
+                name: "Workout \(index + 1)",
+                training: [Stage(id: UUID(100 + index), name: "", duration: .seconds(75 * (index + 1)), intensity: .work)]
+            )
+        }
+    )
+}
+
+#Preview("Live") {
     AppView(store: Store(initialState: AppFeature.State()) { AppFeature() })
+        .preferredColorScheme(.dark)
+}
+
+#Preview("List") {
+    AppView(store: previewStore(.loaded(previewWorkouts(count: 6))))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("List with hidden records") {
+    AppView(store: previewStore(.loaded(previewWorkouts(count: 6)), hiddenRecordCount: 2))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Long values") {
+    let longest = (0..<WorkoutLimits.maxStagesPerSection).map { index in
+        Stage(id: UUID(100 + index), name: "", duration: WorkoutLimits.maxStageDuration, intensity: .work)
+    }
+    let workouts: IdentifiedArrayOf<Workout> = [
+        Workout(id: UUID(0), name: "A workout with a name far too long to fit on one line of the list"),
+        Workout(id: UUID(1), name: ""),
+        Workout(id: UUID(2), name: "Short", training: [Stage(id: UUID(99), name: "", duration: .seconds(75), intensity: .work)]),
+        Workout(id: UUID(3), name: "Longest", training: longest, trainingRounds: WorkoutLimits.maxTrainingRounds),
+    ]
+    AppView(store: previewStore(.loaded(workouts)))
         .preferredColorScheme(.dark)
 }

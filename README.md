@@ -40,7 +40,7 @@ graph TD
 | Module | Responsibility |
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
-| `DesignSystem` | Spacing, radius, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
+| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `WorkoutEditorFeature` | The workout editor: a draft with Save and Cancel, stage editing within `WorkoutLimits`. |
 | `AppFeature` | The root TCA feature: the workout list with loading, empty and retryable error states; presents the editor. |
