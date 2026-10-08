@@ -110,7 +110,7 @@ struct AppFeatureMoveTests {
         await store.receive(\.internal.mutationFinished) {
             $0.pendingMutations = []
             $0.deferredEditor = nil
-            $0.destination = .editor(WorkoutEditorFeature.State(editing: third))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: third))
         }
     }
 

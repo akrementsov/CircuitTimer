@@ -10,8 +10,13 @@ import WorkoutStorage
 public struct AppFeature: Sendable {
     @Reducer
     public enum Destination {
-        case editor(WorkoutEditorFeature)
         case alert(AlertState<Never>)
+    }
+
+    /// Screens pushed onto the Workouts stack.
+    @Reducer
+    public enum Path {
+        case editor(WorkoutEditorFeature)
     }
 
     /// A list change waiting to be written. Writes run one at a time, in the order the user made them.
@@ -40,6 +45,7 @@ public struct AppFeature: Sendable {
         /// Stored records the list cannot show: unreadable workouts and extra copies of shown ones.
         public var hiddenRecordCount = 0
         @Presents public var destination: Destination.State?
+        public internal(set) var path = StackState<Path.State>()
         var pendingMutations: [ListMutation] = []
         /// Set when a write reports that storage no longer matches the list; reload once the queue drains.
         var needsReload = false
@@ -63,6 +69,7 @@ public struct AppFeature: Sendable {
         case view(View)
         case `internal`(Internal)
         case destination(PresentationAction<Destination.Action>)
+        case path(StackActionOf<Path>)
         case settings(SettingsFeature.Action)
 
         @CasePathable
@@ -109,13 +116,14 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .internal(action):
                     reduce(into: &state, action)
-                case let .destination(.presented(.editor(.delegate(.saved(workout))))):
+                case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
-                case .destination, .settings:
+                case .destination, .path, .settings:
                     .none
             }
         }
         .ifLet(\.$destination, action: \.destination)
+        .forEach(\.path, action: \.path)
     }
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
@@ -243,16 +251,17 @@ public struct AppFeature: Sendable {
 
         // A request that cannot open now is dropped rather than kept for a surprise later.
         state.deferredEditor = nil
-        guard state.destination == nil, state.selectedTab == .workouts else { return .none }
+        // An empty stack also drops a second tap made while the editor is being pushed.
+        guard state.destination == nil, state.path.isEmpty, state.selectedTab == .workouts else { return .none }
 
         switch request {
             case .create:
-                state.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid()))
+                state.path.append(.editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid())))
             case let .edit(id):
                 // The workout may be gone by now; then there is nothing to edit.
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
 
-                state.destination = .editor(WorkoutEditorFeature.State(editing: workout))
+                state.path.append(.editor(WorkoutEditorFeature.State(editing: workout)))
         }
         return .none
     }
@@ -330,6 +339,8 @@ public struct AppFeature: Sendable {
 
 extension AppFeature.Destination.State: Equatable, Sendable {}
 extension AppFeature.Destination.Action: Equatable, Sendable {}
+extension AppFeature.Path.State: Equatable, Sendable {}
+extension AppFeature.Path.Action: Equatable, Sendable {}
 
 extension AlertState where Action == Never {
     static var mutationFailed: Self {

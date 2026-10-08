@@ -82,11 +82,6 @@ public struct WorkoutEditorFeature: Sendable {
             !isDraftComplete && !isSaving
         }
 
-        /// A swipe down must not drop unsaved changes or cancel a save in flight.
-        public var blocksInteractiveDismiss: Bool {
-            hasChanges || isSaving
-        }
-
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
             draft[section].count < WorkoutLimits.maxStagesPerSection
         }

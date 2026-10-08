@@ -8,7 +8,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved`; never assume an API exists.
 3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the original app's palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`; how the widget and Live Activity follow the system theme is decided in CT-4. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
-5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions.
+5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions. The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It has its own back button, and the system back gestures are disabled on purpose: a SwiftUI pop reaches the reducer as `popFrom`, which removes the element without a veto and would drop an unsaved draft.
 6. **Every commit passes `make verify-clean`.**
 
 ## Engineering principles
@@ -33,7 +33,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, presenting the editor; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the editor onto the Workouts stack; composes Settings |
 
 Layering:
 

@@ -37,17 +37,12 @@ public struct AppView: View {
                 .tag(AppFeature.RootTab.settings)
         }
         .task { send(.task) }
-        // Presented over the tab bar, so the editor and the write-failure alert show on either tab.
-        .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
-            NavigationStack {
-                WorkoutEditorView(store: editorStore)
-            }
-        }
+        // Presented over the tab bar, so the write-failure alert shows on either tab.
         .alert($store.scope(\.$destination, action: \.destination).alert)
     }
 
     private var workoutsTab: some View {
-        NavigationStack {
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
                 .toolbar {
@@ -68,6 +63,12 @@ public struct AppView: View {
                     }
                 }
                 .screenChrome()
+        } destination: { pathStore in
+            switch pathStore.case {
+                case let .editor(editorStore):
+                    WorkoutEditorView(store: editorStore)
+                        .toolbar(.hidden, for: .tabBar)
+            }
         }
     }
 

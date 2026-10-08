@@ -17,6 +17,8 @@ public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
     @FocusState private var focusedField: EditorField?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
+    // Pushed, the editor shares its navigation stack with the list; its own edit mode keeps the list out of it.
+    @State private var editMode: EditMode = .inactive
 
     public init(store: StoreOf<WorkoutEditorFeature>) {
         self.store = store
@@ -70,9 +72,9 @@ public struct WorkoutEditorView: View {
                 send(action)
             }
         }
-        .interactiveDismissDisabled(store.blocksInteractiveDismiss)
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
+        .environment(\.editMode, $editMode)
     }
 
     private var title: Text {
@@ -112,7 +114,9 @@ public struct WorkoutEditorView: View {
         }
         // Reordering by drag is not discoverable without an explicit edit mode.
         ToolbarItem(placement: .bottomBar) {
+            // Toolbar items read the stack's edit mode, not the editor's; bind the button to the form's own.
             EditButton()
+                .environment(\.editMode, $editMode)
                 .disabled(store.isSaving)
         }
     }
