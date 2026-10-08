@@ -137,10 +137,11 @@ public struct AppFeature: Sendable {
                     // A tap on the selected tab returns it to its root.
                     switch tab {
                         case .workouts:
+                            // The editor hides the tab bar, so a re-tap reaches here only while the editor is being pushed.
                             guard let id = state.path.ids.last, state.path[id: id, case: \.editor] != nil else { return .none }
 
                             // Leaving goes through the editor, so a changed draft asks first and a save in flight finishes.
-                            return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
+                            return reduce(into: &state, action: .path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
                         case .settings:
                             state.settings.popToRoot()
                             return .none

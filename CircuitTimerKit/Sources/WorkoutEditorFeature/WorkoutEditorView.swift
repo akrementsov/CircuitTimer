@@ -17,7 +17,7 @@ public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
     @FocusState private var focusedField: EditorField?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
-    // Pushed, the editor shares its navigation stack with the list; its own edit mode keeps the list out of it.
+    // Pushed onto a stack, the editor would otherwise share the stack's edit mode with the screens below it.
     @State private var editMode: EditMode = .inactive
 
     public init(store: StoreOf<WorkoutEditorFeature>) {
@@ -61,17 +61,11 @@ public struct WorkoutEditorView: View {
         .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        // A system pop removes the screen without asking the reducer and would drop an unsaved draft.
+        // Hiding the system back button also turns off the back gestures, so leaving goes only through Back.
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
-        .onChange(of: focusedField) { _, field in
-            guard let action = actionAfterFocusLoss else { return }
-
-            actionAfterFocusLoss = nil
-            // Focusing a field again cancels the request instead of leaving under the user's typing.
-            if field == nil {
-                send(action)
-            }
-        }
+        .onChange(of: focusedField) { _, field in focusChanged(to: field) }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
         .environment(\.editMode, $editMode)
@@ -97,8 +91,10 @@ public struct WorkoutEditorView: View {
                 }
                 .labelStyle(.iconOnly)
             }
-            .foregroundStyle(.text(.primary))
+            // Tint, not a foreground style, so the chevron still dims while saving.
+            .tint(.text(.primary))
             .disabled(store.isSaving)
+            .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
         }
         ToolbarItem(placement: .confirmationAction) {
             if store.isSaving {
@@ -110,6 +106,8 @@ public struct WorkoutEditorView: View {
                     Text("editor.save", bundle: .module)
                 }
                 .disabled(!store.canSave)
+                // Escape from a bar item would otherwise go up to the navigation controller; it always means leave.
+                .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
             }
         }
         // Reordering by drag is not discoverable without an explicit edit mode.
@@ -174,15 +172,33 @@ public struct WorkoutEditorView: View {
     }
 
     /// Sends `action` once no field is focused, so the reducer sees the text the user last typed.
+    /// This lives in the view because only the view sees when a text field commits its last edit.
     /// The first request wins until it is sent.
     private func send(afterClearingFocus action: WorkoutEditorFeature.Action.View) {
-        guard actionAfterFocusLoss == nil else { return }
+        if let pending = actionAfterFocusLoss {
+            // Focus is gone but no change came to deliver the request; deliver it now rather than leave the buttons dead.
+            if focusedField == nil {
+                actionAfterFocusLoss = nil
+                send(pending)
+            }
+            return
+        }
 
         if focusedField == nil {
             send(action)
         } else {
             actionAfterFocusLoss = action
             focusedField = nil
+        }
+    }
+
+    private func focusChanged(to field: EditorField?) {
+        guard let action = actionAfterFocusLoss else { return }
+
+        actionAfterFocusLoss = nil
+        // Focusing a field again cancels the request instead of leaving under the user's typing.
+        if field == nil {
+            send(action)
         }
     }
 

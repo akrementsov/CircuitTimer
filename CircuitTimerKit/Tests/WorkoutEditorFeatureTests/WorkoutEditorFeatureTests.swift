@@ -217,7 +217,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_backButtonTapped_withoutChangesDismissesAndWithChangesAsks() async {
+    func test_backButtonTapped_unchangedOrChanged_dismissesOrAsks() async {
         let dismissals = LockIsolated(0)
         let dependencies: (inout DependencyValues) -> Void = { $0.dismiss = DismissEffect { dismissals.withValue { $0 += 1 } } }
         let untouchedEdit = makeStore(dependencies: dependencies)
