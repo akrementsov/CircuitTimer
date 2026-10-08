@@ -63,6 +63,8 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 Palette.screen
             case .surface(.card), .stage(.pause):
                 Palette.card
+            case .surface(.cardInactive):
+                Palette.cardInactive
             case .stage(.work), .brand:
                 Palette.accent
             case .stage(.rest):
@@ -103,6 +105,7 @@ enum Palette {
     static let gray = Value(red: 0.596, green: 0.596, blue: 0.624)
     static let screen = Value(red: 0.110, green: 0.110, blue: 0.122)
     static let card = Value(red: 0.173, green: 0.173, blue: 0.188)
+    static let cardInactive = Value(red: 0.145, green: 0.145, blue: 0.161)
     static let accent = Value(red: 0.906, green: 0.996, blue: 0.329)
     static let cyan = Value(red: 0.400, green: 0.929, blue: 1)
     static let danger = Value(red: 1, green: 0.118, blue: 0.118)

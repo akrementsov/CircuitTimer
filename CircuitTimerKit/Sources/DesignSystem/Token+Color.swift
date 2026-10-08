@@ -9,6 +9,8 @@ extension DesignSystem.Token {
     public enum SurfaceColor: Sendable, CaseIterable {
         case screen
         case card
+        /// Rows that cannot be tapped, such as the app version.
+        case cardInactive
     }
 
     public enum StageColor: Sendable, CaseIterable {
@@ -38,6 +40,8 @@ extension ShapeStyle where Self == Color {
                 Color("SurfaceScreen", bundle: .module)
             case .card:
                 Color("SurfaceCard", bundle: .module)
+            case .cardInactive:
+                Color("SurfaceCardInactive", bundle: .module)
         }
     }
 
