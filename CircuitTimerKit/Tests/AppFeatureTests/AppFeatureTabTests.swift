@@ -115,6 +115,7 @@ struct AppFeatureTabTests {
             $0.workouts = .loaded([renamed, self.second])
         }
         await store.receive(\.path.popFrom) { $0.path = StackState() }
+        await store.finish()
         await store.send(.view(.addButtonTapped)) {
             $0.path[id: 1] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
         }
