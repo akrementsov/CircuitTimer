@@ -21,7 +21,6 @@ public struct SettingsView: View {
                 .buttonStyle(.settingsCard)
             }
             .navigationTitle(Text("settings.title", bundle: .module))
-            .toolbarRole(.editor)
             .screenChrome()
         } destination: { pathStore in
             switch pathStore.case {

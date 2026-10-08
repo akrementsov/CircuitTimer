@@ -8,7 +8,6 @@ struct LegalDocumentView: View {
     var body: some View {
         ScrollView {}
             .navigationTitle(document.title)
-            .toolbarRole(.editor)
             .screenChrome()
     }
 }

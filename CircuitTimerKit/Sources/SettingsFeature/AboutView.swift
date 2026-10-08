@@ -22,7 +22,6 @@ struct AboutView: View {
                 .padding(.top, .token(spacing: .m))
         }
         .navigationTitle(Text("settings.about", bundle: .module))
-        .toolbarRole(.editor)
         .screenChrome()
     }
 
