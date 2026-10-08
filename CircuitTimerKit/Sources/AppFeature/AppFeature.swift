@@ -141,7 +141,7 @@ public struct AppFeature: Sendable {
                             guard let id = state.path.ids.last, state.path[id: id, case: \.editor] != nil else { return .none }
 
                             // Leaving goes through the editor, so a changed draft asks first and a save in flight finishes.
-                            return reduce(into: &state, action: .path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
+                            return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
                         case .settings:
                             state.settings.popToRoot()
                             return .none

@@ -58,7 +58,7 @@ public struct WorkoutEditorView: View {
             stagesSection(.coolDown)
         }
         .disabled(store.isSaving)
-        .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
+        .accessibilityAction(.escape, leave)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         // A system pop removes the screen without asking the reducer and would drop an unsaved draft.
@@ -81,9 +81,7 @@ public struct WorkoutEditorView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button {
-                send(afterClearingFocus: .backButtonTapped)
-            } label: {
+            Button(action: leave) {
                 Label {
                     Text("editor.back", bundle: .module)
                 } icon: {
@@ -94,21 +92,23 @@ public struct WorkoutEditorView: View {
             // Tint, not a foreground style, so the chevron still dims while saving.
             .tint(.text(.primary))
             .disabled(store.isSaving)
-            .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
+            // Escape from a bar item would otherwise go up to the navigation controller; on every item it means leave.
+            .accessibilityAction(.escape, leave)
         }
         ToolbarItem(placement: .confirmationAction) {
-            if store.isSaving {
-                ProgressView()
-            } else {
-                Button {
-                    send(afterClearingFocus: .saveButtonTapped)
-                } label: {
-                    Text("editor.save", bundle: .module)
+            Group {
+                if store.isSaving {
+                    ProgressView()
+                } else {
+                    Button {
+                        send(afterClearingFocus: .saveButtonTapped)
+                    } label: {
+                        Text("editor.save", bundle: .module)
+                    }
+                    .disabled(!store.canSave)
                 }
-                .disabled(!store.canSave)
-                // Escape from a bar item would otherwise go up to the navigation controller; it always means leave.
-                .accessibilityAction(.escape) { send(afterClearingFocus: .backButtonTapped) }
             }
+            .accessibilityAction(.escape, leave)
         }
         // Reordering by drag is not discoverable without an explicit edit mode.
         ToolbarItem(placement: .bottomBar) {
@@ -116,6 +116,7 @@ public struct WorkoutEditorView: View {
             EditButton()
                 .environment(\.editMode, $editMode)
                 .disabled(store.isSaving)
+                .accessibilityAction(.escape, leave)
         }
     }
 
@@ -171,15 +172,21 @@ public struct WorkoutEditorView: View {
         }
     }
 
+    private func leave() {
+        send(afterClearingFocus: .backButtonTapped)
+    }
+
     /// Sends `action` once no field is focused, so the reducer sees the text the user last typed.
     /// This lives in the view because only the view sees when a text field commits its last edit.
-    /// The first request wins until it is sent.
+    /// The first request wins until it is sent: a later tap delivers the pending request, not its own.
     private func send(afterClearingFocus action: WorkoutEditorFeature.Action.View) {
         if let pending = actionAfterFocusLoss {
-            // Focus is gone but no change came to deliver the request; deliver it now rather than leave the buttons dead.
+            // No focus change came to deliver the request; retry instead of leaving the buttons dead.
             if focusedField == nil {
                 actionAfterFocusLoss = nil
                 send(pending)
+            } else {
+                focusedField = nil
             }
             return
         }
