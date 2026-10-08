@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import Foundation
+import SettingsFeature
 import SwiftUI
 import WorkoutDomain
 import WorkoutEditorFeature
@@ -14,6 +15,38 @@ public struct AppView: View {
     }
 
     public var body: some View {
+        // No tint or bar background here: the selected tab takes the accent color, the bar stays the system one.
+        TabView(selection: $store.selectedTab.sending(\.view.tabSelected)) {
+            workoutsTab
+                .tabItem {
+                    Label {
+                        Text("tabs.workouts", bundle: .module)
+                    } icon: {
+                        Image(systemName: "figure.run")
+                    }
+                }
+                .tag(AppFeature.RootTab.workouts)
+            SettingsView(store: store.scope(\.settings, action: \.settings))
+                .tabItem {
+                    Label {
+                        Text("tabs.settings", bundle: .module)
+                    } icon: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+                .tag(AppFeature.RootTab.settings)
+        }
+        .task { send(.task) }
+        // Presented over the tab bar, so the editor and the write-failure alert show on either tab.
+        .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
+            NavigationStack {
+                WorkoutEditorView(store: editorStore)
+            }
+        }
+        .alert($store.scope(\.$destination, action: \.destination).alert)
+    }
+
+    private var workoutsTab: some View {
         NavigationStack {
             content
                 .navigationTitle(Text("workouts.title", bundle: .module))
@@ -36,13 +69,6 @@ public struct AppView: View {
                 }
                 .screenChrome()
         }
-        .task { send(.task) }
-        .sheet(item: $store.scope(\.$destination, action: \.destination).editor) { editorStore in
-            NavigationStack {
-                WorkoutEditorView(store: editorStore)
-            }
-        }
-        .alert($store.scope(\.$destination, action: \.destination).alert)
     }
 
     @ViewBuilder
@@ -254,8 +280,13 @@ private struct WorkoutRow: View {
 }
 
 @MainActor
-private func previewStore(_ content: AppFeature.Content, hiddenRecordCount: Int = 0) -> StoreOf<AppFeature> {
+private func previewStore(
+    _ content: AppFeature.Content,
+    hiddenRecordCount: Int = 0,
+    selectedTab: AppFeature.RootTab = .workouts
+) -> StoreOf<AppFeature> {
     var state = AppFeature.State()
+    state.selectedTab = selectedTab
     state.workouts = content
     state.hiddenRecordCount = hiddenRecordCount
     return Store(initialState: state) { AppFeature() }
@@ -290,6 +321,11 @@ private func previewWorkouts(count: Int) -> IdentifiedArrayOf<Workout> {
 
 #Preview("Empty with hidden records") {
     AppView(store: previewStore(.loaded([]), hiddenRecordCount: 2))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Settings tab") {
+    AppView(store: previewStore(.loaded(previewWorkouts(count: 6)), selectedTab: .settings))
         .preferredColorScheme(.dark)
 }
 

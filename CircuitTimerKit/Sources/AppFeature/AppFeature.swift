@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import os
+import SettingsFeature
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutStorage
@@ -26,8 +27,15 @@ public struct AppFeature: Sendable {
         case edit(Workout.ID)
     }
 
+    public enum RootTab: Hashable, Sendable {
+        case workouts
+        case settings
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
+        public var selectedTab: RootTab = .workouts
+        public var settings = SettingsFeature.State()
         public var workouts: Content = .idle
         /// Stored records the list cannot show: unreadable workouts and extra copies of shown ones.
         public var hiddenRecordCount = 0
@@ -55,10 +63,12 @@ public struct AppFeature: Sendable {
         case view(View)
         case `internal`(Internal)
         case destination(PresentationAction<Destination.Action>)
+        case settings(SettingsFeature.Action)
 
         @CasePathable
         public enum View: Equatable, Sendable {
             case task
+            case tabSelected(RootTab)
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
@@ -90,6 +100,9 @@ public struct AppFeature: Sendable {
     public init() {}
 
     public var body: some ReducerOf<Self> {
+        Scope(\.settings, action: \.settings) {
+            SettingsFeature()
+        }
         Reduce { state, action in
             switch action {
                 case let .view(action):
@@ -98,7 +111,7 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .destination(.presented(.editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
-                case .destination:
+                case .destination, .settings:
                     .none
             }
         }
@@ -111,6 +124,23 @@ public struct AppFeature: Sendable {
                 guard state.workouts == .idle else { return .none }
 
                 return loadWorkouts(&state)
+            case let .tabSelected(tab):
+                if tab == state.selectedTab {
+                    // A tap on the selected tab returns it to its root.
+                    switch tab {
+                        case .workouts:
+                            // TODO: [CT-UI-4] Pop the workouts stack once the editor is pushed onto it.
+                            break
+                        case .settings:
+                            state.settings.popToRoot()
+                    }
+                    return .none
+                }
+
+                state.selectedTab = tab
+                // Leaving the list drops its pending editor request, so it does not open when the user comes back.
+                state.deferredEditor = nil
+                return .none
             case .retryButtonTapped:
                 return loadWorkouts(&state)
             case .addButtonTapped:
@@ -213,7 +243,7 @@ public struct AppFeature: Sendable {
 
         // A request that cannot open now is dropped rather than kept for a surprise later.
         state.deferredEditor = nil
-        guard state.destination == nil else { return .none }
+        guard state.destination == nil, state.selectedTab == .workouts else { return .none }
 
         switch request {
             case .create:

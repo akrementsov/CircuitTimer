@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
+        .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
     ],
     dependencies: [
@@ -33,6 +34,7 @@ let package = Package(
             name: "AppFeature",
             dependencies: [
                 "DesignSystem",
+                "SettingsFeature",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
                 "WorkoutStorage",
@@ -45,6 +47,7 @@ let package = Package(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
+                "SettingsFeature",
                 "WorkoutDomain",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -54,6 +57,15 @@ let package = Package(
         ),
         .target(
             name: "DesignSystem",
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "SettingsFeature",
+            dependencies: [
+                "DesignSystem",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
@@ -85,6 +97,15 @@ let package = Package(
         .testTarget(
             name: "DesignSystemTests",
             dependencies: ["DesignSystem"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "SettingsFeatureTests",
+            dependencies: [
+                "SettingsFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
