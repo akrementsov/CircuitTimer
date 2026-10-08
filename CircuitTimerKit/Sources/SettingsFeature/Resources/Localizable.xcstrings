@@ -49,6 +49,22 @@
         }
       }
     },
+    "about.version.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App version unknown"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версия приложения неизвестна"
+          }
+        }
+      }
+    },
     "settings.about" : {
       "localizations" : {
         "en" : {
