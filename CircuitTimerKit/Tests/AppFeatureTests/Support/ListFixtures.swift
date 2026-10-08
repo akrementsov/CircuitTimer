@@ -23,6 +23,24 @@ func makeStore(
     }
 }
 
+/// Holds a stubbed storage call in flight until the test opens it, so the test can act in between.
+struct Gate: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream()
+    }
+
+    func wait() async {
+        for await _ in stream {}
+    }
+
+    func open() {
+        continuation.finish()
+    }
+}
+
 func makeStage(_ number: Int, _ intensity: Stage.Intensity = .work) -> Stage {
     Stage(id: UUID(fixture: number), name: "Stage \(number)", duration: .seconds(10), intensity: intensity)
 }

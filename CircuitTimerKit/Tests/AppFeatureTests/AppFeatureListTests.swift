@@ -456,6 +456,29 @@ struct AppFeatureListTests {
     }
 
     @Test
+    func test_deferredEditor_onSettingsTab_isDroppedOnBothPresentPaths() async {
+        var state = loaded([first, second])
+        state.selectedTab = .settings
+        state.pendingMutations = [.delete(UUID(fixture: 99))]
+        state.deferredEditor = .create
+        let store = makeStore(state)
+        await store.send(.internal(.mutationFinished(.applied))) {
+            $0.pendingMutations = []
+            $0.deferredEditor = nil
+        }
+
+        var loading = AppFeature.State()
+        loading.workouts = .loading
+        loading.selectedTab = .settings
+        loading.deferredEditor = .edit(first.id)
+        let loadingStore = makeStore(loading)
+        await loadingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [first])))) {
+            $0.workouts = .loaded([self.first])
+            $0.deferredEditor = nil
+        }
+    }
+
+    @Test
     func test_deferredEditor_isDroppedWhenSomethingIsAlreadyPresented() async {
         var state = loaded([first])
         state.pendingMutations = [.delete(UUID(fixture: 99))]

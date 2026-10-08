@@ -47,6 +47,7 @@ let package = Package(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
+                "SettingsFeature",
                 "WorkoutDomain",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -96,6 +97,15 @@ let package = Package(
         .testTarget(
             name: "DesignSystemTests",
             dependencies: ["DesignSystem"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "SettingsFeatureTests",
+            dependencies: [
+                "SettingsFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
