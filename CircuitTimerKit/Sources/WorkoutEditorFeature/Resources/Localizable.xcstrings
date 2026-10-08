@@ -17,18 +17,18 @@
         }
       }
     },
-    "editor.cancel" : {
+    "editor.back" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cancel"
+            "value" : "Back"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Отмена"
+            "value" : "Назад"
           }
         }
       }

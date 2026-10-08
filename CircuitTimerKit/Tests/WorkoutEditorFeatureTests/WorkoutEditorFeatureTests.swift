@@ -35,7 +35,7 @@ struct WorkoutEditorFeatureTests {
 
         #expect(!store.state.hasChanges)
         #expect(!store.state.canSave)
-        await store.send(.view(.cancelButtonTapped))
+        await store.send(.view(.backButtonTapped))
         #expect(dismissed.value)
     }
 
@@ -169,7 +169,7 @@ struct WorkoutEditorFeatureTests {
             $0.dismiss = DismissEffect {}
         }
         await store.send(.view(.nameChanged("Renamed"))) { $0.draft.name = "Renamed" }
-        await store.send(.view(.cancelButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
+        await store.send(.view(.backButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
 
         await store.send(.view(.saveButtonTapped)) {
             $0.destination = nil
@@ -217,7 +217,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_cancel_withoutChangesDismissesAndWithChangesAsks() async {
+    func test_backButtonTapped_withoutChangesDismissesAndWithChangesAsks() async {
         let dismissals = LockIsolated(0)
         let dependencies: (inout DependencyValues) -> Void = { $0.dismiss = DismissEffect { dismissals.withValue { $0 += 1 } } }
         let untouchedEdit = makeStore(dependencies: dependencies)
@@ -227,10 +227,10 @@ struct WorkoutEditorFeatureTests {
         )
         let changed = makeStore(dependencies: dependencies)
 
-        await untouchedEdit.send(.view(.cancelButtonTapped))
-        await untouchedNew.send(.view(.cancelButtonTapped))
+        await untouchedEdit.send(.view(.backButtonTapped))
+        await untouchedNew.send(.view(.backButtonTapped))
         await changed.send(.view(.nameChanged("Renamed"))) { $0.draft.name = "Renamed" }
-        await changed.send(.view(.cancelButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
+        await changed.send(.view(.backButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
 
         #expect(dismissals.value == 2)
     }
@@ -241,12 +241,12 @@ struct WorkoutEditorFeatureTests {
         let store = makeStore { $0.dismiss = DismissEffect { dismissals.withValue { $0 += 1 } } }
         await store.send(.view(.nameChanged("Renamed"))) { $0.draft.name = "Renamed" }
 
-        await store.send(.view(.cancelButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
+        await store.send(.view(.backButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
         await store.send(.destination(.dismiss)) { $0.destination = nil }
         #expect(dismissals.value == 0)
         #expect(store.state.draft.name == "Renamed")
 
-        await store.send(.view(.cancelButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
+        await store.send(.view(.backButtonTapped)) { $0.destination = .discardConfirmation(.discardChanges) }
         await store.send(.destination(.presented(.discardConfirmation(.discard)))) { $0.destination = nil }
         #expect(dismissals.value == 1)
     }
@@ -271,7 +271,7 @@ struct WorkoutEditorFeatureTests {
             .stageDurationChanged(.training, stage, .seconds(1)),
             .stageIntensityTapped(.training, stage),
             .stageDurationTapped(stage),
-            .cancelButtonTapped,
+            .backButtonTapped,
             .saveButtonTapped,
         ]
 
