@@ -15,24 +15,6 @@ struct AppFeatureListTests {
     private let first = makeWorkout(1)
     private let second = makeWorkout(2)
 
-    private func loaded(_ workouts: [Workout]) -> AppFeature.State {
-        var state = AppFeature.State()
-        state.workouts = .loaded(IdentifiedArray(uniqueElements: workouts))
-        return state
-    }
-
-    private func makeStore(
-        _ state: AppFeature.State,
-        dependencies: (inout DependencyValues) -> Void = { _ in }
-    ) -> TestStoreOf<AppFeature> {
-        TestStore(initialState: state) {
-            AppFeature()
-        } withDependencies: {
-            $0.uuid = .incrementing
-            dependencies(&$0)
-        }
-    }
-
     @Test
     func test_load_takesHiddenCountUniquesIDsAndReplacesCountOnReload() async {
         let responses = LockIsolated([
@@ -56,18 +38,17 @@ struct AppFeatureListTests {
     }
 
     @Test(arguments: [
-        (AppFeature.Content.idle, false, false),
-        (.loading, false, false),
-        (.failed, false, false),
-        (.loaded([]), true, false),
-        (.loaded([makeWorkout(1)]), true, true),
+        (AppFeature.Content.idle, false),
+        (.loading, false),
+        (.failed, false),
+        (.loaded([]), true),
+        (.loaded([makeWorkout(1)]), true),
     ])
-    func test_listFlags_followContent(content: AppFeature.Content, canAdd: Bool, canEdit: Bool) {
+    func test_listFlags_followContent(content: AppFeature.Content, canAdd: Bool) {
         var state = AppFeature.State()
         state.workouts = content
 
         #expect(state.canAddWorkout == canAdd)
-        #expect(state.canEditList == canEdit)
     }
 
     @Test
@@ -133,6 +114,8 @@ struct AppFeatureListTests {
         await notLoaded.send(.view(.deleteButtonTapped(first.id)))
         await notLoaded.send(.view(.duplicateButtonTapped(first.id)))
         await notLoaded.send(.view(.workoutsMoved(IndexSet(integer: 0), 1)))
+        await notLoaded.send(.view(.workoutMovedUp(first.id)))
+        await notLoaded.send(.view(.workoutMovedDown(first.id)))
     }
 
     @Test
@@ -174,6 +157,34 @@ struct AppFeatureListTests {
         let call = try #require(inserted.value.first)
         #expect(call.0 == copy)
         #expect(call.1 == original.id)
+    }
+
+    @Test(arguments: ["", "   "])
+    func test_duplicate_untitledWorkout_namesCopyAfterDisplayName(name: String) async throws {
+        let inserted = LockIsolated<[(Workout, Workout.ID)]>([])
+        let untitled = makeWorkout(1, name: name)
+        let store = makeStore(loaded([untitled, second])) {
+            $0.workoutStorage.insert = { workout, anchor in
+                inserted.withValue { $0.append((workout, anchor)) }
+                return .applied
+            }
+        }
+        store.exhaustivity = .off
+
+        await store.send(.view(.duplicateButtonTapped(untitled.id)))
+        await store.receive(\.internal.mutationFinished)
+
+        guard case let .loaded(workouts) = store.state.workouts else {
+            Issue.record("The list is not loaded")
+            return
+        }
+        #expect(workouts.ids.elements == [untitled.id, UUID(0), second.id])
+        // `make test` runs in English, so the catalog's English variant applies.
+        #expect(workouts[1].name == "Untitled workout copy")
+        #expect(workouts[0].name == name)
+        let call = try #require(inserted.value.first)
+        #expect(call.0 == workouts[1])
+        #expect(call.1 == untitled.id)
     }
 
     @Test
@@ -245,7 +256,8 @@ struct AppFeatureListTests {
     @Test
     func test_divergence_reloadsOnceTheQueueDrains() async {
         let clock = TestClock()
-        let store = makeStore(loaded([first, second])) {
+        let third = makeWorkout(3)
+        let store = makeStore(loaded([first, second, third])) {
             $0.workoutStorage.delete = { _ in
                 try await clock.sleep(for: .seconds(1))
                 return .storeDiverged
@@ -258,15 +270,16 @@ struct AppFeatureListTests {
         }
 
         await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([self.second])
+            $0.workouts = .loaded([self.second, third])
             $0.pendingMutations = [.delete(self.first.id)]
         }
-        await store.send(.view(.workoutsMoved(IndexSet(integer: 0), 1))) {
-            $0.pendingMutations = [.delete(self.first.id), .reorder([self.second.id])]
+        await store.send(.view(.workoutsMoved(IndexSet(integer: 1), 0))) {
+            $0.workouts = .loaded([third, self.second])
+            $0.pendingMutations = [.delete(self.first.id), .reorder([third.id, self.second.id])]
         }
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFinished) {
-            $0.pendingMutations = [.reorder([self.second.id])]
+            $0.pendingMutations = [.reorder([third.id, self.second.id])]
             $0.needsReload = true
         }
         await clock.advance(by: .seconds(1))
@@ -284,7 +297,8 @@ struct AppFeatureListTests {
     func test_writeFailure_dropsQueueShowsAlertAndReloads() async {
         let clock = TestClock()
         let reorderCalls = LockIsolated(0)
-        var state = loaded([first, second])
+        let third = makeWorkout(3)
+        var state = loaded([first, second, third])
         state.deferredEditor = .create
         let store = makeStore(state) {
             $0.workoutStorage.delete = { _ in
@@ -299,11 +313,12 @@ struct AppFeatureListTests {
         }
 
         await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([self.second])
+            $0.workouts = .loaded([self.second, third])
             $0.pendingMutations = [.delete(self.first.id)]
         }
-        await store.send(.view(.workoutsMoved(IndexSet(integer: 0), 1))) {
-            $0.pendingMutations = [.delete(self.first.id), .reorder([self.second.id])]
+        await store.send(.view(.workoutsMoved(IndexSet(integer: 1), 0))) {
+            $0.workouts = .loaded([third, self.second])
+            $0.pendingMutations = [.delete(self.first.id), .reorder([third.id, self.second.id])]
         }
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFailed) {
@@ -319,7 +334,7 @@ struct AppFeatureListTests {
         #expect(reorderCalls.value == 0)
     }
 
-    @Test(arguments: ["delete", "insert", "reorder"])
+    @Test(arguments: ["delete", "insert", "reorder", "moveUp", "moveDown"])
     func test_writeFailure_anyKind_reportsFailure(kind: String) async {
         let store = makeStore(loaded([first, second])) {
             $0.workoutStorage.delete = { _ in throw WriteFailure() }
@@ -332,6 +347,8 @@ struct AppFeatureListTests {
         switch kind {
             case "delete": await store.send(.view(.deleteButtonTapped(first.id)))
             case "insert": await store.send(.view(.duplicateButtonTapped(first.id)))
+            case "moveUp": await store.send(.view(.workoutMovedUp(second.id)))
+            case "moveDown": await store.send(.view(.workoutMovedDown(first.id)))
             default: await store.send(.view(.workoutsMoved(IndexSet(integer: 1), 0)))
         }
 
@@ -450,21 +467,5 @@ struct AppFeatureListTests {
             $0.pendingMutations = []
             $0.deferredEditor = nil
         }
-    }
-}
-
-private func makeStage(_ number: Int, _ intensity: Stage.Intensity = .work) -> Stage {
-    Stage(id: UUID(fixture: number), name: "Stage \(number)", duration: .seconds(10), intensity: intensity)
-}
-
-private func makeWorkout(_ number: Int, name: String? = nil) -> Workout {
-    Workout(id: UUID(fixture: number), name: name ?? "Workout \(number)", training: [makeStage(number * 100)])
-}
-
-private extension UUID {
-    init(fixture number: Int) {
-        let high = UInt8(truncatingIfNeeded: number >> 8)
-        let low = UInt8(truncatingIfNeeded: number)
-        self.init(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, high, low))
     }
 }

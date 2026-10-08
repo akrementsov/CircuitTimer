@@ -23,6 +23,9 @@ struct TypographyTokenTests {
             case .footnote:
                 #expect(regular.pointSize == 12)
                 #expect(regular.weight == Self.resolvedWeight(.regular))
+            case .icon:
+                #expect(regular.pointSize == 15)
+                #expect(regular.weight == Self.resolvedWeight(.light))
             case .timerLarge:
                 // Rounded design and monospaced digits are only visible on the resolved font as a whole,
                 // so the expected font is written out as a system font.

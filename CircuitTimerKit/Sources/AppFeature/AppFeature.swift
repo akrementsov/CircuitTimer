@@ -42,10 +42,6 @@ public struct AppFeature: Sendable {
         public var canAddWorkout: Bool {
             if case .loaded = workouts { true } else { false }
         }
-
-        public var canEditList: Bool {
-            if case let .loaded(workouts) = workouts { !workouts.isEmpty } else { false }
-        }
     }
 
     public enum Content: Equatable, Sendable {
@@ -69,6 +65,8 @@ public struct AppFeature: Sendable {
             case deleteButtonTapped(Workout.ID)
             case duplicateButtonTapped(Workout.ID)
             case workoutsMoved(IndexSet, Int)
+            case workoutMovedUp(Workout.ID)
+            case workoutMovedDown(Workout.ID)
         }
 
         @CasePathable
@@ -140,9 +138,28 @@ public struct AppFeature: Sendable {
             case let .workoutsMoved(source, destination):
                 guard case var .loaded(workouts) = state.workouts else { return .none }
 
+                let order = workouts.ids
                 workouts.move(fromOffsets: source, toOffset: destination)
-                state.workouts = .loaded(workouts)
-                return enqueue(.reorder(Array(workouts.ids)), &state)
+                // A drop in place still reports a move; there is nothing to write.
+                guard workouts.ids != order else { return .none }
+
+                return reorder(workouts, &state)
+            case let .workoutMovedUp(id):
+                guard
+                    case var .loaded(workouts) = state.workouts,
+                    let index = workouts.indexMovableUp(id)
+                else { return .none }
+
+                workouts.swapAt(index, index - 1)
+                return reorder(workouts, &state)
+            case let .workoutMovedDown(id):
+                guard
+                    case var .loaded(workouts) = state.workouts,
+                    let index = workouts.indexMovableDown(id)
+                else { return .none }
+
+                workouts.swapAt(index, index + 1)
+                return reorder(workouts, &state)
         }
     }
 
@@ -210,6 +227,11 @@ public struct AppFeature: Sendable {
         return .none
     }
 
+    private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
+        state.workouts = .loaded(workouts)
+        return enqueue(.reorder(Array(workouts.ids)), &state)
+    }
+
     private func enqueue(_ mutation: ListMutation, _ state: inout State) -> Effect<Action> {
         state.pendingMutations.append(mutation)
         guard state.pendingMutations.count == 1 else { return .none }
@@ -237,7 +259,7 @@ public struct AppFeature: Sendable {
     }
 
     private func duplicate(_ workout: Workout) -> Workout {
-        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.name)", bundle: .module))
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
         copy.trainingRounds = workout.trainingRounds
         copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
         copy.pauseAfterTraining = workout.pauseAfterTraining
@@ -284,5 +306,21 @@ extension AlertState where Action == Never {
         AlertState {
             TextState("workouts.mutationFailed.title", bundle: .module)
         }
+    }
+}
+
+/// One edge rule for the reducer and the rows' VoiceOver move actions:
+/// the index of `id` when it can move one place, otherwise `nil`.
+extension IdentifiedArray {
+    func indexMovableUp(_ id: ID) -> Int? {
+        guard let index = index(id: id), index > startIndex else { return nil }
+
+        return index
+    }
+
+    func indexMovableDown(_ id: ID) -> Int? {
+        guard let index = index(id: id), index < endIndex - 1 else { return nil }
+
+        return index
     }
 }
