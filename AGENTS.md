@@ -96,7 +96,7 @@ public struct SomeFeature: Sendable {
 
 - Views are `@ViewAction(for:)` and only `send` actions; no logic in `body`.
 - Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
-- A pushed screen without logic is a `@ReducerCaseIgnored` `Path` case that carries its data; it needs no reducer (see `SettingsFeature`).
+- A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.

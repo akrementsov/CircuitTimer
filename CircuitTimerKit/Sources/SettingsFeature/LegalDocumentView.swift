@@ -1,7 +1,12 @@
 import DesignSystem
 import SwiftUI
 
-/// Empty until the texts are written, as in the design.
+public enum LegalDocument: Hashable, Sendable, CaseIterable {
+    case privacyPolicy
+    case userAgreement
+}
+
+// TODO: [CT-7] Write the legal texts before the first external build; the pages are empty, as in the design.
 struct LegalDocumentView: View {
     let document: LegalDocument
 

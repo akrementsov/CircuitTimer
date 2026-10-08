@@ -6,8 +6,10 @@ import os
 public struct AppVersionClient: Sendable {
     /// The marketing version, such as "1.2"; `nil` when the bundle has none.
     public var shortVersion: @Sendable () -> String?
+}
 
-    static func shortVersion(in info: [String: Any]?) -> String? {
+extension AppVersionClient {
+    static func marketingVersion(in info: [String: Any]?) -> String? {
         guard let version = info?["CFBundleShortVersionString"] as? String, !version.isEmpty else { return nil }
 
         return version
@@ -17,7 +19,7 @@ public struct AppVersionClient: Sendable {
 extension AppVersionClient: DependencyKey {
     public static let liveValue = Self(
         shortVersion: {
-            guard let version = Self.shortVersion(in: Bundle.main.infoDictionary) else {
+            guard let version = Self.marketingVersion(in: Bundle.main.infoDictionary) else {
                 Self.logger.error("CFBundleShortVersionString is missing from the main bundle")
                 return nil
             }

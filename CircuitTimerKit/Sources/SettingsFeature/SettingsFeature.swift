@@ -14,10 +14,11 @@ public struct SettingsFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        public var path = StackState<Path.State>()
+        public internal(set) var path = StackState<Path.State>()
 
         public init() {}
 
+        /// Runs in the caller's reducer, outside this feature's `forEach`: pushed screens must own no effects.
         public mutating func popToRoot() {
             path.removeAll()
         }
@@ -64,8 +65,3 @@ public struct SettingsFeature: Sendable {
 
 extension SettingsFeature.Path.State: Equatable, Sendable {}
 extension SettingsFeature.Path.Action: Equatable, Sendable {}
-
-public enum LegalDocument: Hashable, Sendable, CaseIterable {
-    case privacyPolicy
-    case userAgreement
-}
