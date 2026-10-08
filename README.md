@@ -92,9 +92,16 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 ## Roadmap
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
-- [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions
+- [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions; the workflow is in place, the first tagged build is pending
 - [x] **CT-2** — workout list and editor, SwiftData persistence
-- [ ] **CT-UI** — dark design of the original app: launch screen, tab bar, workout list, editor, settings
+- [ ] **CT-UI** — dark design of the original app, in slices:
+  - [x] **CT-UI-1** — dark design tokens and the launch screen
+  - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
+  - [x] **CT-UI-3** — tab bar and the Settings tab with About and the legal pages
+  - [ ] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
+  - [ ] **CT-UI-5** — editor layout of the original app
+  - [ ] **CT-UI-6** — stage durations typed as MM:SS
+  - [ ] Swipe actions of the original list: delete and duplicate
 - [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names
 - [ ] **CT-4** — Live Activity and Dynamic Island
