@@ -29,6 +29,7 @@ graph TD
     WorkoutEditorFeature --> DesignSystem
     WorkoutEditorFeature --> WorkoutStorage
     WorkoutEditorFeature --> WorkoutDomain
+    SettingsFeature --> DesignSystem
     WorkoutStorage --> WorkoutDomain
     AppFeature -.-> WorkoutTimerFeature["WorkoutTimerFeature (planned)"]
     WorkoutTimerFeature -.-> WorkoutDomain
@@ -43,6 +44,7 @@ graph TD
 | `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `WorkoutEditorFeature` | The workout editor: a draft with Save and Cancel, stage editing within `WorkoutLimits`. |
+| `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `AppFeature` | The root TCA feature: the workout list with loading, empty and retryable error states; presents the editor. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).

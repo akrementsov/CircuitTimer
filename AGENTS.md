@@ -32,11 +32,13 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `DesignSystem` | SwiftUI | Spacing, radius, size, typography and color tokens; clock text; screen chrome |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
+| `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the workout list, presenting the editor |
 
 Layering:
 
 - `*Feature` → `DesignSystem`, `Workout*`. A feature never imports another feature; composition happens in `AppFeature`.
+- `SettingsFeature` needs no workout module and imports none.
 - `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - Planned: `WorkoutTimerFeature` (CT-3); `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
 
@@ -94,6 +96,7 @@ public struct SomeFeature: Sendable {
 
 - Views are `@ViewAction(for:)` and only `send` actions; no logic in `body`.
 - Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
+- A pushed screen without logic is a `@ReducerCaseIgnored` `Path` case that carries its data; it needs no reducer (see `SettingsFeature`).
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
