@@ -34,6 +34,7 @@ let package = Package(
             name: "AppFeature",
             dependencies: [
                 "DesignSystem",
+                "SettingsFeature",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
                 "WorkoutStorage",

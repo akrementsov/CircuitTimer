@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine and the workout list with its editor, stored in SwiftData, are in place; the timer screen comes next (see the roadmap).
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, and the Settings tab are in place; the timer screen comes next (see the roadmap).
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -26,6 +26,7 @@ graph TD
     AppFeature --> WorkoutStorage
     AppFeature --> WorkoutDomain
     AppFeature --> WorkoutEditorFeature
+    AppFeature --> SettingsFeature
     WorkoutEditorFeature --> DesignSystem
     WorkoutEditorFeature --> WorkoutStorage
     WorkoutEditorFeature --> WorkoutDomain
@@ -45,7 +46,7 @@ graph TD
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `WorkoutEditorFeature` | The workout editor: a draft with Save and Cancel, stage editing within `WorkoutLimits`. |
 | `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
-| `AppFeature` | The root TCA feature: the workout list with loading, empty and retryable error states; presents the editor. |
+| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; presents the editor. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 

@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import os
+import SettingsFeature
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutStorage
@@ -26,8 +27,15 @@ public struct AppFeature: Sendable {
         case edit(Workout.ID)
     }
 
+    public enum RootTab: Hashable, Sendable {
+        case workouts
+        case settings
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
+        public var selectedTab: RootTab = .workouts
+        public var settings = SettingsFeature.State()
         public var workouts: Content = .idle
         /// Stored records the list cannot show: unreadable workouts and extra copies of shown ones.
         public var hiddenRecordCount = 0
@@ -55,10 +63,12 @@ public struct AppFeature: Sendable {
         case view(View)
         case `internal`(Internal)
         case destination(PresentationAction<Destination.Action>)
+        case settings(SettingsFeature.Action)
 
         @CasePathable
         public enum View: Equatable, Sendable {
             case task
+            case tabSelected(RootTab)
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
@@ -90,6 +100,9 @@ public struct AppFeature: Sendable {
     public init() {}
 
     public var body: some ReducerOf<Self> {
+        Scope(\.settings, action: \.settings) {
+            SettingsFeature()
+        }
         Reduce { state, action in
             switch action {
                 case let .view(action):
@@ -98,7 +111,7 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .destination(.presented(.editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
-                case .destination:
+                case .destination, .settings:
                     .none
             }
         }
@@ -111,6 +124,23 @@ public struct AppFeature: Sendable {
                 guard state.workouts == .idle else { return .none }
 
                 return loadWorkouts(&state)
+            case let .tabSelected(tab):
+                guard tab != state.selectedTab else {
+                    // A tap on the selected tab returns it to its root.
+                    switch tab {
+                        case .workouts:
+                            // The list pushes no screens yet.
+                            break
+                        case .settings:
+                            state.settings.popToRoot()
+                    }
+                    return .none
+                }
+
+                state.selectedTab = tab
+                // An editor requested on the list must not open over another tab once the write finishes.
+                state.deferredEditor = nil
+                return .none
             case .retryButtonTapped:
                 return loadWorkouts(&state)
             case .addButtonTapped:
