@@ -42,6 +42,7 @@ public struct WorkoutEditorView: View {
                     Text("editor.saveHint", bundle: .module)
                 }
             }
+            .listRowBackground(Rectangle().fill(.surface(.card)))
 
             stagesSection(.warmUp)
             if store.draft.canPauseAfterWarmUp {
@@ -57,6 +58,9 @@ public struct WorkoutEditorView: View {
             }
             stagesSection(.coolDown)
         }
+        // Pushed, the form would take the base grouped colors (a black screen); keep the design's surfaces.
+        .scrollContentBackground(.hidden)
+        .background(.surface(.screen))
         .disabled(store.isSaving)
         .accessibilityAction(.escape, leave)
         .navigationTitle(title)
@@ -162,6 +166,7 @@ public struct WorkoutEditorView: View {
                 case .coolDown: Text("editor.section.coolDown", bundle: .module)
             }
         }
+        .listRowBackground(Rectangle().fill(.surface(.card)))
     }
 
     private func pauseSection(isOn: Binding<Bool>, @ViewBuilder label: () -> Text) -> some View {
@@ -170,6 +175,7 @@ public struct WorkoutEditorView: View {
         } footer: {
             Text("editor.pause.footer", bundle: .module)
         }
+        .listRowBackground(Rectangle().fill(.surface(.card)))
     }
 
     private func leave() {
