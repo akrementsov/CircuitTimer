@@ -125,11 +125,11 @@ public struct AppFeature: Sendable {
 
                 return loadWorkouts(&state)
             case let .tabSelected(tab):
-                guard tab != state.selectedTab else {
+                if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
                     switch tab {
                         case .workouts:
-                            // The list pushes no screens yet.
+                            // TODO: [CT-UI-4] Pop the workouts stack once the editor is pushed onto it.
                             break
                         case .settings:
                             state.settings.popToRoot()
@@ -138,7 +138,7 @@ public struct AppFeature: Sendable {
                 }
 
                 state.selectedTab = tab
-                // An editor requested on the list must not open over another tab once the write finishes.
+                // Leaving the list drops its pending editor request, so it does not open when the user comes back.
                 state.deferredEditor = nil
                 return .none
             case .retryButtonTapped:
@@ -243,7 +243,7 @@ public struct AppFeature: Sendable {
 
         // A request that cannot open now is dropped rather than kept for a surprise later.
         state.deferredEditor = nil
-        guard state.destination == nil else { return .none }
+        guard state.destination == nil, state.selectedTab == .workouts else { return .none }
 
         switch request {
             case .create:
