@@ -5,7 +5,7 @@ import SwiftUI
 import WorkoutDomain
 import WorkoutStorage
 
-/// Edits a draft of one workout and saves it on request. Cancelling with changes asks first.
+/// Edits a draft of one workout and saves it on request. Leaving with changes asks first.
 @Reducer
 public struct WorkoutEditorFeature: Sendable {
     // A dialog with actions needs a hand-written `Action`: with a macro-generated one the scoped
@@ -82,11 +82,6 @@ public struct WorkoutEditorFeature: Sendable {
             !isDraftComplete && !isSaving
         }
 
-        /// A swipe down must not drop unsaved changes or cancel a save in flight.
-        public var blocksInteractiveDismiss: Bool {
-            hasChanges || isSaving
-        }
-
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
             draft[section].count < WorkoutLimits.maxStagesPerSection
         }
@@ -115,7 +110,7 @@ public struct WorkoutEditorFeature: Sendable {
             case stageDurationChanged(WorkoutSectionKind, Stage.ID, Duration)
             case stageIntensityTapped(WorkoutSectionKind, Stage.ID)
             case stageDurationTapped(Stage.ID)
-            case cancelButtonTapped
+            case backButtonTapped
             case saveButtonTapped
         }
 
@@ -187,7 +182,7 @@ public struct WorkoutEditorFeature: Sendable {
                 updateStage(id, in: section, of: &state) { $0.intensity = $0.intensity == .work ? .rest : .work }
             case let .stageDurationTapped(id):
                 state.expandedStageID = state.expandedStageID == id ? nil : id
-            case .cancelButtonTapped:
+            case .backButtonTapped:
                 guard state.hasChanges else { return .run { [dismiss] _ in await dismiss() } }
 
                 state.destination = .discardConfirmation(.discardChanges)

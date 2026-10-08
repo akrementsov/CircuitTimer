@@ -44,9 +44,9 @@ graph TD
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
 | `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
-| `WorkoutEditorFeature` | The workout editor: a draft with Save and Cancel, stage editing within `WorkoutLimits`. |
+| `WorkoutEditorFeature` | The workout editor: a draft with Save and Back, stage editing within `WorkoutLimits`. |
 | `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
-| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; presents the editor. |
+| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the editor onto the Workouts stack. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -98,7 +98,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-UI-1** — dark design tokens and the launch screen
   - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
   - [x] **CT-UI-3** — tab bar and the Settings tab with About and the legal pages
-  - [ ] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
+  - [x] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
   - [ ] **CT-UI-5** — editor layout of the original app
   - [ ] **CT-UI-6** — stage durations typed as MM:SS
   - [ ] Swipe actions of the original list: delete and duplicate

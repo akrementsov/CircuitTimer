@@ -7,6 +7,7 @@ struct StageRow: View {
     let stage: Stage
     let isExpanded: Bool
     let name: Binding<String>
+    let focus: FocusState<EditorField?>.Binding
     let onIntensityTap: () -> Void
     let onDurationTap: () -> Void
     let onDurationChange: (Duration) -> Void
@@ -26,6 +27,7 @@ struct StageRow: View {
                 TextField(text: name, prompt: intensityName) {
                     Text("editor.stage.name", bundle: .module)
                 }
+                .focused(focus, equals: .stageName(stage.id))
                 .font(.token(.body))
 
                 Button(action: onDurationTap) {
