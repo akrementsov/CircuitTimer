@@ -137,12 +137,14 @@ public struct AppFeature: Sendable {
                     // A tap on the selected tab returns it to its root.
                     switch tab {
                         case .workouts:
-                            // TODO: [CT-UI-4] Pop the workouts stack once the editor is pushed onto it.
-                            break
+                            guard let id = state.path.ids.last, state.path[id: id, case: \.editor] != nil else { return .none }
+
+                            // Leaving goes through the editor, so a changed draft asks first and a save in flight finishes.
+                            return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
                         case .settings:
                             state.settings.popToRoot()
+                            return .none
                     }
-                    return .none
                 }
 
                 state.selectedTab = tab

@@ -98,7 +98,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-UI-1** — dark design tokens and the launch screen
   - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
   - [x] **CT-UI-3** — tab bar and the Settings tab with About and the legal pages
-  - [ ] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
+  - [x] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
   - [ ] **CT-UI-5** — editor layout of the original app
   - [ ] **CT-UI-6** — stage durations typed as MM:SS
   - [ ] Swipe actions of the original list: delete and duplicate
