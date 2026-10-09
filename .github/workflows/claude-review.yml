@@ -51,14 +51,13 @@ jobs:
           git -C "$RUNNER_TEMP/superpowers" checkout --quiet FETCH_HEAD
 
       - name: Review
+        id: review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          # Claude Code prints its errors to stdout, so the output goes to the log as well.
-          set -o pipefail
           [ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::Set the ANTHROPIC_API_KEY repository secret"; exit 1; }
           {
             cat .github/claude-review.md
@@ -68,7 +67,12 @@ jobs:
           claude -p --model "$CLAUDE_MODEL" --max-budget-usd "$MAX_BUDGET_USD" \
             --plugin-dir "$RUNNER_TEMP/superpowers" \
             --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
-            < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
+            --output-format json < "$RUNNER_TEMP/prompt.md" > "$RUNNER_TEMP/review.json" \
+            || { cat "$RUNNER_TEMP/review.json"; exit 1; }
+          # The result goes to the log as well: on failure it holds Claude Code's error.
+          jq -r .result "$RUNNER_TEMP/review.json" | tee "$RUNNER_TEMP/review.md"
+          # Claude Code's estimate at list prices, subagents included; Console shows the billed usage.
+          printf 'cost=%.2f\n' "$(jq -r .total_cost_usd "$RUNNER_TEMP/review.json")" >> "$GITHUB_OUTPUT"
           # Anything else, such as a stop at the budget cap, must not be posted as a review.
           grep -m 1 -v '^[[:space:]]*$' "$RUNNER_TEMP/review.md" | grep -qE '^## Claude review[[:space:]]*$' \
             || { echo "::error::Claude returned no review"; exit 1; }
@@ -80,10 +84,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          COST: ${{ steps.review.outputs.cost }}
         run: |
           {
             cat "$RUNNER_TEMP/review.md"
-            printf '\n---\n<sub>Reviewed at %s</sub>\n' "$HEAD_SHA"
+            printf '\n---\n<sub>Reviewed at %s · %s · about $%s</sub>\n' "$HEAD_SHA" "$CLAUDE_MODEL" "$COST"
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
 
