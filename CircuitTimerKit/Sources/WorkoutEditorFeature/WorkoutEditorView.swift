@@ -153,17 +153,13 @@ public struct WorkoutEditorView: View {
                 .cardRow(.top)
 
             if section == .training {
-                Stepper(
-                    value: $store.draft.trainingRounds.sending(\.view.trainingRoundsChanged),
-                    in: 1...WorkoutLimits.maxTrainingRounds
-                ) {
-                    Text("editor.rounds \(store.draft.trainingRounds)", bundle: .module)
-                }
-                .font(.token(.body))
-                .foregroundStyle(.text(.primary))
-                .padding(.horizontal, .token(spacing: .l))
-                .padding(.bottom, .token(spacing: .xs))
-                .cardRow(.middle)
+                // Through the focus-loss path on purpose, like the original app ending editing first: pending text
+                // is committed before the rounds change. Its "first request wins" rule holds here too: a second tap
+                // while focus is clearing delivers the first request, and a pending Back or Save goes out instead.
+                RoundsRow(rounds: store.draft.trainingRounds) { send(afterClearingFocus: .trainingRoundsChanged($0)) }
+                    .padding(.horizontal, .token(spacing: .l))
+                    .padding(.bottom, .token(spacing: .xs))
+                    .cardRow(.middle)
             }
 
             ForEach(stages) { stage in

@@ -293,6 +293,22 @@
         }
       }
     },
+    "editor.rounds.label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rounds"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Раунды"
+          }
+        }
+      }
+    },
     "editor.save" : {
       "localizations" : {
         "en" : {
