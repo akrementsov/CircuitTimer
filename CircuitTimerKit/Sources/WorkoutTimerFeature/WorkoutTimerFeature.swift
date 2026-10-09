@@ -57,7 +57,9 @@ public struct WorkoutTimerFeature: Sendable {
         public init(id: UUID, title: String, schedule: WorkoutSchedule) {
             self.id = id
             self.title = title
-            run = WorkoutRun(schedule: schedule)
+            // `@ObservableState` makes stored properties computed, so `self.run` can't be read before every property is set.
+            let run = WorkoutRun(schedule: schedule)
+            self.run = run
             // A new run is idle, or finished when the schedule is empty; neither reads the date.
             snapshot = run.snapshot(at: .distantPast)
             countdown = schedule.stages.isEmpty ? nil : Countdown(.start)
