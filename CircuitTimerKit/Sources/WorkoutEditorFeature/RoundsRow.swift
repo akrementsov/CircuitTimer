@@ -37,7 +37,9 @@ struct RoundsRow: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .imageScale(.large)
-                .foregroundStyle(isEnabled ? .brand : .brandInactive)
+                // A black sign on the square, as in the design, instead of a cut-out showing the row behind it.
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.text(.onAccent), isEnabled ? .brand : .brandInactive)
         }
         .buttonStyle(.borderless)
         .disabled(!isEnabled)
