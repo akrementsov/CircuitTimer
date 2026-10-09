@@ -133,6 +133,10 @@ public struct WorkoutTimerFeature: Sendable {
     // status or the action changed the countdown or the run; otherwise the running loop stays as it is.
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
+        // The close alert relies on a stopped clock; a control that slips under it would restart the clock or
+        // replace the alert.
+        if action != .task, state.destination != nil { return .none }
+
         let now = date()
         switch action {
             case .task:
@@ -186,7 +190,8 @@ public struct WorkoutTimerFeature: Sendable {
                 _ = advance(&state, at: now)
                 state.run.pause(at: now)
                 state.countdown = nil
-                state.hasClockFailed = true
+                // A run that has already finished has nothing to continue, so it shows its end instead.
+                state.hasClockFailed = state.snapshot.status != .finished
                 return syncClock(&state, at: now)
         }
     }
@@ -310,8 +315,10 @@ public struct WorkoutTimerFeature: Sendable {
         let wall = now.elapsed(since: anchor.date)
         if wall + Self.jumpTolerance < monotonic {
             let kept = anchor.totalElapsed + monotonic
+            // `elapsed(since:)` stops at zero, so a jump back past the anchor is measured from the other side.
+            let jump = now < anchor.date ? monotonic + anchor.date.elapsed(since: now) : monotonic - wall
             Self.logger.notice(
-                "The wall clock went back by \((monotonic - wall).inMilliseconds) ms; keeping \(kept.inMilliseconds) ms of the run"
+                "The wall clock went back by \(jump.inMilliseconds) ms; keeping \(kept.inMilliseconds) ms of the run"
             )
             state.run.rebase(at: now, keepingTotalElapsed: kept)
             return true
@@ -406,9 +413,10 @@ public struct WorkoutTimerFeature: Sendable {
         .cancellable(id: CancelID.clock(generation: generation))
     }
 
+    // Wakes whenever the stage clock changes its second and ends once its copy of the run stops.
     // Every input is passed in, so the loop reads nothing from the store or the dependencies.
-    /// Wakes whenever the stage clock changes its second and ends once its copy of the run stops.
-    static func tickLoop<C: Clock<Duration>>( // swiftlint:disable:this function_parameter_count
+    // swiftlint:disable:next function_parameter_count
+    static func tickLoop<C: Clock<Duration>>(
         clock: C,
         date: DateGenerator,
         session: TimerSessionClient,
@@ -439,9 +447,10 @@ public struct WorkoutTimerFeature: Sendable {
         return fraction > .zero ? fraction : .seconds(1)
     }
 
+    // Wakes once per remaining second. Every deadline is measured from one reading, so late wake-ups never add up.
     // Every input is passed in, so the loop reads nothing from the store or the dependencies.
-    /// Wakes once per remaining second. Every deadline is measured from one reading, so late wake-ups never add up.
-    static func countdownLoop<C: Clock<Duration>>( // swiftlint:disable:this function_parameter_count
+    // swiftlint:disable:next function_parameter_count
+    static func countdownLoop<C: Clock<Duration>>(
         clock: C,
         session: TimerSessionClient,
         owner: UUID,

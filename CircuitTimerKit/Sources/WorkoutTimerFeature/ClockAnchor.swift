@@ -7,8 +7,8 @@ import Foundation
 struct MonotonicInstant: Equatable, Sendable {
     private let base: any InstantProtocol<Duration>
 
-    // The clocks arrive as `any Clock<Duration>`; an initializer or a method generic over the clock does not open
-    // that existential, so local generic functions do.
+    // Members generic over the clock did not compile where the reducer passes its `continuousClock` dependency
+    // (`any Clock<Duration>`), so these take the existential and open it in local generic functions.
 
     init(now clock: any Clock<Duration>) {
         func read<C: Clock<Duration>>(_ clock: C) -> any InstantProtocol<Duration> {
