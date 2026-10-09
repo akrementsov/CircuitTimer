@@ -31,7 +31,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 |---|---|---|
 | `WorkoutDomain` | Foundation, CryptoKit | Workout model, `WorkoutLimits`, `WorkoutSchedule` and its fingerprint, `WorkoutRun`, `TimeMath` |
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
-| `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
+| `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData, CryptoKit | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record files |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
 | `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`; its own stack with the stage list |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
@@ -144,6 +144,8 @@ Public initializers take `id` explicitly; features get identifiers from `@Depend
 - Durations are stored as `Int` milliseconds.
 - CloudKit sync: no `@Attribute(.unique)`; every property optional or defaulted; relationships optional; stage order kept in an explicit `order` field.
 - A saved run is `WorkoutRunRecord` v1 with explicit `CodingKeys`: `schemaVersion`, `workoutID`, `scheduleFingerprint`, `phase`, `positionMs`, `cursor`, `sinceEpochMs`. The fingerprint is a SHA-256 of the normalized schedule structure (index, section, round, round count, kind, stage id, duration in ms; not the name). On restore, rebuild the schedule and drop the record if the fingerprint differs or `cursor` is out of range.
+- Run records live outside SwiftData: one JSON file per scene session in Application Support (`RunRecord/<SHA-256 of the session's persistent identifier>.json`), excluded from backup on a best-effort basis. The body is exactly the v1 record; the name pairs it with its session in one atomic write.
+- Writes go through one actor in the order of a revision the reducer takes from `nextRevision()`; each applied write also removes the files of other sessions. Reads only open the current session's file, on their own queue. This holds while the app has one window scene per process; more scenes or an App Group container need another cleanup rule.
 
 ## Errors
 
