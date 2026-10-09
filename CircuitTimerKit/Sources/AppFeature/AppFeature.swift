@@ -5,12 +5,14 @@ import SettingsFeature
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutStorage
+import WorkoutTimerFeature
 
 @Reducer
 public struct AppFeature: Sendable {
     @Reducer
     public enum Destination {
         case alert(AlertState<Never>)
+        case timer(WorkoutTimerFeature)
     }
 
     /// Screens pushed onto the Workouts stack.
@@ -26,10 +28,12 @@ public struct AppFeature: Sendable {
         case reorder([Workout.ID])
     }
 
-    /// An editor the user asked for while the list was being written or reloaded.
-    enum DeferredEditor: Equatable, Sendable {
+    /// A screen the user asked for while the list was being written or reloaded.
+    enum DeferredScreen: Equatable, Sendable {
         case create
         case edit(Workout.ID)
+        /// Plays the workout in the full-screen timer.
+        case start(Workout.ID)
     }
 
     public enum RootTab: Hashable, Sendable {
@@ -49,7 +53,7 @@ public struct AppFeature: Sendable {
         var pendingMutations: [ListMutation] = []
         /// Set when a write reports that storage no longer matches the list; reload once the queue drains.
         var needsReload = false
-        var deferredEditor: DeferredEditor?
+        var deferredScreen: DeferredScreen?
 
         public init() {}
 
@@ -79,6 +83,7 @@ public struct AppFeature: Sendable {
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
+            case startButtonTapped(Workout.ID)
             case deleteButtonTapped(Workout.ID)
             case duplicateButtonTapped(Workout.ID)
             case workoutsMoved(IndexSet, Int)
@@ -149,21 +154,23 @@ public struct AppFeature: Sendable {
                 }
 
                 state.selectedTab = tab
-                // Leaving the list drops its pending editor request, so it does not open when the user comes back.
-                state.deferredEditor = nil
+                // Leaving the list drops its pending screen request, so it does not open when the user comes back.
+                state.deferredScreen = nil
                 return .none
             case .retryButtonTapped:
                 return loadWorkouts(&state)
             case .addButtonTapped:
-                return openEditor(.create, &state)
+                return openScreen(.create, &state)
             case let .workoutTapped(id):
-                return openEditor(.edit(id), &state)
+                return openScreen(.edit(id), &state)
+            case let .startButtonTapped(id):
+                return openScreen(.start(id), &state)
             case let .deleteButtonTapped(id):
                 guard case var .loaded(workouts) = state.workouts, workouts.remove(id: id) != nil else { return .none }
 
                 state.workouts = .loaded(workouts)
-                if state.deferredEditor == .edit(id) {
-                    state.deferredEditor = nil
+                if state.deferredScreen == .edit(id) || state.deferredScreen == .start(id) {
+                    state.deferredScreen = nil
                 }
                 return enqueue(.delete(id), &state)
             case let .duplicateButtonTapped(id):
@@ -210,10 +217,10 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
-                return presentDeferredEditor(&state)
+                return presentDeferredScreen(&state)
             case .workoutsLoadingFailed:
                 state.workouts = .failed
-                state.deferredEditor = nil
+                state.deferredScreen = nil
                 return .none
             case let .mutationFinished(outcome):
                 if outcome == .storeDiverged {
@@ -226,35 +233,36 @@ public struct AppFeature: Sendable {
                     return write(next)
                 }
                 if state.needsReload {
-                    // The reload presents a deferred editor once the list is current.
+                    // The reload presents a deferred screen once the list is current.
                     state.needsReload = false
                     return loadWorkouts(&state)
                 }
-                return presentDeferredEditor(&state)
+                return presentDeferredScreen(&state)
             case .mutationFailed:
                 // Later writes were derived from a list that storage did not accept; drop them and resync.
                 state.pendingMutations = []
                 state.needsReload = false
-                state.deferredEditor = nil
+                state.deferredScreen = nil
                 state.destination = .alert(.mutationFailed)
                 return loadWorkouts(&state)
         }
     }
 
-    /// Opens the editor now, or once pending writes and reloads are done so it never shows a stale list.
-    private func openEditor(_ request: DeferredEditor, _ state: inout State) -> Effect<Action> {
-        state.deferredEditor = request
+    /// Opens the screen now, or once pending writes and reloads are done so it never shows a stale workout.
+    private func openScreen(_ request: DeferredScreen, _ state: inout State) -> Effect<Action> {
+        state.deferredScreen = request
         guard state.pendingMutations.isEmpty, case .loaded = state.workouts else { return .none }
 
-        return presentDeferredEditor(&state)
+        return presentDeferredScreen(&state)
     }
 
-    private func presentDeferredEditor(_ state: inout State) -> Effect<Action> {
-        guard let request = state.deferredEditor else { return .none }
+    private func presentDeferredScreen(_ state: inout State) -> Effect<Action> {
+        guard let request = state.deferredScreen else { return .none }
 
         // A request that cannot open now is dropped rather than kept for a surprise later.
-        state.deferredEditor = nil
-        // An empty stack also drops a second tap made while the editor is being pushed.
+        state.deferredScreen = nil
+        // An empty stack also drops a second tap made while the editor is being pushed, and an empty destination
+        // one made while the timer is being presented.
         guard state.destination == nil, state.path.isEmpty, state.selectedTab == .workouts else { return .none }
 
         switch request {
@@ -265,6 +273,17 @@ public struct AppFeature: Sendable {
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
 
                 state.path.append(.editor(WorkoutEditorFeature.State(editing: workout)))
+            case let .start(id):
+                // The workout may be gone by now, and one with nothing to play has no timer.
+                guard
+                    case let .loaded(workouts) = state.workouts,
+                    let workout = workouts[id: id],
+                    workout.totalDuration > .zero
+                else { return .none }
+
+                state.destination = .timer(
+                    WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
+                )
         }
         return .none
     }

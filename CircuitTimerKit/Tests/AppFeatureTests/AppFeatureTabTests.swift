@@ -48,10 +48,10 @@ struct AppFeatureTabTests {
     }
 
     @Test
-    func test_tabSelected_workoutsReselected_keepsDeferredEditorAndSettingsPath() async {
+    func test_tabSelected_workoutsReselected_keepsDeferredScreenAndSettingsPath() async {
         var state = loaded([first, second])
         state.pendingMutations = [.delete(UUID(fixture: 99))]
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         let store = makeStore(state) {
             $0.appVersion.shortVersion = { "1.2" }
         }
@@ -134,11 +134,11 @@ struct AppFeatureTabTests {
             $0.workouts = .loaded([self.second])
             $0.pendingMutations = [.delete(self.first.id)]
         }
-        await store.send(.view(.addButtonTapped)) { $0.deferredEditor = .create }
+        await store.send(.view(.addButtonTapped)) { $0.deferredScreen = .create }
 
         await store.send(.view(.tabSelected(.settings))) {
             $0.selectedTab = .settings
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
         await store.send(.view(.tabSelected(.workouts))) { $0.selectedTab = .workouts }
         gate.open()
@@ -157,11 +157,11 @@ struct AppFeatureTabTests {
             }
         }
         await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
-        await store.send(.view(.workoutTapped(first.id))) { $0.deferredEditor = .edit(self.first.id) }
+        await store.send(.view(.workoutTapped(first.id))) { $0.deferredScreen = .edit(self.first.id) }
 
         await store.send(.view(.tabSelected(.settings))) {
             $0.selectedTab = .settings
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
         gate.open()
 

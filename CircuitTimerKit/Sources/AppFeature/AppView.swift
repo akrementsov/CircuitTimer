@@ -5,6 +5,7 @@ import SettingsFeature
 import SwiftUI
 import WorkoutDomain
 import WorkoutEditorFeature
+import WorkoutTimerFeature
 
 @ViewAction(for: AppFeature.self)
 public struct AppView: View {
@@ -39,6 +40,12 @@ public struct AppView: View {
         .task { send(.task) }
         // Presented over the tab bar, so the write-failure alert shows on either tab.
         .alert($store.scope(\.$destination, action: \.destination).alert)
+        // Full screen over the tab bar, with no swipe to dismiss: the timer closes only through its own X.
+        .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
+            NavigationStack {
+                WorkoutTimerView(store: timerStore)
+            }
+        }
     }
 
     private var workoutsTab: some View {
@@ -98,6 +105,24 @@ public struct AppView: View {
                         .buttonStyle(.workoutCard)
                         // Taps and the drag preview follow the card, not the row with its margins.
                         .contentShape([.interaction, .dragPreview], .workoutCard)
+                        // TODO: [CT-3-2] An interim way to start a workout; «Start workout» on the workout screen replaces it.
+                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                            // A workout with nothing to play has no timer.
+                            if workout.totalDuration > .zero {
+                                Button {
+                                    send(.startButtonTapped(workout.id))
+                                } label: {
+                                    Label {
+                                        Text("workouts.start", bundle: .module)
+                                    } icon: {
+                                        Image(systemName: "play.fill")
+                                    }
+                                    .labelStyle(.iconOnly)
+                                }
+                                // A white glyph is unreadable on the brand color.
+                                .tint(.secondaryAction)
+                            }
+                        }
                         // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
                         // Duplicate lives here too: a context menu on the row breaks a slow swipe.
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
