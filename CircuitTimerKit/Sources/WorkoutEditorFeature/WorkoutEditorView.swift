@@ -48,7 +48,7 @@ public struct WorkoutEditorView: View {
         .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, .token(spacing: .m), for: .scrollContent)
-        // The list already insets its content by the bottom safe area; the panel sits right above it.
+        // Before iOS 26 the panel floats over the list; the list already insets its content by the bottom safe area.
         .contentMargins(.bottom, savePanelHeight, for: .scrollContent)
         // Rows set their own heights; the system minimum would stretch the thin ones.
         .environment(\.defaultMinListRowHeight, .zero)
@@ -56,19 +56,16 @@ public struct WorkoutEditorView: View {
         .mask { Rectangle().ignoresSafeArea(edges: .vertical) }
         .padding(.horizontal, .token(spacing: .l))
         .background(.surface(.screen))
-        .overlay(alignment: .bottom) {
-            SaveWorkoutPanel(
-                showsHint: store.showsSaveHint,
-                isSaving: store.isSaving,
-                canSave: store.canSave,
-                onSave: { send(afterClearingFocus: .saveButtonTapped) }
-            )
-            // Measured before the frame: the panel's own height, not the overlay's.
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { savePanelHeight = $0 })
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            // The keyboard covers the panel instead of pushing it up, as in the original app.
-            .ignoresSafeArea(.keyboard)
-        }
+        .modifier(
+            SavePanelPlacement(height: $savePanelHeight) {
+                SaveWorkoutPanel(
+                    showsHint: store.showsSaveHint,
+                    isSaving: store.isSaving,
+                    canSave: store.canSave,
+                    onSave: { send(afterClearingFocus: .saveButtonTapped) }
+                )
+            }
+        )
         // The panel sits inside `.disabled` on purpose: inert while saving like the rest of the screen;
         // its spinner still shows because the label switches on `isSaving`, not on being enabled.
         .disabled(store.isSaving)
@@ -307,6 +304,29 @@ public struct WorkoutEditorView: View {
             get: { stage.name },
             set: { send(.stageNameChanged(section, stage.id, $0)) }
         )
+    }
+}
+
+/// Puts the save panel at the bottom of the screen. On iOS 26 it is a bar: the list scrolls under it with the system's
+/// scroll edge effect and insets its content by it. Before that the panel floats over the list, and the list's
+/// bottom margin is the panel's measured height.
+private struct SavePanelPlacement<Panel: View>: ViewModifier {
+    @Binding var height: CGFloat
+    @ViewBuilder let panel: () -> Panel
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content.safeAreaBar(edge: .bottom, content: panel)
+        } else {
+            content.overlay(alignment: .bottom) {
+                panel()
+                    // Measured before the frame: the panel's own height, not the overlay's.
+                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { height = $0 })
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    // The keyboard covers the panel instead of pushing it up, as in the original app.
+                    .ignoresSafeArea(.keyboard)
+            }
+        }
     }
 }
 

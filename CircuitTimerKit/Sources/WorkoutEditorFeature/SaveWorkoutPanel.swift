@@ -2,7 +2,8 @@ import DesignSystem
 import SwiftUI
 
 // TODO: [CT-3] Move the panel and its button style to DesignSystem together with Start workout, their second user.
-/// The bottom panel with the save hint and the full-width Save workout button, on a blur like the original app's.
+/// The save hint and the full-width Save workout button, floating over the editor's content:
+/// Liquid Glass on iOS 26, the solid brand button with the original shadow before.
 struct SaveWorkoutPanel: View {
     let showsHint: Bool
     let isSaving: Bool
@@ -16,6 +17,10 @@ struct SaveWorkoutPanel: View {
                     .font(.token(.footnote))
                     .foregroundStyle(.text(.secondary))
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, .token(spacing: .m))
+                    .padding(.vertical, .token(spacing: .xs))
+                    // The hint floats over the cards too; it needs a backing to stay readable.
+                    .floatingBacking(in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
             }
             Button(action: onSave) {
                 if isSaving {
@@ -29,23 +34,11 @@ struct SaveWorkoutPanel: View {
             // The spinner replaces the title while saving; VoiceOver says what is going on instead.
             .accessibilityLabel(isSaving ? Text("editor.saving", bundle: .module) : Text("editor.saveWorkout", bundle: .module))
             .disabled(!canSave)
-            // The original button's shadow: the screen color at half opacity.
-            .shadow(color: .surface(.screen).opacity(0.5), radius: Self.shadowRadius)
         }
         .padding(.horizontal, .token(spacing: .l))
         .padding(.top, .token(spacing: .m))
         .padding(.bottom, .token(spacing: .xs))
-        .background {
-            Rectangle()
-                .fill(.regularMaterial)
-                .opacity(Self.blurOpacity)
-                .ignoresSafeArea(edges: .bottom)
-        }
     }
-
-    private static let shadowRadius: CGFloat = 5
-    /// The original panel's blur is slightly see-through.
-    private static let blurOpacity = 0.8
 }
 
 private struct SaveWorkoutButtonStyle: ButtonStyle {
@@ -61,14 +54,38 @@ private struct SaveWorkoutButton: View {
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
-        configuration.label
+        let shape = RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
+        let label = configuration.label
             .font(.token(.button))
             .foregroundStyle(.text(.onAccent))
             .frame(maxWidth: .infinity, minHeight: .token(size: .row))
-            .background(isEnabled ? .brand : .brandInactive, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-            .opacity(configuration.isPressed ? Self.pressedOpacity : 1)
+            .contentShape(shape)
+
+        if #available(iOS 26, *) {
+            // Interactive glass draws its own pressed state.
+            label.glassEffect(.regular.tint(isEnabled ? .brand : .brandInactive).interactive(isEnabled), in: shape)
+        } else {
+            label
+                .background(isEnabled ? .brand : .brandInactive, in: shape)
+                // The original button's shadow: the screen color at half opacity.
+                .shadow(color: .surface(.screen).opacity(0.5), radius: Self.shadowRadius)
+                .opacity(configuration.isPressed ? Self.pressedOpacity : 1)
+        }
     }
 
+    private static let shadowRadius: CGFloat = 5
     /// A pressed button dims a little, like a system button's highlight.
     private static let pressedOpacity = 0.8
+}
+
+private extension View {
+    /// Glass on iOS 26, a material before it.
+    @ViewBuilder
+    func floatingBacking(in shape: some Shape) -> some View {
+        if #available(iOS 26, *) {
+            glassEffect(.regular, in: shape)
+        } else {
+            background(.regularMaterial, in: shape)
+        }
+    }
 }
