@@ -69,12 +69,12 @@ jobs:
             --plugin-dir "$RUNNER_TEMP/superpowers" \
             --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
             < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
-          # Anything else, such as a stop at the budget cap, must not replace the previous review.
+          # Anything else, such as a stop at the budget cap, must not be posted as a review.
           grep -m 1 -v '^[[:space:]]*$' "$RUNNER_TEMP/review.md" | grep -qE '^## Claude review[[:space:]]*$' \
             || { echo "::error::Claude returned no review"; exit 1; }
 
-      # One comment per pull request, replaced on every review. A failed run leaves the previous
-      # review, so the comment names the commit it covers.
+      # Every review is a new comment, so the history of reviews stays on the pull request;
+      # each names the commit it covers.
       - name: Post the review
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,8 +85,7 @@ jobs:
             cat "$RUNNER_TEMP/review.md"
             printf '\n---\n<sub>Reviewed at %s</sub>\n' "$HEAD_SHA"
           } > "$RUNNER_TEMP/comment.md"
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
 
   # A separate job, so the label also goes away on a draft, whose review waits for `ready_for_review`.
   unlabel:
