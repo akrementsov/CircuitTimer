@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
+        .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
     ],
@@ -90,6 +91,16 @@ let package = Package(
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "WorkoutTimerFeature",
+            dependencies: [
+                "DesignSystem",
+                "WorkoutDomain",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
