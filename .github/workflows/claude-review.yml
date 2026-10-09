@@ -5,11 +5,6 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, labeled]
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
-  # Any label starts a run that only skips the job; it must not cancel a review in progress.
-  cancel-in-progress: false
-
 permissions:
   contents: read
   pull-requests: write
@@ -29,6 +24,10 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
       && !github.event.pull_request.draft
       && (github.event.action != 'labeled' || github.event.label.name == 'claude-review')
+    # On the job, so a run that skips it for another label never displaces a queued review.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -71,10 +70,10 @@ jobs:
             --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
             < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
           # Anything else, such as a stop at the budget cap, must not replace the previous review.
-          head -n 1 "$RUNNER_TEMP/review.md" | grep -qx '## Claude review' \
+          grep -m 1 -v '^[[:space:]]*$' "$RUNNER_TEMP/review.md" | grep -qE '^## Claude review[[:space:]]*$' \
             || { echo "::error::Claude returned no review"; exit 1; }
 
-      # One comment per pull request, replaced on every push. A failed run leaves the previous
+      # One comment per pull request, replaced on every review. A failed run leaves the previous
       # review, so the comment names the commit it covers.
       - name: Post the review
         env:
@@ -89,8 +88,14 @@ jobs:
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
 
+  # A separate job, so the label also goes away on a draft, whose review waits for `ready_for_review`.
+  unlabel:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.action == 'labeled' && github.event.label.name == 'claude-review'
+    runs-on: ubuntu-latest
+    steps:
       - name: Remove the review request
-        if: always() && github.event.action == 'labeled'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
