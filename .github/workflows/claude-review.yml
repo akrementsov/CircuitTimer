@@ -1,0 +1,73 @@
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CLAUDE_CODE_VERSION: 2.1.295
+  CLAUDE_MODEL: claude-opus-5-5
+  # The commit of the superpowers v6.4.1 tag; the plugin runs with the API key, so it stays pinned.
+  SUPERPOWERS_SHA: 5bf4e78011075bcfc0dc295f0724994cd123ee71
+  # The monthly API credits are shared by every key of the Console organization.
+  MAX_BUDGET_USD: '5'
+
+jobs:
+  review:
+    # Pull requests from forks get no secrets; drafts are reviewed once they are ready.
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      # Claude Code runs as a plain CLI with an API key: monthly API credits cover `claude -p`
+      # started this way, but not runs started by the Claude Code GitHub Action.
+      - name: Install Claude Code
+        run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+
+      # Outside the workspace, so the review never reads the plugin as part of the repository.
+      - name: Fetch superpowers
+        run: |
+          git init --quiet "$RUNNER_TEMP/superpowers"
+          git -C "$RUNNER_TEMP/superpowers" fetch --quiet --depth 1 https://github.com/obra/superpowers.git "$SUPERPOWERS_SHA"
+          git -C "$RUNNER_TEMP/superpowers" checkout --quiet FETCH_HEAD
+
+      - name: Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          [ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::Set the ANTHROPIC_API_KEY repository secret"; exit 1; }
+          {
+            cat .github/claude-review.md
+            printf '\nBASE_SHA: %s\nHEAD_SHA: %s\n' "$(git merge-base "$BASE_SHA" HEAD)" "$(git rev-parse HEAD)"
+            printf '\nPull request title: %s\n\nPull request description:\n\n%s\n' "$PR_TITLE" "$PR_BODY"
+          } > "$RUNNER_TEMP/prompt.md"
+          claude -p --model "$CLAUDE_MODEL" --max-budget-usd "$MAX_BUDGET_USD" \
+            --plugin-dir "$RUNNER_TEMP/superpowers" \
+            --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
+            < "$RUNNER_TEMP/prompt.md" > "$RUNNER_TEMP/review.md"
+          [ -s "$RUNNER_TEMP/review.md" ] || { echo "::error::Claude returned an empty review"; exit 1; }
+
+      # One comment per pull request, replaced on every push.
+      - name: Post the review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --edit-last --create-if-none --body-file "$RUNNER_TEMP/review.md"

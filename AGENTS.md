@@ -63,6 +63,7 @@ Layering:
 - A tag `v<MARKETING_VERSION>` (or `v<MARKETING_VERSION>-<suffix>` for another build of the same version) on a commit of `main` whose CI passed runs `testflight.yml`, which archives and uploads to TestFlight. The build number is the UTC start time, `YYMMDD.HHMMSS`.
 - The archive is unsigned: an App Store Connect API key signs only at export, with a cloud-managed distribution certificate, so the key needs the Admin role. CT-4 and CT-5 must check that the exported app keeps their entitlements.
 - `ExportOptions.plist` repeats the team ID from `App.xcconfig`; change both together.
+- `claude-review.yml` reviews every ready pull request from this repository with `claude -p` through the pinned superpowers plugin (its `requesting-code-review` skill) and keeps one comment with the result; the prompt is `.github/claude-review.md`. It needs the `ANTHROPIC_API_KEY` secret from the Console organization that receives the Max plan's monthly API credits. It is not a required check.
 
 ## Toolchain
 
