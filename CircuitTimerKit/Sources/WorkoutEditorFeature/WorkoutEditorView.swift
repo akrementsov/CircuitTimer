@@ -219,7 +219,7 @@ public struct WorkoutEditorView: View {
             .onMove { send(.stagesMoved(section, $0, $1)) }
 
             Button {
-                send(.addStageButtonTapped(section))
+                send(.addStageButtonTapped(section), animation: .default)
             } label: {
                 Label {
                     Text("editor.addStage", bundle: .module)
