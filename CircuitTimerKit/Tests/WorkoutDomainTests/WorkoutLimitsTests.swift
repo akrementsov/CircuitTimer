@@ -51,6 +51,30 @@ struct WorkoutLimitsTests {
         #expect(WorkoutLimits.normalizedTrainingRounds(input) == expected)
     }
 
+    @Test(arguments: [
+        (WorkoutSectionKind.warmUp, Duration.seconds(30)),
+        (.training, .seconds(225)),
+        (.coolDown, .seconds(20)),
+    ])
+    func test_durationOf_section_sumsStagesAndRepeatsOnlyTraining(section: WorkoutSectionKind, expected: Duration) {
+        let workout = Workout(
+            id: UUID(fixture: 900),
+            warmUp: [makeStage(1, .seconds(30))],
+            training: [makeStage(2, .seconds(45)), makeStage(3, .seconds(30), .rest)],
+            trainingRounds: 3,
+            coolDown: [makeStage(4, .seconds(20))]
+        )
+
+        #expect(workout.duration(of: section) == expected)
+    }
+
+    @Test(arguments: WorkoutSectionKind.allCases)
+    func test_durationOf_emptySection_isZero(section: WorkoutSectionKind) {
+        let workout = Workout(id: UUID(fixture: 900), trainingRounds: 3)
+
+        #expect(workout.duration(of: section) == .zero)
+    }
+
     @Test
     func test_totalDuration_randomWorkouts_matchesScheduleAndScheduleIsContiguous() {
         var generator = SeededGenerator(seed: 0xC1C1)
@@ -59,6 +83,11 @@ struct WorkoutLimitsTests {
             let schedule = WorkoutSchedule(workout: workout)
 
             #expect(workout.totalDuration == schedule.totalDuration, "iteration \(iteration)")
+            // The schedule normalizes stages and rounds on its own, so it is an independent oracle per section.
+            for section in WorkoutSectionKind.allCases {
+                let scheduled = schedule.stages.filter { $0.section == section }.reduce(Duration.zero) { $0 + $1.duration }
+                #expect(workout.duration(of: section) == scheduled, "iteration \(iteration), \(section)")
+            }
             #expect(schedule.totalDuration == (schedule.stages.last?.end ?? .zero), "iteration \(iteration)")
             var expectedStart = Duration.zero
             for (index, stage) in schedule.stages.enumerated() {
