@@ -11,6 +11,10 @@ extension DesignSystem.Token {
         case footnote
         /// 15 pt light on the subheadline style; SF Symbols next to text.
         case icon
+        /// 15 pt bold on the subheadline style; the workout name being edited.
+        case fieldTitle
+        /// 17 pt on the body style; the title of a full-width action button.
+        case button
         /// The countdown on the timer screen: rounded, with fixed-width digits so it does not jitter.
         case timerLarge
     }
@@ -28,6 +32,10 @@ extension Font {
                 .caption
             case .icon:
                 .system(.subheadline, weight: .light)
+            case .fieldTitle:
+                .system(.subheadline, weight: .bold)
+            case .button:
+                .body
             case .timerLarge:
                 .system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit()
         }

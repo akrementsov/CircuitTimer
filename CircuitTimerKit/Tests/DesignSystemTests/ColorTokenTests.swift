@@ -27,13 +27,15 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
     case surface(DesignSystem.Token.SurfaceColor)
     case stage(DesignSystem.Token.StageColor)
     case brand
+    case brandInactive
+    case switchOn
     case danger
     case secondaryAction
 
     static let all: [ColorToken] = DesignSystem.Token.TextColor.allCases.map(ColorToken.text)
         + DesignSystem.Token.SurfaceColor.allCases.map(ColorToken.surface)
         + DesignSystem.Token.StageColor.allCases.map(ColorToken.stage)
-        + [.brand, .danger, .secondaryAction]
+        + [.brand, .brandInactive, .switchOn, .danger, .secondaryAction]
 
     var color: Color {
         switch self {
@@ -45,6 +47,10 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 .stage(color)
             case .brand:
                 .brand
+            case .brandInactive:
+                .brandInactive
+            case .switchOn:
+                .switchOn
             case .danger:
                 .danger
             case .secondaryAction:
@@ -59,19 +65,27 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 Palette.white
             case .text(.secondary):
                 Palette.gray
+            case .text(.onAccent):
+                Palette.black
             case .surface(.screen):
                 Palette.screen
             case .surface(.card), .stage(.pause):
                 Palette.card
             case .surface(.cardInactive):
                 Palette.cardInactive
+            case .surface(.field):
+                Palette.field
             case .stage(.work), .brand:
                 Palette.accent
+            case .brandInactive:
+                Palette.accentInactive
             case .stage(.rest):
                 Palette.cyan
+            case .switchOn:
+                Palette.green
             case .danger:
                 Palette.danger
-            case .secondaryAction:
+            case .surface(.focused), .secondaryAction:
                 Palette.secondaryAction
         }
     }
@@ -86,6 +100,10 @@ enum ColorToken: Sendable, CustomTestStringConvertible {
                 "stage(.\(color))"
             case .brand:
                 "brand"
+            case .brandInactive:
+                "brandInactive"
+            case .switchOn:
+                "switchOn"
             case .danger:
                 "danger"
             case .secondaryAction:
@@ -102,12 +120,16 @@ enum Palette {
     }
 
     static let white = Value(red: 1, green: 1, blue: 1)
+    static let black = Value(red: 0, green: 0, blue: 0)
     static let gray = Value(red: 0.596, green: 0.596, blue: 0.624)
     static let screen = Value(red: 0.110, green: 0.110, blue: 0.122)
     static let card = Value(red: 0.173, green: 0.173, blue: 0.188)
     static let cardInactive = Value(red: 0.145, green: 0.145, blue: 0.161)
+    static let field = Value(red: 0.208, green: 0.208, blue: 0.224)
     static let accent = Value(red: 0.906, green: 0.996, blue: 0.329)
+    static let accentInactive = Value(red: 0.498, green: 0.533, blue: 0.282)
     static let cyan = Value(red: 0.400, green: 0.929, blue: 1)
+    static let green = Value(red: 0.188, green: 0.820, blue: 0.345)
     static let danger = Value(red: 1, green: 0.118, blue: 0.118)
     static let secondaryAction = Value(red: 0.286, green: 0.286, blue: 0.310)
 }

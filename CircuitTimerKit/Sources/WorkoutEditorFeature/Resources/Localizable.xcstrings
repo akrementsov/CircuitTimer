@@ -177,7 +177,7 @@
         }
       }
     },
-    "editor.name.placeholder" : {
+    "editor.name" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -189,6 +189,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Название тренировки"
+          }
+        }
+      }
+    },
+    "editor.name.placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter workout name"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Введите название тренировки"
           }
         }
       }
@@ -225,7 +241,7 @@
         }
       }
     },
-    "editor.pause.footer" : {
+    "editor.pause.hint" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -267,25 +283,25 @@
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунда"
+                  "value" : "%lld круга"
                 }
               },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раундов"
+                  "value" : "%lld кругов"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунд"
+                  "value" : "%lld круг"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунда"
+                  "value" : "%lld круга"
                 }
               }
             }
@@ -293,18 +309,18 @@
         }
       }
     },
-    "editor.save" : {
+    "editor.rounds.label" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Save"
+            "value" : "Rounds"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сохранить"
+            "value" : "Круги"
           }
         }
       }
@@ -346,13 +362,45 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add a name and at least one stage longer than 0:00 to save."
+            "value" : "Add a name and at least one stage longer than 00:00 to save."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чтобы сохранить, укажите название и хотя бы один этап длиннее 0:00."
+            "value" : "Чтобы сохранить, укажите название и хотя бы один этап длиннее 00:00."
+          }
+        }
+      }
+    },
+    "editor.saveWorkout" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить тренировку"
+          }
+        }
+      }
+    },
+    "editor.saving" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранение тренировки"
           }
         }
       }
@@ -405,6 +453,22 @@
         }
       }
     },
+    "editor.stage.delete" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить"
+          }
+        }
+      }
+    },
     "editor.stage.duration" : {
       "localizations" : {
         "en" : {
@@ -437,6 +501,38 @@
         }
       }
     },
+    "editor.stage.moveDown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Down"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить ниже"
+          }
+        }
+      }
+    },
+    "editor.stage.moveUp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить выше"
+          }
+        }
+      }
+    },
     "editor.stage.name" : {
       "localizations" : {
         "en" : {
@@ -458,13 +554,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A 0:00 stage is removed when you save"
+            "value" : "A 00:00 stage is removed when you save"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Этап 0:00 удалится при сохранении"
+            "value" : "Этап 00:00 удалится при сохранении"
           }
         }
       }
@@ -501,18 +597,18 @@
         }
       }
     },
-    "editor.totalDuration" : {
+    "editor.totalWorkoutTime" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total"
+            "value" : "Total workout time"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Всего"
+            "value" : "Общее время тренировки"
           }
         }
       }

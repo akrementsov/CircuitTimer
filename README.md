@@ -44,7 +44,7 @@ graph TD
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
 | `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
-| `WorkoutEditorFeature` | The workout editor: a draft with Save and Back, stage editing within `WorkoutLimits`. |
+| `WorkoutEditorFeature` | The workout editor in the original app's cards: a draft saved with the bottom Save workout button or discarded with Back, stage editing within `WorkoutLimits`. |
 | `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the editor onto the Workouts stack. |
 
@@ -99,9 +99,9 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
   - [x] **CT-UI-3** — tab bar and the Settings tab with About and the legal pages
   - [x] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
-  - [ ] **CT-UI-5** — editor layout of the original app
+  - [x] **CT-UI-5** — editor layout of the original app
   - [ ] **CT-UI-6** — stage durations typed as MM:SS
-  - [ ] Swipe actions of the original list: delete and duplicate
+  - [ ] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list
 - [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names
 - [ ] **CT-4** — Live Activity and Dynamic Island

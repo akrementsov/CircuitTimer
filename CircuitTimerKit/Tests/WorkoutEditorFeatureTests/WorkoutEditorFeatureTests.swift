@@ -95,7 +95,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_stagesDeletedMovedAndExpanded_keepPickerConsistent() async {
+    func test_stageDeleteMoveAndExpand_expandedStage_keepsPickerConsistent() async {
         let store = makeStore()
         let first = UUID(fixture: 20)
         let second = UUID(fixture: 21)
@@ -107,11 +107,75 @@ struct WorkoutEditorFeatureTests {
         await store.send(.view(.stagesMoved(.training, IndexSet(integer: 1), 0))) {
             $0.draft.training = [makeStage(21, .rest), makeStage(20)]
         }
-        await store.send(.view(.stagesDeleted(.coolDown, IndexSet(integer: 0)))) { $0.draft.coolDown = [] }
-        await store.send(.view(.stagesDeleted(.training, IndexSet(integer: 0)))) {
+        await store.send(.view(.stageDeleteButtonTapped(.coolDown, UUID(fixture: 30)))) { $0.draft.coolDown = [] }
+        await store.send(.view(.stageDeleteButtonTapped(.training, UUID(fixture: 21)))) {
             $0.draft.training = [makeStage(20)]
             $0.expandedStageID = nil
         }
+    }
+
+    @Test(arguments: [
+        (WorkoutSectionKind.training, UUID(fixture: 99)),
+        (.warmUp, UUID(fixture: 20)),
+    ])
+    func test_stageDeleteButtonTapped_idNotInSection_isNoOpAndKeepsExpanded(section: WorkoutSectionKind, id: UUID) async {
+        let store = makeStore()
+
+        await store.send(.view(.stageDurationTapped(id))) { $0.expandedStageID = id }
+        await store.send(.view(.stageDeleteButtonTapped(section, id)))
+    }
+
+    @Test(arguments: [
+        ("source past the end", IndexSet(integer: 2), 0),
+        ("destination past the end", IndexSet(integer: 0), 3),
+        ("negative destination", IndexSet(integer: 0), -1),
+        ("empty source", IndexSet(), 0),
+    ])
+    func test_stagesMoved_staleOffsets_isNoOp(_ name: String, source: IndexSet, destination: Int) async {
+        let store = makeStore()
+
+        await store.send(.view(.stagesMoved(.training, source, destination)))
+    }
+
+    @Test
+    func test_stageMovedUpAndDown_middleStage_swapsWithNeighbour() async {
+        let first = makeStage(20)
+        let middle = makeStage(21, .rest)
+        let last = makeStage(22)
+        var workout = makeWorkout()
+        workout.training = [first, middle, last]
+        let store = makeStore(WorkoutEditorFeature.State(editing: workout))
+
+        await store.send(.view(.stageDurationTapped(middle.id))) { $0.expandedStageID = middle.id }
+        await store.send(.view(.stageMovedUp(.training, middle.id))) { $0.draft.training = [middle, first, last] }
+        #expect(store.state.hasChanges)
+        await store.send(.view(.stageMovedDown(.training, middle.id))) { $0.draft.training = [first, middle, last] }
+        #expect(!store.state.hasChanges)
+        await store.send(.view(.stageMovedDown(.training, middle.id))) { $0.draft.training = [first, last, middle] }
+    }
+
+    @Test(arguments: [
+        ("first up", [20, 21, 22], WorkoutEditorFeature.Action.View.stageMovedUp(.training, UUID(fixture: 20))),
+        ("last down", [20, 21, 22], .stageMovedDown(.training, UUID(fixture: 22))),
+        ("single up", [20], .stageMovedUp(.training, UUID(fixture: 20))),
+        ("single down", [20], .stageMovedDown(.training, UUID(fixture: 20))),
+        ("empty up", [], .stageMovedUp(.training, UUID(fixture: 20))),
+        ("empty down", [], .stageMovedDown(.training, UUID(fixture: 20))),
+        ("unknown up", [20, 21], .stageMovedUp(.training, UUID(fixture: 99))),
+        ("unknown down", [20, 21], .stageMovedDown(.training, UUID(fixture: 99))),
+        ("other section up", [20, 21], .stageMovedUp(.warmUp, UUID(fixture: 21))),
+        ("other section down", [20, 21], .stageMovedDown(.warmUp, UUID(fixture: 20))),
+    ])
+    func test_stageMovedUpAndDown_edgeUnknownOtherSectionSingleOrEmpty_isNoOp(
+        _ name: String,
+        training: [Int],
+        action: WorkoutEditorFeature.Action.View
+    ) async {
+        var workout = makeWorkout()
+        workout.training = training.map { makeStage($0) }
+        let store = makeStore(WorkoutEditorFeature.State(editing: workout))
+
+        await store.send(.view(action))
     }
 
     @Test
@@ -265,8 +329,11 @@ struct WorkoutEditorFeatureTests {
             .pauseAfterWarmUpChanged(true),
             .pauseAfterTrainingChanged(true),
             .addStageButtonTapped(.training),
-            .stagesDeleted(.training, IndexSet(integer: 0)),
+            .stageDeleteButtonTapped(.training, stage),
             .stagesMoved(.training, IndexSet(integer: 1), 0),
+            // Ids that would really move, so only the saving guard keeps them still.
+            .stageMovedUp(.training, UUID(fixture: 21)),
+            .stageMovedDown(.training, UUID(fixture: 20)),
             .stageNameChanged(.training, stage, "Other"),
             .stageDurationChanged(.training, stage, .seconds(1)),
             .stageIntensityTapped(.training, stage),
