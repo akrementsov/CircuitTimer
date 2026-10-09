@@ -245,18 +245,18 @@
         }
       }
     },
-    "workouts.start" : {
+    "workouts.start.spoken %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start"
+            "value" : "Start %@"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Начать"
+            "value" : "Начать %@"
           }
         }
       }

@@ -97,7 +97,7 @@ public struct AppView: View {
             case let .loaded(workouts):
                 List {
                     ForEach(workouts) { workout in
-                        HStack(spacing: .token(spacing: .xs)) {
+                        HStack(spacing: Self.startChipSpacing) {
                             Button {
                                 send(.workoutTapped(workout.id))
                             } label: {
@@ -132,7 +132,7 @@ public struct AppView: View {
                         // The chip takes the card's height: square at the default text size, taller at large sizes.
                         .fixedSize(horizontal: false, vertical: true)
                         // The chip is dragged with its card, as one preview without the row's margins.
-                        .contentShape(.dragPreview, CardAndChipShape(chipWidth: .token(size: .row), spacing: .token(spacing: .xs)))
+                        .contentShape(.dragPreview, CardAndChipShape(chipWidth: Self.startChipWidth, spacing: Self.startChipSpacing))
                         // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
                         // Duplicate lives here too: a context menu on the row breaks a slow swipe.
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -189,6 +189,10 @@ public struct AppView: View {
         }
     }
 
+    // The row's layout and its drag preview share these, so the preview always outlines the chip and the card.
+    private static let startChipWidth: CGFloat = .token(size: .row)
+    private static let startChipSpacing: CGFloat = .token(spacing: .xs)
+
     /// A chip after the card, as tall as it. A workout with nothing to play keeps a disabled chip, so the cards
     /// stay aligned.
     private func startChip(_ workout: Workout) -> some View {
@@ -198,7 +202,7 @@ public struct AppView: View {
             Image(systemName: "play.fill")
                 .font(.token(.body))
                 .foregroundStyle(workout.isPlayable ? .text(.primary) : .text(.secondary))
-                .frame(width: .token(size: .row))
+                .frame(width: Self.startChipWidth)
                 .frame(maxHeight: .infinity)
                 .background(.surface(.card), in: .workoutCard)
         }
@@ -207,7 +211,9 @@ public struct AppView: View {
         .buttonStyle(.workoutCard)
         .contentShape(.interaction, .workoutCard)
         .disabled(!workout.isPlayable)
-        .accessibilityLabel(Text("workouts.start", bundle: .module))
+        .accessibilityLabel(Text("workouts.start.spoken \(workout.displayName)", bundle: .module))
+        // A dead chip only keeps the cards aligned; VoiceOver skips it.
+        .accessibilityHidden(!workout.isPlayable)
     }
 
     @ViewBuilder
