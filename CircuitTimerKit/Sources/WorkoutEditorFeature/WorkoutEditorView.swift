@@ -234,7 +234,7 @@ public struct WorkoutEditorView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, .token(spacing: .l))
             .padding(.bottom, .token(spacing: .xl))
-            .cardRow(.bottom)
+            .cardRow(.bottom, endsList: section == .coolDown)
         }
         .listSectionSeparator(.hidden)
     }
@@ -317,9 +317,9 @@ private struct SavePanelPlacement<Panel: View>: ViewModifier {
         // Scrolling to a focused field brings only its text above the panel; the spacing keeps the field's own
         // padding and background clear of the button too.
         if #available(iOS 26, *) {
-            content.safeAreaBar(edge: .bottom, spacing: .token(spacing: .l), content: panel)
+            content.safeAreaBar(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
         } else {
-            content.safeAreaInset(edge: .bottom, spacing: .token(spacing: .l), content: panel)
+            content.safeAreaInset(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
         }
     }
 }

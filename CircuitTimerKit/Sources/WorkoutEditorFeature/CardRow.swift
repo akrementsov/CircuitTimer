@@ -19,11 +19,13 @@ enum CardRowPosition {
 
 extension View {
     /// A list row drawn as one part of a card, edge to edge; the content sets its own padding.
-    func cardRow(_ position: CardRowPosition) -> some View {
-        padding(.bottom, position.endsCard ? .token(spacing: .m) : .zero)
+    /// The last card of the list leaves no gap under it: nothing follows it.
+    func cardRow(_ position: CardRowPosition, endsList: Bool = false) -> some View {
+        let gap: CGFloat = position.endsCard && !endsList ? .token(spacing: .m) : .zero
+        return padding(.bottom, gap)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
-            .listRowBackground(CardRowBackground(position: position))
+            .listRowBackground(CardRowBackground(position: position, gap: gap))
     }
 
     /// A list row outside any card, on the screen color.
@@ -38,11 +40,12 @@ extension View {
 /// The card's part behind one row. The gap under the last row stays unpainted, so the screen shows through it.
 private struct CardRowBackground: View {
     let position: CardRowPosition
+    let gap: CGFloat
 
     var body: some View {
         UnevenRoundedRectangle(cornerRadii: cornerRadii, style: .continuous)
             .fill(.surface(.card))
-            .padding(.bottom, position.endsCard ? .token(spacing: .m) : .zero)
+            .padding(.bottom, gap)
     }
 
     private var cornerRadii: RectangleCornerRadii {
