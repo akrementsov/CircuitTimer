@@ -182,13 +182,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Workout name"
+            "value" : "Enter workout name"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Название тренировки"
+            "value" : "Введите название тренировки"
           }
         }
       }
@@ -267,25 +267,25 @@
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунда"
+                  "value" : "%lld круга"
                 }
               },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раундов"
+                  "value" : "%lld кругов"
                 }
               },
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунд"
+                  "value" : "%lld круг"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld раунда"
+                  "value" : "%lld круга"
                 }
               }
             }
@@ -304,7 +304,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Раунды"
+            "value" : "Круги"
           }
         }
       }
