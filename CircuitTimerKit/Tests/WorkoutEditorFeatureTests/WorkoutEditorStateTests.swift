@@ -12,7 +12,6 @@ struct WorkoutEditorStateTests {
         let isDraftComplete: Bool
         let canSave: Bool
         let showsSaveHint: Bool
-        let blocksInteractiveDismiss: Bool
     }
 
     static let flagsCases: [FlagsCase] = {
@@ -38,48 +37,42 @@ struct WorkoutEditorStateTests {
                 state: untouchedNew,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true,
-                blocksInteractiveDismiss: false
+                showsSaveHint: true
             ),
             FlagsCase(
                 testDescription: "complete but untouched",
                 state: untouched,
                 isDraftComplete: true,
                 canSave: false,
-                showsSaveHint: false,
-                blocksInteractiveDismiss: false
+                showsSaveHint: false
             ),
             FlagsCase(
                 testDescription: "complete and changed",
                 state: changed,
                 isDraftComplete: true,
                 canSave: true,
-                showsSaveHint: false,
-                blocksInteractiveDismiss: true
+                showsSaveHint: false
             ),
             FlagsCase(
                 testDescription: "blank name",
                 state: blankName,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true,
-                blocksInteractiveDismiss: true
+                showsSaveHint: true
             ),
             FlagsCase(
                 testDescription: "nothing to play",
                 state: nothingToPlay,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true,
-                blocksInteractiveDismiss: true
+                showsSaveHint: true
             ),
             FlagsCase(
                 testDescription: "saving",
                 state: saving,
                 isDraftComplete: true,
                 canSave: false,
-                showsSaveHint: false,
-                blocksInteractiveDismiss: true
+                showsSaveHint: false
             ),
         ]
     }()
@@ -114,6 +107,5 @@ struct WorkoutEditorStateTests {
         #expect(flags.state.isDraftComplete == flags.isDraftComplete)
         #expect(flags.state.canSave == flags.canSave)
         #expect(flags.state.showsSaveHint == flags.showsSaveHint)
-        #expect(flags.state.blocksInteractiveDismiss == flags.blocksInteractiveDismiss)
     }
 }

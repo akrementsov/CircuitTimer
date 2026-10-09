@@ -56,39 +56,43 @@ struct AppFeatureListTests {
         let store = makeStore(loaded([first]))
 
         await store.send(.view(.addButtonTapped)) {
-            $0.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
         }
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await store.send(.path(.popFrom(id: 0))) { $0.path = StackState() }
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.destination = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 1] = .editor(WorkoutEditorFeature.State(editing: self.first))
         }
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await store.send(.path(.popFrom(id: 1))) { $0.path = StackState() }
         await store.send(.view(.workoutTapped(UUID(fixture: 99))))
     }
 
     @Test
-    func test_editorSaved_updatesInPlaceAppendsNewAndReloadsWhenNotLoaded() async {
+    func test_editorSaved_updatesInPlaceAppendsNewAndReloadsWhenNotLoaded() async throws {
         var renamed = first
         renamed.name = "Renamed"
         var state = loaded([first, second])
-        state.destination = .editor(WorkoutEditorFeature.State(editing: first))
+        state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+        let id = try #require(state.path.ids.first)
         let store = makeStore(state)
 
-        await store.send(.destination(.presented(.editor(.delegate(.saved(renamed)))))) {
+        await store.send(.path(.element(id: id, action: .editor(.delegate(.saved(renamed)))))) {
             $0.workouts = .loaded([renamed, self.second])
         }
-        await store.send(.destination(.presented(.editor(.delegate(.saved(makeWorkout(3))))))) {
+        await store.send(.path(.element(id: id, action: .editor(.delegate(.saved(makeWorkout(3))))))) {
             $0.workouts = .loaded([renamed, self.second, makeWorkout(3)])
         }
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await store.send(.path(.popFrom(id: id))) { $0.path = StackState() }
 
         var failed = AppFeature.State()
         failed.workouts = .failed
-        failed.destination = .editor(WorkoutEditorFeature.State(editing: first))
+        failed.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+        let failedID = try #require(failed.path.ids.first)
         let notLoaded = makeStore(failed) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(3)]) }
         }
-        await notLoaded.send(.destination(.presented(.editor(.delegate(.saved(makeWorkout(3))))))) { $0.workouts = .loading }
+        await notLoaded.send(.path(.element(id: failedID, action: .editor(.delegate(.saved(makeWorkout(3))))))) {
+            $0.workouts = .loading
+        }
         await notLoaded.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([makeWorkout(3)]) }
     }
 
@@ -396,7 +400,7 @@ struct AppFeatureListTests {
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
             $0.deferredEditor = nil
-            $0.destination = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
         }
     }
 
@@ -417,7 +421,7 @@ struct AppFeatureListTests {
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([makeWorkout(1), renamed])
             $0.deferredEditor = nil
-            $0.destination = .editor(WorkoutEditorFeature.State(editing: renamed))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: renamed))
         }
     }
 
