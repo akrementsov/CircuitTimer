@@ -29,7 +29,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 
 | Module | Depends on | Owns |
 |---|---|---|
-| `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
+| `WorkoutDomain` | Foundation, CryptoKit | Workout model, `WorkoutLimits`, `WorkoutSchedule` and its fingerprint, `WorkoutRun`, `TimeMath` |
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |

@@ -7,6 +7,8 @@ public struct WorkoutSchedule: Hashable, Sendable {
     public let stages: [ScheduledStage]
     public let segments: [ScheduleSegment]
     public let totalDuration: Duration
+    /// Identifies the schedule's structure for a saved run; see `fingerprint(of:)`.
+    public let fingerprint: String
 
     public init(workout: Workout) {
         let warmUp = WorkoutLimits.normalizedStages(workout.warmUp)
@@ -30,6 +32,7 @@ public struct WorkoutSchedule: Hashable, Sendable {
         stages = builder.stages
         segments = builder.segments
         totalDuration = builder.position
+        fingerprint = Self.fingerprint(of: builder.stages)
     }
 
     /// The stage after `stage`, or `nil` for the last one or a stage from another schedule.
