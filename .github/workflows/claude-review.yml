@@ -31,6 +31,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          # Claude can read any file, so no GitHub token stays in the git config.
+          persist-credentials: false
 
       # Claude Code runs as a plain CLI with an API key: monthly API credits cover `claude -p`
       # started this way, but not runs started by the Claude Code GitHub Action.
@@ -65,11 +67,17 @@ jobs:
             < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
           [ -s "$RUNNER_TEMP/review.md" ] || { echo "::error::Claude returned an empty review"; exit 1; }
 
-      # One comment per pull request, replaced on every push.
+      # One comment per pull request, replaced on every push. A failed run leaves the previous
+      # review, so the comment names the commit it covers.
       - name: Post the review
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          {
+            cat "$RUNNER_TEMP/review.md"
+            printf '\n---\n<sub>Reviewed at %s</sub>\n' "$HEAD_SHA"
+          } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --edit-last --create-if-none --body-file "$RUNNER_TEMP/review.md"
+            --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
