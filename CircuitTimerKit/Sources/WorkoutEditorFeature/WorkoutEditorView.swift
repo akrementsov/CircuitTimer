@@ -148,7 +148,8 @@ public struct WorkoutEditorView: View {
             TitleAndTimeRow(title: sectionTitle(section), duration: store.draft.duration(of: section), style: .adaptive, font: .body)
                 .accessibilityAddTraits(.isHeader)
                 .padding(.horizontal, .token(spacing: .l))
-                .padding(.vertical, .token(spacing: .xl))
+                .padding(.top, .token(spacing: .xl))
+                .padding(.bottom, .token(spacing: .l))
                 .cardRow(.top)
 
             if section == .training {
@@ -159,7 +160,7 @@ public struct WorkoutEditorView: View {
                     send(afterClearingFocus: .trainingRoundsChanged($0))
                 }
                 .padding(.horizontal, .token(spacing: .l))
-                .padding(.bottom, .token(spacing: .xs))
+                .padding(.vertical, .token(spacing: .xxs))
                 .cardRow(.middle)
             }
 
@@ -176,7 +177,8 @@ public struct WorkoutEditorView: View {
                 // The lifted row is scaled up; drawn as the whole row it would spill over the card's edges.
                 .contentShape(.dragPreview, RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
                 .padding(.horizontal, .token(spacing: .l))
-                .padding(.bottom, .token(spacing: .xs))
+                // Half of the gap between stages on each side, so a stage sits in the middle of its own row.
+                .padding(.vertical, .token(spacing: .xxs))
                 .cardRow(.middle)
                 .moveDisabled(focusedField != nil)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -232,7 +234,7 @@ public struct WorkoutEditorView: View {
             .tint(.text(.primary))
             .disabled(!store.state.canAddStage(to: section))
             .frame(maxWidth: .infinity)
-            .padding(.top, .token(spacing: .m))
+            .padding(.top, .token(spacing: .l))
             .padding(.bottom, .token(spacing: .xl))
             .cardRow(.bottom)
         }
