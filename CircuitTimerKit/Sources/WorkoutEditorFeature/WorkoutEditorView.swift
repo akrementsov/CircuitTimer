@@ -17,7 +17,6 @@ public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
     @FocusState private var focusedField: EditorField?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
-    @State private var savePanelHeight: CGFloat = .zero
 
     public init(store: StoreOf<WorkoutEditorFeature>) {
         self.store = store
@@ -48,16 +47,15 @@ public struct WorkoutEditorView: View {
         .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, .token(spacing: .m), for: .scrollContent)
-        // Before iOS 26 the panel floats over the list; the list already insets its content by the bottom safe area.
-        .contentMargins(.bottom, savePanelHeight, for: .scrollContent)
         // Rows set their own heights; the system minimum would stretch the thin ones.
         .environment(\.defaultMinListRowHeight, .zero)
         // A swiped row is cut at the card's edge, while the content still scrolls under the bars.
         .mask { Rectangle().ignoresSafeArea(edges: .vertical) }
         .padding(.horizontal, .token(spacing: .l))
-        .background(.surface(.screen))
+        // Under the keyboard too: its rounded top corners would show the black window behind the screen.
+        .background { Rectangle().fill(.surface(.screen)).ignoresSafeArea() }
         .modifier(
-            SavePanelPlacement(height: $savePanelHeight) {
+            SavePanelPlacement {
                 SaveWorkoutPanel(
                     showsHint: store.showsSaveHint,
                     isSaving: store.isSaving,
@@ -309,25 +307,27 @@ public struct WorkoutEditorView: View {
     }
 }
 
-/// Puts the save panel at the bottom of the screen. On iOS 26 it is a bar: the list scrolls under it with the system's
-/// scroll edge effect and insets its content by it. Before that the panel floats over the list, and the list's
-/// bottom margin is the panel's measured height.
+/// Puts the save panel at the bottom of the screen, above the keyboard while a field is edited. On iOS 26 it is a bar:
+/// the list scrolls under it with the system's scroll edge effect and insets its content by it. Before that the panel
+/// floats over the list, and the list's bottom margin is the panel's measured height.
 private struct SavePanelPlacement<Panel: View>: ViewModifier {
-    @Binding var height: CGFloat
     @ViewBuilder let panel: () -> Panel
+
+    @State private var panelHeight: CGFloat = .zero
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content.safeAreaBar(edge: .bottom, content: panel)
         } else {
-            content.overlay(alignment: .bottom) {
-                panel()
-                    // Measured before the frame: the panel's own height, not the overlay's.
-                    .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { height = $0 })
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    // The keyboard covers the panel instead of pushing it up, as in the original app.
-                    .ignoresSafeArea(.keyboard)
-            }
+            content
+                // The list already insets its content by the bottom safe area and the keyboard.
+                .contentMargins(.bottom, panelHeight, for: .scrollContent)
+                .overlay(alignment: .bottom) {
+                    panel()
+                        // Measured before the frame: the panel's own height, not the overlay's.
+                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { panelHeight = $0 })
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }
         }
     }
 }

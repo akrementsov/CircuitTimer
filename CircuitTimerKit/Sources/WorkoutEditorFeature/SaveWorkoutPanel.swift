@@ -35,6 +35,7 @@ struct SaveWorkoutPanel: View {
             .accessibilityLabel(isSaving ? Text("editor.saving", bundle: .module) : Text("editor.saveWorkout", bundle: .module))
             .disabled(!canSave)
         }
+        .glassGroup(spacing: .token(spacing: .xs))
         .padding(.horizontal, .token(spacing: .l))
         .padding(.top, .token(spacing: .m))
         .padding(.bottom, .token(spacing: .xs))
@@ -79,6 +80,16 @@ private struct SaveWorkoutButton: View {
 }
 
 private extension View {
+    /// On iOS 26 neighbouring glass shapes render together, as one surface; there is no glass before it.
+    @ViewBuilder
+    func glassGroup(spacing: CGFloat) -> some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: spacing) { self }
+        } else {
+            self
+        }
+    }
+
     /// Glass on iOS 26, a material before it.
     @ViewBuilder
     func floatingBacking(in shape: some Shape) -> some View {
