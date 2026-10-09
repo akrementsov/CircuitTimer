@@ -181,6 +181,10 @@ public struct WorkoutEditorFeature: Sendable {
                 }
                 state.draft[section].remove(at: index)
             case let .stagesMoved(section, source, destination):
+                // Offsets come from the list as it was drawn; stale ones would trap in `move`, so they are ignored.
+                let count = state.draft[section].count
+                guard !source.isEmpty, source.allSatisfy({ $0 < count }), (0...count).contains(destination) else { return .none }
+
                 state.draft[section].move(fromOffsets: source, toOffset: destination)
             case let .stageMovedUp(section, id):
                 guard let index = state.draft[section].indexMovableUp(id) else { return .none }

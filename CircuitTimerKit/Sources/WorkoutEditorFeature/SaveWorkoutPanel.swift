@@ -2,7 +2,8 @@ import DesignSystem
 import SwiftUI
 
 // TODO: [CT-3] Move the panel and its button style to DesignSystem together with Start workout, their second user;
-// TitleAndTimeRow and the card rows go with them, and the shadow radius and pressed opacity become tokens.
+// TitleAndTimeRow and the card rows go with them, and the hint's material, the shadow radius and the pressed
+// opacity become tokens.
 /// The save hint and the full-width Save workout button, floating over the editor's content:
 /// Liquid Glass on iOS 26, the solid brand button with the original shadow before.
 struct SaveWorkoutPanel: View {

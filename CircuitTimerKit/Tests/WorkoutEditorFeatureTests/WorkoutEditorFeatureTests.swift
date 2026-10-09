@@ -95,7 +95,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_stageDeletedMovedAndExpanded_keepPickerConsistent() async {
+    func test_stageDeleteMoveAndExpand_expandedStage_keepsPickerConsistent() async {
         let store = makeStore()
         let first = UUID(fixture: 20)
         let second = UUID(fixture: 21)
@@ -123,6 +123,18 @@ struct WorkoutEditorFeatureTests {
 
         await store.send(.view(.stageDurationTapped(id))) { $0.expandedStageID = id }
         await store.send(.view(.stageDeleteButtonTapped(section, id)))
+    }
+
+    @Test(arguments: [
+        ("source past the end", IndexSet(integer: 2), 0),
+        ("destination past the end", IndexSet(integer: 0), 3),
+        ("negative destination", IndexSet(integer: 0), -1),
+        ("empty source", IndexSet(), 0),
+    ])
+    func test_stagesMoved_staleOffsets_isNoOp(_ name: String, source: IndexSet, destination: Int) async {
+        let store = makeStore()
+
+        await store.send(.view(.stagesMoved(.training, source, destination)))
     }
 
     @Test
