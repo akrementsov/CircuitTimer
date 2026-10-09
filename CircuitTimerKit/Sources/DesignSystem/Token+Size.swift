@@ -9,6 +9,10 @@ extension DesignSystem.Token {
         case rowTitleMinWidth = 100
         /// Side of a stage's intensity marker.
         case marker = 17
+        /// Height of the timer's progress bar.
+        case progressBar = 8
+        /// Width of the outline of the timer's round buttons.
+        case buttonBorder = 2
     }
 }
 
