@@ -70,3 +70,4 @@ The row is the phase *after* settling.
 
 - **Backwards past the anchor:** the run re-anchors at the current time instead of stalling. Committed progress is kept; time between the last commit and the change can be lost, and `rebase(at:keepingTotalElapsed:)` lets the UI restore what it has already shown.
 - **Forwards:** indistinguishable from time spent in the background, so timed stages are skipped up to the next manual pause. This is an accepted trade-off of using wall-clock time, which is what survives an app restart and drives a Live Activity countdown.
+- **Detecting a change:** `WorkoutTimerFeature` compares wall-clock time with a monotonic clock before every update; see AGENTS.md › Time.
