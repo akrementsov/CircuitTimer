@@ -198,14 +198,14 @@ public struct WorkoutEditorView: View {
                 // Rows read only the stages captured above: a row that reads the store observes the stages on its own
                 // and is redrawn apart from the list while a drag settles, showing the wrong stage.
                 .accessibilityActions {
-                    if stages.indexMovableUp(stage.id) != nil {
+                    if focusedField == nil, stages.indexMovableUp(stage.id) != nil {
                         Button {
                             send(.stageMovedUp(section, stage.id))
                         } label: {
                             Text("editor.stage.moveUp", bundle: .module)
                         }
                     }
-                    if stages.indexMovableDown(stage.id) != nil {
+                    if focusedField == nil, stages.indexMovableDown(stage.id) != nil {
                         Button {
                             send(.stageMovedDown(section, stage.id))
                         } label: {
