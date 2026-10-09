@@ -19,6 +19,15 @@ public struct WorkoutRun: Hashable, Sendable {
         case finished
     }
 
+    /// Why a saved record cannot be restored.
+    public enum RestoreError: Error, Equatable, Sendable {
+        /// The workout changed since the record was saved.
+        case fingerprintMismatch
+        case cursorOutOfRange
+        /// The phase, position and anchor do not describe a state the run can be in.
+        case inconsistentState
+    }
+
     private enum Mode {
         case running(since: Date)
         case paused
@@ -36,6 +45,37 @@ public struct WorkoutRun: Hashable, Sendable {
         position = .zero
         cursor = 0
         phase = schedule.stages.isEmpty ? .finished : .idle
+    }
+
+    /// Rebuilds a saved run over `schedule` and settles it at `now`, so a run that kept going
+    /// while the process was gone lands on the right stage, a manual pause or the end.
+    ///
+    /// Rejects a record made for another schedule or describing a state that breaks the
+    /// invariants in `docs/timer-engine.md`. An anchor later than `now` re-anchors at `now`.
+    public init(schedule: WorkoutSchedule, restoring record: WorkoutRunRecord, at now: Date) throws(RestoreError) {
+        guard record.scheduleFingerprint == schedule.fingerprint else { throw .fingerprintMismatch }
+        guard schedule.stages.indices.contains(record.cursor) else { throw .cursorOutOfRange }
+
+        let stage = schedule.stages[record.cursor]
+        let position = Duration.milliseconds(record.positionMs)
+        let isInsideTimedStage = stage.kind != .pause && stage.start <= position && position < stage.end
+        let phase: Phase
+        switch (record.phase, record.since) {
+            case (.awaitingUser, nil) where stage.kind == .pause && position == stage.start:
+                phase = .awaitingUser
+            case (.paused, nil) where isInsideTimedStage:
+                phase = .paused
+            case let (.running, since?) where isInsideTimedStage:
+                phase = .running(since: since)
+            default:
+                throw .inconsistentState
+        }
+
+        self.schedule = schedule
+        self.position = position
+        cursor = record.cursor
+        self.phase = phase
+        settle(at: now)
     }
 
     // MARK: - Operations

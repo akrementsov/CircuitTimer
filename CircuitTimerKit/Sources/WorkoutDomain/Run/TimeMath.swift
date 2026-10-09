@@ -50,4 +50,19 @@ extension Date {
     func adding(_ duration: Duration) -> Date {
         addingTimeInterval(TimeInterval(duration.inMilliseconds) / 1_000)
     }
+
+    /// Whole milliseconds since 1970 for a saved run, truncated with the same 1 µs tolerance as
+    /// `elapsed(since:)` and clamped to ±10¹⁰ seconds, so `Date(millisecondsSince1970: m)`
+    /// reads back as `m`.
+    var millisecondsSince1970: Int64 {
+        let seconds = timeIntervalSince1970
+        guard seconds.isFinite else { return 0 }
+
+        let clamped = min(max(seconds, -Self.maxElapsedSeconds), Self.maxElapsedSeconds)
+        return Int64((clamped * 1_000 + 0.001).rounded(.down))
+    }
+
+    init(millisecondsSince1970 milliseconds: Int64) {
+        self.init(timeIntervalSince1970: TimeInterval(milliseconds) / 1_000)
+    }
 }

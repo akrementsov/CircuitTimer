@@ -71,3 +71,10 @@ The row is the phase *after* settling.
 - **Backwards past the anchor:** the run re-anchors at the current time instead of stalling. Committed progress is kept; time between the last commit and the change can be lost, and `rebase(at:keepingTotalElapsed:)` lets the UI restore what it has already shown.
 - **Forwards:** indistinguishable from time spent in the background, so timed stages are skipped up to the next manual pause. This is an accepted trade-off of using wall-clock time, which is what survives an app restart and drives a Live Activity countdown.
 - **Detecting a change:** `WorkoutTimerFeature` compares wall-clock time with a monotonic clock before every update; see AGENTS.md › Time.
+
+## Saved runs
+
+- `WorkoutRunRecord` v1 saves a started, unfinished run: its phase (`running`, `paused` or `awaitingUser`), `positionMs`, `cursor`, the running anchor `sinceEpochMs` and the schedule fingerprint. Idle and finished runs have no record.
+- `WorkoutSchedule.fingerprint` hashes the structure the record depends on: each stage's index, section, round, round count, kind, stage ID and duration. Names are left out, so renaming keeps a saved run.
+- `WorkoutRun.init(schedule:restoring:at:)` rejects a record whose fingerprint differs, whose cursor is out of range, or whose phase, position and anchor break I4 and I5 (an anchor exists exactly while running). It then settles at `now`, so I9 holds and a run that kept going while the process was gone lands on the right stage, a manual pause or the end.
+- Across a process restart only `sinceEpochMs` survives. A clock moved back past it re-anchors at the saved position (settling rule 1); a smaller backward move undercounts by that amount; a forward move is indistinguishable from elapsed time.
