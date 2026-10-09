@@ -40,6 +40,7 @@ public struct WorkoutTimerFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Identifiable, Sendable {
+        /// Also identifies this screen's session in `TimerSessionClient`.
         public let id: UUID
         public let title: String
         var run: WorkoutRun
@@ -52,6 +53,9 @@ public struct WorkoutTimerFeature: Sendable {
         var clockGeneration = 0
         /// Set while a tick loop runs, and refreshed on every tick.
         var clockAnchor: ClockAnchor?
+        /// The keep-awake vote last sent for this screen, and its revision.
+        var requestedAwake = false
+        var awakeRevision = 0
         @Presents public var destination: Destination.State?
 
         public init(id: UUID, title: String, schedule: WorkoutSchedule) {
@@ -63,6 +67,11 @@ public struct WorkoutTimerFeature: Sendable {
             // A new run is idle, or finished when the schedule is empty; neither reads the date.
             snapshot = run.snapshot(at: .distantPast)
             countdown = schedule.stages.isEmpty ? nil : Countdown(.start)
+        }
+
+        /// A run waiting for the user lets the screen lock.
+        var keepsScreenAwake: Bool {
+            countdown != nil || snapshot.status == .running
         }
     }
 
@@ -100,6 +109,7 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.continuousClock) private var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.timerSession) private var timerSession
 
     public init() {}
 
@@ -238,7 +248,8 @@ public struct WorkoutTimerFeature: Sendable {
                 case .idle, .paused, .awaitingUser:
                     restart = nil
                 case .finished:
-                    return .merge(syncClock(&state, at: now), .run { [dismiss] _ in await dismiss() })
+                    let stop = syncClock(&state, at: now)
+                    return .merge(stop, closeScreen(state))
             }
         }
         state.destination = .closeConfirmation(.closeConfirmation(restart: restart))
@@ -248,7 +259,7 @@ public struct WorkoutTimerFeature: Sendable {
     private func closeConfirmed(_ choice: CloseConfirmation, _ state: inout State) -> Effect<Action> {
         switch choice {
             case .finish:
-                return .run { [dismiss] _ in await dismiss() }
+                return closeScreen(state)
             case let .stay(restart):
                 let now = date()
                 let mustSync = advance(&state, at: now)
@@ -262,6 +273,18 @@ public struct WorkoutTimerFeature: Sendable {
                         return mustSync ? syncClock(&state, at: now) : .none
                 }
                 return syncClock(&state, at: now)
+        }
+    }
+
+    /// The only way the timer closes; its clock must have stopped already.
+    private func closeScreen(_ state: State) -> Effect<Action> {
+        assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
+        // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
+        // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
+        // session ended and returns before it sleeps.
+        return .run { [timerSession, dismiss, id = state.id] _ in
+            await timerSession.end(owner: id)
+            await dismiss()
         }
     }
 
@@ -304,8 +327,24 @@ public struct WorkoutTimerFeature: Sendable {
         ClockAnchor(date: now, instant: MonotonicInstant(now: clock), totalElapsed: totalElapsed)
     }
 
-    /// Replaces the current clock loop with the one the settled state needs, if any.
+    /// Replaces the current clock loop with the one the settled state needs, if any, and asks to keep the screen
+    /// awake exactly while a clock runs. The only place where the keep-awake vote changes.
     private func syncClock(_ state: inout State, at now: Date) -> Effect<Action> {
+        let loop = replaceClockLoop(&state, at: now)
+        guard state.keepsScreenAwake != state.requestedAwake else { return loop }
+
+        state.requestedAwake = state.keepsScreenAwake
+        state.awakeRevision += 1
+        let id = state.id
+        let awake = state.requestedAwake
+        let revision = state.awakeRevision
+        let request = Effect<Action>.run { [timerSession] _ in
+            await timerSession.requestAwake(owner: id, awake: awake, revision: revision)
+        }
+        return .merge(loop, request)
+    }
+
+    private func replaceClockLoop(_ state: inout State, at now: Date) -> Effect<Action> {
         state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
         let replaced = Effect<Action>.cancel(id: CancelID.clock(generation: state.clockGeneration))
@@ -314,20 +353,27 @@ public struct WorkoutTimerFeature: Sendable {
 
         if let countdown = state.countdown {
             state.hasClockFailed = false
-            return .merge(replaced, runCountdown(remaining: countdown.remaining, generation: state.clockGeneration))
+            return .merge(replaced, runCountdown(remaining: countdown.remaining, owner: state.id, generation: state.clockGeneration))
         }
         if state.snapshot.status == .running {
             state.hasClockFailed = false
             state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
-            return .merge(replaced, runTicks(state.run, generation: state.clockGeneration))
+            return .merge(replaced, runTicks(state.run, owner: state.id, generation: state.clockGeneration))
         }
         return replaced
     }
 
-    private func runCountdown(remaining: Int, generation: Int) -> Effect<Action> {
-        .run { [clock] send in
+    private func runCountdown(remaining: Int, owner: UUID, generation: Int) -> Effect<Action> {
+        .run { [clock, timerSession] send in
             do {
-                try await Self.countdownLoop(clock: clock, remaining: remaining, generation: generation, send: send)
+                try await Self.countdownLoop(
+                    clock: clock,
+                    session: timerSession,
+                    owner: owner,
+                    remaining: remaining,
+                    generation: generation,
+                    send: send
+                )
             } catch is CancellationError {
                 return
             } catch {
@@ -338,10 +384,18 @@ public struct WorkoutTimerFeature: Sendable {
         .cancellable(id: CancelID.clock(generation: generation))
     }
 
-    private func runTicks(_ run: WorkoutRun, generation: Int) -> Effect<Action> {
-        .run { [clock, date] send in
+    private func runTicks(_ run: WorkoutRun, owner: UUID, generation: Int) -> Effect<Action> {
+        .run { [clock, date, timerSession] send in
             do {
-                try await Self.tickLoop(clock: clock, date: date, run: run, generation: generation, send: send)
+                try await Self.tickLoop(
+                    clock: clock,
+                    date: date,
+                    session: timerSession,
+                    owner: owner,
+                    run: run,
+                    generation: generation,
+                    send: send
+                )
             } catch is CancellationError {
                 return
             } catch {
@@ -352,15 +406,21 @@ public struct WorkoutTimerFeature: Sendable {
         .cancellable(id: CancelID.clock(generation: generation))
     }
 
+    // Every input is passed in, so the loop reads nothing from the store or the dependencies.
     /// Wakes whenever the stage clock changes its second and ends once its copy of the run stops.
-    static func tickLoop<C: Clock<Duration>>(
+    static func tickLoop<C: Clock<Duration>>( // swiftlint:disable:this function_parameter_count
         clock: C,
         date: DateGenerator,
+        session: TimerSessionClient,
+        owner: UUID,
         run: WorkoutRun,
         generation: Int,
         send: Send<Action>
     ) async throws {
         while true {
+            // A loop that starts after its screen closed ends before it sleeps.
+            guard await !session.isEnded(owner: owner) else { return }
+
             // The loop's copy only schedules wake-ups; the reducer commits and shows its own reading.
             let shown = run.snapshot(at: date())
             let stopped = shown.status != .running
@@ -379,15 +439,20 @@ public struct WorkoutTimerFeature: Sendable {
         return fraction > .zero ? fraction : .seconds(1)
     }
 
+    // Every input is passed in, so the loop reads nothing from the store or the dependencies.
     /// Wakes once per remaining second. Every deadline is measured from one reading, so late wake-ups never add up.
-    static func countdownLoop<C: Clock<Duration>>(
+    static func countdownLoop<C: Clock<Duration>>( // swiftlint:disable:this function_parameter_count
         clock: C,
+        session: TimerSessionClient,
+        owner: UUID,
         remaining: Int,
         generation: Int,
         send: Send<Action>
     ) async throws {
         let start = clock.now
         for second in stride(from: 1, through: remaining, by: 1) {
+            guard await !session.isEnded(owner: owner) else { return }
+
             try await clock.sleep(until: start.advanced(by: .seconds(second)), tolerance: nil)
             await send(.internal(.countdownTicked(generation: generation)))
         }
