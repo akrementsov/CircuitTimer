@@ -9,4 +9,9 @@ extension Workout {
             ? String(localized: "workouts.untitled", bundle: .module)
             : name
     }
+
+    /// A workout with nothing to play has no timer.
+    var isPlayable: Bool {
+        totalDuration > .zero
+    }
 }

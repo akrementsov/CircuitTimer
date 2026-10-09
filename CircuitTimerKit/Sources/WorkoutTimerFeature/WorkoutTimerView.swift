@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import DesignSystem
+import Foundation
 import SwiftUI
 import WorkoutDomain
 
@@ -14,8 +15,9 @@ public struct WorkoutTimerView: View {
 
     public var body: some View {
         GeometryReader { proxy in
-            // Heights are the original app's shares of a 718-point screen below the navigation bar.
-            let unit = proxy.size.height / 718
+            // Heights are the original app's shares of a 718-point screen below the navigation bar, which runs to the
+            // bottom edge, home indicator strip included.
+            let unit = (proxy.size.height + proxy.safeAreaInsets.bottom) / 718
             VStack(spacing: .zero) {
                 SegmentedProgressBar(segments: store.progressSegments)
                     .frame(height: .token(size: .progressBar))
@@ -44,6 +46,9 @@ public struct WorkoutTimerView: View {
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .screenChrome()
+        // On iOS 17 the editor toolbar role adds a system back button to the cover's root, which would close a running
+        // workout without asking.
+        .navigationBarBackButtonHidden(true)
         .navigationTitle(store.title)
         .toolbar { toolbar }
         .accessibilityAction(.escape) { send(.closeButtonTapped) }
@@ -110,6 +115,7 @@ private enum PreviewTimer {
     ) -> WorkoutTimerFeature.State {
         var state = WorkoutTimerFeature.State(id: UUID(0), title: workout.name, schedule: WorkoutSchedule(workout: workout))
         play(&state.run)
+        state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
         state.countdown = countdown
         state.hasClockFailed = hasClockFailed

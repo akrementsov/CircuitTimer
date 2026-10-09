@@ -107,8 +107,7 @@ public struct AppView: View {
                         .contentShape([.interaction, .dragPreview], .workoutCard)
                         // TODO: [CT-3-2] An interim way to start a workout; «Start workout» on the workout screen replaces it.
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            // A workout with nothing to play has no timer.
-                            if workout.totalDuration > .zero {
+                            if workout.isPlayable {
                                 Button {
                                     send(.startButtonTapped(workout.id))
                                 } label: {

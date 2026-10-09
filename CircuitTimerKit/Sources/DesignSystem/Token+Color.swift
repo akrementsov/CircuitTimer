@@ -22,7 +22,7 @@ extension DesignSystem.Token {
     public enum StageColor: Sendable, CaseIterable {
         case work
         case rest
-        /// The `surface(.card)` asset: it fills the full-screen timer and is never drawn on a card.
+        /// The `surface(.card)` asset: the timer's dark stage card, for pauses, the start and the end.
         case pause
     }
 }

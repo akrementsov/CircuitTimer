@@ -1,4 +1,5 @@
 import CoreText
+import Foundation
 import os
 import SwiftUI
 import UIKit
@@ -42,7 +43,9 @@ public struct StageClockText: View {
                 }
                 .font(face.font(size: size))
                 .alignmentGuide(VerticalAlignment.center) { $0[.firstTextBaseline] - size * metrics.capHeight / 2 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Exactly the box: a flexible frame would grow to the font's line height, taller than the box, and
+                // sit at its top, so the cap centre would miss the box centre. The line overflows the box unclipped.
+                .frame(width: proxy.size.width, height: proxy.size.height)
         }
     }
 
@@ -87,7 +90,7 @@ extension StageClockText.Face {
         let font = CTFontCreateWithName(LeagueGothic.postScriptName as CFString, referenceSize, nil)
         let found = CTFontCopyPostScriptName(font) as String
         guard found == LeagueGothic.postScriptName else {
-            logger.error("CoreText returned \(found, privacy: .public) for League Gothic; the stage clock uses the system font")
+            Logger.designSystem.error("CoreText returned \(found, privacy: .public) for League Gothic; the stage clock uses the system font")
             return nil
         }
         return ClockFaceMetrics(font: font)
@@ -97,8 +100,6 @@ extension StageClockText.Face {
     private static let systemMetrics = ClockFaceMetrics(font: UIFont.systemFont(ofSize: referenceSize) as CTFont)
 
     private static let referenceSize: CGFloat = 100
-
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "DesignSystem")
 }
 
 /// What sizing the stage clock needs from a font, in em.

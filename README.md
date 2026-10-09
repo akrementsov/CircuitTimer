@@ -43,7 +43,7 @@ graph TD
 | Module | Responsibility |
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
-| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
+| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `WorkoutEditorFeature` | The workout editor in the original app's cards: a draft saved with the bottom Save workout button or discarded with Back, stage editing within `WorkoutLimits`. |
 | `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs. |

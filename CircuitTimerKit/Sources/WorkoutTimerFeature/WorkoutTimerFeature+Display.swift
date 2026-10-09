@@ -46,23 +46,25 @@ extension WorkoutTimerFeature.State {
             return countdownCard(countdown)
         }
         if hasClockFailed {
-            let message = snapshot.status == .idle ? Self.text("timer.failed.start") : Self.text("timer.failed.resume")
+            let message = snapshot.status == .idle
+                ? String(localized: "timer.failed.start", bundle: .module)
+                : String(localized: "timer.failed.resume", bundle: .module)
             return CurrentCard(tone: .dark, content: .pauseGlyph, name: message, spokenValue: message)
         }
 
         let name: String
         switch snapshot.status {
             case .idle:
-                name = Self.text("timer.stage.getReady")
+                name = String(localized: "timer.stage.getReady", bundle: .module)
             case .running:
                 if let stage = snapshot.currentStage, stage.kind != .pause {
                     return runningCard(stage)
                 }
-                name = Self.text("timer.stage.pause")
+                name = String(localized: "timer.stage.pause", bundle: .module)
             case .paused, .awaitingUser:
-                name = Self.text("timer.stage.pause")
+                name = String(localized: "timer.stage.pause", bundle: .module)
             case .finished:
-                name = Self.text("timer.stage.finished")
+                name = String(localized: "timer.stage.finished", bundle: .module)
         }
         return CurrentCard(tone: .dark, content: .pauseGlyph, name: name, spokenValue: name)
     }
@@ -76,7 +78,7 @@ extension WorkoutTimerFeature.State {
                 // Before the start the first stage comes next; a user pause resumes the stage it stopped.
                 return snapshot.currentStage.map(Self.displayName)
             case .running, .awaitingUser:
-                return snapshot.nextStage.map(Self.displayName) ?? Self.text("timer.stage.finished")
+                return snapshot.nextStage.map(Self.displayName) ?? String(localized: "timer.stage.finished", bundle: .module)
         }
     }
 
@@ -85,14 +87,15 @@ extension WorkoutTimerFeature.State {
         let minutes = Self.minutesRoundedUp(snapshot.totalRemaining)
         let hours = minutes / 60
         let restMinutes = minutes % 60
-        var parts: [String] = []
-        if hours > 0 {
-            parts.append(String(localized: "timer.total.hours \(hours)", bundle: .module))
+        let hoursText = String(localized: "timer.total.hours \(hours)", bundle: .module)
+        let minutesText = String(localized: "timer.total.minutes \(restMinutes)", bundle: .module)
+        if hours == 0 {
+            return String(localized: "timer.total.approximate \(minutesText)", bundle: .module)
         }
-        if hours == 0 || restMinutes > 0 {
-            parts.append(String(localized: "timer.total.minutes \(restMinutes)", bundle: .module))
+        if restMinutes == 0 {
+            return String(localized: "timer.total.approximate \(hoursText)", bundle: .module)
         }
-        return "~" + parts.joined(separator: " ")
+        return String(localized: "timer.total.approximateHoursMinutes \(hoursText) \(minutesText)", bundle: .module)
     }
 
     var spokenTotalLeft: String {
@@ -129,18 +132,23 @@ extension WorkoutTimerFeature.State {
     private func countdownCard(_ countdown: WorkoutTimerFeature.Countdown) -> CurrentCard {
         switch countdown.purpose {
             case .start:
-                let name = Self.text("timer.stage.getReady")
+                let name = String(localized: "timer.stage.getReady", bundle: .module)
                 let spoken = String(localized: "timer.countdown.start \(countdown.remaining)", bundle: .module)
                 return CurrentCard(
                     tone: .rest,
                     content: .clock(Duration.seconds(countdown.remaining).clockText(.minutesSeconds)),
                     name: name,
-                    spokenValue: "\(name), \(spoken)"
+                    spokenValue: String(localized: "timer.current.spoken \(name) \(spoken)", bundle: .module)
                 )
             case .resume:
-                let name = Self.text("timer.stage.pause")
+                let name = String(localized: "timer.stage.pause", bundle: .module)
                 let spoken = String(localized: "timer.countdown.resume \(countdown.remaining)", bundle: .module)
-                return CurrentCard(tone: .dark, content: .countdownDigit(countdown.remaining), name: name, spokenValue: "\(name), \(spoken)")
+                return CurrentCard(
+                    tone: .dark,
+                    content: .countdownDigit(countdown.remaining),
+                    name: name,
+                    spokenValue: String(localized: "timer.current.spoken \(name) \(spoken)", bundle: .module)
+                )
         }
     }
 
@@ -152,7 +160,7 @@ extension WorkoutTimerFeature.State {
             tone: stage.kind == .rest ? .rest : .work,
             content: .clock(snapshot.stageRemaining.clockText(.remaining)),
             name: name,
-            spokenValue: "\(name), \(spoken)"
+            spokenValue: String(localized: "timer.current.spoken \(name) \(spoken)", bundle: .module)
         )
     }
 
@@ -163,11 +171,11 @@ extension WorkoutTimerFeature.State {
         }
         return switch stage.kind {
             case .work:
-                text("timer.stage.work")
+                String(localized: "timer.stage.work", bundle: .module)
             case .rest:
-                text("timer.stage.rest")
+                String(localized: "timer.stage.rest", bundle: .module)
             case .pause:
-                text("timer.stage.pause")
+                String(localized: "timer.stage.pause", bundle: .module)
         }
     }
 
@@ -178,9 +186,5 @@ extension WorkoutTimerFeature.State {
 
     private static func minutesRoundedUp(_ duration: Duration) -> Int64 {
         (secondsRoundedUp(duration) + 59) / 60
-    }
-
-    private static func text(_ key: String.LocalizationValue) -> String {
-        String(localized: key, bundle: .module)
     }
 }

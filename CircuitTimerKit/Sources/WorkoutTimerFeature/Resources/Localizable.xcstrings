@@ -225,6 +225,22 @@
         }
       }
     },
+    "timer.current.spoken %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
     "timer.failed.resume" : {
       "localizations" : {
         "en" : {
@@ -333,6 +349,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Работа"
+          }
+        }
+      }
+    },
+    "timer.total.approximate %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~%@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~%@"
+          }
+        }
+      }
+    },
+    "timer.total.approximateHoursMinutes %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~%1$@ %2$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~%1$@ %2$@"
           }
         }
       }

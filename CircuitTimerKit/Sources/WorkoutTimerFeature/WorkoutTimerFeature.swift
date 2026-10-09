@@ -190,8 +190,7 @@ public struct WorkoutTimerFeature: Sendable {
                 _ = advance(&state, at: now)
                 state.run.pause(at: now)
                 state.countdown = nil
-                // A run that has already finished has nothing to continue, so it shows its end instead.
-                state.hasClockFailed = state.snapshot.status != .finished
+                state.hasClockFailed = true
                 return syncClock(&state, at: now)
         }
     }
@@ -366,6 +365,10 @@ public struct WorkoutTimerFeature: Sendable {
             state.hasClockFailed = false
             state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
             return .merge(replaced, runTicks(state.run, owner: state.id, generation: state.clockGeneration))
+        }
+        if state.snapshot.status == .finished {
+            // A finished run has nothing left to continue, so it shows its end rather than a stopped clock.
+            state.hasClockFailed = false
         }
         return replaced
     }

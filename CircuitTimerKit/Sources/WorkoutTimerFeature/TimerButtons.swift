@@ -19,28 +19,32 @@ struct TimerButtons: View {
                 Spacer()
                     .frame(width: smallSide, height: smallSide)
                 Spacer(minLength: .zero)
-                playPauseButton(side: side)
+                playPauseButton(rowHeight: side)
                 Spacer(minLength: .zero)
                 nextButton(side: smallSide)
             }
         }
     }
 
-    private func playPauseButton(side: CGFloat) -> some View {
-        Button(action: onPlayPause) {
+    /// Inset by its border at the top and the bottom of the row, like the original button.
+    private func playPauseButton(rowHeight: CGFloat) -> some View {
+        let border: CGFloat = .token(size: .buttonBorder)
+        let side = rowHeight - 2 * border
+        return Button(action: onPlayPause) {
             Image(systemName: playButton == .pause ? "pause.fill" : "play.fill")
                 .resizable()
                 .scaledToFit()
-                .frame(width: side * 35 / 98, height: side * 35 / 98)
+                .frame(width: rowHeight * 35 / 98, height: rowHeight * 35 / 98)
                 .foregroundStyle(playColor)
                 .frame(width: side, height: side)
                 .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
-                        .strokeBorder(playColor, lineWidth: .token(size: .buttonBorder))
+                        .strokeBorder(playColor, lineWidth: border)
                 }
         }
         .buttonStyle(.plain)
+        .padding(.top, border)
         .disabled(!isPlayEnabled)
         .accessibilityLabel(playLabel)
     }

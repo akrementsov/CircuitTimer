@@ -10,21 +10,22 @@ enum LeagueGothic {
     static let isAvailable: Bool = {
         // `.process` resources lose their folders, so the font is looked up at the bundle's top level.
         guard let url = Bundle.module.url(forResource: "LeagueGothic-Regular-VariableFont_wdth", withExtension: "ttf") else {
-            logger.error("League Gothic is missing from the DesignSystem bundle")
+            Logger.designSystem.error("League Gothic is missing from the DesignSystem bundle")
             return false
         }
 
         var error: Unmanaged<CFError>?
         guard CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) else {
-            let error = error?.takeRetainedValue()
-            if let error, CTFontManagerError(rawValue: CFErrorGetCode(error)) == .alreadyRegistered {
+            guard let error = error?.takeRetainedValue() else {
+                Logger.designSystem.error("Failed to register League Gothic without an error")
+                return false
+            }
+            if CTFontManagerError(rawValue: CFErrorGetCode(error)) == .alreadyRegistered {
                 return true
             }
-            logger.error("Failed to register League Gothic: \(String(describing: error), privacy: .public)")
+            Logger.designSystem.error("Failed to register League Gothic: \(String(reflecting: error), privacy: .public)")
             return false
         }
         return true
     }()
-
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "DesignSystem")
 }

@@ -110,6 +110,8 @@ struct NextStageCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("timer.card.next", bundle: .module))
         .accessibilityValue(name ?? "")
+        // Once the workout is over the card is empty and has nothing to say.
+        .accessibilityHidden(name == nil)
     }
 }
 

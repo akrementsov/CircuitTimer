@@ -106,6 +106,7 @@ public struct AppFeature: Sendable {
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -123,6 +124,8 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
+                case .destination(.dismiss):
+                    timerDismissed(state)
                 case .destination, .path, .settings:
                     .none
             }
@@ -243,7 +246,10 @@ public struct AppFeature: Sendable {
                 state.pendingMutations = []
                 state.needsReload = false
                 state.deferredScreen = nil
-                state.destination = .alert(.mutationFailed)
+                // A presented timer is never replaced: it would close without ending its session.
+                if state.destination?.is(\.timer) != true {
+                    state.destination = .alert(.mutationFailed)
+                }
                 return loadWorkouts(&state)
         }
     }
@@ -278,7 +284,7 @@ public struct AppFeature: Sendable {
                 guard
                     case let .loaded(workouts) = state.workouts,
                     let workout = workouts[id: id],
-                    workout.totalDuration > .zero
+                    workout.isPlayable
                 else { return .none }
 
                 state.destination = .timer(
@@ -330,6 +336,16 @@ public struct AppFeature: Sendable {
             }
         }
         return copy
+    }
+
+    /// The timer closes itself after ending its session, but a system dismissal, such as a back button the timer failed
+    /// to hide, skips that; ending it again here is harmless.
+    private func timerDismissed(_ state: State) -> Effect<Action> {
+        guard case let .timer(timer) = state.destination else { return .none }
+
+        return .run { [timerSession, id = timer.id] _ in
+            await timerSession.end(owner: id)
+        }
     }
 
     /// Storage appends a new workout, so a new one goes to the end here too.
