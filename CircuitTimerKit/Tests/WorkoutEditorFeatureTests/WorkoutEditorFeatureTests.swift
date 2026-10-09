@@ -107,8 +107,8 @@ struct WorkoutEditorFeatureTests {
         await store.send(.view(.stagesMoved(.training, IndexSet(integer: 1), 0))) {
             $0.draft.training = [makeStage(21, .rest), makeStage(20)]
         }
-        await store.send(.view(.stagesDeleted(.coolDown, IndexSet(integer: 0)))) { $0.draft.coolDown = [] }
-        await store.send(.view(.stagesDeleted(.training, IndexSet(integer: 0)))) {
+        await store.send(.view(.stageDeleteButtonTapped(.coolDown, UUID(fixture: 30)))) { $0.draft.coolDown = [] }
+        await store.send(.view(.stageDeleteButtonTapped(.training, UUID(fixture: 21)))) {
             $0.draft.training = [makeStage(20)]
             $0.expandedStageID = nil
         }
@@ -265,7 +265,7 @@ struct WorkoutEditorFeatureTests {
             .pauseAfterWarmUpChanged(true),
             .pauseAfterTrainingChanged(true),
             .addStageButtonTapped(.training),
-            .stagesDeleted(.training, IndexSet(integer: 0)),
+            .stageDeleteButtonTapped(.training, stage),
             .stagesMoved(.training, IndexSet(integer: 1), 0),
             .stageNameChanged(.training, stage, "Other"),
             .stageDurationChanged(.training, stage, .seconds(1)),

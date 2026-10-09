@@ -104,8 +104,10 @@ public struct WorkoutEditorFeature: Sendable {
             case pauseAfterWarmUpChanged(Bool)
             case pauseAfterTrainingChanged(Bool)
             case addStageButtonTapped(WorkoutSectionKind)
-            case stagesDeleted(WorkoutSectionKind, IndexSet)
+            case stageDeleteButtonTapped(WorkoutSectionKind, Stage.ID)
             case stagesMoved(WorkoutSectionKind, IndexSet, Int)
+            case stageMovedUp(WorkoutSectionKind, Stage.ID)
+            case stageMovedDown(WorkoutSectionKind, Stage.ID)
             case stageNameChanged(WorkoutSectionKind, Stage.ID, String)
             case stageDurationChanged(WorkoutSectionKind, Stage.ID, Duration)
             case stageIntensityTapped(WorkoutSectionKind, Stage.ID)
@@ -167,13 +169,23 @@ public struct WorkoutEditorFeature: Sendable {
                 guard state.canAddStage(to: section) else { return .none }
 
                 state.draft[section].append(State.newStage(id: uuid()))
-            case let .stagesDeleted(section, offsets):
-                if let expanded = state.expandedStageID, offsets.contains(where: { state.draft[section][$0].id == expanded }) {
+            case let .stageDeleteButtonTapped(section, id):
+                guard let index = state.draft[section].firstIndex(where: { $0.id == id }) else { return .none }
+
+                if state.expandedStageID == id {
                     state.expandedStageID = nil
                 }
-                state.draft[section].remove(atOffsets: offsets)
+                state.draft[section].remove(at: index)
             case let .stagesMoved(section, source, destination):
                 state.draft[section].move(fromOffsets: source, toOffset: destination)
+            case let .stageMovedUp(section, id):
+                guard let index = state.draft[section].indexMovableUp(id) else { return .none }
+
+                state.draft[section].swapAt(index, index - 1)
+            case let .stageMovedDown(section, id):
+                guard let index = state.draft[section].indexMovableDown(id) else { return .none }
+
+                state.draft[section].swapAt(index, index + 1)
             case let .stageNameChanged(section, id, name):
                 updateStage(id, in: section, of: &state) { $0.name = name }
             case let .stageDurationChanged(section, id, duration):
@@ -256,6 +268,22 @@ public struct WorkoutEditorFeature: Sendable {
 }
 
 extension WorkoutEditorFeature.Destination.State: Equatable, Sendable {}
+
+/// One edge rule for the reducer and the rows' VoiceOver move actions:
+/// the index of `id` when it can move one place within its section, otherwise `nil`.
+extension Array where Element: Identifiable {
+    func indexMovableUp(_ id: Element.ID) -> Int? {
+        guard let index = firstIndex(where: { $0.id == id }), index > startIndex else { return nil }
+
+        return index
+    }
+
+    func indexMovableDown(_ id: Element.ID) -> Int? {
+        guard let index = firstIndex(where: { $0.id == id }), index < endIndex - 1 else { return nil }
+
+        return index
+    }
+}
 
 extension AlertState where Action == Never {
     static var saveFailed: Self {

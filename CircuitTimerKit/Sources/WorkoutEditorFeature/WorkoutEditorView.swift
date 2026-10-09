@@ -125,8 +125,9 @@ public struct WorkoutEditorView: View {
     }
 
     private func stagesSection(_ section: WorkoutSectionKind) -> some View {
-        Section {
-            ForEach(store.draft[section]) { stage in
+        let stages = store.draft[section]
+        return Section {
+            ForEach(stages) { stage in
                 StageRow(
                     stage: stage,
                     isExpanded: store.expandedStageID == stage.id,
@@ -136,8 +137,40 @@ public struct WorkoutEditorView: View {
                     onDurationTap: { send(.stageDurationTapped(stage.id)) },
                     onDurationChange: { send(.stageDurationChanged(section, stage.id, $0)) }
                 )
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    // An empty builder leaves the row without a swipe while a field is being edited.
+                    if focusedField == nil {
+                        Button(role: .destructive) {
+                            send(.stageDeleteButtonTapped(section, stage.id))
+                        } label: {
+                            Label {
+                                Text("editor.stage.delete", bundle: .module)
+                            } icon: {
+                                Image(systemName: "trash")
+                            }
+                            .labelStyle(.iconOnly)
+                        }
+                        .tint(.danger)
+                    }
+                }
+                // Rows read only the stages captured above, as the workout list does with its workouts.
+                .accessibilityActions {
+                    if stages.indexMovableUp(stage.id) != nil {
+                        Button {
+                            send(.stageMovedUp(section, stage.id))
+                        } label: {
+                            Text("editor.stage.moveUp", bundle: .module)
+                        }
+                    }
+                    if stages.indexMovableDown(stage.id) != nil {
+                        Button {
+                            send(.stageMovedDown(section, stage.id))
+                        } label: {
+                            Text("editor.stage.moveDown", bundle: .module)
+                        }
+                    }
+                }
             }
-            .onDelete { send(.stagesDeleted(section, $0)) }
             .onMove { send(.stagesMoved(section, $0, $1)) }
 
             if section == .training {
