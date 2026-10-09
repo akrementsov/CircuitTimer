@@ -19,18 +19,15 @@ struct RoundsRow: View {
         }
         .padding(.token(spacing: .l))
         .background(.surface(.field), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-        // VoiceOver adjusts the whole row; the buttons are its visual parts.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("editor.rounds.label", bundle: .module))
-        .accessibilityValue(Text("editor.rounds \(rounds)", bundle: .module))
-        // Past a limit nothing is sent, as with the disabled buttons: a send would still end the editing of a field.
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-                case .increment where rounds < range.upperBound: onChange(rounds + 1)
-                case .decrement where rounds > range.lowerBound: onChange(rounds - 1)
-                default: break
+        // Assistive technologies get one system stepper instead of the row's parts: the − and + glyphs would
+        // otherwise surface under their symbol names. Past a limit nothing is sent, as with the disabled buttons:
+        // a send would still end the editing of a field.
+        .accessibilityRepresentation {
+            Stepper(value: Binding(get: { rounds }, set: { if $0 != rounds { onChange($0) } }), in: range) {
+                Text("editor.rounds.label", bundle: .module)
             }
         }
+        .accessibilityValue(Text("editor.rounds \(rounds)", bundle: .module))
     }
 
     private func stepButton(systemImage: String, isEnabled: Bool, action: @escaping () -> Void) -> some View {
