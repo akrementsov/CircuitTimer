@@ -362,13 +362,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add a name and at least one stage longer than 0:00 to save."
+            "value" : "Add a name and at least one stage longer than 00:00 to save."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Чтобы сохранить, укажите название и хотя бы один этап длиннее 0:00."
+            "value" : "Чтобы сохранить, укажите название и хотя бы один этап длиннее 00:00."
           }
         }
       }
@@ -522,13 +522,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A 0:00 stage is removed when you save"
+            "value" : "A 00:00 stage is removed when you save"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Этап 0:00 удалится при сохранении"
+            "value" : "Этап 00:00 удалится при сохранении"
           }
         }
       }
