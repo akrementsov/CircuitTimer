@@ -4,6 +4,8 @@ extension DesignSystem.Token {
     public enum TextColor: Sendable, CaseIterable {
         case primary
         case secondary
+        /// Text on a `brand` fill.
+        case onAccent
     }
 
     public enum SurfaceColor: Sendable, CaseIterable {
@@ -11,6 +13,10 @@ extension DesignSystem.Token {
         case card
         /// Rows that cannot be tapped, such as the app version.
         case cardInactive
+        /// An input or a control inside a card.
+        case field
+        /// The `secondaryAction` asset: the field being edited.
+        case focused
     }
 
     public enum StageColor: Sendable, CaseIterable {
@@ -30,6 +36,8 @@ extension ShapeStyle where Self == Color {
                 Color("TextPrimary", bundle: .module)
             case .secondary:
                 Color("TextSecondary", bundle: .module)
+            case .onAccent:
+                Color("TextOnAccent", bundle: .module)
         }
     }
 
@@ -42,6 +50,10 @@ extension ShapeStyle where Self == Color {
                 Color("SurfaceCard", bundle: .module)
             case .cardInactive:
                 Color("SurfaceCardInactive", bundle: .module)
+            case .field:
+                Color("SurfaceField", bundle: .module)
+            case .focused:
+                Color("SecondaryAction", bundle: .module)
         }
     }
 
@@ -59,6 +71,16 @@ extension ShapeStyle where Self == Color {
 
     public static var brand: Color {
         Color("Brand", bundle: .module)
+    }
+
+    /// A `brand` control that cannot act now, such as a stepper at its limit.
+    public static var brandInactive: Color {
+        Color("BrandInactive", bundle: .module)
+    }
+
+    /// The track of a switch that is on.
+    public static var switchOn: Color {
+        Color("SwitchOn", bundle: .module)
     }
 
     /// Destructive actions.
