@@ -1,4 +1,5 @@
 import DesignSystem
+import Foundation
 import SwiftUI
 
 /// A title with a duration at the trailing edge: the workout's total time and each section's header.

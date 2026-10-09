@@ -54,14 +54,17 @@ public struct WorkoutEditorFeature: Sendable {
         }
 
         private init(mode: Mode, workout: Workout) {
-            // The editor offers 1…maxTrainingRounds rounds; lifting a stored 0 in both copies keeps an untouched
-            // workout unchanged.
+            // Lifting a stored 0 to the editor's minimum in both copies keeps an untouched workout unchanged.
             var workout = workout
-            workout.trainingRounds = max(1, WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds))
+            let rounds = WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
+            workout.trainingRounds = max(Self.trainingRoundsRange.lowerBound, rounds)
             self.mode = mode
             original = workout
             draft = workout
         }
+
+        /// The rounds the editor offers: a workout without training rounds is not edited here.
+        static let trainingRoundsRange = 1...WorkoutLimits.maxTrainingRounds
 
         public var hasChanges: Bool {
             draft != original
@@ -160,7 +163,8 @@ public struct WorkoutEditorFeature: Sendable {
             case let .nameChanged(name):
                 state.draft.name = name
             case let .trainingRoundsChanged(rounds):
-                state.draft.trainingRounds = min(max(rounds, 1), WorkoutLimits.maxTrainingRounds)
+                let range = State.trainingRoundsRange
+                state.draft.trainingRounds = min(max(rounds, range.lowerBound), range.upperBound)
             case let .pauseAfterWarmUpChanged(isOn):
                 state.draft.pauseAfterWarmUp = isOn
             case let .pauseAfterTrainingChanged(isOn):

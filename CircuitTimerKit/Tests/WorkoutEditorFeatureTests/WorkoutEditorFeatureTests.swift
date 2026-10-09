@@ -95,7 +95,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_stagesDeletedMovedAndExpanded_keepPickerConsistent() async {
+    func test_stageDeletedMovedAndExpanded_keepPickerConsistent() async {
         let store = makeStore()
         let first = UUID(fixture: 20)
         let second = UUID(fixture: 21)

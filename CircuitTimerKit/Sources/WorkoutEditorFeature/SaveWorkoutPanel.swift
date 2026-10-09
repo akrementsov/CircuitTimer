@@ -1,14 +1,13 @@
 import DesignSystem
 import SwiftUI
 
+// TODO: [CT-3] Move the panel and its button style to DesignSystem together with Start workout, their second user.
 /// The bottom panel with the save hint and the full-width Save workout button, on a blur like the original app's.
-/// Moves to DesignSystem together with Start workout (CT-3), its second user.
 struct SaveWorkoutPanel: View {
     let showsHint: Bool
     let isSaving: Bool
     let canSave: Bool
     let onSave: () -> Void
-    let onEscape: () -> Void
 
     var body: some View {
         VStack(spacing: .token(spacing: .xs)) {
@@ -27,6 +26,8 @@ struct SaveWorkoutPanel: View {
                 }
             }
             .buttonStyle(SaveWorkoutButtonStyle())
+            // The spinner replaces the title while saving; VoiceOver says what is going on instead.
+            .accessibilityLabel(isSaving ? Text("editor.saving", bundle: .module) : Text("editor.saveWorkout", bundle: .module))
             .disabled(!canSave)
             // The original button's shadow: the screen color at half opacity.
             .shadow(color: .surface(.screen).opacity(0.5), radius: Self.shadowRadius)
@@ -37,13 +38,14 @@ struct SaveWorkoutPanel: View {
         .background {
             Rectangle()
                 .fill(.regularMaterial)
-                .opacity(0.8)
+                .opacity(Self.blurOpacity)
                 .ignoresSafeArea(edges: .bottom)
         }
-        .accessibilityAction(.escape, onEscape)
     }
 
     private static let shadowRadius: CGFloat = 5
+    /// The original panel's blur is slightly see-through.
+    private static let blurOpacity = 0.8
 }
 
 private struct SaveWorkoutButtonStyle: ButtonStyle {
@@ -64,6 +66,9 @@ private struct SaveWorkoutButton: View {
             .foregroundStyle(.text(.onAccent))
             .frame(maxWidth: .infinity, minHeight: .token(size: .row))
             .background(isEnabled ? .brand : .brandInactive, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-            .opacity(configuration.isPressed ? 0.8 : 1)
+            .opacity(configuration.isPressed ? Self.pressedOpacity : 1)
     }
+
+    /// A pressed button dims a little, like a system button's highlight.
+    private static let pressedOpacity = 0.8
 }

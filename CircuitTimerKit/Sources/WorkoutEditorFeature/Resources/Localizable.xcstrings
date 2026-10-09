@@ -177,6 +177,22 @@
         }
       }
     },
+    "editor.name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workout name"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Название тренировки"
+          }
+        }
+      }
+    },
     "editor.name.placeholder" : {
       "localizations" : {
         "en" : {
@@ -225,7 +241,7 @@
         }
       }
     },
-    "editor.pause.footer" : {
+    "editor.pause.hint" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -369,6 +385,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Сохранить тренировку"
+          }
+        }
+      }
+    },
+    "editor.saving" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранение тренировки"
           }
         }
       }

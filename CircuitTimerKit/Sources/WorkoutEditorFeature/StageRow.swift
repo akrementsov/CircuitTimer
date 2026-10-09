@@ -1,4 +1,5 @@
 import DesignSystem
+import Foundation
 import SwiftUI
 import WorkoutDomain
 

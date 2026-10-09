@@ -61,11 +61,10 @@ public struct WorkoutEditorView: View {
                 showsHint: store.showsSaveHint,
                 isSaving: store.isSaving,
                 canSave: store.canSave,
-                onSave: { send(afterClearingFocus: .saveButtonTapped) },
-                onEscape: leave
+                onSave: { send(afterClearingFocus: .saveButtonTapped) }
             )
             // Measured before the frame: the panel's own height, not the overlay's.
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { newValue in savePanelHeight = newValue })
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { savePanelHeight = $0 })
             .frame(maxHeight: .infinity, alignment: .bottom)
             // The keyboard covers the panel instead of pushing it up, as in the original app.
             .ignoresSafeArea(.keyboard)
@@ -90,7 +89,7 @@ public struct WorkoutEditorView: View {
             text: $store.draft.name.sending(\.view.nameChanged),
             prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary))
         ) {
-            Text("editor.name.placeholder", bundle: .module)
+            Text("editor.name", bundle: .module)
         }
         .focused($focusedField, equals: .name)
         .font(.token(.fieldTitle))
@@ -114,10 +113,9 @@ public struct WorkoutEditorView: View {
             style: .hoursMinutesSeconds,
             font: .headline
         )
-        .padding(.vertical, .token(spacing: .xs))
-        // The gaps to the cards around it belong to this row: on iOS 26 a tap anywhere in a row
-        // with a text field focuses the field, so the name row ends at its card.
-        .padding(.vertical, .token(spacing: .m))
+        // `xs` around the text plus the `m` gaps to the cards around it. The gaps belong to this row:
+        // on iOS 26 a tap anywhere in a row with a text field focuses the field, so the name row ends at its card.
+        .padding(.vertical, .token(spacing: .xl))
         .screenRow()
     }
 
@@ -160,10 +158,12 @@ public struct WorkoutEditorView: View {
                 // Through the focus-loss path on purpose, like the original app ending editing first: pending text
                 // is committed before the rounds change. Its "first request wins" rule holds here too: a second tap
                 // while focus is clearing delivers the first request, and a pending Back or Save goes out instead.
-                RoundsRow(rounds: store.draft.trainingRounds) { send(afterClearingFocus: .trainingRoundsChanged($0)) }
-                    .padding(.horizontal, .token(spacing: .l))
-                    .padding(.bottom, .token(spacing: .xs))
-                    .cardRow(.middle)
+                RoundsRow(rounds: store.draft.trainingRounds, range: WorkoutEditorFeature.State.trainingRoundsRange) {
+                    send(afterClearingFocus: .trainingRoundsChanged($0))
+                }
+                .padding(.horizontal, .token(spacing: .l))
+                .padding(.bottom, .token(spacing: .xs))
+                .cardRow(.middle)
             }
 
             ForEach(stages) { stage in
@@ -198,7 +198,8 @@ public struct WorkoutEditorView: View {
                         .tint(.danger)
                     }
                 }
-                // Rows read only the stages captured above, as the workout list does with its workouts.
+                // Rows read only the stages captured above: a row that reads the store observes the stages on its own
+                // and is redrawn apart from the list while a drag settles, showing the wrong stage.
                 .accessibilityActions {
                     if stages.indexMovableUp(stage.id) != nil {
                         Button {
@@ -257,7 +258,7 @@ public struct WorkoutEditorView: View {
             }
             .tint(.switchOn)
             .foregroundStyle(.text(.primary))
-            .accessibilityHint(Text("editor.pause.footer", bundle: .module))
+            .accessibilityHint(Text("editor.pause.hint", bundle: .module))
             .padding(.token(spacing: .l))
             .cardRow(.single)
         }

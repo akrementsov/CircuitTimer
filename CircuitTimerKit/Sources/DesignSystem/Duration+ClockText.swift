@@ -14,15 +14,15 @@ extension Duration {
     public func clockText(_ style: ClockTextStyle) -> String {
         switch style {
             case .hoursMinutesSeconds:
-                formatted(pattern: .hourMinuteSecond(padHourToLength: 2, roundFractionalSeconds: .down))
+                posixFormatted(.hourMinuteSecond(padHourToLength: 2, roundFractionalSeconds: .down))
             case .minutesSeconds:
-                formatted(pattern: .minuteSecond(padMinuteToLength: 2, roundFractionalSeconds: .down))
+                posixFormatted(.minuteSecond(padMinuteToLength: 2, roundFractionalSeconds: .down))
             case .adaptive:
                 clockText(self < .seconds(3_600) ? .minutesSeconds : .hoursMinutesSeconds)
         }
     }
 
-    private func formatted(pattern: TimeFormatStyle.Pattern) -> String {
+    private func posixFormatted(_ pattern: TimeFormatStyle.Pattern) -> String {
         formatted(TimeFormatStyle(pattern: pattern, locale: Locale(identifier: "en_US_POSIX")))
     }
 }
