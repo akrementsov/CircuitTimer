@@ -50,6 +50,8 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var hasClockFailed = false
         /// The clock loop whose actions count; 0 until the screen first appears.
         var clockGeneration = 0
+        /// Set while a tick loop runs, and refreshed on every tick.
+        var clockAnchor: ClockAnchor?
         @Presents public var destination: Destination.State?
 
         public init(id: UUID, title: String, schedule: WorkoutSchedule) {
@@ -87,6 +89,9 @@ public struct WorkoutTimerFeature: Sendable {
     private enum CancelID: Hashable, Sendable {
         case clock(generation: Int)
     }
+
+    /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
+    static let jumpTolerance: Duration = .milliseconds(250)
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutTimer")
 
@@ -159,9 +164,12 @@ public struct WorkoutTimerFeature: Sendable {
                 return syncClock(&state, at: now)
             case let .ticked(_, isFinal):
                 let mustSync = advance(&state, at: now)
-                guard mustSync || isFinal || state.snapshot.status != .running else { return .none }
+                // A loop that has ended leaves a still running run without a clock, so it is restarted.
+                guard !mustSync, !isFinal, state.snapshot.status == .running else { return syncClock(&state, at: now) }
 
-                return syncClock(&state, at: now)
+                // Measuring each jump check over one tick keeps a slow slew of the wall clock from adding up.
+                state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
+                return .none
             case .clockFailed:
                 _ = advance(&state, at: now)
                 state.run.pause(at: now)
@@ -255,12 +263,43 @@ public struct WorkoutTimerFeature: Sendable {
         }
     }
 
-    /// Commits the progress made by `now` and returns whether the clock must follow: the status changed.
+    /// Handles a clock jump, commits the progress made by `now` and returns whether the clock must follow:
+    /// a jump was found or the status changed.
     private func advance(_ state: inout State, at now: Date) -> Bool {
         let status = state.snapshot.status
+        let jumped = reconcile(&state, at: now)
         state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
-        return state.snapshot.status != status
+        return jumped || state.snapshot.status != status
+    }
+
+    /// Compares the time since the anchor on both clocks. After a backward jump the run keeps the progress the
+    /// monotonic clock vouches for; a forward jump keeps its progress, like time spent in the background.
+    private func reconcile(_ state: inout State, at now: Date) -> Bool {
+        guard let anchor = state.clockAnchor else { return false }
+        guard let monotonic = anchor.instant.duration(toNowOf: clock) else {
+            Self.logger.error("The clock anchor was taken on another clock; clock jumps go undetected")
+            return false
+        }
+
+        let wall = now.elapsed(since: anchor.date)
+        if wall + Self.jumpTolerance < monotonic {
+            let kept = anchor.totalElapsed + monotonic
+            Self.logger.notice(
+                "The wall clock went back by \((monotonic - wall).inMilliseconds) ms; keeping \(kept.inMilliseconds) ms of the run"
+            )
+            state.run.rebase(at: now, keepingTotalElapsed: kept)
+            return true
+        }
+        if wall > monotonic + Self.jumpTolerance {
+            Self.logger.notice("The wall clock jumped forward by \((wall - monotonic).inMilliseconds) ms; the run keeps its progress")
+            return true
+        }
+        return false
+    }
+
+    private func anchor(at now: Date, totalElapsed: Duration) -> ClockAnchor {
+        ClockAnchor(date: now, instant: MonotonicInstant(now: clock), totalElapsed: totalElapsed)
     }
 
     /// Replaces the current clock loop with the one the settled state needs, if any.
@@ -269,6 +308,7 @@ public struct WorkoutTimerFeature: Sendable {
         state.snapshot = state.run.snapshot(at: now)
         let replaced = Effect<Action>.cancel(id: CancelID.clock(generation: state.clockGeneration))
         state.clockGeneration += 1
+        state.clockAnchor = nil
 
         if let countdown = state.countdown {
             state.hasClockFailed = false
@@ -276,6 +316,8 @@ public struct WorkoutTimerFeature: Sendable {
         }
         if state.snapshot.status == .running {
             state.hasClockFailed = false
+            state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
+            return .merge(replaced, runTicks(state.run, generation: state.clockGeneration))
         }
         return replaced
     }
@@ -292,6 +334,47 @@ public struct WorkoutTimerFeature: Sendable {
             }
         }
         .cancellable(id: CancelID.clock(generation: generation))
+    }
+
+    private func runTicks(_ run: WorkoutRun, generation: Int) -> Effect<Action> {
+        .run { [clock, date] send in
+            do {
+                try await Self.tickLoop(clock: clock, date: date, run: run, generation: generation, send: send)
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("The tick clock failed: \(String(reflecting: error), privacy: .public)")
+                await send(.internal(.clockFailed(generation: generation)))
+            }
+        }
+        .cancellable(id: CancelID.clock(generation: generation))
+    }
+
+    /// Wakes whenever the stage clock changes its second and ends once its copy of the run stops.
+    static func tickLoop<C: Clock<Duration>>(
+        clock: C,
+        date: DateGenerator,
+        run: WorkoutRun,
+        generation: Int,
+        send: Send<Action>
+    ) async throws {
+        while true {
+            // The loop's copy only schedules wake-ups; the reducer commits and shows its own reading.
+            let shown = run.snapshot(at: date())
+            let stopped = shown.status != .running
+            if !stopped {
+                try await clock.sleep(for: wakeDelay(stageRemaining: shown.stageRemaining))
+            }
+            await send(.internal(.ticked(generation: generation, isFinal: stopped)))
+            if stopped { return }
+        }
+    }
+
+    /// Time until `stageRemaining` crosses a whole second, where the stage clock, which rounds up, changes.
+    /// Never zero, so the loop never spins.
+    static func wakeDelay(stageRemaining: Duration) -> Duration {
+        let fraction = stageRemaining - .seconds(stageRemaining.components.seconds)
+        return fraction > .zero ? fraction : .seconds(1)
     }
 
     /// Wakes once per remaining second. Every deadline is measured from one reading, so late wake-ups never add up.
