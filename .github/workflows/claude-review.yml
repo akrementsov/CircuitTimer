@@ -71,8 +71,10 @@ jobs:
             || { cat "$RUNNER_TEMP/review.json"; exit 1; }
           # The result goes to the log as well: on failure it holds Claude Code's error.
           jq -r .result "$RUNNER_TEMP/review.json" | tee "$RUNNER_TEMP/review.md"
-          # Claude Code's estimate at list prices, subagents included; Console shows the billed usage.
-          printf 'cost=%.2f\n' "$(jq -r .total_cost_usd "$RUNNER_TEMP/review.json")" >> "$GITHUB_OUTPUT"
+          # Claude Code's estimate at list prices; Console shows the billed usage.
+          # A missing estimate must not drop a finished review.
+          cost=$(jq -r '.total_cost_usd // empty' "$RUNNER_TEMP/review.json")
+          if [ -n "$cost" ]; then printf 'cost=$%.2f\n' "$cost"; else echo 'cost=unknown'; fi >> "$GITHUB_OUTPUT"
           # Anything else, such as a stop at the budget cap, must not be posted as a review.
           grep -m 1 -v '^[[:space:]]*$' "$RUNNER_TEMP/review.md" | grep -qE '^## Claude review[[:space:]]*$' \
             || { echo "::error::Claude returned no review"; exit 1; }
@@ -88,7 +90,7 @@ jobs:
         run: |
           {
             cat "$RUNNER_TEMP/review.md"
-            printf '\n---\n<sub>Reviewed at %s · %s · about $%s</sub>\n' "$HEAD_SHA" "$CLAUDE_MODEL" "$COST"
+            printf '\n---\n<sub>Reviewed at %s · %s · cost about %s</sub>\n' "$HEAD_SHA" "$CLAUDE_MODEL" "$COST"
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
 
