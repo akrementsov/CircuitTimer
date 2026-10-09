@@ -51,6 +51,8 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          # Claude Code prints its errors to stdout, so the output goes to the log as well.
+          set -o pipefail
           [ -n "$ANTHROPIC_API_KEY" ] || { echo "::error::Set the ANTHROPIC_API_KEY repository secret"; exit 1; }
           {
             cat .github/claude-review.md
@@ -60,7 +62,7 @@ jobs:
           claude -p --model "$CLAUDE_MODEL" --max-budget-usd "$MAX_BUDGET_USD" \
             --plugin-dir "$RUNNER_TEMP/superpowers" \
             --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
-            < "$RUNNER_TEMP/prompt.md" > "$RUNNER_TEMP/review.md"
+            < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
           [ -s "$RUNNER_TEMP/review.md" ] || { echo "::error::Claude returned an empty review"; exit 1; }
 
       # One comment per pull request, replaced on every push.
