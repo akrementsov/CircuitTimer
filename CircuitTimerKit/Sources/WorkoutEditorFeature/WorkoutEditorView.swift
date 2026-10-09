@@ -307,27 +307,19 @@ public struct WorkoutEditorView: View {
     }
 }
 
-/// Puts the save panel at the bottom of the screen, above the keyboard while a field is edited. On iOS 26 it is a bar:
-/// the list scrolls under it with the system's scroll edge effect and insets its content by it. Before that the panel
-/// floats over the list, and the list's bottom margin is the panel's measured height.
+/// Puts the save panel at the bottom of the screen, above the keyboard while a field is edited. The list scrolls
+/// under the panel, insets its content by it and scrolls a focused field above it; on iOS 26 with the system's
+/// scroll edge effect.
 private struct SavePanelPlacement<Panel: View>: ViewModifier {
     @ViewBuilder let panel: () -> Panel
 
-    @State private var panelHeight: CGFloat = .zero
-
     func body(content: Content) -> some View {
+        // Scrolling to a focused field brings only its text above the panel; the spacing keeps the field's own
+        // padding and background clear of the button too.
         if #available(iOS 26, *) {
-            content.safeAreaBar(edge: .bottom, content: panel)
+            content.safeAreaBar(edge: .bottom, spacing: .token(spacing: .l), content: panel)
         } else {
-            content
-                // The list already insets its content by the bottom safe area and the keyboard.
-                .contentMargins(.bottom, panelHeight, for: .scrollContent)
-                .overlay(alignment: .bottom) {
-                    panel()
-                        // Measured before the frame: the panel's own height, not the overlay's.
-                        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { panelHeight = $0 })
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                }
+            content.safeAreaInset(edge: .bottom, spacing: .token(spacing: .l), content: panel)
         }
     }
 }

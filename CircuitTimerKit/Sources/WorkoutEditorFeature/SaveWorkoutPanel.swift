@@ -35,7 +35,7 @@ struct SaveWorkoutPanel: View {
             .accessibilityLabel(isSaving ? Text("editor.saving", bundle: .module) : Text("editor.saveWorkout", bundle: .module))
             .disabled(!canSave)
         }
-        .glassGroup(spacing: .token(spacing: .xs))
+        .glassGroup()
         .padding(.horizontal, .token(spacing: .l))
         .padding(.top, .token(spacing: .m))
         .padding(.bottom, .token(spacing: .xs))
@@ -80,11 +80,12 @@ private struct SaveWorkoutButton: View {
 }
 
 private extension View {
-    /// On iOS 26 neighbouring glass shapes render together, as one surface; there is no glass before it.
+    /// On iOS 26 the hint and the button sample what is behind them together; with no spacing they stay separate
+    /// plates instead of merging into one. There is no glass before iOS 26.
     @ViewBuilder
-    func glassGroup(spacing: CGFloat) -> some View {
+    func glassGroup() -> some View {
         if #available(iOS 26, *) {
-            GlassEffectContainer(spacing: spacing) { self }
+            GlassEffectContainer(spacing: .zero) { self }
         } else {
             self
         }
