@@ -1,12 +1,14 @@
 name: Claude review
 
+# A push does not start a review; the `claude-review` label asks for another one.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, labeled]
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  # Any label starts a run that only skips the job; it must not cancel a review in progress.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -23,7 +25,10 @@ env:
 jobs:
   review:
     # Pull requests from forks get no secrets; drafts are reviewed once they are ready.
-    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository
+      && !github.event.pull_request.draft
+      && (github.event.action != 'labeled' || github.event.label.name == 'claude-review')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -65,7 +70,9 @@ jobs:
             --plugin-dir "$RUNNER_TEMP/superpowers" \
             --allowedTools Skill Agent Read Grep Glob 'Bash(git diff:*)' 'Bash(git log:*)' 'Bash(git show:*)' \
             < "$RUNNER_TEMP/prompt.md" | tee "$RUNNER_TEMP/review.md"
-          [ -s "$RUNNER_TEMP/review.md" ] || { echo "::error::Claude returned an empty review"; exit 1; }
+          # Anything else, such as a stop at the budget cap, must not replace the previous review.
+          head -n 1 "$RUNNER_TEMP/review.md" | grep -qx '## Claude review' \
+            || { echo "::error::Claude returned no review"; exit 1; }
 
       # One comment per pull request, replaced on every push. A failed run leaves the previous
       # review, so the comment names the commit it covers.
@@ -81,3 +88,10 @@ jobs:
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --edit-last --create-if-none --body-file "$RUNNER_TEMP/comment.md"
+
+      - name: Remove the review request
+        if: always() && github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --remove-label claude-review
