@@ -62,6 +62,7 @@ The row is the phase *after* settling.
 ## Time
 
 - `TimeMath` is the only place converting between `Date` and `Duration`.
+- `Date.elapsed(since:)` is its public conversion for callers that measure wall-clock time, such as the timer's clock-jump check.
 - Elapsed time is truncated to milliseconds with a 1 µs tolerance, so for dates of the current epoch an exact `currentStageEndDate` already shows the next stage, and a moment 2 µs earlier still shows the current one.
 - Accuracy: the position trails real time by up to one millisecond (the truncated remainder) plus a microsecond-level term from date rounding. Measured on dates of the current epoch: at most 1.004 ms after 5 000 updates and 1.009 ms after 50 000 updates (about 14 hours at one update per second). Irregular or missed UI updates do not add error, because nothing is accumulated per tick.
 

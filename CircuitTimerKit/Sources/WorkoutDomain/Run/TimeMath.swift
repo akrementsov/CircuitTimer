@@ -29,13 +29,17 @@ extension Date {
     /// Upper bound that keeps the millisecond conversion far from `Int64` overflow.
     private static let maxElapsedSeconds: TimeInterval = 10_000_000_000
 
-    /// Whole milliseconds elapsed since `start`; zero when `start` is in the future.
+    /// Whole milliseconds elapsed since `start`; zero when `start` is in the future, and capped
+    /// at 10¹⁰ seconds so the result never overflows.
+    ///
+    /// Callers outside the domain use it to measure wall-clock time without converting `Date`
+    /// and `Duration` themselves.
     ///
     /// `Date` arithmetic in `Double` lands a hair below an exact millisecond boundary about
     /// half of the time, so a 1 µs tolerance is added before truncating. With it,
     /// `start.adding(d).elapsed(since: start) == d` for whole-millisecond `d` and dates of the
     /// current epoch, where `Double` still resolves well below a microsecond.
-    func elapsed(since start: Date) -> Duration {
+    public func elapsed(since start: Date) -> Duration {
         let seconds = timeIntervalSince(start)
         guard seconds.isFinite, seconds > 0 else { return .zero }
 
