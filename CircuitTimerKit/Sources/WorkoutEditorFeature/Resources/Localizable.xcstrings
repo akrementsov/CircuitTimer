@@ -549,18 +549,18 @@
         }
       }
     },
-    "editor.totalDuration" : {
+    "editor.totalWorkoutTime" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Total"
+            "value" : "Total workout time"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Всего"
+            "value" : "Общее время тренировки"
           }
         }
       }

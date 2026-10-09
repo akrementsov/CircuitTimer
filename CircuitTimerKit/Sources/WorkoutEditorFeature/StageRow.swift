@@ -50,8 +50,6 @@ struct StageRow: View {
                 StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
             }
         }
-        // The separator would otherwise start at the first text, which here is the duration button.
-        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 
     private var intensityColor: Color {
