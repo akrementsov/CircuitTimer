@@ -17,6 +17,7 @@ public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
     @FocusState private var focusedField: EditorField?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
+    @State private var savePanelHeight: CGFloat = .zero
 
     public init(store: StoreOf<WorkoutEditorFeature>) {
         self.store = store
@@ -46,13 +47,31 @@ public struct WorkoutEditorView: View {
         .listStyle(.plain)
         .scrollIndicators(.hidden)
         .scrollContentBackground(.hidden)
-        .contentMargins(.vertical, .token(spacing: .m), for: .scrollContent)
+        .contentMargins(.top, .token(spacing: .m), for: .scrollContent)
+        // The list already insets its content by the bottom safe area; the panel sits right above it.
+        .contentMargins(.bottom, savePanelHeight, for: .scrollContent)
         // Rows set their own heights; the system minimum would stretch the thin ones.
         .environment(\.defaultMinListRowHeight, .zero)
         // A swiped row is cut at the card's edge, while the content still scrolls under the bars.
         .mask { Rectangle().ignoresSafeArea(edges: .vertical) }
         .padding(.horizontal, .token(spacing: .l))
         .background(.surface(.screen))
+        .overlay(alignment: .bottom) {
+            SaveWorkoutPanel(
+                showsHint: store.showsSaveHint,
+                isSaving: store.isSaving,
+                canSave: store.canSave,
+                onSave: { send(afterClearingFocus: .saveButtonTapped) },
+                onEscape: leave
+            )
+            // Measured before the frame: the panel's own height, not the overlay's.
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { newValue in savePanelHeight = newValue })
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            // The keyboard covers the panel instead of pushing it up, as in the original app.
+            .ignoresSafeArea(.keyboard)
+        }
+        // The panel sits inside `.disabled` on purpose: inert while saving like the rest of the screen;
+        // its spinner still shows because the label switches on `isSaving`, not on being enabled.
         .disabled(store.isSaving)
         .accessibilityAction(.escape, leave)
         .navigationTitle(title)
@@ -124,21 +143,6 @@ public struct WorkoutEditorView: View {
             .tint(.text(.primary))
             .disabled(store.isSaving)
             // Escape from a bar item would otherwise go up to the navigation controller; on every item it means leave.
-            .accessibilityAction(.escape, leave)
-        }
-        ToolbarItem(placement: .confirmationAction) {
-            Group {
-                if store.isSaving {
-                    ProgressView()
-                } else {
-                    Button {
-                        send(afterClearingFocus: .saveButtonTapped)
-                    } label: {
-                        Text("editor.save", bundle: .module)
-                    }
-                    .disabled(!store.canSave)
-                }
-            }
             .accessibilityAction(.escape, leave)
         }
     }

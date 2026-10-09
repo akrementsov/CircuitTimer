@@ -309,22 +309,6 @@
         }
       }
     },
-    "editor.save" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Save"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Сохранить"
-          }
-        }
-      }
-    },
     "editor.saveFailed.message" : {
       "localizations" : {
         "en" : {
@@ -369,6 +353,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Чтобы сохранить, укажите название и хотя бы один этап длиннее 00:00."
+          }
+        }
+      }
+    },
+    "editor.saveWorkout" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить тренировку"
           }
         }
       }
