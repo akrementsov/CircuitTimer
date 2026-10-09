@@ -97,31 +97,42 @@ public struct AppView: View {
             case let .loaded(workouts):
                 List {
                     ForEach(workouts) { workout in
-                        Button {
-                            send(.workoutTapped(workout.id))
-                        } label: {
-                            WorkoutRow(workout: workout)
-                        }
-                        .buttonStyle(.workoutCard)
-                        // Taps and the drag preview follow the card, not the row with its margins.
-                        .contentShape([.interaction, .dragPreview], .workoutCard)
-                        // TODO: [CT-3-2] An interim way to start a workout; «Start workout» on the workout screen replaces it.
-                        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            if workout.isPlayable {
-                                Button {
-                                    send(.startButtonTapped(workout.id))
-                                } label: {
-                                    Label {
-                                        Text("workouts.start", bundle: .module)
-                                    } icon: {
-                                        Image(systemName: "play.fill")
-                                    }
-                                    .labelStyle(.iconOnly)
-                                }
-                                // A white glyph is unreadable on the brand color.
-                                .tint(.secondaryAction)
+                        HStack(spacing: .token(spacing: .xs)) {
+                            Button {
+                                send(.workoutTapped(workout.id))
+                            } label: {
+                                WorkoutRow(workout: workout)
                             }
+                            .buttonStyle(.workoutCard)
+                            // Taps follow the card, not the row with its margins.
+                            .contentShape(.interaction, .workoutCard)
+                            .accessibilityLabel(Text(workout.displayName))
+                            .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
+                            // Rows read only the list captured above: a row that reads the store observes `workouts`
+                            // on its own and is redrawn apart from the list while a drag settles, showing the wrong workout.
+                            .accessibilityActions {
+                                if workouts.indexMovableUp(workout.id) != nil {
+                                    Button {
+                                        send(.workoutMovedUp(workout.id))
+                                    } label: {
+                                        Text("workouts.moveUp", bundle: .module)
+                                    }
+                                }
+                                if workouts.indexMovableDown(workout.id) != nil {
+                                    Button {
+                                        send(.workoutMovedDown(workout.id))
+                                    } label: {
+                                        Text("workouts.moveDown", bundle: .module)
+                                    }
+                                }
+                            }
+                            // TODO: [CT-3-2] An interim way to start a workout until the workout screen's «Start workout».
+                            startChip(workout)
                         }
+                        // The chip takes the card's height: square at the default text size, taller at large sizes.
+                        .fixedSize(horizontal: false, vertical: true)
+                        // The chip is dragged with its card, as one preview without the row's margins.
+                        .contentShape(.dragPreview, CardAndChipShape(chipWidth: .token(size: .row), spacing: .token(spacing: .xs)))
                         // A saved workout is gone for good once deleted, so only an explicit tap deletes it.
                         // Duplicate lives here too: a context menu on the row breaks a slow swipe.
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -149,26 +160,6 @@ public struct AppView: View {
                             .tint(.secondaryAction)
                         }
                         .workoutListRow()
-                        .accessibilityLabel(Text(workout.displayName))
-                        .accessibilityValue(WorkoutRow.spokenDuration(of: workout))
-                        // Rows read only the list captured above: a row that reads the store observes `workouts`
-                        // on its own and is redrawn apart from the list while a drag settles, showing the wrong workout.
-                        .accessibilityActions {
-                            if workouts.indexMovableUp(workout.id) != nil {
-                                Button {
-                                    send(.workoutMovedUp(workout.id))
-                                } label: {
-                                    Text("workouts.moveUp", bundle: .module)
-                                }
-                            }
-                            if workouts.indexMovableDown(workout.id) != nil {
-                                Button {
-                                    send(.workoutMovedDown(workout.id))
-                                } label: {
-                                    Text("workouts.moveDown", bundle: .module)
-                                }
-                            }
-                        }
                     }
                     .onMove { send(.workoutsMoved($0, $1)) }
                     hiddenRecordsNotice
@@ -198,6 +189,27 @@ public struct AppView: View {
         }
     }
 
+    /// A chip after the card, as tall as it. A workout with nothing to play keeps a disabled chip, so the cards
+    /// stay aligned.
+    private func startChip(_ workout: Workout) -> some View {
+        Button {
+            send(.startButtonTapped(workout.id))
+        } label: {
+            Image(systemName: "play.fill")
+                .font(.token(.body))
+                .foregroundStyle(workout.isPlayable ? .text(.primary) : .text(.secondary))
+                .frame(width: .token(size: .row))
+                .frame(maxHeight: .infinity)
+                .background(.surface(.card), in: .workoutCard)
+        }
+        // An explicit style keeps the chip and the card separate buttons: a List row taps every button with the
+        // automatic style at once.
+        .buttonStyle(.workoutCard)
+        .contentShape(.interaction, .workoutCard)
+        .disabled(!workout.isPlayable)
+        .accessibilityLabel(Text("workouts.start", bundle: .module))
+    }
+
     @ViewBuilder
     private var hiddenRecordsNotice: some View {
         if store.hiddenRecordCount > 0 {
@@ -223,6 +235,21 @@ private extension ButtonStyle where Self == WorkoutCardButtonStyle {
 private extension Shape where Self == RoundedRectangle {
     static var workoutCard: Self {
         RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
+    }
+}
+
+/// The card and the start chip of a list row, without the gap between them.
+private struct CardAndChipShape: Shape {
+    let chipWidth: CGFloat
+    let spacing: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let chipX = rect.maxX - chipWidth
+        let card = CGRect(x: rect.minX, y: rect.minY, width: max(chipX - spacing - rect.minX, .zero), height: rect.height)
+        path.addPath(RoundedRectangle.workoutCard.path(in: card))
+        path.addPath(RoundedRectangle.workoutCard.path(in: CGRect(x: chipX, y: rect.minY, width: chipWidth, height: rect.height)))
+        return path
     }
 }
 
