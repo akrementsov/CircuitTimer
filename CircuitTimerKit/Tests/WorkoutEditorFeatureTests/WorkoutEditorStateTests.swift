@@ -16,7 +16,7 @@ struct WorkoutEditorStateTests {
 
     static let flagsCases: [FlagsCase] = {
         let untouchedNew = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
-        let untouched = WorkoutEditorFeature.State(editing: makeWorkout())
+        let untouched = editingState(makeWorkout())
         var changed = untouched
         changed.draft.name = "Changed"
         var blankName = untouched
@@ -81,7 +81,7 @@ struct WorkoutEditorStateTests {
     func test_initNew_givesOneWorkStageInTraining() {
         let state = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
 
-        #expect(state.mode == .create)
+        #expect(state.phase == .new)
         #expect(state.draft == Workout(
             id: UUID(fixture: 1),
             training: [Stage(id: UUID(fixture: 2), name: "", duration: .seconds(30), intensity: .work)]
@@ -90,13 +90,13 @@ struct WorkoutEditorStateTests {
     }
 
     @Test(arguments: [(-5, 1), (0, 1), (7, 7), (WorkoutLimits.maxTrainingRounds + 1, WorkoutLimits.maxTrainingRounds)])
-    func test_initEditing_liftsRoundsIntoEditorRangeWithoutChanges(stored: Int, expected: Int) {
+    func test_initViewing_liftsRoundsIntoEditorRangeWithoutChanges(stored: Int, expected: Int) {
         var workout = makeWorkout()
         workout.trainingRounds = stored
 
-        let state = WorkoutEditorFeature.State(editing: workout)
+        let state = WorkoutEditorFeature.State(viewing: workout)
 
-        #expect(state.mode == .edit)
+        #expect(state.phase == .viewing)
         #expect(state.draft.trainingRounds == expected)
         #expect(state.original == state.draft)
         #expect(!state.hasChanges)

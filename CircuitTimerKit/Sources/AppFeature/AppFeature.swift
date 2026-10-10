@@ -31,7 +31,8 @@ public struct AppFeature: Sendable {
     /// A screen the user asked for while the list was being written or reloaded.
     enum DeferredScreen: Equatable, Sendable {
         case create
-        case edit(Workout.ID)
+        /// Opens the workout's screen, read-only.
+        case open(Workout.ID)
         /// Plays the workout in the full-screen timer.
         case start(Workout.ID)
     }
@@ -165,14 +166,14 @@ public struct AppFeature: Sendable {
             case .addButtonTapped:
                 return openScreen(.create, &state)
             case let .workoutTapped(id):
-                return openScreen(.edit(id), &state)
+                return openScreen(.open(id), &state)
             case let .startButtonTapped(id):
                 return openScreen(.start(id), &state)
             case let .deleteButtonTapped(id):
                 guard case var .loaded(workouts) = state.workouts, workouts.remove(id: id) != nil else { return .none }
 
                 state.workouts = .loaded(workouts)
-                if state.deferredScreen == .edit(id) || state.deferredScreen == .start(id) {
+                if state.deferredScreen == .open(id) || state.deferredScreen == .start(id) {
                     state.deferredScreen = nil
                 }
                 return enqueue(.delete(id), &state)
@@ -275,11 +276,11 @@ public struct AppFeature: Sendable {
         switch request {
             case .create:
                 state.path.append(.editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid())))
-            case let .edit(id):
-                // The workout may be gone by now; then there is nothing to edit.
+            case let .open(id):
+                // The workout may be gone by now; then there is nothing to show.
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
 
-                state.path.append(.editor(WorkoutEditorFeature.State(editing: workout)))
+                state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
             case let .start(id):
                 // The workout may be gone by now, and one with nothing to play has no timer.
                 guard

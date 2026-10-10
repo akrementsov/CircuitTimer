@@ -5,7 +5,8 @@ import SwiftUI
 import WorkoutDomain
 import WorkoutStorage
 
-/// Edits a draft of one workout and saves it on request. Leaving with changes asks first.
+/// One workout's screen: a saved workout opens read-only, and the pencil turns it into an editor of a draft
+/// that is saved or discarded as a whole; a new workout opens in the editor. Leaving with changes asks first.
 @Reducer
 public struct WorkoutEditorFeature: Sendable {
     // A dialog with actions needs a hand-written `Action`: with a macro-generated one the scoped
@@ -30,13 +31,20 @@ public struct WorkoutEditorFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
-        public enum Mode: Equatable, Sendable {
-            case create
-            case edit
+        public enum Phase: Equatable, Sendable {
+            /// A workout that is not stored yet, edited until its first save.
+            case new
+            /// A stored workout, read-only.
+            case viewing
+            /// A stored workout being edited.
+            case editing
         }
 
-        public let mode: Mode
-        public let original: Workout
+        public internal(set) var phase: Phase
+        /// The workout exactly as it is stored: what the screen shows while viewing.
+        public internal(set) var workout: Workout
+        /// The base of the draft: `workout` as the editor offers it.
+        public internal(set) var original: Workout
         public var draft: Workout
         public var isSaving = false
         /// The stage whose duration picker is open; one at a time.
@@ -46,21 +54,28 @@ public struct WorkoutEditorFeature: Sendable {
         /// A new workout starts with one work stage in the training section.
         public init(newWorkoutID: Workout.ID, firstStageID: Stage.ID) {
             let workout = Workout(id: newWorkoutID, training: [State.newStage(id: firstStageID)])
-            self.init(mode: .create, workout: workout)
+            phase = .new
+            self.workout = workout
+            original = workout
+            draft = workout
         }
 
-        public init(editing workout: Workout) {
-            self.init(mode: .edit, workout: workout)
+        /// A stored workout opens read-only.
+        public init(viewing workout: Workout) {
+            phase = .viewing
+            self.workout = workout
+            let editable = Self.editable(workout)
+            original = editable
+            draft = editable
         }
 
-        private init(mode: Mode, workout: Workout) {
-            // Lifting a stored 0 to the editor's minimum in both copies keeps an untouched workout unchanged.
+        /// Lifting a stored 0 to the editor's minimum in both the base and the draft keeps an untouched workout
+        /// unchanged; `workout` keeps the stored value, which is what plays.
+        static func editable(_ workout: Workout) -> Workout {
             var workout = workout
             let rounds = WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
             workout.trainingRounds = max(Self.trainingRoundsRange.lowerBound, rounds)
-            self.mode = mode
-            original = workout
-            draft = workout
+            return workout
         }
 
         /// The rounds the editor offers: a workout without training rounds is not edited here.
@@ -83,6 +98,11 @@ public struct WorkoutEditorFeature: Sendable {
         /// Explains what the draft is missing; an untouched or saving draft needs no hint.
         public var showsSaveHint: Bool {
             !isDraftComplete && !isSaving
+        }
+
+        /// The stored workout as the read-only screen shows it.
+        public var outline: WorkoutOutline {
+            WorkoutOutline(schedule: WorkoutSchedule(workout: workout))
         }
 
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
@@ -117,11 +137,13 @@ public struct WorkoutEditorFeature: Sendable {
             case stageDurationTapped(Stage.ID)
             case backButtonTapped
             case saveButtonTapped
+            case editButtonTapped
         }
 
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case saveFailed
+            case saveSucceeded(Workout)
         }
 
         @CasePathable
@@ -158,6 +180,14 @@ public struct WorkoutEditorFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         // Nothing may change the draft or close the editor while it is being written.
         guard !state.isSaving else { return .none }
+
+        // The read-only screen draws no editing controls; a late action from the editor it replaced changes nothing.
+        switch state.phase {
+            case .viewing:
+                guard action == .backButtonTapped || action == .editButtonTapped else { return .none }
+            case .new, .editing:
+                guard action != .editButtonTapped else { return .none }
+        }
 
         switch action {
             case let .nameChanged(name):
@@ -208,6 +238,11 @@ public struct WorkoutEditorFeature: Sendable {
                 state.destination = .discardConfirmation(.discardChanges)
             case .saveButtonTapped:
                 return save(&state)
+            case .editButtonTapped:
+                state.original = State.editable(state.workout)
+                state.draft = state.original
+                state.expandedStageID = nil
+                state.phase = .editing
         }
         return .none
     }
@@ -218,6 +253,14 @@ public struct WorkoutEditorFeature: Sendable {
                 state.isSaving = false
                 state.destination = .saveFailedAlert(.saveFailed)
                 return .none
+            case let .saveSucceeded(workout):
+                state.isSaving = false
+                state.workout = workout
+                state.original = State.editable(workout)
+                state.draft = state.original
+                state.expandedStageID = nil
+                state.phase = .viewing
+                return .send(.delegate(.saved(workout)))
         }
     }
 
@@ -235,11 +278,10 @@ public struct WorkoutEditorFeature: Sendable {
         let workout = Self.normalizedForSaving(state.draft)
         state.destination = nil
         state.isSaving = true
-        return .run { [workoutStorage, dismiss] send in
+        return .run { [workoutStorage] send in
             do {
                 try await workoutStorage.save(workout: workout)
-                await send(.delegate(.saved(workout)))
-                await dismiss()
+                await send(.internal(.saveSucceeded(workout)))
             } catch is CancellationError {
                 return
             } catch {

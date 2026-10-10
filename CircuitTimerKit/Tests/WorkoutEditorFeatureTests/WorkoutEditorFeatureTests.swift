@@ -9,7 +9,7 @@ import WorkoutDomain
 @Suite
 struct WorkoutEditorFeatureTests {
     private func makeStore(
-        _ state: WorkoutEditorFeature.State = WorkoutEditorFeature.State(editing: makeWorkout()),
+        _ state: WorkoutEditorFeature.State = editingState(makeWorkout()),
         dependencies: (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<WorkoutEditorFeature> {
         TestStore(initialState: state) {
@@ -58,7 +58,7 @@ struct WorkoutEditorFeatureTests {
     func test_addStage_belowLimitAppendsAndAtLimitDoesNothing() async {
         var workout = makeWorkout()
         workout.training = (1..<WorkoutLimits.maxStagesPerSection).map { makeStage(100 + $0) }
-        let store = makeStore(WorkoutEditorFeature.State(editing: workout))
+        let store = makeStore(editingState(workout))
 
         await store.send(.view(.addStageButtonTapped(.training))) {
             $0.draft.training.append(Stage(id: UUID(0), name: "", duration: .seconds(30), intensity: .work))
@@ -144,7 +144,7 @@ struct WorkoutEditorFeatureTests {
         let last = makeStage(22)
         var workout = makeWorkout()
         workout.training = [first, middle, last]
-        let store = makeStore(WorkoutEditorFeature.State(editing: workout))
+        let store = makeStore(editingState(workout))
 
         await store.send(.view(.stageDurationTapped(middle.id))) { $0.expandedStageID = middle.id }
         await store.send(.view(.stageMovedUp(.training, middle.id))) { $0.draft.training = [middle, first, last] }
@@ -173,13 +173,13 @@ struct WorkoutEditorFeatureTests {
     ) async {
         var workout = makeWorkout()
         workout.training = training.map { makeStage($0) }
-        let store = makeStore(WorkoutEditorFeature.State(editing: workout))
+        let store = makeStore(editingState(workout))
 
         await store.send(.view(action))
     }
 
     @Test
-    func test_save_changedDraft_savesNormalizedCopyThenDelegatesThenDismisses() async {
+    func test_save_changedDraft_savesNormalizedCopyThenReturnsToViewing() async {
         let events = LockIsolated<[String]>([])
         let saved = LockIsolated<Workout?>(nil)
         let store = makeStore {
@@ -199,12 +199,19 @@ struct WorkoutEditorFeatureTests {
         expected.coolDown = []
 
         await store.send(.view(.saveButtonTapped)) { $0.isSaving = true }
+        await store.receive(\.internal.saveSucceeded, expected) {
+            $0.isSaving = false
+            $0.workout = expected
+            $0.original = expected
+            $0.draft = expected
+            $0.phase = .viewing
+        }
         await store.receive(\.delegate.saved, expected)
 
         await store.finish()
         #expect(saved.value == expected)
-        #expect(store.state.draft == draft)
-        #expect(events.value == ["save", "dismiss"])
+        #expect(draft != expected)
+        #expect(events.value == ["save"])
     }
 
     @Test
@@ -221,7 +228,7 @@ struct WorkoutEditorFeatureTests {
         for section in WorkoutSectionKind.allCases {
             silent[section] = silent[section].map { Stage(id: $0.id, name: $0.name, duration: .zero, intensity: $0.intensity) }
         }
-        let nothingToPlay = makeStore(WorkoutEditorFeature.State(editing: silent))
+        let nothingToPlay = makeStore(editingState(silent))
         await nothingToPlay.send(.view(.nameChanged("Still silent"))) { $0.draft.name = "Still silent" }
         await nothingToPlay.send(.view(.saveButtonTapped))
     }
@@ -239,6 +246,7 @@ struct WorkoutEditorFeatureTests {
             $0.destination = nil
             $0.isSaving = true
         }
+        await store.receive(\.internal.saveSucceeded) { $0.returnToViewing(savedName: "Renamed") }
         await store.receive(\.delegate.saved)
     }
 
@@ -265,6 +273,7 @@ struct WorkoutEditorFeatureTests {
 
         failing.setValue(false)
         await store.send(.view(.saveButtonTapped)) { $0.isSaving = true }
+        await store.receive(\.internal.saveSucceeded) { $0.returnToViewing(savedName: "Renamed") }
         await store.receive(\.delegate.saved)
     }
 
@@ -317,7 +326,7 @@ struct WorkoutEditorFeatureTests {
 
     @Test
     func test_whileSaving_viewActionsAndDiscardAreIgnored() async {
-        var state = WorkoutEditorFeature.State(editing: makeWorkout())
+        var state = editingState(makeWorkout())
         state.draft.name = "Renamed"
         state.isSaving = true
         state.destination = .discardConfirmation(.discardChanges)
@@ -346,5 +355,18 @@ struct WorkoutEditorFeatureTests {
             await store.send(.view(action))
         }
         await store.send(.destination(.presented(.discardConfirmation(.discard)))) { $0.destination = nil }
+    }
+}
+
+private extension WorkoutEditorFeature.State {
+    /// After a successful save of `makeWorkout()` renamed to `savedName`: read-only, showing what was written.
+    mutating func returnToViewing(savedName: String) {
+        var saved = makeWorkout()
+        saved.name = savedName
+        isSaving = false
+        workout = saved
+        original = saved
+        draft = saved
+        phase = .viewing
     }
 }

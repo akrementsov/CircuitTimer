@@ -23,6 +23,30 @@ public struct WorkoutEditorView: View {
     }
 
     public var body: some View {
+        content
+            .accessibilityAction(.escape, leave)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            // A system pop removes the screen without asking the reducer and would drop an unsaved draft.
+            // Hiding the system back button also turns off the back gestures, so leaving goes only through Back.
+            .navigationBarBackButtonHidden(true)
+            .toolbar { toolbar }
+            .onChange(of: focusedField) { _, field in focusChanged(to: field) }
+            .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
+            .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch store.phase {
+            case .viewing:
+                WorkoutOverviewList(outline: store.outline)
+            case .new, .editing:
+                editingList
+        }
+    }
+
+    private var editingList: some View {
         List {
             Section {
                 nameRow
@@ -57,16 +81,6 @@ public struct WorkoutEditorView: View {
         // The panel sits inside `.disabled` on purpose: inert while saving like the rest of the screen;
         // its spinner still shows because the label switches on being busy, not on being enabled.
         .disabled(store.isSaving)
-        .accessibilityAction(.escape, leave)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        // A system pop removes the screen without asking the reducer and would drop an unsaved draft.
-        // Hiding the system back button also turns off the back gestures, so leaving goes only through Back.
-        .navigationBarBackButtonHidden(true)
-        .toolbar { toolbar }
-        .onChange(of: focusedField) { _, field in focusChanged(to: field) }
-        .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
-        .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
 
     private var nameRow: some View {
@@ -105,9 +119,17 @@ public struct WorkoutEditorView: View {
     }
 
     private var title: Text {
-        switch store.mode {
-            case .create: Text("editor.title.new", bundle: .module)
-            case .edit: Text("editor.title.edit", bundle: .module)
+        switch store.phase {
+            case .new:
+                Text("editor.title.new", bundle: .module)
+            case .viewing:
+                if store.workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("editor.title.untitled", bundle: .module)
+                } else {
+                    Text(verbatim: store.workout.name)
+                }
+            case .editing:
+                Text("editor.title.edit", bundle: .module)
         }
     }
 
@@ -127,6 +149,21 @@ public struct WorkoutEditorView: View {
             .disabled(store.isSaving)
             // Escape from a bar item would otherwise go up to the navigation controller; on every item it means leave.
             .accessibilityAction(.escape, leave)
+        }
+        if store.phase == .viewing {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    send(.editButtonTapped, animation: .default)
+                } label: {
+                    Label {
+                        Text("editor.edit", bundle: .module)
+                    } icon: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .labelStyle(.iconOnly)
+                }
+                .tint(.brand)
+            }
         }
     }
 
@@ -297,9 +334,16 @@ public struct WorkoutEditorView: View {
     }
 }
 
+#Preview("Viewing") {
+    NavigationStack {
+        WorkoutEditorView(store: Store(initialState: WorkoutEditorFeature.State(viewing: .sample)) { WorkoutEditorFeature() })
+    }
+    .preferredColorScheme(.dark)
+}
+
 #Preview("Edit") {
     NavigationStack {
-        WorkoutEditorView(store: Store(initialState: WorkoutEditorFeature.State(editing: .sample)) { WorkoutEditorFeature() })
+        WorkoutEditorView(store: Store(initialState: editingPreviewState(.sample)) { WorkoutEditorFeature() })
     }
     .preferredColorScheme(.dark)
 }
@@ -316,7 +360,7 @@ public struct WorkoutEditorView: View {
         coolDown: [Stage(id: UUID(100), name: "", duration: .seconds(30), intensity: .rest)]
     )
     NavigationStack {
-        WorkoutEditorView(store: Store(initialState: WorkoutEditorFeature.State(editing: workout)) { WorkoutEditorFeature() })
+        WorkoutEditorView(store: Store(initialState: editingPreviewState(workout)) { WorkoutEditorFeature() })
     }
     .preferredColorScheme(.dark)
 }
@@ -330,4 +374,10 @@ public struct WorkoutEditorView: View {
         )
     }
     .preferredColorScheme(.dark)
+}
+
+private func editingPreviewState(_ workout: Workout) -> WorkoutEditorFeature.State {
+    var state = WorkoutEditorFeature.State(viewing: workout)
+    state.phase = .editing
+    return state
 }

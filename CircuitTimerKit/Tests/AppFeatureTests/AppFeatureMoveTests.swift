@@ -97,7 +97,7 @@ struct AppFeatureMoveTests {
             $0.workouts = .loaded([third, self.first, self.second])
             $0.pendingMutations.append(.reorder([third.id, self.first.id, self.second.id]))
         }
-        await store.send(.view(.workoutTapped(third.id))) { $0.deferredScreen = .edit(third.id) }
+        await store.send(.view(.workoutTapped(third.id))) { $0.deferredScreen = .open(third.id) }
         #expect(payloads.value == [[first.id, third.id, second.id]])
 
         await clock.advance(by: .seconds(1))
@@ -110,7 +110,7 @@ struct AppFeatureMoveTests {
         await store.receive(\.internal.mutationFinished) {
             $0.pendingMutations = []
             $0.deferredScreen = nil
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: third))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: third))
         }
     }
 

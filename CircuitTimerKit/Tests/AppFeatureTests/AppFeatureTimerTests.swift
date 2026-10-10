@@ -140,7 +140,7 @@ struct AppFeatureTimerTests {
             case .alertShown:
                 state.destination = .alert(.mutationFailed)
             case .editorPushed:
-                state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+                state.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
             case .settingsTab:
                 state.selectedTab = .settings
         }

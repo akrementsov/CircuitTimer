@@ -145,6 +145,22 @@
         }
       }
     },
+    "editor.edit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Редактировать"
+          }
+        }
+      }
+    },
     "editor.intensity.rest" : {
       "localizations" : {
         "en" : {
@@ -593,6 +609,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Новая тренировка"
+          }
+        }
+      }
+    },
+    "editor.title.untitled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка без названия"
           }
         }
       }

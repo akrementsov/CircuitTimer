@@ -66,7 +66,7 @@ struct AppFeatureTabTests {
     func test_tabSelected_workoutsReselectedWithUnchangedEditor_popsStack() async {
         let store = makeStore(loaded([first, second]))
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
         }
 
         await store.send(.view(.tabSelected(.workouts)))
@@ -78,7 +78,10 @@ struct AppFeatureTabTests {
     func test_tabSelected_workoutsReselectedWithChangedEditor_asksToDiscardAndKeepsStack() async {
         let store = makeStore(loaded([first, second]))
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
+        }
+        await store.send(.path(.element(id: 0, action: .editor(.view(.editButtonTapped))))) {
+            $0.path[id: 0, case: \.editor]?.phase = .editing
         }
         await store.send(.path(.element(id: 0, action: .editor(.view(.nameChanged("Renamed")))))) {
             $0.path[id: 0, case: \.editor]?.draft.name = "Renamed"
@@ -91,7 +94,7 @@ struct AppFeatureTabTests {
     }
 
     @Test
-    func test_tabSelected_workoutsReselectedWhileSaveInFlight_saveCompletesThenPops() async {
+    func test_tabSelected_workoutsReselectedWhileSaveInFlight_saveCompletesAndStaysInViewing() async {
         let gate = Gate()
         var renamed = first
         renamed.name = "Renamed"
@@ -99,7 +102,10 @@ struct AppFeatureTabTests {
             $0.workoutStorage.save = { _ in await gate.wait() }
         }
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
+        }
+        await store.send(.path(.element(id: 0, action: .editor(.view(.editButtonTapped))))) {
+            $0.path[id: 0, case: \.editor]?.phase = .editing
         }
         await store.send(.path(.element(id: 0, action: .editor(.view(.nameChanged("Renamed")))))) {
             $0.path[id: 0, case: \.editor]?.draft.name = "Renamed"
@@ -111,14 +117,18 @@ struct AppFeatureTabTests {
         await store.send(.view(.tabSelected(.workouts)))
         await store.receive(.path(.element(id: 0, action: .editor(.view(.backButtonTapped)))))
         gate.open()
+        await store.receive(.path(.element(id: 0, action: .editor(.internal(.saveSucceeded(renamed)))))) {
+            $0.path[id: 0, case: \.editor]?.isSaving = false
+            $0.path[id: 0, case: \.editor]?.workout = renamed
+            $0.path[id: 0, case: \.editor]?.original = renamed
+            $0.path[id: 0, case: \.editor]?.phase = .viewing
+        }
         await store.receive(.path(.element(id: 0, action: .editor(.delegate(.saved(renamed)))))) {
             $0.workouts = .loaded([renamed, self.second])
         }
-        await store.receive(\.path.popFrom) { $0.path = StackState() }
         await store.finish()
-        await store.send(.view(.addButtonTapped)) {
-            $0.path[id: 1] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
-        }
+        // The workout's screen is still pushed, so nothing else opens.
+        await store.send(.view(.addButtonTapped))
     }
 
     @Test
@@ -157,7 +167,7 @@ struct AppFeatureTabTests {
             }
         }
         await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
-        await store.send(.view(.workoutTapped(first.id))) { $0.deferredScreen = .edit(self.first.id) }
+        await store.send(.view(.workoutTapped(first.id))) { $0.deferredScreen = .open(self.first.id) }
 
         await store.send(.view(.tabSelected(.settings))) {
             $0.selectedTab = .settings

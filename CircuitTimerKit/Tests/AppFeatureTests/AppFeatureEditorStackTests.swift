@@ -22,7 +22,10 @@ struct AppFeatureEditorStackTests {
             $0.workoutStorage.save = { _ in throw SaveFailure() }
         }
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
+        }
+        await store.send(.path(.element(id: 0, action: .editor(.view(.editButtonTapped))))) {
+            $0.path[id: 0, case: \.editor]?.phase = .editing
         }
         await store.send(.path(.element(id: 0, action: .editor(.view(.nameChanged("Renamed")))))) {
             $0.path[id: 0, case: \.editor]?.draft.name = "Renamed"
@@ -43,7 +46,10 @@ struct AppFeatureEditorStackTests {
             $0.workoutStorage.save = { _ in Issue.record("Discarding must not save") }
         }
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
+        }
+        await store.send(.path(.element(id: 0, action: .editor(.view(.editButtonTapped))))) {
+            $0.path[id: 0, case: \.editor]?.phase = .editing
         }
         await store.send(.path(.element(id: 0, action: .editor(.view(.nameChanged("Renamed")))))) {
             $0.path[id: 0, case: \.editor]?.draft.name = "Renamed"
@@ -61,7 +67,7 @@ struct AppFeatureEditorStackTests {
     @Test
     func test_openScreen_editorAlreadyPushed_doesNotPushAgain() async {
         var state = loaded([first, second])
-        state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+        state.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
         state.pendingMutations = [.delete(UUID(fixture: 99))]
         state.deferredScreen = .create
         let store = makeStore(state)
