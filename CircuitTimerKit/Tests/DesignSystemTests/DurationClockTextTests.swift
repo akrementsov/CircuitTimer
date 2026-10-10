@@ -43,4 +43,17 @@ struct DurationClockTextTests {
     func test_clockText_adaptive_switchesFormAtOneHour(duration: Duration, expected: String) {
         #expect(duration.clockText(.adaptive) == expected)
     }
+
+    @Test(arguments: [
+        (Duration.zero, "00:00"),
+        (.milliseconds(1), "00:01"),
+        (.milliseconds(59_900), "01:00"),
+        (.seconds(60), "01:00"),
+        (.milliseconds(74_200), "01:15"),
+        (.seconds(75), "01:15"),
+        (.milliseconds(3_599_001), "60:00"),
+    ])
+    func test_clockText_remaining_roundsFractionsUp(duration: Duration, expected: String) {
+        #expect(duration.clockText(.remaining) == expected)
+    }
 }

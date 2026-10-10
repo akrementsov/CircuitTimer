@@ -32,7 +32,7 @@ public struct StageClockText: View {
             let size = metrics.fontSize(fitting: proxy.size)
             // The visible text hangs from the leading edge of a centred template that changes only with the
             // minutes, so the clock does not shift every second.
-            Text(template)
+            Text(Self.template(for: text))
                 .lineLimit(1)
                 .fixedSize()
                 .hidden()
@@ -50,7 +50,7 @@ public struct StageClockText: View {
     }
 
     /// The minutes repeated, `01:01` for `01:15`, or the text itself when it has no colon.
-    private var template: String {
+    static func template(for text: String) -> String {
         guard let colon = text.firstIndex(of: ":") else { return text }
 
         let minutes = text[..<colon]
@@ -82,19 +82,24 @@ extension StageClockText.Face {
         }
     }
 
+    private static let leagueGothicMetrics = metrics(
+        forPostScriptName: LeagueGothic.postScriptName,
+        isAvailable: LeagueGothic.isAvailable
+    )
+
     // `CTFontCreateWithName` silently substitutes another font for a name it cannot find, which would size the
     // clock from the wrong metrics.
-    private static let leagueGothicMetrics: ClockFaceMetrics? = {
-        guard LeagueGothic.isAvailable else { return nil }
+    static func metrics(forPostScriptName name: String, isAvailable: Bool) -> ClockFaceMetrics? {
+        guard isAvailable else { return nil }
 
-        let font = CTFontCreateWithName(LeagueGothic.postScriptName as CFString, referenceSize, nil)
+        let font = CTFontCreateWithName(name as CFString, referenceSize, nil)
         let found = CTFontCopyPostScriptName(font) as String
-        guard found == LeagueGothic.postScriptName else {
-            Logger.designSystem.error("CoreText returned \(found, privacy: .public) for League Gothic; the stage clock uses the system font")
+        guard found == name else {
+            Logger.designSystem.error("CoreText returned \(found, privacy: .public) for \(name, privacy: .public); the stage clock uses the system font")
             return nil
         }
         return ClockFaceMetrics(font: font)
-    }()
+    }
 
     // Measured at a display size: at text sizes the system font uses its text optical size, which is wider.
     private static let systemMetrics = ClockFaceMetrics(font: UIFont.systemFont(ofSize: referenceSize) as CTFont)
