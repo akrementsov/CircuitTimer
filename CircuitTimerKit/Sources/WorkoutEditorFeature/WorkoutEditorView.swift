@@ -43,29 +43,19 @@ public struct WorkoutEditorView: View {
             }
             stagesCard(.coolDown)
         }
-        .listStyle(.plain)
-        .scrollIndicators(.hidden)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, .token(spacing: .m), for: .scrollContent)
-        // Rows set their own heights; the system minimum would stretch the thin ones.
-        .environment(\.defaultMinListRowHeight, .zero)
-        // A swiped row is cut at the card's edge, while the content still scrolls under the bars.
-        .mask { Rectangle().ignoresSafeArea(edges: .vertical) }
-        .padding(.horizontal, .token(spacing: .l))
-        // Under the keyboard too: its rounded top corners would show the black window behind the screen.
-        .background { Rectangle().fill(.surface(.screen)).ignoresSafeArea() }
-        .modifier(
-            SavePanelPlacement {
-                SaveWorkoutPanel(
-                    showsHint: store.showsSaveHint,
-                    isSaving: store.isSaving,
-                    canSave: store.canSave,
-                    onSave: { send(afterClearingFocus: .saveButtonTapped) }
-                )
-            }
-        )
+        .cardList()
+        .bottomActionPanel {
+            BottomActionPanel(
+                title: Text("editor.saveWorkout", bundle: .module),
+                hint: store.showsSaveHint ? Text("editor.saveHint", bundle: .module) : nil,
+                isBusy: store.isSaving,
+                busyLabel: Text("editor.saving", bundle: .module),
+                isEnabled: store.canSave,
+                action: { send(afterClearingFocus: .saveButtonTapped) }
+            )
+        }
         // The panel sits inside `.disabled` on purpose: inert while saving like the rest of the screen;
-        // its spinner still shows because the label switches on `isSaving`, not on being enabled.
+        // its spinner still shows because the label switches on being busy, not on being enabled.
         .disabled(store.isSaving)
         .accessibilityAction(.escape, leave)
         .navigationTitle(title)
@@ -304,23 +294,6 @@ public struct WorkoutEditorView: View {
             get: { stage.name },
             set: { send(.stageNameChanged(section, stage.id, $0)) }
         )
-    }
-}
-
-/// Puts the save panel at the bottom of the screen, above the keyboard while a field is edited. The list scrolls
-/// under the panel, insets its content by it and scrolls a focused field above it; on iOS 26 with the system's
-/// scroll edge effect.
-private struct SavePanelPlacement<Panel: View>: ViewModifier {
-    @ViewBuilder let panel: () -> Panel
-
-    func body(content: Content) -> some View {
-        // Scrolling to a focused field brings only its text above the panel; the spacing keeps the field's own
-        // padding and background clear of the button too.
-        if #available(iOS 26, *) {
-            content.safeAreaBar(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
-        } else {
-            content.safeAreaInset(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
-        }
     }
 }
 

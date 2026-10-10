@@ -1,9 +1,8 @@
-import DesignSystem
 import Foundation
 import SwiftUI
 
 /// A title with a duration at the trailing edge: the workout's total time and each section's header.
-struct TitleAndTimeRow: View {
+public struct TitleAndTimeRow: View {
     let title: Text
     let duration: Duration
     let style: Duration.ClockTextStyle
@@ -12,7 +11,14 @@ struct TitleAndTimeRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .subheadline) private var minimumTitleWidth: CGFloat = .token(size: .rowTitleMinWidth)
 
-    var body: some View {
+    public init(title: Text, duration: Duration, style: Duration.ClockTextStyle, font: DesignSystem.Token.Typography) {
+        self.title = title
+        self.duration = duration
+        self.style = style
+        self.font = font
+    }
+
+    public var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 stacked

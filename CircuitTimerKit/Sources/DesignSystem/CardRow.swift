@@ -1,15 +1,14 @@
-import DesignSystem
 import SwiftUI
 
 /// Where a list row sits in its card: only the card's outer corners are rounded.
-enum CardRowPosition {
+public enum CardRowPosition: Sendable {
     case top
     case middle
     case bottom
     case single
 
     /// The last row of a card also carries the gap to the next card.
-    var endsCard: Bool {
+    public var endsCard: Bool {
         switch self {
             case .top, .middle: false
             case .bottom, .single: true
@@ -20,7 +19,7 @@ enum CardRowPosition {
 extension View {
     /// A list row drawn as one part of a card, edge to edge; the content sets its own padding.
     /// The last card of the list leaves no gap under it: nothing follows it.
-    func cardRow(_ position: CardRowPosition, endsList: Bool = false) -> some View {
+    public func cardRow(_ position: CardRowPosition, endsList: Bool = false) -> some View {
         let gap: CGFloat = position.endsCard && !endsList ? .token(spacing: .m) : .zero
         return padding(.bottom, gap)
             .listRowInsets(EdgeInsets())
@@ -29,7 +28,7 @@ extension View {
     }
 
     /// A list row outside any card, on the screen color.
-    func screenRow() -> some View {
+    public func screenRow() -> some View {
         listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
             // A plain list paints rows with the system background, and a clear color is not a token.
