@@ -3,9 +3,9 @@ import Foundation
 import SwiftUI
 import WorkoutDomain
 
-/// The workout's stages, read-only, pushed over the paused timer. The workout's screen in the editor draws the same
-/// layout from its own strings (`WorkoutOverviewList`): a feature never imports another, and DesignSystem knows
-/// no workouts.
+/// The workout's stages, read-only, pushed over the paused timer: the original app showed its workout screen here
+/// with the cells inactive. The editor's read-only phase draws the same cards from its own rows and strings: a feature
+/// never imports another, and DesignSystem knows no workouts.
 struct TimerStageListView: View {
     let title: String
     let outline: WorkoutOutline

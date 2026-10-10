@@ -15,6 +15,8 @@ extension DesignSystem.Token {
         case cardInactive
         /// An input or a control inside a card, and the track of a progress bar.
         case field
+        /// A field that cannot be edited, such as a stage on a read-only workout screen.
+        case fieldInactive
         /// The `secondaryAction` asset: the field being edited.
         case focused
     }
@@ -52,6 +54,8 @@ extension ShapeStyle where Self == Color {
                 Color("SurfaceCardInactive", bundle: .module)
             case .field:
                 Color("SurfaceField", bundle: .module)
+            case .fieldInactive:
+                Color("SurfaceFieldInactive", bundle: .module)
             case .focused:
                 Color("SecondaryAction", bundle: .module)
         }

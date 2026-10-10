@@ -15,6 +15,6 @@ public struct CaptionPlate: View {
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.token(spacing: .l))
-            .background(.surface(.field), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+            .background(.surface(.fieldInactive), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
     }
 }

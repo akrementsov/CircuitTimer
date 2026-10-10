@@ -29,14 +29,14 @@ public struct ReadOnlyStageRow: View {
             .padding(.vertical, .token(spacing: .s))
             .padding(.horizontal, .token(spacing: .xs))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.surface(.field), in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
+            .background(.surface(.fieldInactive), in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
 
             Text(duration.clockText(.minutesSeconds))
                 .monospacedDigit()
                 .fixedSize()
                 .padding(.vertical, .token(spacing: .s))
                 .padding(.horizontal, .token(spacing: .m))
-                .background(.surface(.field), in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
+                .background(.surface(.fieldInactive), in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
         }
         .font(.token(.body))
         .foregroundStyle(.text(.primary))

@@ -107,9 +107,51 @@ public struct WorkoutEditorFeature: Sendable {
             phase == .viewing && workout.isPlayable && !isStarting
         }
 
-        /// The stored workout as the read-only screen shows it.
-        public var outline: WorkoutOutline {
-            WorkoutOutline(schedule: WorkoutSchedule(workout: workout))
+        /// The same cells serve both phases: read-only they show what the stored workout plays, and the pencil
+        /// turns them into the draft's controls, as the original app did.
+        public var isEditable: Bool {
+            phase != .viewing
+        }
+
+        /// The stages a section shows: the draft's while editing; while read-only, the ones that play.
+        public func shownStages(in section: WorkoutSectionKind) -> [Stage] {
+            guard !isEditable else { return draft[section] }
+
+            return workout.duration(of: section) > .zero ? WorkoutLimits.normalizedStages(workout[section]) : []
+        }
+
+        /// A read-only screen leaves out a section that plays nothing.
+        public func showsSection(_ section: WorkoutSectionKind) -> Bool {
+            isEditable || !shownStages(in: section).isEmpty
+        }
+
+        public func shownDuration(of section: WorkoutSectionKind) -> Duration {
+            isEditable ? draft.duration(of: section) : workout.duration(of: section)
+        }
+
+        public var shownTotalDuration: Duration {
+            isEditable ? draft.totalDuration : workout.totalDuration
+        }
+
+        public var shownTrainingRounds: Int {
+            isEditable ? draft.trainingRounds : WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
+        }
+
+        /// While editing, a pause card offers its switch wherever the pause would play; read-only, only a pause
+        /// that plays shows.
+        public func showsPause(after section: WorkoutSectionKind) -> Bool {
+            switch (section, isEditable) {
+                case (.warmUp, true): draft.canPauseAfterWarmUp
+                case (.warmUp, false): workout.pauseAfterWarmUp && workout.canPauseAfterWarmUp
+                case (.training, true): draft.canPauseAfterTraining
+                case (.training, false): workout.pauseAfterTraining && workout.canPauseAfterTraining
+                case (.coolDown, _): false
+            }
+        }
+
+        /// The last section on screen, whose card leaves no gap under it.
+        public var lastShownSection: WorkoutSectionKind? {
+            WorkoutSectionKind.allCases.last(where: showsSection)
         }
 
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
@@ -164,6 +206,10 @@ public struct WorkoutEditorFeature: Sendable {
     }
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutEditor")
+
+    /// The pencil and a save switch the screen with the short curve of a collection view's batch update, as the
+    /// original screen did; a spring's long settle would drag the rows after it.
+    static let phaseChangeAnimation: Animation = .easeInOut(duration: 0.3)
 
     @Dependency(\.dismiss) private var dismiss
     @Dependency(\.uuid) private var uuid
@@ -301,7 +347,8 @@ public struct WorkoutEditorFeature: Sendable {
         return .run { [workoutStorage] send in
             do {
                 try await workoutStorage.save(workout: workout)
-                await send(.internal(.saveSucceeded(workout)))
+                // The cells turn read-only in place, so the change animates like the pencil's.
+                await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
             } catch is CancellationError {
                 return
             } catch {
