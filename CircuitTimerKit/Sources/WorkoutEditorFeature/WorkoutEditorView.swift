@@ -41,6 +41,11 @@ public struct WorkoutEditorView: View {
         switch store.phase {
             case .viewing:
                 WorkoutOverviewList(outline: store.outline)
+                    .bottomActionPanel {
+                        BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
+                            send(.startButtonTapped)
+                        }
+                    }
             case .new, .editing:
                 editingList
         }

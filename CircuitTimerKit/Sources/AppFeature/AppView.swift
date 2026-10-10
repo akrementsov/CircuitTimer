@@ -45,6 +45,7 @@ public struct AppView: View {
             NavigationStack {
                 WorkoutTimerView(store: timerStore)
             }
+            .onAppear { send(.timerCoverAppeared) }
         }
     }
 

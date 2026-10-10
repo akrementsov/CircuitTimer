@@ -47,6 +47,8 @@ public struct WorkoutEditorFeature: Sendable {
         public internal(set) var original: Workout
         public var draft: Workout
         public var isSaving = false
+        /// Start was tapped and the timer is on its way; a second tap must not ask again.
+        public internal(set) var isStarting = false
         /// The stage whose duration picker is open; one at a time.
         public var expandedStageID: Stage.ID?
         @Presents public var destination: Destination.State?
@@ -100,6 +102,11 @@ public struct WorkoutEditorFeature: Sendable {
             !isDraftComplete && !isSaving
         }
 
+        /// The read-only screen plays the stored workout, once.
+        public var canStart: Bool {
+            phase == .viewing && workout.isPlayable && !isStarting
+        }
+
         /// The stored workout as the read-only screen shows it.
         public var outline: WorkoutOutline {
             WorkoutOutline(schedule: WorkoutSchedule(workout: workout))
@@ -138,6 +145,7 @@ public struct WorkoutEditorFeature: Sendable {
             case backButtonTapped
             case saveButtonTapped
             case editButtonTapped
+            case startButtonTapped
         }
 
         @CasePathable
@@ -150,6 +158,8 @@ public struct WorkoutEditorFeature: Sendable {
         public enum Delegate: Equatable, Sendable {
             /// The workout exactly as it was written to storage.
             case saved(Workout)
+            /// The workout exactly as it is stored, to play in the timer.
+            case startRequested(Workout)
         }
     }
 
@@ -184,9 +194,9 @@ public struct WorkoutEditorFeature: Sendable {
         // The read-only screen draws no editing controls; a late action from the editor it replaced changes nothing.
         switch state.phase {
             case .viewing:
-                guard action == .backButtonTapped || action == .editButtonTapped else { return .none }
+                guard [.backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
             case .new, .editing:
-                guard action != .editButtonTapped else { return .none }
+                guard action != .editButtonTapped, action != .startButtonTapped else { return .none }
         }
 
         switch action {
@@ -243,6 +253,16 @@ public struct WorkoutEditorFeature: Sendable {
                 state.draft = state.original
                 state.expandedStageID = nil
                 state.phase = .editing
+                state.isStarting = false
+            case .startButtonTapped:
+                guard state.canStart else { return .none }
+
+                // The container presents the timer and then empties the stack under it, so this screen goes away.
+                // It refuses only an unplayable workout, which `canStart` excludes, or something already presented:
+                // an alert is modal, so Start cannot be tapped under it, and a timer comes only from this flag's
+                // first tap. The flag only blocks Start; Back keeps working.
+                state.isStarting = true
+                return .send(.delegate(.startRequested(state.workout)))
         }
         return .none
     }

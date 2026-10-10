@@ -90,6 +90,7 @@ public struct AppFeature: Sendable {
             case workoutsMoved(IndexSet, Int)
             case workoutMovedUp(Workout.ID)
             case workoutMovedDown(Workout.ID)
+            case timerCoverAppeared
         }
 
         @CasePathable
@@ -125,6 +126,8 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
+                case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
+                    startWorkout(workout, &state)
                 case .destination(.dismiss):
                     timerDismissed(state)
                 case .destination, .path, .settings:
@@ -212,6 +215,10 @@ public struct AppFeature: Sendable {
 
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
+            case .timerCoverAppeared:
+                // Under the cover, so the pop is not seen; closing the timer lands on the list.
+                state.path.removeAll()
+                return .none
         }
     }
 
@@ -289,11 +296,30 @@ public struct AppFeature: Sendable {
                     workout.isPlayable
                 else { return .none }
 
-                state.destination = .timer(
-                    WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
-                )
+                state.destination = .timer(timerState(for: workout))
         }
         return .none
+    }
+
+    /// Presents the timer over the tab bar; the Workouts stack returns to the list once the cover is up.
+    private func startWorkout(_ workout: Workout, _ state: inout State) -> Effect<Action> {
+        // The workout's screen offers Start only for a playable workout and never under a presentation.
+        guard state.destination == nil else {
+            Self.logger.error("Refused to start a workout while something is presented")
+            return .none
+        }
+        guard workout.isPlayable else {
+            Self.logger.error("Refused to start a workout with nothing to play")
+            return .none
+        }
+
+        state.destination = .timer(timerState(for: workout))
+        return .none
+    }
+
+    /// The one place a timer's state is built.
+    private func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
     }
 
     private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {

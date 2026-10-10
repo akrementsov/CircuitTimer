@@ -581,6 +581,22 @@
         }
       }
     },
+    "editor.startWorkout" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать тренировку"
+          }
+        }
+      }
+    },
     "editor.title.edit" : {
       "localizations" : {
         "en" : {
