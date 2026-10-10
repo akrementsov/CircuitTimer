@@ -8,9 +8,11 @@ extension Duration {
         case minutesSeconds
         /// `minutesSeconds` below an hour, `hoursMinutesSeconds` from an hour on.
         case adaptive
+        /// `minutesSeconds` with fractions rounded up, so time left reads `00:00` only once none is left.
+        case remaining
     }
 
-    /// ASCII digits and colons in every region; fractions round down.
+    /// ASCII digits and colons in every region; fractions round down, except for `remaining`.
     public func clockText(_ style: ClockTextStyle) -> String {
         switch style {
             case .hoursMinutesSeconds:
@@ -19,6 +21,8 @@ extension Duration {
                 posixFormatted(.minuteSecond(padMinuteToLength: 2, roundFractionalSeconds: .down))
             case .adaptive:
                 clockText(self < .seconds(3_600) ? .minutesSeconds : .hoursMinutesSeconds)
+            case .remaining:
+                posixFormatted(.minuteSecond(padMinuteToLength: 2, roundFractionalSeconds: .up))
         }
     }
 

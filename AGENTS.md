@@ -7,6 +7,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 1. **Platform:** iOS 17+, Swift 6 language mode with complete strict concurrency, Xcode 26.5.
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved`; never assume an API exists.
 3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the original app's palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`; how the widget and Live Activity follow the system theme is decided in CT-4. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together.
+   - Fonts ship in `Sources/DesignSystem/Resources/Fonts/` with their license and are registered at runtime from `Bundle.module`; `Font.custom` lives only in `DesignSystem`.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions. A pushed screen that must not close unasked hides the system back button: a SwiftUI pop reaches the reducer as `popFrom`, which removes the element without a veto.
 6. **Every commit passes `make verify-clean`.**
@@ -29,18 +30,20 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | Module | Depends on | Owns |
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
-| `DesignSystem` | SwiftUI | Spacing, radius, size, typography and color tokens; clock text; screen chrome |
+| `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
+| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient` |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the editor onto the Workouts stack; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the editor onto the Workouts stack, presenting the timer full screen; composes Settings |
 
 Layering:
 
 - `*Feature` → `DesignSystem`, `Workout*`. A feature never imports another feature; composition happens in `AppFeature`.
 - `SettingsFeature` needs no workout module and imports none.
+- `WorkoutTimerFeature` imports no storage module: `AppFeature` hands it a `WorkoutSchedule`.
 - `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
-- Planned: `WorkoutTimerFeature` (CT-3); `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
+- Planned: `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
 
 ## Essential commands
 
@@ -99,6 +102,7 @@ public struct SomeFeature: Sendable {
 - Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
 - A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
 - The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action.
+- The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends the session afterwards, which drops the keep-awake vote.
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
@@ -110,7 +114,11 @@ public struct SomeFeature: Sendable {
 - UI must call `WorkoutRun.tick(at:)` and then `snapshot(at:)` on every update; `snapshot` alone never commits progress.
 - Never convert between `Date` and `Duration` outside `TimeMath`.
 - `rebase(at:keepingTotalElapsed:)` is the recovery point after a backward clock change.
-- Wall-clock vs monotonic reconciliation and the tick-effect design belong to CT-3.
+- The timer runs at most one clock loop, a 3-2-1 countdown or a tick loop. Each loop carries a generation in its cancel id and in every action it sends; an action from an older generation only cancels its own loop.
+- A loop only sleeps and wakes; the reducer measures and commits. Before every tick and user action it checks the clock anchor, a wall date and a `continuousClock` instant read together and refreshed on every tick, through `TimeMath`'s public `Date.elapsed(since:)`. A backward jump rebases the run to the progress the monotonic clock vouches for; a forward jump is logged and kept, like time in the background.
+- `snapshot` without `tick` appears in two places only: the tick loop's own copy of the run, which schedules wake-ups and is never shown or committed, and the state's initial snapshot at `.distantPast` of a run that is idle or finished.
+- A tick loop that ends while the committed run still runs reports `isFinal`, and the reducer starts a new one.
+- One clock instance per timer session: a `MonotonicInstant` checks only the type of its instant.
 
 ## Domain limits
 

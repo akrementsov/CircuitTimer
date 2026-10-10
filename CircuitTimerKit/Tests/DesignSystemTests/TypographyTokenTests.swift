@@ -32,12 +32,6 @@ struct TypographyTokenTests {
             case .button:
                 #expect(regular.pointSize == 17)
                 #expect(regular.weight == Self.resolvedWeight(.regular))
-            case .timerLarge:
-                // Rounded design and monospaced digits are only visible on the resolved font as a whole,
-                // so the expected font is written out as a system font.
-                // swiftlint:disable:next no_literal_font
-                let reference = Font.system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit()
-                #expect(regular == reference.resolve(in: Self.context(.large)))
         }
         #expect(accessibility.pointSize > regular.pointSize)
     }

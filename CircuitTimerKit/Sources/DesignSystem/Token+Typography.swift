@@ -15,8 +15,6 @@ extension DesignSystem.Token {
         case fieldTitle
         /// 17 pt on the body style; the title of a full-width action button.
         case button
-        /// The countdown on the timer screen: rounded, with fixed-width digits so it does not jitter.
-        case timerLarge
     }
 }
 
@@ -36,8 +34,6 @@ extension Font {
                 .system(.subheadline, weight: .bold)
             case .button:
                 .body
-            case .timerLarge:
-                .system(.largeTitle, design: .rounded, weight: .bold).monospacedDigit()
         }
     }
 }

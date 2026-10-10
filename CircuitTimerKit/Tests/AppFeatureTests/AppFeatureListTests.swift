@@ -303,7 +303,7 @@ struct AppFeatureListTests {
         let reorderCalls = LockIsolated(0)
         let third = makeWorkout(3)
         var state = loaded([first, second, third])
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         let store = makeStore(state) {
             $0.workoutStorage.delete = { _ in
                 try await clock.sleep(for: .seconds(1))
@@ -327,7 +327,7 @@ struct AppFeatureListTests {
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFailed) {
             $0.pendingMutations = []
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
             $0.destination = .alert(.mutationFailed)
             $0.workouts = .loading
         }
@@ -379,37 +379,37 @@ struct AppFeatureListTests {
         state.pendingMutations = [.delete(UUID(fixture: 99))]
         let store = makeStore(state)
 
-        await store.send(.view(.addButtonTapped)) { $0.deferredEditor = .create }
-        await store.send(.view(.workoutTapped(second.id))) { $0.deferredEditor = .edit(self.second.id) }
+        await store.send(.view(.addButtonTapped)) { $0.deferredScreen = .create }
+        await store.send(.view(.workoutTapped(second.id))) { $0.deferredScreen = .edit(self.second.id) }
 
         var loading = AppFeature.State()
         loading.workouts = .loading
         let loadingStore = makeStore(loading)
-        await loadingStore.send(.view(.addButtonTapped)) { $0.deferredEditor = .create }
+        await loadingStore.send(.view(.addButtonTapped)) { $0.deferredScreen = .create }
     }
 
     @Test
-    func test_deferredEditor_opensWhenQueueDrainsWithCurrentData() async {
+    func test_deferredScreen_opensWhenQueueDrainsWithCurrentData() async {
         var state = loaded([first, second])
         state.pendingMutations = [.reorder([second.id, first.id])]
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         let store = makeStore(state) {
             $0.workoutStorage.reorder = { _ in .applied }
         }
 
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
         }
     }
 
     @Test
-    func test_deferredEditor_afterDivergenceOpensOnlyOnceReloaded() async {
+    func test_deferredScreen_afterDivergenceOpensOnlyOnceReloaded() async {
         let renamed = makeWorkout(2, name: "Reloaded")
         var state = loaded([first, second])
         state.pendingMutations = [.reorder([second.id, first.id])]
-        state.deferredEditor = .edit(second.id)
+        state.deferredScreen = .edit(second.id)
         let store = makeStore(state) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(1), renamed]) }
         }
@@ -420,7 +420,7 @@ struct AppFeatureListTests {
         }
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([makeWorkout(1), renamed])
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: renamed))
         }
     }
@@ -429,7 +429,7 @@ struct AppFeatureListTests {
     func test_deferredEdit_isDroppedForDeletedOrMissingWorkoutAndOnLoadFailure() async {
         var state = loaded([first, second])
         state.pendingMutations = [.reorder([UUID(fixture: 99)])]
-        state.deferredEditor = .edit(first.id)
+        state.deferredScreen = .edit(first.id)
         let store = makeStore(state) {
             $0.workoutStorage.delete = { _ in .applied }
         }
@@ -437,62 +437,62 @@ struct AppFeatureListTests {
             $0.workouts = .loaded([self.first])
             $0.pendingMutations.append(.delete(self.second.id))
         }
-        #expect(store.state.deferredEditor == .edit(first.id))
+        #expect(store.state.deferredScreen == .edit(first.id))
         await store.send(.view(.deleteButtonTapped(first.id))) {
             $0.workouts = .loaded([])
             $0.pendingMutations.append(.delete(self.first.id))
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
 
         var missing = loaded([second])
-        missing.deferredEditor = .edit(first.id)
+        missing.deferredScreen = .edit(first.id)
         let missingStore = makeStore(missing)
-        await missingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [second])))) { $0.deferredEditor = nil }
+        await missingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [second])))) { $0.deferredScreen = nil }
 
         var failing = AppFeature.State()
         failing.workouts = .loading
-        failing.deferredEditor = .create
+        failing.deferredScreen = .create
         let failingStore = makeStore(failing)
         await failingStore.send(.internal(.workoutsLoadingFailed)) {
             $0.workouts = .failed
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
     }
 
     @Test
-    func test_deferredEditor_onSettingsTab_isDroppedOnBothPresentPaths() async {
+    func test_deferredScreen_onSettingsTab_isDroppedOnBothPresentPaths() async {
         var state = loaded([first, second])
         state.selectedTab = .settings
         state.pendingMutations = [.delete(UUID(fixture: 99))]
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         let store = makeStore(state)
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
 
         var loading = AppFeature.State()
         loading.workouts = .loading
         loading.selectedTab = .settings
-        loading.deferredEditor = .edit(first.id)
+        loading.deferredScreen = .edit(first.id)
         let loadingStore = makeStore(loading)
         await loadingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [first])))) {
             $0.workouts = .loaded([self.first])
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
     }
 
     @Test
-    func test_deferredEditor_isDroppedWhenSomethingIsAlreadyPresented() async {
+    func test_deferredScreen_isDroppedWhenSomethingIsAlreadyPresented() async {
         var state = loaded([first])
         state.pendingMutations = [.delete(UUID(fixture: 99))]
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         state.destination = .alert(.mutationFailed)
         let store = makeStore(state)
 
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
     }
 }

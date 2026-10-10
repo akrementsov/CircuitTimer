@@ -245,6 +245,22 @@
         }
       }
     },
+    "workouts.start.spoken %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать %@"
+          }
+        }
+      }
+    },
     "workouts.title" : {
       "localizations" : {
         "en" : {

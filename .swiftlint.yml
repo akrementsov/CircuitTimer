@@ -144,7 +144,7 @@ custom_rules:
 
   todo_with_ticket:
     name: TODO without ticket
-    regex: '\b(TODO|FIXME)\b(?!: \[CT-([A-Z]+-)?\d+\])'
+    regex: '\b(TODO|FIXME)\b(?!: \[CT-(([A-Z]+|\d+)-)?\d+\])'
     match_kinds:
       - comment
     message: 'Reference a ticket: // TODO: [CT-123] ...'

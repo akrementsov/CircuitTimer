@@ -4,7 +4,7 @@ extension DesignSystem.Token {
     public enum TextColor: Sendable, CaseIterable {
         case primary
         case secondary
-        /// Text on a `brand` fill.
+        /// Text on a `brand` or stage fill.
         case onAccent
     }
 
@@ -13,7 +13,7 @@ extension DesignSystem.Token {
         case card
         /// Rows that cannot be tapped, such as the app version.
         case cardInactive
-        /// An input or a control inside a card.
+        /// An input or a control inside a card, and the track of a progress bar.
         case field
         /// The `secondaryAction` asset: the field being edited.
         case focused
@@ -22,7 +22,7 @@ extension DesignSystem.Token {
     public enum StageColor: Sendable, CaseIterable {
         case work
         case rest
-        /// The `surface(.card)` asset: it fills the full-screen timer and is never drawn on a card.
+        /// The `surface(.card)` asset: the timer's dark stage card, for pauses, the start and the end.
         case pause
     }
 }

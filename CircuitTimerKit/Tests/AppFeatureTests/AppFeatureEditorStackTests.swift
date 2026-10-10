@@ -59,16 +59,16 @@ struct AppFeatureEditorStackTests {
     }
 
     @Test
-    func test_openEditor_editorAlreadyPushed_doesNotPushAgain() async {
+    func test_openScreen_editorAlreadyPushed_doesNotPushAgain() async {
         var state = loaded([first, second])
         state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
         state.pendingMutations = [.delete(UUID(fixture: 99))]
-        state.deferredEditor = .create
+        state.deferredScreen = .create
         let store = makeStore(state)
 
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
-            $0.deferredEditor = nil
+            $0.deferredScreen = nil
         }
         await store.send(.view(.addButtonTapped))
         await store.send(.view(.workoutTapped(second.id)))

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, and the Settings tab are in place; the timer screen comes next (see the roadmap).
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, the Settings tab and a full-screen timer that plays a workout in the foreground are in place; background playback, sound and haptics come next (see the roadmap).
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -27,13 +27,14 @@ graph TD
     AppFeature --> WorkoutDomain
     AppFeature --> WorkoutEditorFeature
     AppFeature --> SettingsFeature
+    AppFeature --> WorkoutTimerFeature
     WorkoutEditorFeature --> DesignSystem
     WorkoutEditorFeature --> WorkoutStorage
     WorkoutEditorFeature --> WorkoutDomain
     SettingsFeature --> DesignSystem
+    WorkoutTimerFeature --> DesignSystem
+    WorkoutTimerFeature --> WorkoutDomain
     WorkoutStorage --> WorkoutDomain
-    AppFeature -.-> WorkoutTimerFeature["WorkoutTimerFeature (planned)"]
-    WorkoutTimerFeature -.-> WorkoutDomain
     Widget["Widget extension (planned)"] -.-> WorkoutActivity["WorkoutActivity (planned)"]
     Widget -.-> DesignSystem
     WorkoutActivity -.-> WorkoutDomain
@@ -42,11 +43,12 @@ graph TD
 | Module | Responsibility |
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
-| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; screen chrome. Lint rejects literal styles anywhere else. |
+| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
 | `WorkoutEditorFeature` | The workout editor in the original app's cards: a draft saved with the bottom Save workout button or discarded with Back, stage editing within `WorkoutLimits`. |
+| `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs. |
 | `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
-| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the editor onto the Workouts stack. |
+| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the editor onto the Workouts stack and presents the timer full screen. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -103,7 +105,12 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [ ] **CT-UI-6** — stage durations typed as MM:SS
   - [ ] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list
 - [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
-- [ ] **CT-3** — timer screen, background audio, haptics and spoken stage names
+- [ ] **CT-3** — the workout timer, in slices:
+  - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
+  - [ ] **CT-3-2** — the original start path: the workout screen and its Start workout button
+  - [ ] **CT-3-3** — background and restore
+  - [ ] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
+  - [ ] **CT-3-5** — cues in the background through local notifications
 - [ ] **CT-4** — Live Activity and Dynamic Island
 - [ ] **CT-5** — iCloud sync
 - [ ] **CT-6** — in-app purchase with StoreKit 2

@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
+        .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
     ],
@@ -38,6 +39,7 @@ let package = Package(
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
                 "WorkoutStorage",
+                "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
@@ -50,6 +52,7 @@ let package = Package(
                 "SettingsFeature",
                 "WorkoutDomain",
                 "WorkoutStorage",
+                "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
             ],
@@ -94,6 +97,16 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
+        .target(
+            name: "WorkoutTimerFeature",
+            dependencies: [
+                "DesignSystem",
+                "WorkoutDomain",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
         .testTarget(
             name: "DesignSystemTests",
             dependencies: ["DesignSystem"],
@@ -126,6 +139,15 @@ let package = Package(
         .testTarget(
             name: "WorkoutDomainTests",
             dependencies: ["WorkoutDomain"],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "WorkoutTimerFeatureTests",
+            dependencies: [
+                "WorkoutDomain",
+                "WorkoutTimerFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             swiftSettings: strictSettings
         ),
     ]
