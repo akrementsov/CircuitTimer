@@ -33,8 +33,6 @@ public struct AppFeature: Sendable {
         case create
         /// Opens the workout's screen, read-only.
         case open(Workout.ID)
-        /// Plays the workout in the full-screen timer.
-        case start(Workout.ID)
     }
 
     public enum RootTab: Hashable, Sendable {
@@ -84,7 +82,6 @@ public struct AppFeature: Sendable {
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
-            case startButtonTapped(Workout.ID)
             case deleteButtonTapped(Workout.ID)
             case duplicateButtonTapped(Workout.ID)
             case workoutsMoved(IndexSet, Int)
@@ -170,13 +167,11 @@ public struct AppFeature: Sendable {
                 return openScreen(.create, &state)
             case let .workoutTapped(id):
                 return openScreen(.open(id), &state)
-            case let .startButtonTapped(id):
-                return openScreen(.start(id), &state)
             case let .deleteButtonTapped(id):
                 guard case var .loaded(workouts) = state.workouts, workouts.remove(id: id) != nil else { return .none }
 
                 state.workouts = .loaded(workouts)
-                if state.deferredScreen == .open(id) || state.deferredScreen == .start(id) {
+                if state.deferredScreen == .open(id) {
                     state.deferredScreen = nil
                 }
                 return enqueue(.delete(id), &state)
@@ -288,15 +283,6 @@ public struct AppFeature: Sendable {
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
 
                 state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
-            case let .start(id):
-                // The workout may be gone by now, and one with nothing to play has no timer.
-                guard
-                    case let .loaded(workouts) = state.workouts,
-                    let workout = workouts[id: id],
-                    workout.isPlayable
-                else { return .none }
-
-                state.destination = .timer(timerState(for: workout))
         }
         return .none
     }
