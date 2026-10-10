@@ -126,7 +126,7 @@ struct TimerLifecycleTests {
     }
 
     @Test
-    func test_emptySchedule_startsFinishedAndClosesWithoutAlert() async {
+    func test_controls_emptySchedule_actAsFinishedAndCloseWithoutAlert() async {
         let state = WorkoutTimerFeature.State.fresh(Schedules.empty)
         #expect(state.snapshot.status == .finished)
         #expect(state.countdown == nil)
