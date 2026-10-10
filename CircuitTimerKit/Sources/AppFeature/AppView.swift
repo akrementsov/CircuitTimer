@@ -74,8 +74,9 @@ public struct AppView: View {
         } destination: { pathStore in
             switch pathStore.case {
                 case let .editor(editorStore):
+                    // The tab bar stays. Hidden by the pushed screen it pops in only after the pop; hidden by the
+                    // stack's root it comes back smoothly, but the bottom panel jumps at the end of the push on iOS 17.
                     WorkoutEditorView(store: editorStore)
-                        .toolbar(.hidden, for: .tabBar)
             }
         }
     }

@@ -63,7 +63,7 @@ struct AppFeatureTabTests {
     }
 
     @Test
-    func test_tabSelected_workoutsReselectedWithUnchangedEditor_popsStack() async {
+    func test_tabSelected_workoutsReselectedWithReadOnlyScreen_popsStack() async {
         let store = makeStore(loaded([first, second]))
         await store.send(.view(.workoutTapped(first.id))) {
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
@@ -75,7 +75,7 @@ struct AppFeatureTabTests {
     }
 
     @Test
-    func test_tabSelected_workoutsReselectedWithChangedEditor_asksToDiscardAndKeepsStack() async {
+    func test_tabSelected_workoutsReselectedWithChangedEditor_ignoresReselectAndKeepsDraft() async {
         let store = makeStore(loaded([first, second]))
         await store.send(.view(.workoutTapped(first.id))) {
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))
@@ -88,13 +88,10 @@ struct AppFeatureTabTests {
         }
 
         await store.send(.view(.tabSelected(.workouts)))
-        await store.receive(.path(.element(id: 0, action: .editor(.view(.backButtonTapped))))) {
-            $0.path[id: 0, case: \.editor]?.destination = .discardConfirmation(.discardChanges)
-        }
     }
 
     @Test
-    func test_tabSelected_workoutsReselectedWhileSaveInFlight_saveCompletesAndStaysInViewing() async {
+    func test_tabSelected_workoutsReselectedWhileSaveInFlight_ignoresReselectAndSaveReturnsToViewing() async {
         let gate = Gate()
         var renamed = first
         renamed.name = "Renamed"
@@ -115,7 +112,6 @@ struct AppFeatureTabTests {
         }
 
         await store.send(.view(.tabSelected(.workouts)))
-        await store.receive(.path(.element(id: 0, action: .editor(.view(.backButtonTapped)))))
         gate.open()
         await store.receive(.path(.element(id: 0, action: .editor(.internal(.saveSucceeded(renamed)))))) {
             $0.path[id: 0, case: \.editor]?.isSaving = false

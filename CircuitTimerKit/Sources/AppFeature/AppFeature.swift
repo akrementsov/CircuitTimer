@@ -146,10 +146,14 @@ public struct AppFeature: Sendable {
                     // A tap on the selected tab returns it to its root.
                     switch tab {
                         case .workouts:
-                            // The editor hides the tab bar, so a re-tap reaches here only while the editor is being pushed.
-                            guard let id = state.path.ids.last, state.path[id: id, case: \.editor] != nil else { return .none }
+                            // Only a read-only screen leaves, through its own Back. An editor may have a field focused
+                            // whose last edit reaches the draft only through the view: a re-tap would drop that edit
+                            // or leave without the discard dialog.
+                            guard
+                                let id = state.path.ids.last,
+                                state.path[id: id, case: \.editor]?.phase == .viewing
+                            else { return .none }
 
-                            // Leaving goes through the editor, so a changed draft asks first and a save in flight finishes.
                             return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
                         case .settings:
                             state.settings.popToRoot()
