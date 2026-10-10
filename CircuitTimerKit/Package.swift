@@ -141,5 +141,14 @@ let package = Package(
             dependencies: ["WorkoutDomain"],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "WorkoutTimerFeatureTests",
+            dependencies: [
+                "WorkoutDomain",
+                "WorkoutTimerFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            swiftSettings: strictSettings
+        ),
     ]
 )
