@@ -9,6 +9,11 @@ extension Workout {
     public var totalDuration: Duration {
         WorkoutSectionKind.allCases.reduce(.zero) { $0 + duration(of: $1) }
     }
+
+    /// A workout with nothing to play has no timer.
+    public var isPlayable: Bool {
+        totalDuration > .zero
+    }
 }
 
 extension [Stage] {
