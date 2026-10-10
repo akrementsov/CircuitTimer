@@ -42,10 +42,8 @@ public struct AppView: View {
         .alert($store.scope(\.$destination, action: \.destination).alert)
         // Full screen over the tab bar, with no swipe to dismiss: the timer closes only through its own X.
         .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
-            NavigationStack {
-                WorkoutTimerView(store: timerStore)
-            }
-            .onAppear { send(.timerCoverAppeared) }
+            WorkoutTimerStack(store: timerStore)
+                .onAppear { send(.timerCoverAppeared) }
         }
     }
 

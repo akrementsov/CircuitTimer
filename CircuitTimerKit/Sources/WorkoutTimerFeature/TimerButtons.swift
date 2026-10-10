@@ -1,11 +1,12 @@
 import DesignSystem
 import SwiftUI
 
-/// The original row: the workout list, a bordered Play/Pause in the middle and Next, sized from the row height.
+/// The original row: the workout's stages, a bordered Play/Pause in the middle and Next, sized from the row height.
 struct TimerButtons: View {
     let playButton: WorkoutTimerFeature.State.PlayButton
     let isPlayEnabled: Bool
     let isNextEnabled: Bool
+    let onStages: () -> Void
     let onPlayPause: () -> Void
     let onNext: () -> Void
 
@@ -15,9 +16,7 @@ struct TimerButtons: View {
             // The original side buttons are 70 of the row's 98 points, aligned to its top.
             let smallSide = side * 70 / 98
             HStack(alignment: .top, spacing: .zero) {
-                // TODO: [CT-3-2] The button that shows the workout's stages goes in this slot.
-                Spacer()
-                    .frame(width: smallSide, height: smallSide)
+                stagesButton(side: smallSide)
                 Spacer(minLength: .zero)
                 playPauseButton(rowHeight: side)
                 Spacer(minLength: .zero)
@@ -47,6 +46,20 @@ struct TimerButtons: View {
         .padding(.top, border)
         .disabled(!isPlayEnabled)
         .accessibilityLabel(playLabel)
+    }
+
+    private func stagesButton(side: CGFloat) -> some View {
+        Button(action: onStages) {
+            Image(systemName: "list.bullet")
+                .resizable()
+                .scaledToFit()
+                .frame(width: side * 26 / 70, height: side * 26 / 70)
+                .foregroundStyle(.text(.primary))
+                .frame(width: side, height: side)
+                .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("timer.button.stages", bundle: .module))
     }
 
     private func nextButton(side: CGFloat) -> some View {

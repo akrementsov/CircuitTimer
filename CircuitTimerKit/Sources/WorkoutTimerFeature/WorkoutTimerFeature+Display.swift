@@ -41,6 +41,11 @@ extension WorkoutTimerFeature.State {
         let fill: Double
     }
 
+    /// The workout as the stage list shows it.
+    var outline: WorkoutOutline {
+        WorkoutOutline(schedule: run.schedule)
+    }
+
     var currentCard: CurrentCard {
         if let countdown {
             return countdownCard(countdown)
