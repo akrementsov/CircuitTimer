@@ -246,7 +246,8 @@ public struct AppFeature: Sendable {
                 state.pendingMutations = []
                 state.needsReload = false
                 state.deferredScreen = nil
-                // A presented timer is never replaced: it would close without ending its session.
+                // A presented timer is never replaced: it would close without ending its session. No write starts under
+                // the cover yet, so this guard is defensive; the reload still resyncs the list.
                 if state.destination?.is(\.timer) != true {
                     state.destination = .alert(.mutationFailed)
                 }
