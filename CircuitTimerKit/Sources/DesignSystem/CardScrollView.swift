@@ -23,7 +23,6 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
             ScrollView {
                 content(proxy)
                     .coordinateSpace(.named(RowContentSpace.name))
-                    .id(CardScrollContent.whole)
                     // A tap in a gap between the cards closes an open swipe too.
                     .contentShape(Rectangle())
                     .simultaneousGesture(
@@ -31,6 +30,7 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
                         including: interaction.swipedID != nil ? .all : .subviews
                     )
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { contentMoved(to: $0) }
+                    .background { AutoScrollDriver(velocity: interaction.autoScrollVelocity) }
             }
             .scrollIndicators(.hidden)
             .contentMargins(.top, topMargin, for: .scrollContent)
@@ -42,9 +42,6 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
                 interaction.visibleRect = rect
                 interaction.geometry.visibleRect = rect
             }
-            .background {
-                AutoScrollDriver(target: CardScrollContent.whole, interaction: interaction, proxy: proxy)
-            }
         }
         .modifier(ScrolledBarBackground(isScrolled: interaction.isScrolled))
         .environment(interaction)
@@ -53,7 +50,6 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
 
     private func contentMoved(to frame: CGRect) {
         interaction.geometry.contentFrame = frame
-        interaction.geometry.topMargin = topMargin
         // Scrolling closes an open swipe, as in the original app.
         if interaction.swipedID != nil, let anchor = interaction.swipeAnchorMinY, abs(frame.minY - anchor) > .token(spacing: .xs) {
             interaction.closeSwipe()
@@ -68,11 +64,6 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
 /// The scroll content of a `CardScrollView`: rows measured in it keep their frames while the screen scrolls.
 enum RowContentSpace {
     static let name = "cardScrollContent"
-}
-
-/// The id of the whole content: scrolling to it with a computed anchor moves the content by an exact distance.
-private enum CardScrollContent: Hashable {
-    case whole
 }
 
 /// Before iOS 26 the navigation bar turns translucent over scrolled content only for a list; over a scroll view with

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// How fast the screen scrolls while a lifted row is held near the top or the bottom of the visible area, in points
 /// per frame: negative scrolls up, positive down.
@@ -34,41 +35,87 @@ enum EdgeAutoScroll {
 struct ScrollContentGeometry: Equatable, Sendable {
     var contentFrame: CGRect = .zero
     var visibleRect: CGRect = .zero
-    /// The scroll view's top content margin: `scrollTo` lines anchors up below it.
-    var topMargin: CGFloat = .zero
-
-    /// The anchor that scrolls the content by `step` points: `scrollTo` lines up the anchor's point in the content
-    /// with the same point of the visible area under the top margin, and every anchor from 0 to 1 is a valid offset.
-    func anchor(scrollingBy step: CGFloat) -> UnitPoint? {
-        let overflow = visibleRect.height - topMargin - contentFrame.height
-        guard overflow < .zero else { return nil }
-
-        let top = contentFrame.minY - (visibleRect.minY + topMargin) - step
-        return UnitPoint(x: 0.5, y: min(max(top / overflow, 0), 1))
-    }
 }
 
-/// Scrolls by the interaction's velocity on every frame while it isn't zero, through `target`: the id of the whole
-/// content. A timeline, because a view has no other clock that is not a task; `scrollTo` goes out from `onChange`,
-/// never while the view is being built.
-struct AutoScrollDriver<ID: Hashable, Target: Hashable>: View {
-    let target: Target
-    let interaction: RowInteraction<ID>
-    let proxy: ScrollViewProxy
+/// Scrolls the enclosing scroll view by `velocity` points per frame while it isn't zero: a zero-size view inside the
+/// content that moves the UIKit scroll view's offset on every display frame, kept within its ends. `scrollTo` with a
+/// computed anchor can't do it: on iOS 17 a scroll view under a tab bar drops the anchor after a few frames and stops.
+struct AutoScrollDriver: UIViewRepresentable {
+    let velocity: CGFloat
 
-    var body: some View {
-        let velocity = interaction.autoScrollVelocity
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: velocity == .zero)) { context in
-            Rectangle()
-                .fill(.surface(.screen))
-                .opacity(0)
-                .onChange(of: context.date) {
-                    guard velocity != .zero, let anchor = interaction.geometry.anchor(scrollingBy: velocity) else { return }
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
-                    proxy.scrollTo(target, anchor: anchor)
+    func makeUIView(context: Context) -> ProbeView {
+        ProbeView(coordinator: context.coordinator)
+    }
+
+    func updateUIView(_ view: ProbeView, context: Context) {
+        context.coordinator.velocity = velocity
+    }
+
+    static func dismantleUIView(_ view: ProbeView, coordinator: Coordinator) {
+        coordinator.stop()
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        weak var scrollView: UIScrollView?
+        private var displayLink: CADisplayLink?
+        private var lastTimestamp: CFTimeInterval?
+
+        var velocity: CGFloat = .zero {
+            didSet {
+                if velocity == .zero {
+                    stop()
+                } else if displayLink == nil {
+                    let link = CADisplayLink(target: self, selector: #selector(step))
+                    link.add(to: .main, forMode: .common)
+                    displayLink = link
                 }
+            }
         }
-        .frame(width: .zero, height: .zero)
-        .accessibilityHidden(true)
+
+        func stop() {
+            displayLink?.invalidate()
+            displayLink = nil
+            lastTimestamp = nil
+        }
+
+        @objc private func step(_ link: CADisplayLink) {
+            // Points per frame at 60 frames a second, whatever the display's rate.
+            let frames = lastTimestamp.map { CGFloat((link.timestamp - $0) * 60) } ?? 1
+            lastTimestamp = link.timestamp
+            guard let scrollView else { return }
+
+            let inset = scrollView.adjustedContentInset
+            let top = -inset.top
+            let bottom = max(top, scrollView.contentSize.height + inset.bottom - scrollView.bounds.height)
+            let offsetY = min(max(scrollView.contentOffset.y + velocity * frames, top), bottom)
+            if offsetY != scrollView.contentOffset.y {
+                scrollView.contentOffset.y = offsetY
+            }
+        }
+    }
+
+    final class ProbeView: UIView {
+        private let coordinator: Coordinator
+
+        init(coordinator: Coordinator) {
+            self.coordinator = coordinator
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("ProbeView is created in code only")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            coordinator.scrollView = sequence(first: superview) { $0?.superview }.lazy.compactMap { $0 as? UIScrollView }.first
+        }
     }
 }

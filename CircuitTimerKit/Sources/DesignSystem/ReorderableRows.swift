@@ -85,6 +85,9 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     /// Rows' places in the scroll content, which don't move while it scrolls.
     @State private var frames: [Item.ID: CGRect] = [:]
     @State private var drag: ReorderDrag<Item.ID>?
+    /// The lifted row's last offset, as drawn. A plain reference: it changes on every frame the screen scrolls by
+    /// itself, and redrawing every row for it would stall a long list.
+    @State private var liftedOffset = LiftedOffset()
     @Environment(RowInteraction<Item.ID>.self) private var interaction: RowInteraction<Item.ID>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -214,6 +217,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         else { return }
 
         let geometry = ReorderGeometry(heights: sizes.map(\.height), from: from, spacing: spacing)
+        liftedOffset.value = .zero
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
             drag = ReorderDrag(id: item.id, ids: items.map(\.id), sizes: sizes, geometry: geometry)
             interaction.liftedID = item.id
@@ -233,7 +237,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     private func liftedOffsetChanged(_ offset: CGFloat) {
         guard let current = drag else { return }
 
-        drag?.offset = offset
+        liftedOffset.value = offset
         let destination = current.geometry.destination(for: offset)
         if destination != current.destination {
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
@@ -249,8 +253,8 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         var velocity = EdgeAutoScroll.velocity(fingerY: fingerY, visibleRect: interaction.geometry.visibleRect)
         // At the last place the row stops; scrolling on would only move the card away under the finger.
         let range = drag.geometry.offsetRange
-        let isAtTop = velocity < .zero && drag.offset <= range.lowerBound
-        let isAtBottom = velocity > .zero && drag.offset >= range.upperBound
+        let isAtTop = velocity < .zero && liftedOffset.value <= range.lowerBound
+        let isAtBottom = velocity > .zero && liftedOffset.value >= range.upperBound
         if isAtTop || isAtBottom {
             velocity = .zero
         }
@@ -285,6 +289,11 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     }
 }
 
+@MainActor
+private final class LiftedOffset {
+    var value: CGFloat = .zero
+}
+
 private struct ReorderDrag<ID: Hashable>: Equatable {
     let id: ID
     /// The rows and their sizes at the lift: a change to either cancels the drag.
@@ -294,8 +303,6 @@ private struct ReorderDrag<ID: Hashable>: Equatable {
     var destination: Int
     var fingerYAtLift: CGFloat?
     var fingerY: CGFloat?
-    /// The lifted row's last offset, as drawn.
-    var offset: CGFloat = .zero
 
     init(id: ID, ids: [ID], sizes: [CGSize], geometry: ReorderGeometry) {
         self.id = id
