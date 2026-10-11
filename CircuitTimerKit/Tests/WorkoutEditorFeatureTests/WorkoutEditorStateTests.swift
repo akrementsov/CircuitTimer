@@ -40,10 +40,10 @@ struct WorkoutEditorStateTests {
                 showsSaveHint: true
             ),
             FlagsCase(
-                testDescription: "complete but untouched",
+                testDescription: "saved workout untouched",
                 state: untouched,
                 isDraftComplete: true,
-                canSave: false,
+                canSave: true,
                 showsSaveHint: false
             ),
             FlagsCase(

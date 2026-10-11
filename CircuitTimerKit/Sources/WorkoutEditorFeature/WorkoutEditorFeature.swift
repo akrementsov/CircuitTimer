@@ -92,9 +92,10 @@ public struct WorkoutEditorFeature: Sendable {
             !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero
         }
 
-        /// Saving an untouched workout would write nothing new, so Save waits for a change.
+        /// A new workout's Save waits for a change. A saved workout's Save is the way back to Start, as in the
+        /// original app: untouched, it writes nothing and only ends the editing.
         public var canSave: Bool {
-            isDraftComplete && hasChanges && !isSaving
+            isDraftComplete && (hasChanges || phase == .editing) && !isSaving
         }
 
         /// Explains what the draft is missing; an untouched or saving draft needs no hint.
@@ -189,6 +190,7 @@ public struct WorkoutEditorFeature: Sendable {
         public enum Internal: Equatable, Sendable {
             case saveFailed
             case saveSucceeded(Workout)
+            case editingEnded
         }
 
         @CasePathable
@@ -317,12 +319,19 @@ public struct WorkoutEditorFeature: Sendable {
             case let .saveSucceeded(workout):
                 state.isSaving = false
                 state.workout = workout
-                state.original = State.editable(workout)
-                state.draft = state.original
-                state.expandedStageID = nil
-                state.phase = .viewing
+                endEditing(&state)
                 return .send(.delegate(.saved(workout)))
+            case .editingEnded:
+                endEditing(&state)
+                return .none
         }
+    }
+
+    private func endEditing(_ state: inout State) {
+        state.original = State.editable(state.workout)
+        state.draft = state.original
+        state.expandedStageID = nil
+        state.phase = .viewing
     }
 
     private func discardChanges(_ state: State) -> Effect<Action> {
@@ -334,6 +343,12 @@ public struct WorkoutEditorFeature: Sendable {
 
     private func save(_ state: inout State) -> Effect<Action> {
         guard state.canSave else { return .none }
+
+        guard state.hasChanges else {
+            state.destination = nil
+            // The cells turn read-only in place, so the change animates like the pencil's.
+            return .run { send in await send(.internal(.editingEnded), animation: Self.phaseChangeAnimation) }
+        }
 
         // The draft stays as typed, so a failed save loses nothing; storage gets the normalized copy.
         let workout = Self.normalizedForSaving(state.draft)

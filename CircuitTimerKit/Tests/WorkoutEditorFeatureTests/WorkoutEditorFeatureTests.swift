@@ -34,7 +34,6 @@ struct WorkoutEditorFeatureTests {
         await store.send(.view(.pauseAfterTrainingChanged(false))) { $0.draft.pauseAfterTraining = false }
 
         #expect(!store.state.hasChanges)
-        #expect(!store.state.canSave)
         await store.send(.view(.backButtonTapped))
         #expect(dismissed.value)
     }
@@ -215,10 +214,25 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_save_guardFails_doesNothing() async {
-        let untouched = makeStore()
-        await untouched.send(.view(.saveButtonTapped))
+    func test_save_untouchedSavedWorkout_endsEditingWithoutWriting() async {
+        var workout = makeWorkout()
+        workout.trainingRounds = 0
+        // Storage is left unimplemented: a write fails the test.
+        let store = makeStore(editingState(workout))
+        await store.send(.view(.stageDurationTapped(UUID(fixture: 10)))) { $0.expandedStageID = UUID(fixture: 10) }
 
+        await store.send(.view(.saveButtonTapped))
+        await store.receive(\.internal.editingEnded) {
+            $0.expandedStageID = nil
+            $0.phase = .viewing
+        }
+
+        #expect(store.state.workout == workout)
+        #expect(store.state.canStart)
+    }
+
+    @Test
+    func test_save_guardFails_doesNothing() async {
         let blankName = makeStore()
         await blankName.send(.view(.nameChanged("   "))) { $0.draft.name = "   " }
         await blankName.send(.view(.saveButtonTapped))
