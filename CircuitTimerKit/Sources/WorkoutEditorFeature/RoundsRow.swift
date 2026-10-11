@@ -1,7 +1,7 @@
 import DesignSystem
 import SwiftUI
 
-/// The training's rounds with − and + at the edges, like the original app's stepper. Read-only the signs hide and
+/// The training's rounds with − and + at the edges, like the original app's stepper. Read-only the signs fade out and
 /// the row takes the inactive field color, like the original cell.
 struct RoundsRow: View {
     let rounds: Int
@@ -20,10 +20,12 @@ struct RoundsRow: View {
             stepButton(systemImage: "plus.app.fill", isEnabled: rounds < range.upperBound) { onChange(rounds + 1) }
         }
         .padding(.token(spacing: .l))
-        .background(
-            isEditable ? .surface(.field) : .surface(.fieldInactive),
-            in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
-        )
+        // The plaque moves with the row, and only its color switches at once, like the original cell's.
+        .background {
+            RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
+                .animation(nil) { $0.foregroundStyle(isEditable ? .surface(.field) : .surface(.fieldInactive)) }
+        }
+        .contentTransition(.identity)
         // Assistive technologies get one system stepper instead of the row's parts: the − and + glyphs would
         // otherwise surface under their symbol names. Past a limit nothing is sent, as with the disabled buttons:
         // a send would still end the editing of a field. Read-only, the count alone. The branch is inside the
@@ -38,8 +40,6 @@ struct RoundsRow: View {
                 Text("editor.rounds \(rounds)", bundle: .module)
             }
         }
-        // The cell restyles at once, like the original one; only rows coming and going animate.
-        .animation(nil, value: isEditable)
     }
 
     private func stepButton(systemImage: String, isEnabled: Bool, action: @escaping () -> Void) -> some View {

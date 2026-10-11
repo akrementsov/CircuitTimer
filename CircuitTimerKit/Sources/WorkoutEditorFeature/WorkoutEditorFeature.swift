@@ -149,11 +149,6 @@ public struct WorkoutEditorFeature: Sendable {
             }
         }
 
-        /// The last section on screen, whose card leaves no gap under it.
-        public var lastShownSection: WorkoutSectionKind? {
-            WorkoutSectionKind.allCases.last(where: showsSection)
-        }
-
         public func canAddStage(to section: WorkoutSectionKind) -> Bool {
             draft[section].count < WorkoutLimits.maxStagesPerSection
         }
@@ -267,7 +262,7 @@ public struct WorkoutEditorFeature: Sendable {
                 }
                 state.draft[section].remove(at: index)
             case let .stagesMoved(section, source, destination):
-                // Offsets come from the list as it was drawn; stale ones would trap in `move`, so they are ignored.
+                // Offsets come from the rows as they were drawn; stale ones would trap in `move`, so they are ignored.
                 let count = state.draft[section].count
                 guard !source.isEmpty, source.allSatisfy({ $0 < count }), (0...count).contains(destination) else { return .none }
 

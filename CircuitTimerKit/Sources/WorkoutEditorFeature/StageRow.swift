@@ -31,15 +31,17 @@ struct StageRow: View {
 
             if isExpanded {
                 StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
+                    .transition(.opacity)
             }
         }
-        // Parameters, not branches: a branch would make the List take the row for a new one and fade it in and out
-        // when the screen turns editable. Read-only the row reads as one element, like a row of the stage list.
+        // The picker opens inside the row's growing height instead of spilling over the rows under it.
+        .clipped()
+        .contentTransition(.identity)
+        // Parameters, not branches: the row stays the same view in both phases and only restyles. Read-only it reads
+        // as one element, like a row of the stage list.
         .accessibilityElement(children: isEditable ? .contain : .ignore)
         .accessibilityLabel(shownName)
         .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
-        // The cell restyles at once, like the original one; only rows coming and going animate.
-        .animation(nil, value: isEditable)
     }
 
     /// The marker sits inside the name's field, like the original app's title inset.
@@ -62,14 +64,11 @@ struct StageRow: View {
             }
             .focused(focus, equals: .stageName(stage.id))
             .font(.token(.body))
-            .disabled(!isEditable)
+            .animation(nil) { $0.disabled(!isEditable) }
         }
         .padding(.vertical, .token(spacing: .s))
         .padding(.horizontal, .token(spacing: .xs))
-        .background(
-            fieldColor(isFocused: focus.wrappedValue == .stageName(stage.id)),
-            in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
-        )
+        .background { fieldPlaque(isFocused: focus.wrappedValue == .stageName(stage.id)) }
     }
 
     private var durationButton: some View {
@@ -80,10 +79,7 @@ struct StageRow: View {
                 .fixedSize()
                 .padding(.vertical, .token(spacing: .s))
                 .padding(.horizontal, .token(spacing: .m))
-                .background(
-                    fieldColor(isFocused: isExpanded),
-                    in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
-                )
+                .background { fieldPlaque(isFocused: isExpanded) }
         }
         .buttonStyle(.borderless)
         .allowsHitTesting(isEditable)
@@ -91,6 +87,12 @@ struct StageRow: View {
         .foregroundStyle(.text(.primary))
         .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
         .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
+    }
+
+    /// The plaque moves and resizes with the row, and only its color switches at once, like the original cell's.
+    private func fieldPlaque(isFocused: Bool) -> some View {
+        RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
+            .animation(nil) { $0.foregroundStyle(fieldColor(isFocused: isFocused)) }
     }
 
     private func fieldColor(isFocused: Bool) -> Color {

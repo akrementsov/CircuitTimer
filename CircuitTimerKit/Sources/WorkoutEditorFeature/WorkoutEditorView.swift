@@ -12,42 +12,33 @@ enum EditorField: Hashable {
     case stageName(Stage.ID)
 }
 
+/// Where the screen scrolls to keep a focused field in sight.
+enum EditorScrollTarget: Hashable {
+    case name
+    case stageField(Stage.ID)
+}
+
 @ViewAction(for: WorkoutEditorFeature.self)
 public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
     @FocusState private var focusedField: EditorField?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
+    @State private var rowInteraction = RowInteraction<Stage.ID>()
 
     public init(store: StoreOf<WorkoutEditorFeature>) {
         self.store = store
     }
 
     public var body: some View {
-        // One list for every phase: the pencil turns the read-only cells into controls and adds the editing rows,
-        // and a save turns them back, as the original app's screen did.
-        List {
-            Section {
-                if store.isEditable {
-                    nameRow
-                }
-                totalTimeRow
-            }
-            .listSectionSeparator(.hidden)
-            stagesCard(.warmUp)
-            if store.state.showsPause(after: .warmUp) {
-                pauseCard(isOn: $store.draft.pauseAfterWarmUp.sending(\.view.pauseAfterWarmUpChanged)) {
-                    Text("editor.pause.afterWarmUp", bundle: .module)
-                }
-            }
-            stagesCard(.training)
-            if store.state.showsPause(after: .training) {
-                pauseCard(isOn: $store.draft.pauseAfterTraining.sending(\.view.pauseAfterTrainingChanged)) {
-                    Text("editor.pause.afterTraining", bundle: .module)
-                }
-            }
-            stagesCard(.coolDown)
+        // One scroll view of cards for every phase: the pencil turns the read-only cells into controls and opens the
+        // editing rows inside their cards, and a save turns them back, as the original app's screen did.
+        CardScrollView(interaction: rowInteraction, topMargin: .token(spacing: .m)) { proxy in
+            content
+                .onChange(of: focusedField) { scrollToFocusedField(proxy) }
+                .onChange(of: rowInteraction.visibleRect) { scrollToFocusedField(proxy) }
         }
-        .cardList()
+        // A style, not a view, under the keyboard too: its rounded top corners would show the black window.
+        .background(.surface(.screen))
         .bottomActionPanel { actionPanel }
         // The panel sits inside `.disabled` on purpose: inert while saving like the rest of the screen;
         // its spinner still shows because the label switches on being busy, not on being enabled.
@@ -60,8 +51,39 @@ public struct WorkoutEditorView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
         .onChange(of: focusedField) { _, field in focusChanged(to: field) }
+        .onChange(of: store.draft) { closeSwipe() }
+        .onChange(of: store.expandedStageID) { closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
+    }
+
+    private var content: some View {
+        VStack(spacing: .zero) {
+            nameRow
+            totalTimeRow
+            VStack(spacing: .token(spacing: .m)) {
+                stagesCard(.warmUp)
+                if store.state.showsPause(after: .warmUp) {
+                    PauseCard(
+                        isOn: $store.draft.pauseAfterWarmUp.sending(\.view.pauseAfterWarmUpChanged),
+                        isEditable: store.isEditable,
+                        label: Text("editor.pause.afterWarmUp", bundle: .module)
+                    )
+                    .transition(PlaqueReveal())
+                }
+                stagesCard(.training)
+                if store.state.showsPause(after: .training) {
+                    PauseCard(
+                        isOn: $store.draft.pauseAfterTraining.sending(\.view.pauseAfterTrainingChanged),
+                        isEditable: store.isEditable,
+                        label: Text("editor.pause.afterTraining", bundle: .module)
+                    )
+                    .transition(PlaqueReveal())
+                }
+                stagesCard(.coolDown)
+            }
+        }
+        .padding(.horizontal, .token(spacing: .l))
     }
 
     @ViewBuilder
@@ -83,7 +105,8 @@ public struct WorkoutEditorView: View {
     }
 
     private var nameRow: some View {
-        TextField(
+        let isEditable = store.isEditable
+        return TextField(
             text: $store.draft.name.sending(\.view.nameChanged),
             prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary))
         ) {
@@ -92,8 +115,11 @@ public struct WorkoutEditorView: View {
         .focused($focusedField, equals: .name)
         .font(.token(.fieldTitle))
         .foregroundStyle(.text(.primary))
+        .disabled(!isEditable)
         .padding(.horizontal, .token(spacing: .l))
         .frame(minHeight: .token(size: .row))
+        // Before the background, so the card grows with its corners rounded.
+        .phaseCollapsed(!isEditable)
         .background(
             focusedField == .name ? .surface(.focused) : .surface(.card),
             in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous)
@@ -101,8 +127,7 @@ public struct WorkoutEditorView: View {
         // The whole card focuses the field, like the legacy field's insets.
         .contentShape(Rectangle())
         .onTapGesture { focusedField = .name }
-        .listRowContentInstant()
-        .screenRow()
+        .id(EditorScrollTarget.name)
     }
 
     private var totalTimeRow: some View {
@@ -112,11 +137,10 @@ public struct WorkoutEditorView: View {
             style: .hoursMinutesSeconds,
             font: .headline
         )
-        // `xs` around the text plus the `m` gaps to the cards around it. The gaps belong to this row:
-        // on iOS 26 a tap anywhere in a row with a text field focuses the field, so the name row ends at its card.
+        .contentTransition(.identity)
+        // `xs` around the text plus the `m` gaps to the cards around it. The gaps belong to this row, so a tap in
+        // them focuses nothing.
         .padding(.vertical, .token(spacing: .xl))
-        .listRowContentInstant()
-        .screenRow()
     }
 
     private var title: Text {
@@ -172,21 +196,20 @@ public struct WorkoutEditorView: View {
     private func stagesCard(_ section: WorkoutSectionKind) -> some View {
         if store.state.showsSection(section) {
             stagesCardContent(section)
+                .transition(PlaqueReveal())
         }
     }
 
     private func stagesCardContent(_ section: WorkoutSectionKind) -> some View {
         let stages = store.state.shownStages(in: section)
         let isEditable = store.isEditable
-        let endsList = section == store.lastShownSection
-        return Section {
+        return EditorCard {
             TitleAndTimeRow(title: sectionTitle(section), duration: store.state.shownDuration(of: section), style: .adaptive, font: .body)
+                .contentTransition(.identity)
                 .accessibilityAddTraits(.isHeader)
                 .padding(.horizontal, .token(spacing: .l))
                 .padding(.top, .token(spacing: .xl))
                 .padding(.bottom, .token(spacing: .l))
-                .listRowContentInstant()
-                .cardRow(.top)
 
             if section == .training {
                 // Through the focus-loss path on purpose, like the original app ending editing first: pending text
@@ -201,98 +224,108 @@ public struct WorkoutEditorView: View {
                 }
                 .padding(.horizontal, .token(spacing: .l))
                 .padding(.vertical, .token(spacing: .xxs))
-                .listRowContentInstant()
-                .cardRow(.middle)
             }
 
-            ForEach(stages) { stage in
-                StageRow(
-                    stage: stage,
-                    isEditable: isEditable,
-                    isExpanded: store.expandedStageID == stage.id,
-                    name: stageNameBinding(stage, in: section),
-                    focus: $focusedField,
-                    onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
-                    onDurationTap: { send(.stageDurationTapped(stage.id)) },
-                    onDurationChange: { send(.stageDurationChanged(section, stage.id, $0)) }
-                )
-                // The lifted row is scaled up; drawn as the whole row it would spill over the card's edges.
-                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous))
-                .padding(.horizontal, .token(spacing: .l))
-                // Half of the gap between stages on each side, so a stage sits in the middle of its own row.
-                .padding(.vertical, .token(spacing: .xxs))
-                .listRowContentInstant()
-                .cardRow(.middle)
-                .moveDisabled(!isEditable || focusedField != nil)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    // An empty builder leaves the row without a swipe while read-only or while a field is being edited.
-                    if isEditable, focusedField == nil {
-                        Button(role: .destructive) {
-                            send(.stageDeleteButtonTapped(section, stage.id))
-                        } label: {
-                            Label {
-                                Text("editor.stage.delete", bundle: .module)
-                            } icon: {
-                                Image(systemName: "trash")
-                            }
-                            .labelStyle(.iconOnly)
-                        }
-                        .tint(.danger)
-                    }
-                }
-                // Rows read only the stages captured above: a row that reads the store observes the stages on its own
-                // and is redrawn apart from the list while a drag settles, showing the wrong stage.
-                .accessibilityActions {
-                    if isEditable, focusedField == nil, stages.indexMovableUp(stage.id) != nil {
-                        Button {
-                            send(.stageMovedUp(section, stage.id))
-                        } label: {
-                            Text("editor.stage.moveUp", bundle: .module)
-                        }
-                    }
-                    if isEditable, focusedField == nil, stages.indexMovableDown(stage.id) != nil {
-                        Button {
-                            send(.stageMovedDown(section, stage.id))
-                        } label: {
-                            Text("editor.stage.moveDown", bundle: .module)
-                        }
-                    }
-                }
-            }
-            .onMove { send(.stagesMoved(section, $0, $1)) }
+            ReorderableRows(
+                items: stages,
+                spacing: .zero,
+                isEnabled: isEditable && focusedField == nil && rowInteraction.swipedID == nil && !store.isSaving && stages.count > 1,
+                canLift: { $0.id != store.expandedStageID },
+                onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
+                onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
+                row: { stageRow($0, in: section, stages: stages) }
+            )
 
-            if isEditable {
-                Button {
-                    send(.addStageButtonTapped(section), animation: .default)
-                } label: {
-                    Label {
-                        Text("editor.addStage", bundle: .module)
-                    } icon: {
-                        Image(systemName: "plus")
-                            .imageScale(.large)
-                    }
-                    .labelStyle(.iconOnly)
-                }
-                .buttonStyle(.borderless)
-                // Tint, not a foreground style, so the icon dims when the section is full.
-                .tint(.text(.primary))
-                .disabled(!store.state.canAddStage(to: section))
-                .frame(maxWidth: .infinity)
-                .padding(.top, .token(spacing: .l))
-                .padding(.bottom, .token(spacing: .xs))
-                .listRowContentInstant()
-                .cardRow(.middle)
-            }
+            addStageButton(section)
+                .phaseCollapsed(!isEditable)
 
-            // The card's bottom inset in both phases: the add button comes and goes above it, so no part of the card's
-            // background disappears while the list animates and the screen never shows through.
+            // The card's bottom inset in both phases.
             Spacer(minLength: .zero)
                 .frame(height: .token(spacing: .m))
                 .accessibilityHidden(true)
-                .listRowContentInstant()
-                .cardRow(.bottom, endsList: endsList)
         }
-        .listSectionSeparator(.hidden)
+    }
+
+    /// Rows read only the stages captured by the card: a row that reads the store observes the stages on its own
+    /// and is redrawn apart from the card while a drag settles, showing the wrong stage.
+    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage]) -> some View {
+        let isEditable = store.isEditable
+        let offersActions = isEditable && focusedField == nil
+        return StageRow(
+            stage: stage,
+            isEditable: isEditable,
+            isExpanded: store.expandedStageID == stage.id,
+            name: stageNameBinding(stage, in: section),
+            focus: $focusedField,
+            onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
+            onDurationTap: { send(.stageDurationTapped(stage.id), animation: WorkoutEditorFeature.phaseChangeAnimation) },
+            onDurationChange: { send(.stageDurationChanged(section, stage.id, $0)) }
+        )
+        .swipePlaques(
+            isOpen: rowInteraction.swipeBinding(for: stage.id),
+            isEnabled: offersActions && !store.isSaving && rowInteraction.liftedID == nil,
+            style: .row,
+            actions: [
+                SwipePlaqueAction(
+                    id: "delete",
+                    role: .destructive,
+                    label: Text("editor.stage.delete", bundle: .module),
+                    icon: Image(systemName: "trash")
+                ) {
+                    deleteStage(stage.id, in: section)
+                },
+            ]
+        )
+        .padding(.horizontal, .token(spacing: .l))
+        // Half of the gap between stages on each side, so a stage sits in the middle of its own row.
+        .padding(.vertical, .token(spacing: .xxs))
+        // The padding takes the row's taps and its long press too.
+        .contentShape(Rectangle())
+        .accessibilityActions {
+            if offersActions, stages.indexMovableUp(stage.id) != nil {
+                Button {
+                    send(.stageMovedUp(section, stage.id))
+                } label: {
+                    Text("editor.stage.moveUp", bundle: .module)
+                }
+            }
+            if offersActions, stages.indexMovableDown(stage.id) != nil {
+                Button {
+                    send(.stageMovedDown(section, stage.id))
+                } label: {
+                    Text("editor.stage.moveDown", bundle: .module)
+                }
+            }
+            if offersActions {
+                Button {
+                    deleteStage(stage.id, in: section)
+                } label: {
+                    Text("editor.stage.delete", bundle: .module)
+                }
+            }
+        }
+        .id(EditorScrollTarget.stageField(stage.id))
+    }
+
+    private func addStageButton(_ section: WorkoutSectionKind) -> some View {
+        Button {
+            send(.addStageButtonTapped(section), animation: .default)
+        } label: {
+            Label {
+                Text("editor.addStage", bundle: .module)
+            } icon: {
+                Image(systemName: "plus")
+                    .imageScale(.large)
+            }
+            .labelStyle(.iconOnly)
+        }
+        .buttonStyle(.borderless)
+        // Tint, not a foreground style, so the icon dims when the section is full.
+        .tint(.text(.primary))
+        .disabled(!store.state.canAddStage(to: section) || !store.isEditable || rowInteraction.liftedID != nil)
+        .frame(maxWidth: .infinity)
+        .padding(.top, .token(spacing: .l))
+        .padding(.bottom, .token(spacing: .xs))
     }
 
     private func sectionTitle(_ section: WorkoutSectionKind) -> Text {
@@ -303,41 +336,40 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    /// A switch while editing; read-only, only a pause that plays shows, its title centered and no switch, like the
-    /// original cell.
-    private func pauseCard(isOn: Binding<Bool>, @ViewBuilder label: () -> Text) -> some View {
-        let isEditable = store.isEditable
-        return Section {
-            ZStack {
-                // Sizes the card to the switch in both phases, so it keeps its height.
-                Toggle(isOn: .constant(false), label: label)
-                    .labelsHidden()
-                    .hidden()
-                    .accessibilityHidden(true)
-                HStack(spacing: .token(spacing: .xs)) {
-                    label()
-                        .font(.token(.body))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: isEditable ? .leading : .center)
-                        // The switch carries the title while editing.
-                        .accessibilityHidden(isEditable)
-                    if isEditable {
-                        Toggle(isOn: isOn, label: label)
-                            .labelsHidden()
-                            .tint(.switchOn)
-                            .accessibilityHint(Text("editor.pause.hint", bundle: .module))
-                    }
-                }
-            }
-            .foregroundStyle(.text(.primary))
-            .padding(.token(spacing: .l))
-            .listRowContentInstant()
-            .cardRow(.single)
+    private func deleteStage(_ id: Stage.ID, in section: WorkoutSectionKind) {
+        withAnimation(.default) {
+            rowInteraction.swipedID = nil
+            send(.stageDeleteButtonTapped(section, id))
         }
-        .listSectionSeparator(.hidden)
+    }
+
+    private func closeSwipe() {
+        rowInteraction.closeSwipe()
+    }
+
+    /// Keeps the focused field above the bottom panel and the keyboard, scrolling as little as it takes.
+    private func scrollToFocusedField(_ proxy: ScrollViewProxy) {
+        switch focusedField {
+            case .name:
+                withAnimation { proxy.scrollTo(EditorScrollTarget.name) }
+            case let .stageName(id):
+                withAnimation { proxy.scrollTo(EditorScrollTarget.stageField(id)) }
+            case nil:
+                break
+        }
+    }
+
+    /// On iOS 26 a tap anywhere in a row with a text field focuses the field, as the system list did there.
+    private static var focusesWholeRow: Bool {
+        if #available(iOS 26, *) {
+            true
+        } else {
+            false
+        }
     }
 
     private func leave() {
+        closeSwipe()
         send(afterClearingFocus: .backButtonTapped)
     }
 
@@ -428,13 +460,4 @@ private func editingPreviewState(_ workout: Workout) -> WorkoutEditorFeature.Sta
     var state = WorkoutEditorFeature.State(viewing: workout)
     state.phase = .editing
     return state
-}
-
-private extension View {
-    /// A row's content takes a phase change at once, like the original cells, and only the list animates rows
-    /// coming and going. Animated inside, an inserted row grows from nothing and the list re-measures it on every
-    /// frame, which drags the rows under it for a second or more.
-    func listRowContentInstant() -> some View {
-        transaction { $0.animation = nil }
-    }
 }
