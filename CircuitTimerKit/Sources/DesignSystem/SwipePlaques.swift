@@ -107,6 +107,9 @@ private struct SwipePlaques: ViewModifier {
             content
                 .offset(x: offset)
                 .allowsHitTesting(!isOpen)
+                // On iOS 17 the drag runs alongside the row's buttons, which keep the touch: letting it go would press
+                // the one it started on.
+                .disabled(drag != nil)
         }
         .contentShape(Rectangle())
         .gesture(TapGesture().onEnded { close() }, including: isOpen ? .gesture : .subviews)
@@ -204,6 +207,9 @@ private struct SwipePlaques: ViewModifier {
     }
 
     private func dragChanged(_ translation: CGSize) {
+        // A pan begins before it has moved: the direction waits for the first movement.
+        guard drag != nil || translation != .zero else { return }
+
         let axis = drag?.axis ?? SwipeAxis(translation: translation)
         if drag == nil, axis == .vertical, isOpen {
             close()
@@ -327,6 +333,15 @@ private struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
 
             let velocity = pan.velocity(in: pan.view)
             return abs(velocity.x) > abs(velocity.y)
+        }
+
+        /// Alongside the row's buttons, which on iOS 26 hold the touch from its start, but never alongside a scroll:
+        /// a sideways drag doesn't scroll. The swiped row's content is disabled, so letting go presses nothing.
+        func gestureRecognizer(
+            _ recognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+        ) -> Bool {
+            !(other.view is UIScrollView)
         }
     }
 }
