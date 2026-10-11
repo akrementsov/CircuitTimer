@@ -54,7 +54,7 @@ public struct WorkoutEditorView: View {
         .onChange(of: store.draft) { closeSwipe() }
         .onChange(of: store.expandedStageID) { closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
-        .confirmationDialog($store.scope(\.$destination, action: \.destination).discardConfirmation)
+        .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
 
     private var content: some View {

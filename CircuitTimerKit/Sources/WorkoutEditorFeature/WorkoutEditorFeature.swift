@@ -16,7 +16,7 @@ public struct WorkoutEditorFeature: Sendable {
         @ReducerCaseIgnored
         case saveFailedAlert(AlertState<Never>)
         @ReducerCaseIgnored
-        case discardConfirmation(ConfirmationDialogState<DiscardConfirmation>)
+        case discardConfirmation(AlertState<DiscardConfirmation>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
@@ -422,9 +422,11 @@ extension AlertState where Action == Never {
     }
 }
 
-extension ConfirmationDialogState where Action == WorkoutEditorFeature.DiscardConfirmation {
+// An alert, not a confirmation dialog: on iOS 26 the dialog becomes a popover that drops its Cancel button,
+// leaving no way to answer «stay».
+extension AlertState where Action == WorkoutEditorFeature.DiscardConfirmation {
     static var discardChanges: Self {
-        ConfirmationDialogState(titleVisibility: .visible) {
+        AlertState {
             TextState("editor.discard.title", bundle: .module)
         } actions: {
             ButtonState(role: .destructive, action: .discard) {
@@ -433,6 +435,8 @@ extension ConfirmationDialogState where Action == WorkoutEditorFeature.DiscardCo
             ButtonState(role: .cancel) {
                 TextState("editor.discard.keepEditing", bundle: .module)
             }
+        } message: {
+            TextState("editor.discard.message", bundle: .module)
         }
     }
 }
