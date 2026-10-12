@@ -75,6 +75,20 @@ struct WorkoutLimitsTests {
         #expect(workout.duration(of: section) == .zero)
     }
 
+    @Test(arguments: [
+        (Workout(id: UUID(fixture: 900)), false),
+        (Workout(id: UUID(fixture: 900), training: [makeStage(1, .zero)]), false),
+        // Normalization floors durations to whole milliseconds, so this stage never reaches the schedule.
+        (Workout(id: UUID(fixture: 900), training: [makeStage(1, .microseconds(999))]), false),
+        (Workout(id: UUID(fixture: 900), training: [makeStage(1, .seconds(10))], trainingRounds: 0), false),
+        (Workout(id: UUID(fixture: 900), training: [makeStage(1, .milliseconds(1))]), true),
+        (Workout(id: UUID(fixture: 900), warmUp: [makeStage(1, .seconds(10))]), true),
+        (Workout(id: UUID(fixture: 900), coolDown: [makeStage(1, .seconds(10))]), true),
+    ])
+    func test_isPlayable_totalDuration_isTrueOnlyAboveZero(workout: Workout, expected: Bool) {
+        #expect(workout.isPlayable == expected)
+    }
+
     @Test
     func test_totalDuration_randomWorkouts_matchesScheduleAndScheduleIsContiguous() {
         var generator = SeededGenerator(seed: 0xC1C1)
