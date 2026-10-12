@@ -5,7 +5,8 @@ import WorkoutDomain
 /// Applies run record writes in revision order.
 ///
 /// Each write is one synchronous actor turn, from the revision check to the last file
-/// operation, so no other write can interleave with it.
+/// operation, so no other write can interleave with it. The files are a few hundred bytes, so
+/// doing the I/O inside that turn is cheaper than the ordering a suspension would cost.
 actor RunRecordFile {
     private let directory: URL
     private var lastAppliedRevision = 0
@@ -24,9 +25,16 @@ actor RunRecordFile {
         lastAppliedRevision = revision
         let url = RunRecordLayout.fileURL(in: directory, sessionID: sessionID)
         if let record {
-            try prepareDirectory()
-            let data = try JSONEncoder().encode(record)
-            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            do {
+                try prepareDirectory()
+                let data = try JSONEncoder().encode(record)
+                try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            } catch {
+                // The older record would bring back a phase the user has left, such as running after a pause;
+                // no record is better than that one.
+                removeOutdated(url)
+                throw error
+            }
         } else {
             try remove(url)
         }
@@ -47,6 +55,14 @@ actor RunRecordFile {
             isExclusionApplied = true
         } catch {
             Logger.runRecord.error("Excluding run records from backup failed: \(String(reflecting: error), privacy: .public)")
+        }
+    }
+
+    private func removeOutdated(_ url: URL) {
+        do {
+            try remove(url)
+        } catch {
+            Logger.runRecord.error("Removing an outdated run record failed: \(String(reflecting: error), privacy: .public)")
         }
     }
 

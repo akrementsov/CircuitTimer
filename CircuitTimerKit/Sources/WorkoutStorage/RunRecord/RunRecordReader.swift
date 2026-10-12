@@ -53,7 +53,7 @@ final class RunRecordReader: Sendable {
 
         do {
             return StoredRunRecord(record: try JSONDecoder().decode(WorkoutRunRecord.self, from: data), savedAt: savedAt)
-        } catch WorkoutRunRecord.DecodingFailure.unsupportedSchema(let version) {
+        } catch WorkoutRunRecord.SchemaError.unsupportedSchema(let version) {
             throw RunRecordError.unsupportedSchema(version)
         } catch {
             throw RunRecordError.corrupt(error)

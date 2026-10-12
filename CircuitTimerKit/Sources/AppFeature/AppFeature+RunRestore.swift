@@ -1,7 +1,9 @@
 import ComposableArchitecture
 import Foundation
+import os
 import WorkoutDomain
 import WorkoutStorage
+import WorkoutTimerFeature
 
 extension AppFeature {
     /// The launch's check for a run saved before the process was gone. It ends before the first list is shown, so no
@@ -38,6 +40,9 @@ extension AppFeature {
             do {
                 await send(.internal(.runRecordLoaded(try await workoutRunRecord.load(sceneSessionID))))
             } catch is CancellationError {
+                return
+            } catch where Task.isCancelled {
+                // A result after the timeout decides nothing and is not reported as a failure.
                 return
             } catch RunRecordError.unsupportedSchema(let version) {
                 Self.logger.notice("The saved run was written by another app version (schema \(version)); it stays on disk")
@@ -125,7 +130,7 @@ extension AppFeature {
         do {
             run = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: record, at: now)
         } catch {
-            Self.logger.notice("The saved run no longer fits its workout: \(String(describing: error), privacy: .public)")
+            Self.logger.notice("The saved run no longer fits its workout: \(String(reflecting: error), privacy: .public)")
             state.destination = .alert(.runNotRestored)
             return discardRunRecord(state)
         }
@@ -148,23 +153,28 @@ extension AppFeature {
         }
 
         state.selectedTab = .workouts
-        state.destination = .timer(timerState(for: workout, sceneSessionID: sceneSessionID, restoring: (run, now)))
+        state.destination = .timer(restoredTimerState(for: workout, sceneSessionID: sceneSessionID, run: run, at: now))
         return .none
     }
 
-    /// Clears this session's record; the write also sweeps away the files of earlier sessions.
+    /// Clears this session's record; the write also sweeps away the files of earlier sessions. Like every record write,
+    /// it holds a background-task assertion taken here, before the effect is scheduled.
     func discardRunRecord(_ state: State) -> Effect<Action> {
         guard let sceneSessionID = state.sceneSessionID else { return .none }
 
         let revision = workoutRunRecord.nextRevision()
-        return .run { [workoutRunRecord] _ in
+        let token = backgroundTask.begin("Clear the saved workout run")
+        return .run { [workoutRunRecord, backgroundTask] _ in
             do {
                 try await workoutRunRecord.write(nil, sceneSessionID, revision)
             } catch is CancellationError {
+                // Only the root store going away cancels it; the write has run regardless.
+                await backgroundTask.end(token)
                 return
             } catch {
                 Self.logger.error("Clearing the saved run failed: \(String(reflecting: error), privacy: .public)")
             }
+            await backgroundTask.end(token)
         }
     }
 }

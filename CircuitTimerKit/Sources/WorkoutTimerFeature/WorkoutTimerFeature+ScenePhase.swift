@@ -18,7 +18,9 @@ extension WorkoutTimerFeature {
                     state.countdown = Countdown(countdown.purpose)
                 }
                 // A running run gets an anchor taken as the app leaves, which measures the whole time away on return,
-                // and the record gets the position reached.
+                // and the record gets the position reached. It is written even when unchanged: the file's date is
+                // when the user last left the run, which the 24-hour limit on restoring a paused run measures from.
+                state.recordSync = .unknown
                 return syncClock(&state, at: now)
             case .active:
                 guard state.isInBackground else { return .none }

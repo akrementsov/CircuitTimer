@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import os
 
 enum RunRecordLayout {
     static let fileExtension = "json"
@@ -24,8 +23,4 @@ enum RunRecordLayout {
         let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError
         return underlying?.domain == NSPOSIXErrorDomain && underlying?.code == Int(ENOENT)
     }
-}
-
-extension Logger {
-    static let runRecord = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "RunRecord")
 }

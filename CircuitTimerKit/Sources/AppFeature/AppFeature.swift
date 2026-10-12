@@ -117,11 +117,12 @@ public struct AppFeature: Sendable {
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date) var date
     @Dependency(\.sceneSession) private var sceneSession
     @Dependency(\.timerSession) private var timerSession
-    @Dependency(\.uuid) var uuid
+    @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -365,28 +366,32 @@ public struct AppFeature: Sendable {
         return .none
     }
 
-    /// The one place a timer's state is built: a new run, or a saved one already settled at `now`.
-    func timerState(
-        for workout: Workout,
-        sceneSessionID: String,
-        restoring restored: (run: WorkoutRun, now: Date)? = nil
-    ) -> WorkoutTimerFeature.State {
-        if let restored {
-            return WorkoutTimerFeature.State(
-                id: uuid(),
-                workoutID: workout.id,
-                title: workout.displayName,
-                sceneSessionID: sceneSessionID,
-                restoring: restored.run,
-                at: restored.now
-            )
-        }
-        return WorkoutTimerFeature.State(
+    // A timer's state is built only here and in `restoredTimerState`, so both get the same identifiers and title.
+
+    private func timerState(for workout: Workout, sceneSessionID: String) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
             schedule: WorkoutSchedule(workout: workout),
             sceneSessionID: sceneSessionID
+        )
+    }
+
+    /// A timer over a saved run already settled at `now`.
+    func restoredTimerState(
+        for workout: Workout,
+        sceneSessionID: String,
+        run: WorkoutRun,
+        at now: Date
+    ) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(
+            id: uuid(),
+            workoutID: workout.id,
+            title: workout.displayName,
+            sceneSessionID: sceneSessionID,
+            restoring: run,
+            at: now
         )
     }
 
@@ -442,19 +447,12 @@ public struct AppFeature: Sendable {
     /// button the timer failed to hide, skips that; doing both again here is harmless. The second clear also retries
     /// one that failed: its revision is newer than the timer's, and older than any write of a timer started later.
     private func timerDismissed(_ state: State) -> Effect<Action> {
-        guard case let .timer(timer) = state.destination, let sceneSessionID = state.sceneSessionID else { return .none }
+        guard case let .timer(timer) = state.destination else { return .none }
 
-        let revision = workoutRunRecord.nextRevision()
-        return .run { [timerSession, workoutRunRecord, id = timer.id] _ in
+        let end = Effect<Action>.run { [timerSession, id = timer.id] _ in
             await timerSession.end(owner: id)
-            do {
-                try await workoutRunRecord.write(nil, sceneSessionID, revision)
-            } catch is CancellationError {
-                return
-            } catch {
-                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
-            }
         }
+        return .merge(end, discardRunRecord(state))
     }
 
     /// Storage appends a new workout, so a new one goes to the end here too.

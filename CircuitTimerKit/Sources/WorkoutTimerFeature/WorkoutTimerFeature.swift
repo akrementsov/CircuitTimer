@@ -98,6 +98,9 @@ public struct WorkoutTimerFeature: Sendable {
             self.workoutID = workoutID
             self.title = title
             self.sceneSessionID = sceneSessionID
+            var run = run
+            // Already settled at `now`; the tick keeps the rule that a snapshot follows a tick.
+            run.tick(at: now)
             self.run = run
             snapshot = run.snapshot(at: now)
             countdown = nil
@@ -148,7 +151,7 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.continuousClock) private var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
-    @Dependency(\.workoutRunRecord) var runRecord
+    @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.timerSession) private var timerSession
 
     public init() {}
@@ -206,53 +209,58 @@ public struct WorkoutTimerFeature: Sendable {
             case let .recordWritten(revision, succeeded):
                 recordWritten(revision: revision, succeeded: succeeded, &state)
                 return .none
-            case let .countdownTicked(generation), let .ticked(generation, _), let .clockFailed(generation):
-                // A replaced loop may have started after its cancel ran, so its own action cancels it again.
-                guard generation == state.clockGeneration else {
-                    return .cancel(id: CancelID.clock(generation: generation))
-                }
+            case let .countdownTicked(generation):
+                if let stale = stopIfStale(generation, state) { return stale }
 
-                return clockTicked(&state, action)
-        }
-    }
+                return countdownTicked(&state, at: date())
+            case let .ticked(generation, isFinal):
+                if let stale = stopIfStale(generation, state) { return stale }
 
-    private func clockTicked(_ state: inout State, _ action: Action.Internal) -> Effect<Action> {
-        let now = date()
-        switch action {
-            case .countdownTicked:
-                guard var countdown = state.countdown else { return .none }
+                return ticked(isFinal: isFinal, &state, at: date())
+            case let .clockFailed(generation):
+                if let stale = stopIfStale(generation, state) { return stale }
 
-                countdown.remaining -= 1
-                if countdown.remaining > 0 {
-                    state.countdown = countdown
-                    return .none
-                }
-
-                state.countdown = nil
-                switch countdown.purpose {
-                    case .start:
-                        state.run.start(at: now)
-                    case .resume:
-                        state.run.resume(at: now)
-                }
-                return syncClock(&state, at: now)
-            case let .ticked(_, isFinal):
-                let mustSync = advance(&state, at: now)
-                // A loop that has ended leaves a still running run without a clock, so it is restarted.
-                guard !mustSync, !isFinal, state.snapshot.status == .running else { return syncClock(&state, at: now) }
-
-                // Measuring each jump check over one tick keeps a slow slew of the wall clock from adding up.
-                state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
-                return .none
-            case .clockFailed:
+                let now = date()
                 _ = advance(&state, at: now)
                 state.run.pause(at: now)
                 state.countdown = nil
                 state.hasClockFailed = true
                 return syncClock(&state, at: now)
-            case .recordWritten:
-                return .none
         }
+    }
+
+    /// A replaced loop may have started after its cancel ran, so its own action cancels it again.
+    private func stopIfStale(_ generation: Int, _ state: State) -> Effect<Action>? {
+        generation == state.clockGeneration ? nil : .cancel(id: CancelID.clock(generation: generation))
+    }
+
+    private func countdownTicked(_ state: inout State, at now: Date) -> Effect<Action> {
+        guard var countdown = state.countdown else { return .none }
+
+        countdown.remaining -= 1
+        if countdown.remaining > 0 {
+            state.countdown = countdown
+            return .none
+        }
+
+        state.countdown = nil
+        switch countdown.purpose {
+            case .start:
+                state.run.start(at: now)
+            case .resume:
+                state.run.resume(at: now)
+        }
+        return syncClock(&state, at: now)
+    }
+
+    private func ticked(isFinal: Bool, _ state: inout State, at now: Date) -> Effect<Action> {
+        let mustSync = advance(&state, at: now)
+        // A loop that has ended leaves a still running run without a clock, so it is restarted.
+        guard !mustSync, !isFinal, state.snapshot.status == .running else { return syncClock(&state, at: now) }
+
+        // Measuring each jump check over one tick keeps a slow slew of the wall clock from adding up.
+        state.clockAnchor = anchor(at: now, totalElapsed: state.snapshot.totalElapsed)
+        return .none
     }
 
     private func playPause(_ state: inout State, at now: Date) -> Effect<Action> {
@@ -361,25 +369,24 @@ public struct WorkoutTimerFeature: Sendable {
     /// The only way the timer closes; its clock must have stopped already.
     private func closeScreen(_ state: State) -> Effect<Action> {
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
-        let revision = runRecord.nextRevision()
+        let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the closed workout run")
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        return .run { [timerSession, dismiss, runRecord, backgroundTask, id = state.id, sessionID = state.sceneSessionID] _ in
+        return .run { [timerSession, dismiss, workoutRunRecord, backgroundTask, id = state.id, sessionID = state.sceneSessionID] _ in
             await timerSession.end(owner: id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that.
-            let failure: (any Error)?
             do {
-                try await runRecord.write(nil, sessionID, revision)
-                failure = nil
+                try await workoutRunRecord.write(nil, sessionID, revision)
+            } catch is CancellationError {
+                // The teardown cancels this effect, but the write has run regardless; nothing failed.
+                await backgroundTask.end(token)
+                return
             } catch {
-                failure = error
-            }
-            if let failure, !(failure is CancellationError) {
-                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: failure), privacy: .public)")
+                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
             }
             await backgroundTask.end(token)
         }
@@ -429,7 +436,7 @@ public struct WorkoutTimerFeature: Sendable {
     /// Replaces the current clock loop with the one the settled state needs, if any, saves the run, and asks to keep
     /// the screen awake exactly while a clock runs. The only place where the keep-awake vote changes and, apart from
     /// the clear on close, where the run is saved: every operation, jump and change of status reaches the record file,
-    /// and no tick does.
+    /// and a tick that changes none of them does not.
     func syncClock(_ state: inout State, at now: Date) -> Effect<Action> {
         let loop = Effect.merge(replaceClockLoop(&state, at: now), persist(&state))
         guard state.keepsScreenAwake != state.requestedAwake else { return loop }

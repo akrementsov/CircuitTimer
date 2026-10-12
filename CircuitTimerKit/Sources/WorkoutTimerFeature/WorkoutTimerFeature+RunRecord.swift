@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import os
 import WorkoutDomain
 import WorkoutStorage
 
@@ -31,13 +32,13 @@ extension WorkoutTimerFeature {
                 break
         }
 
-        let revision = runRecord.nextRevision()
+        let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Save the workout run")
         state.recordSync = .pending(revision: revision, record: record)
-        return .run { [runRecord, backgroundTask, sessionID = state.sceneSessionID] send in
+        return .run { [workoutRunRecord, backgroundTask, sessionID = state.sceneSessionID] send in
             let succeeded: Bool?
             do {
-                try await runRecord.write(record, sessionID, revision)
+                try await workoutRunRecord.write(record, sessionID, revision)
                 succeeded = true
             } catch is CancellationError {
                 succeeded = nil
@@ -57,6 +58,8 @@ extension WorkoutTimerFeature {
         guard case let .pending(pending, record) = state.recordSync, pending == revision else { return }
 
         state.recordSync = succeeded ? .stored(record) : .failed(record)
-        state.hasRecordFailed = !succeeded
+        // Only a run that could have come back is lost; a failed clear is logged, and the file removes an outdated
+        // record when a newer one fails to replace it.
+        state.hasRecordFailed = !succeeded && record != nil
     }
 }

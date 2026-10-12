@@ -36,8 +36,10 @@ public struct WorkoutRunRecordClient: Sendable {
     public var nextRevision: @Sendable () -> Int = { 0 }
     /// The record of `sessionID`, or `nil` when that session has none. Never changes the disk.
     public var load: @Sendable (_ sessionID: String) async throws -> StoredRunRecord?
-    /// Replaces the record of `sessionID`, or removes it for `nil`, then removes the files left
-    /// by other sessions. Ignored when `revision` is not newer than any write applied before.
+    /// Replaces the record of `sessionID`, or removes it for `nil`; a record that fails to write
+    /// removes the older one. The first applied writes also remove the files left by earlier
+    /// sessions, until one pass succeeds. Ignored when `revision` is not newer than any write
+    /// applied before.
     public var write: @Sendable (_ record: WorkoutRunRecord?, _ sessionID: String, _ revision: Int) async throws -> Void
 }
 

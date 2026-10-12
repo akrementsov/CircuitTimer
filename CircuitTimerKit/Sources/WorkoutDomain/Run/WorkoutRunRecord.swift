@@ -7,22 +7,20 @@ import Foundation
 public struct WorkoutRunRecord: Codable, Hashable, Sendable {
     public static let currentSchemaVersion = 1
 
-    public enum Phase: Codable, Hashable, Sendable {
+    public enum Phase: CaseIterable, Codable, Hashable, Sendable {
         case running
         case paused
         case awaitingUser
 
         public init(from decoder: any Decoder) throws {
             let token = try decoder.singleValueContainer().decode(String.self)
-            switch token {
-                case "running": self = .running
-                case "paused": self = .paused
-                case "awaitingUser": self = .awaitingUser
-                default:
-                    throw DecodingError.dataCorrupted(
-                        DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown run phase «\(token)»")
-                    )
+            guard let phase = Self.allCases.first(where: { $0.storageToken == token }) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown run phase «\(token)»")
+                )
             }
+
+            self = phase
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -40,7 +38,7 @@ public struct WorkoutRunRecord: Codable, Hashable, Sendable {
         }
     }
 
-    public enum DecodingFailure: Error, Equatable, Sendable {
+    public enum SchemaError: Error, Equatable, Sendable {
         /// Written by another app version; kept on disk rather than treated as corrupt.
         case unsupportedSchema(Int)
     }
@@ -114,7 +112,7 @@ public struct WorkoutRunRecord: Codable, Hashable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
         guard schemaVersion == Self.currentSchemaVersion else {
-            throw DecodingFailure.unsupportedSchema(schemaVersion)
+            throw SchemaError.unsupportedSchema(schemaVersion)
         }
 
         self.schemaVersion = schemaVersion
