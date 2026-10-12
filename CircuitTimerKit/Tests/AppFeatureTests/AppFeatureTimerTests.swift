@@ -46,12 +46,19 @@ struct AppFeatureTimerTests {
     }
 
     @Test
-    func test_startRequested_notPlayableOrTimerShown_presentsNothing() async throws {
+    func test_startRequested_notPlayableAlertOrTimerShown_presentsNothing() async throws {
         var notPlayable = loaded([first, empty])
         notPlayable.path.append(.editor(WorkoutEditorFeature.State(viewing: empty)))
         let notPlayableID = try #require(notPlayable.path.ids.first)
         let notPlayableStore = makeStore(notPlayable)
         await notPlayableStore.send(.path(.element(id: notPlayableID, action: .editor(.delegate(.startRequested(empty))))))
+
+        var alertShown = loaded([first])
+        alertShown.destination = .alert(.mutationFailed)
+        alertShown.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
+        let alertShownID = try #require(alertShown.path.ids.first)
+        let alertShownStore = makeStore(alertShown)
+        await alertShownStore.send(.path(.element(id: alertShownID, action: .editor(.delegate(.startRequested(first))))))
 
         var timerShown = loaded([first])
         timerShown.destination = .timer(Self.timer(UUID(fixture: 7), for: first))
