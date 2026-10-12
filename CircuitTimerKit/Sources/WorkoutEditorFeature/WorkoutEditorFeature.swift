@@ -345,7 +345,7 @@ public struct WorkoutEditorFeature: Sendable {
                 case let .internal(action):
                     reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
-                    discardChanges(state)
+                    discardChanges(&state)
                 case .delegate, .destination:
                     .none
             }
@@ -415,11 +415,7 @@ public struct WorkoutEditorFeature: Sendable {
             case let .stageIntensityTapped(section, id):
                 updateStage(id, in: section, of: &state) { $0.intensity = $0.intensity == .work ? .rest : .work }
             case .backButtonTapped:
-                guard state.hasChanges else {
-                    // The screen is going away; the tip must not show on it while it slides out.
-                    state.hasSettled = false
-                    return .run { [dismiss] _ in await dismiss() }
-                }
+                guard state.hasChanges else { return leave(&state) }
 
                 state.destination = .discardConfirmation(.discardChanges)
             case .saveButtonTapped:
@@ -497,11 +493,21 @@ public struct WorkoutEditorFeature: Sendable {
         state.phase = .viewing
     }
 
-    private func discardChanges(_ state: State) -> Effect<Action> {
+    private func discardChanges(_ state: inout State) -> Effect<Action> {
         // A save in flight must finish; dismissing would cancel it.
         guard !state.isSaving else { return .none }
 
-        return .run { [dismiss] _ in await dismiss() }
+        return leave(&state)
+    }
+
+    /// Closes the screen. It slides out for a moment, so the tip must not show on it, and a wait still running must
+    /// not bring it back.
+    private func leave(_ state: inout State) -> Effect<Action> {
+        state.hasSettled = false
+        return .merge(
+            .cancel(id: CancelID.settle),
+            .run { [dismiss] _ in await dismiss() }
+        )
     }
 
     private func save(_ state: inout State) -> Effect<Action> {
