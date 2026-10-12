@@ -162,7 +162,7 @@ struct AppFeatureTabTests {
                 return StoredWorkouts(workouts: [renamed])
             }
         }
-        await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
+        await store.send(.view(.retryButtonTapped)) { $0.isReloading = true }
         await store.send(.view(.workoutTapped(first.id))) { $0.deferredScreen = .open(self.first.id) }
 
         await store.send(.view(.tabSelected(.settings))) {
@@ -171,6 +171,9 @@ struct AppFeatureTabTests {
         }
         gate.open()
 
-        await store.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([renamed]) }
+        await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
+            $0.workouts = .loaded([renamed])
+        }
     }
 }

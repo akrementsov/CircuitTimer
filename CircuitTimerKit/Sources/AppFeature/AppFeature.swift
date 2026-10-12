@@ -52,6 +52,8 @@ public struct AppFeature: Sendable {
         var pendingMutations: [ListMutation] = []
         /// Set when a write reports that storage no longer matches the list; reload once the queue drains.
         var needsReload = false
+        /// A reload of a list that stays on screen meanwhile.
+        var isReloading = false
         var deferredScreen: DeferredScreen?
 
         public init() {}
@@ -224,11 +226,19 @@ public struct AppFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
             case let .workoutsLoaded(stored):
+                state.isReloading = false
+                // A write made on the shown list during the reload may be missing from what was read; read again
+                // once the queue drains instead of dropping it from the list.
+                if !state.pendingMutations.isEmpty {
+                    state.needsReload = true
+                    return .none
+                }
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
                 return presentDeferredScreen(&state)
             case .workoutsLoadingFailed:
+                state.isReloading = false
                 state.workouts = .failed
                 state.deferredScreen = nil
                 return .none
@@ -265,7 +275,7 @@ public struct AppFeature: Sendable {
     /// Opens the screen now, or once pending writes and reloads are done so it never shows a stale workout.
     private func openScreen(_ request: DeferredScreen, _ state: inout State) -> Effect<Action> {
         state.deferredScreen = request
-        guard state.pendingMutations.isEmpty, case .loaded = state.workouts else { return .none }
+        guard state.pendingMutations.isEmpty, !state.isReloading, case .loaded = state.workouts else { return .none }
 
         return presentDeferredScreen(&state)
     }
@@ -376,7 +386,13 @@ public struct AppFeature: Sendable {
     }
 
     private func loadWorkouts(_ state: inout State) -> Effect<Action> {
-        state.workouts = .loading
+        // A shown list stays until the new one arrives: a spinner in its place would flash, and a push right after the
+        // reload would carry the spinner's picture of the tab bar on iOS 26.
+        if case .loaded = state.workouts {
+            state.isReloading = true
+        } else {
+            state.workouts = .loading
+        }
         return .run { [workoutStorage] send in
             do {
                 let stored = try await workoutStorage.fetchAll()

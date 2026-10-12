@@ -30,8 +30,9 @@ struct AppFeatureListTests {
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2)])
             $0.hiddenRecordCount = 2
         }
-        await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
+        await store.send(.view(.retryButtonTapped)) { $0.isReloading = true }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([])
             $0.hiddenRecordCount = 0
         }
@@ -290,9 +291,10 @@ struct AppFeatureListTests {
         await store.receive(\.internal.mutationFinished) {
             $0.pendingMutations = []
             $0.needsReload = false
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(2), makeWorkout(1, name: "Copy")])
         }
     }
@@ -329,9 +331,10 @@ struct AppFeatureListTests {
             $0.pendingMutations = []
             $0.deferredScreen = nil
             $0.destination = .alert(.mutationFailed)
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2)])
         }
 
@@ -416,9 +419,10 @@ struct AppFeatureListTests {
 
         await store.send(.internal(.mutationFinished(.storeDiverged))) {
             $0.pendingMutations = []
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), renamed])
             $0.deferredScreen = nil
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: renamed))

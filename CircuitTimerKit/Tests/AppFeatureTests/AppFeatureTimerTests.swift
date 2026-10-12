@@ -103,9 +103,10 @@ struct AppFeatureTimerTests {
             $0.pendingMutations = []
             $0.needsReload = false
             $0.deferredScreen = nil
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2), makeWorkout(4)])
         }
 
