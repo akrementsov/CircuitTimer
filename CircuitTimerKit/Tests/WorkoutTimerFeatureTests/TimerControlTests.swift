@@ -360,6 +360,7 @@ struct TimerControlTests {
         WorkoutTimerFeature.Action.View.closeButtonTapped,
         .playPauseButtonTapped,
         .nextButtonTapped,
+        .stagesButtonTapped,
     ])
     func test_viewAction_alertShown_isIgnored(action: WorkoutTimerFeature.Action.View) async {
         var state = State.fixture(.paused)
