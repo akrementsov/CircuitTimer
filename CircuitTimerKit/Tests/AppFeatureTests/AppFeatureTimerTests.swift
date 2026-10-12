@@ -188,6 +188,17 @@ struct AppFeatureTimerTests {
         await store.send(.destination(.dismiss)) { $0.destination = nil }
     }
 
+    @Test
+    func test_timerCoverAppeared_emptyStack_changesNothing() async {
+        var state = loaded([first])
+        state.destination = .timer(Self.timer(UUID(fixture: 7), for: first))
+        let store = makeStore(state) { $0.timerSession.end = { _ in } }
+
+        await store.send(.view(.timerCoverAppeared))
+
+        await closeTimer(store)
+    }
+
     /// The user's route: the workout's screen opens, Start presents the timer, and the stack empties under the cover.
     /// The timer takes the store's first UUID: a read-only screen draws none.
     private func start(_ workout: Workout, in store: TestStoreOf<AppFeature>, timer: WorkoutTimerFeature.State? = nil) async {

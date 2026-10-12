@@ -23,14 +23,16 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
             ScrollView {
                 content(proxy)
                     .coordinateSpace(.named(RowContentSpace.name))
-                    // A tap in a gap between the cards closes an open swipe too.
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { contentMoved(to: $0) }
+                    .background { AutoScrollDriver(velocity: interaction.autoScrollVelocity) }
+                    // A tap in a gap between the cards, or below a short list, closes an open swipe too, as in the
+                    // original app.
+                    .frame(minHeight: max(interaction.visibleRect.height - topMargin, .zero), alignment: .top)
                     .contentShape(Rectangle())
                     .simultaneousGesture(
                         TapGesture().onEnded { interaction.closeSwipe() },
                         including: interaction.swipedID != nil ? .all : .subviews
                     )
-                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { contentMoved(to: $0) }
-                    .background { AutoScrollDriver(velocity: interaction.autoScrollVelocity) }
             }
             .scrollIndicators(.hidden)
             .contentMargins(.top, topMargin, for: .scrollContent)

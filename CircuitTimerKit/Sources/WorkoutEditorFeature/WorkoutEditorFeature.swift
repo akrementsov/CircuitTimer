@@ -93,14 +93,19 @@ public struct WorkoutEditorFeature: Sendable {
         }
 
         /// A new workout's Save waits for a change. A saved workout's Save is the way back to Start, as in the
-        /// original app: untouched, it writes nothing and only ends the editing.
+        /// original app: untouched, it writes nothing and only ends the editing, even for a stored workout the editor
+        /// would not accept as it is.
         public var canSave: Bool {
-            isDraftComplete && (hasChanges || phase == .editing) && !isSaving
+            !isSaving && (endsEditingUntouched || isDraftComplete && hasChanges)
         }
 
-        /// Explains what the draft is missing; an untouched or saving draft needs no hint.
+        /// Explains what the draft is missing; a saving draft, or an untouched one Save only closes, needs no hint.
         public var showsSaveHint: Bool {
-            !isDraftComplete && !isSaving
+            !isDraftComplete && !isSaving && !endsEditingUntouched
+        }
+
+        private var endsEditingUntouched: Bool {
+            phase == .editing && !hasChanges
         }
 
         /// The read-only screen plays the stored workout, once.

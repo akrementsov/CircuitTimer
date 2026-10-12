@@ -110,6 +110,19 @@ struct WorkoutEditorViewingTests {
     }
 
     @Test
+    func test_save_untouchedStoredWorkoutWithoutAName_endsEditing() async {
+        var workout = makeWorkout()
+        workout.name = ""
+        // Storage is left unimplemented: a write fails the test.
+        let store = makeStore(editingState(workout))
+
+        await store.send(.view(.saveButtonTapped))
+        await store.receive(\.internal.editingEnded) { $0.phase = .viewing }
+
+        #expect(store.state.canStart)
+    }
+
+    @Test
     func test_backButtonTapped_starting_stillLeaves() async {
         let dismissals = LockIsolated(0)
         var state = WorkoutEditorFeature.State(viewing: makeWorkout())

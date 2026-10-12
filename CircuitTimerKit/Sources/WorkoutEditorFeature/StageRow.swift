@@ -107,7 +107,7 @@ struct StageRow: View {
 
     /// What VoiceOver reads for a stage: its name, or its intensity when it has none.
     private var shownName: Text {
-        if stage.name.isEmpty {
+        if stage.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             intensityName
         } else {
             Text(verbatim: stage.name) + Text(verbatim: ", ") + intensityName

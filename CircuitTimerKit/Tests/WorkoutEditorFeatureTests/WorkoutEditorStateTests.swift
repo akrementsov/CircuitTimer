@@ -29,6 +29,9 @@ struct WorkoutEditorStateTests {
                 return stage
             }
         }
+        var storedNameless = makeWorkout()
+        storedNameless.name = ""
+        let untouchedNameless = editingState(storedNameless)
         var saving = changed
         saving.isSaving = true
         return [
@@ -66,6 +69,13 @@ struct WorkoutEditorStateTests {
                 isDraftComplete: false,
                 canSave: false,
                 showsSaveHint: true
+            ),
+            FlagsCase(
+                testDescription: "stored without a name, untouched",
+                state: untouchedNameless,
+                isDraftComplete: false,
+                canSave: true,
+                showsSaveHint: false
             ),
             FlagsCase(
                 testDescription: "saving",
