@@ -9,10 +9,27 @@ import WorkoutTimerFeature
 
 @Reducer
 public struct AppFeature: Sendable {
+    // An alert with actions needs a hand-written `Action`: with a macro-generated one the scoped
+    // binding would drop the user's choice. See AGENTS.md › TCA.
     @Reducer
     public enum Destination {
+        @ReducerCaseIgnored
         case alert(AlertState<Never>)
+        @ReducerCaseIgnored
+        case resumeRun(AlertState<ResumeRunChoice>)
         case timer(WorkoutTimerFeature)
+
+        @CasePathable
+        public enum Action: Equatable, Sendable {
+            case alert(Never)
+            case resumeRun(ResumeRunChoice)
+            case timer(WorkoutTimerFeature.Action)
+        }
+    }
+
+    public enum ResumeRunChoice: Equatable, Sendable {
+        case resume
+        case finish
     }
 
     /// Screens pushed onto the Workouts stack.
@@ -57,6 +74,8 @@ public struct AppFeature: Sendable {
         var deferredScreen: DeferredScreen?
         /// The launch's check for a run saved before the process was gone.
         var runRestore = RunRestore.idle
+        /// Set once the timer's cover is on screen; a dismissal before that comes from the alert it replaced.
+        var isTimerCoverUp = false
 
         public init() {}
 
@@ -103,6 +122,9 @@ public struct AppFeature: Sendable {
             case runRecordLoaded(StoredRunRecord?)
             case runRecordLoadingFailed(RunRecordLoadFailure)
             case runRecordReadTimedOut
+            /// Sent after the resume alert has gone, so the timer's cover never overlaps it.
+            case resumeRunConfirmed
+            case runFinishFailed
         }
     }
 
@@ -138,8 +160,10 @@ public struct AppFeature: Sendable {
                     workoutSaved(workout, &state)
                 case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
                     startWorkout(workout, &state)
+                case let .destination(.presented(.resumeRun(choice))):
+                    resumeRunChosen(choice, &state)
                 case .destination(.dismiss):
-                    timerDismissed(state)
+                    destinationDismissed(&state)
                 case .destination, .path, .settings:
                     .none
             }
@@ -230,6 +254,7 @@ public struct AppFeature: Sendable {
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
             case .timerCoverAppeared:
+                state.isTimerCoverUp = true
                 // Under the cover, so the pop is not seen; closing the timer lands on the list.
                 state.path.removeAll()
                 return .none
@@ -296,6 +321,14 @@ public struct AppFeature: Sendable {
                 return runRecordLoadingFailed(failure, &state)
             case .runRecordReadTimedOut:
                 return runRecordReadTimedOut(&state)
+            case .resumeRunConfirmed:
+                return resumeRunConfirmed(&state)
+            case .runFinishFailed:
+                // Shown only over the list; the run may be offered again at the next launch.
+                if state.destination == nil {
+                    state.destination = .alert(.runNotFinished)
+                }
+                return .none
         }
     }
 
@@ -407,16 +440,30 @@ public struct AppFeature: Sendable {
         return copy
     }
 
-    /// The timer closes itself after ending its session and clearing its run, but a system dismissal, such as a back
-    /// button the timer failed to hide, skips that; doing both again here is harmless. The second clear also retries
-    /// one that failed: its revision is newer than the timer's, and older than any write of a timer started later.
-    private func timerDismissed(_ state: State) -> Effect<Action> {
-        guard case let .timer(timer) = state.destination else { return .none }
-
-        let end = Effect<Action>.run { [timerSession, id = timer.id] _ in
-            await timerSession.end(owner: id)
+    private func destinationDismissed(_ state: inout State) -> Effect<Action> {
+        switch state.destination {
+            case let .timer(timer):
+                // The timer closes itself after ending its session and clearing its run, but a system dismissal, such as
+                // a back button the timer failed to hide, skips that; doing both again here is harmless. The second clear
+                // also retries one that failed: its revision is newer than the timer's, and older than any write of a
+                // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
+                let isCoverUp = state.isTimerCoverUp
+                state.isTimerCoverUp = false
+                let end = Effect<Action>.run { [timerSession, id = timer.id] _ in
+                    await timerSession.end(owner: id)
+                }
+                guard isCoverUp else {
+                    Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")
+                    return end
+                }
+                return .merge(end, discardRunRecord())
+            case .resumeRun:
+                // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
+                state.runRestore = .resolved
+                return .none
+            case .alert, nil:
+                return .none
         }
-        return .merge(end, discardRunRecord())
     }
 
     /// Storage appends a new workout, so a new one goes to the end here too.
@@ -453,7 +500,6 @@ public struct AppFeature: Sendable {
 }
 
 extension AppFeature.Destination.State: Equatable, Sendable {}
-extension AppFeature.Destination.Action: Equatable, Sendable {}
 extension AppFeature.Path.State: Equatable, Sendable {}
 extension AppFeature.Path.Action: Equatable, Sendable {}
 

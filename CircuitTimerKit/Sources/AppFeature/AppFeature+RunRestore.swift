@@ -14,6 +14,8 @@ extension AppFeature {
         case reading
         /// Found; decided once the workouts are loaded.
         case found(StoredRunRecord)
+        /// The list asks whether to continue it.
+        case offered(StoredRunRecord)
         case resolved
     }
 
@@ -103,7 +105,10 @@ extension AppFeature {
         return .merge(.cancel(id: CancelID.readRunRecord), loadWorkouts(&state))
     }
 
-    /// Reopens the found run over the loaded list, or drops it. Runs once, at the first load.
+    /// Offers to continue the found run over the loaded list, or drops it. Runs once, at the first load.
+    ///
+    /// Every process death asks, whether the user closed the app in the App Switcher or the system did: iOS keeps the
+    /// scene session in both cases, so nothing tells them apart.
     func resolveRestore(_ state: inout State) -> Effect<Action> {
         guard case let .found(stored) = state.runRestore, case let .loaded(workouts) = state.workouts else { return .none }
 
@@ -144,6 +149,54 @@ extension AppFeature {
                 break
         }
         guard state.destination == nil else {
+            Self.logger.error("Refused to offer a run over another presentation; it stays for the next launch")
+            return .none
+        }
+
+        // Nothing is committed while the alert is up: a running run keeps going by the wall clock.
+        state.selectedTab = .workouts
+        state.runRestore = .offered(stored)
+        state.destination = .resumeRun(.resumeRun(workoutName: workout.displayName))
+        return .none
+    }
+
+    func resumeRunChosen(_ choice: ResumeRunChoice, _ state: inout State) -> Effect<Action> {
+        guard case .offered = state.runRestore else { return .none }
+
+        switch choice {
+            case .finish:
+                state.runRestore = .resolved
+                return discardRunRecord(reportingFailure: true)
+            case .resume:
+                // The alert is still leaving the screen; the cover comes with the next action, so the two never overlap.
+                return .run { send in
+                    await send(.internal(.resumeRunConfirmed))
+                }
+        }
+    }
+
+    /// Settles the run at the tap and opens the timer in its saved phase. A run that ended while the alert was up
+    /// still opens: the user asked to continue, and the timer shows the end.
+    func resumeRunConfirmed(_ state: inout State) -> Effect<Action> {
+        guard case let .offered(stored) = state.runRestore else { return .none }
+
+        state.runRestore = .resolved
+        let now = date()
+        // The alert keeps the list from changing, so both checks are defensive.
+        guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: stored.record.workoutID] else {
+            Self.logger.notice("The offered run's workout is gone; dropping the run")
+            state.destination = .alert(.runNotRestored)
+            return discardRunRecord()
+        }
+        let run: WorkoutRun
+        do {
+            run = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: stored.record, at: now)
+        } catch {
+            Self.logger.notice("The offered run no longer fits its workout: \(String(reflecting: error), privacy: .public)")
+            state.destination = .alert(.runNotRestored)
+            return discardRunRecord()
+        }
+        guard state.destination == nil else {
             Self.logger.error("Refused to restore a run over another presentation; it stays for the next launch")
             return .none
         }
@@ -154,11 +207,11 @@ extension AppFeature {
     }
 
     /// Clears the saved run. Like every record write, it holds a background-task assertion taken here, before the
-    /// effect is scheduled.
-    func discardRunRecord() -> Effect<Action> {
+    /// effect is scheduled. `reportingFailure` tells the user when the clear they asked for failed.
+    func discardRunRecord(reportingFailure: Bool = false) -> Effect<Action> {
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the saved workout run")
-        return .run { [workoutRunRecord, backgroundTask] _ in
+        return .run { [workoutRunRecord, backgroundTask] send in
             do {
                 try await workoutRunRecord.write(nil, revision)
             } catch is CancellationError {
@@ -167,8 +220,27 @@ extension AppFeature {
                 return
             } catch {
                 Self.logger.error("Clearing the saved run failed: \(String(reflecting: error), privacy: .public)")
+                if reportingFailure {
+                    await send(.internal(.runFinishFailed))
+                }
             }
             await backgroundTask.end(token)
+        }
+    }
+}
+
+extension AlertState where Action == AppFeature.ResumeRunChoice {
+    static func resumeRun(workoutName: String) -> Self {
+        AlertState {
+            TextState(String(localized: "workouts.resumeRun.title \(workoutName)", bundle: .module))
+        } actions: {
+            // The cancel role keeps the system from adding a third, Cancel button: one of the two must be chosen.
+            ButtonState(role: .cancel, action: .resume) {
+                TextState("workouts.resumeRun.continue", bundle: .module)
+            }
+            ButtonState(role: .destructive, action: .finish) {
+                TextState("workouts.resumeRun.finish", bundle: .module)
+            }
         }
     }
 }
@@ -179,6 +251,14 @@ extension AlertState where Action == Never {
             TextState("workouts.restoreFailed.title", bundle: .module)
         } message: {
             TextState("workouts.restoreFailed.message", bundle: .module)
+        }
+    }
+
+    static var runNotFinished: Self {
+        AlertState {
+            TextState("workouts.finishFailed.title", bundle: .module)
+        } message: {
+            TextState("workouts.finishFailed.message", bundle: .module)
         }
     }
 }
