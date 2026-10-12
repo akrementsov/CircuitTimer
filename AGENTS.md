@@ -10,7 +10,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
    - Fonts ship in `Sources/DesignSystem/Resources/Fonts/` with their license and are registered at runtime from `Bundle.module`; `Font.custom` lives only in `DesignSystem`.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions. A pushed screen that must not close unasked hides the system back button: a SwiftUI pop reaches the reducer as `popFrom`, which removes the element without a veto.
-6. **Every commit passes `make verify-clean`.**
+6. **Every commit passes `make verify-clean`.** A squash-merged pull request may run it at milestones instead; its last commit always passes it.
 
 ## Engineering principles
 
@@ -55,7 +55,7 @@ Layering:
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
 | `make resolve` | Re-resolves both lockfiles |
 | `make ci` | `lint`, `check-resolved`, `test`, `build-app` |
-| `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit |
+| `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
@@ -187,6 +187,6 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 ## Git
 
 - Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`. A milestone split into slices uses `CT-<milestone>-<n>` instead of `CT-<n>` (`CT-UI-1-dark-tokens`, `CT-UI-1: …`).
-- One logical change per commit, and every commit passes `make verify-clean`.
+- One logical change per commit, and every commit passes `make verify-clean` (at milestones only in a squash-merged pull request, see core rule 6).
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
