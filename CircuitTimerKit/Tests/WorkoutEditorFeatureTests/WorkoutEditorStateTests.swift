@@ -15,7 +15,7 @@ struct WorkoutEditorStateTests {
     }
 
     static let flagsCases: [FlagsCase] = {
-        let untouchedNew = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+        let untouchedNew = newDraftState()
         let untouched = editingState(makeWorkout())
         var changed = untouched
         changed.draft.name = "Changed"
@@ -88,13 +88,15 @@ struct WorkoutEditorStateTests {
     }()
 
     @Test
-    func test_initNew_givesOneWorkStageInTraining() {
-        let state = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+    func test_initNew_givesAnEmptyWorkStageInEverySection() {
+        let state = newDraftState()
 
         #expect(state.phase == .new)
         #expect(state.draft == Workout(
             id: UUID(fixture: 1),
-            training: [Stage(id: UUID(fixture: 2), name: "", duration: .seconds(30), intensity: .work)]
+            warmUp: [Stage(id: UUID(fixture: 2), name: "", duration: .zero, intensity: .work)],
+            training: [Stage(id: UUID(fixture: 3), name: "", duration: .zero, intensity: .work)],
+            coolDown: [Stage(id: UUID(fixture: 4), name: "", duration: .zero, intensity: .work)]
         ))
         #expect(state.original == state.draft)
     }
@@ -137,14 +139,14 @@ struct WorkoutEditorStateTests {
         let editing = editingState(makeWorkout())
         var saving = editing
         saving.isSaving = true
-        var new = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+        var new = newDraftState()
 
         #expect(editing.canReorderStages(in: .training))
         #expect(!editing.canReorderStages(in: .warmUp))
         #expect(!saving.canReorderStages(in: .training))
         #expect(!WorkoutEditorFeature.State(viewing: makeWorkout()).canReorderStages(in: .training))
         #expect(!new.canReorderStages(in: .training))
-        new.draft.training.append(makeStage(3))
+        new.draft.training.append(makeStage(5))
         #expect(new.canReorderStages(in: .training))
     }
 
@@ -222,6 +224,6 @@ struct WorkoutEditorStateTests {
         #expect(!starting.canStart)
         #expect(!WorkoutEditorFeature.State(viewing: silent).canStart)
         #expect(!editingState(makeWorkout()).canStart)
-        #expect(!WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)).canStart)
+        #expect(!newDraftState().canStart)
     }
 }

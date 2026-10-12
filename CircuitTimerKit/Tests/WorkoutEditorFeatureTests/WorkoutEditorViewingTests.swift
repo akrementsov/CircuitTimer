@@ -66,7 +66,7 @@ struct WorkoutEditorViewingTests {
     }
 
     @Test(arguments: [
-        WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)),
+        newDraftState(),
         editingState(makeWorkout()),
     ])
     func test_editAndStart_newOrEditing_changeNothing(state: WorkoutEditorFeature.State) async {
@@ -134,7 +134,7 @@ struct WorkoutEditorViewingTests {
     @Test
     func test_save_newWorkoutFailsThenRetrySucceeds_turnsReadOnlyWithStart() async {
         let calls = LockIsolated(0)
-        let store = makeStore(WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))) {
+        let store = makeStore(newDraftState()) {
             $0.workoutStorage.save = { _ in
                 calls.withValue { $0 += 1 }
                 if calls.value == 1 {
@@ -143,6 +143,9 @@ struct WorkoutEditorViewingTests {
             }
         }
         await store.send(.view(.nameChanged("  Morning  "))) { $0.draft.name = "  Morning  " }
+        await store.send(.view(.stageDurationTextChanged(.training, UUID(fixture: 3), "00:30"))) {
+            $0.draft.training[0].duration = .seconds(30)
+        }
 
         await store.send(.view(.saveButtonTapped)) { $0.isSaving = true }
         await store.receive(\.internal.saveFailed) {
@@ -164,6 +167,8 @@ struct WorkoutEditorViewingTests {
         }
         await store.receive(\.delegate.saved, saved)
 
+        #expect(saved.warmUp.isEmpty)
+        #expect(saved.coolDown.isEmpty)
         #expect(store.state.canStart)
         #expect(calls.value == 2)
     }

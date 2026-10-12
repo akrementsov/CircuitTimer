@@ -66,7 +66,12 @@ struct AppFeatureReloadTests {
         await creating.receive(\.internal.workoutsLoaded) {
             $0.isReloading = false
             $0.deferredScreen = nil
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(
+                newWorkoutID: UUID(0),
+                warmUpStageID: UUID(1),
+                trainingStageID: UUID(2),
+                coolDownStageID: UUID(3)
+            ))
         }
     }
 

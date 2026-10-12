@@ -60,12 +60,12 @@ struct WorkoutEditorFeatureTests {
         let store = makeStore(editingState(workout))
 
         await store.send(.view(.addStageButtonTapped(.training))) {
-            $0.draft.training.append(Stage(id: UUID(0), name: "", duration: .seconds(30), intensity: .work))
+            $0.draft.training.append(Stage(id: UUID(0), name: "", duration: .zero, intensity: .work))
         }
         #expect(!store.state.canAddStage(to: .training))
         await store.send(.view(.addStageButtonTapped(.training)))
         await store.send(.view(.addStageButtonTapped(.warmUp))) {
-            $0.draft.warmUp.append(Stage(id: UUID(1), name: "", duration: .seconds(30), intensity: .work))
+            $0.draft.warmUp.append(Stage(id: UUID(1), name: "", duration: .zero, intensity: .work))
         }
     }
 
@@ -296,7 +296,7 @@ struct WorkoutEditorFeatureTests {
         let dependencies: (inout DependencyValues) -> Void = { $0.dismiss = DismissEffect { dismissals.withValue { $0 += 1 } } }
         let untouchedEdit = makeStore(dependencies: dependencies)
         let untouchedNew = makeStore(
-            WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)),
+            newDraftState(),
             dependencies: dependencies
         )
         let changed = makeStore(dependencies: dependencies)

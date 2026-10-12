@@ -29,6 +29,16 @@ func makeWorkout() -> Workout {
     )
 }
 
+/// A new workout as the editor opens it: an empty stage in every section, the training one `UUID(fixture: 3)`.
+func newDraftState() -> WorkoutEditorFeature.State {
+    WorkoutEditorFeature.State(
+        newWorkoutID: UUID(fixture: 1),
+        warmUpStageID: UUID(fixture: 2),
+        trainingStageID: UUID(fixture: 3),
+        coolDownStageID: UUID(fixture: 4)
+    )
+}
+
 /// A stored workout after the pencil: the editor of `workout`.
 func editingState(_ workout: Workout = makeWorkout()) -> WorkoutEditorFeature.State {
     var state = WorkoutEditorFeature.State(viewing: workout)

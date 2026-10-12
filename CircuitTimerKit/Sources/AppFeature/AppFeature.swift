@@ -363,7 +363,16 @@ public struct AppFeature: Sendable {
 
         switch request {
             case .create:
-                state.path.append(.editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid())))
+                state.path.append(
+                    .editor(
+                        WorkoutEditorFeature.State(
+                            newWorkoutID: uuid(),
+                            warmUpStageID: uuid(),
+                            trainingStageID: uuid(),
+                            coolDownStageID: uuid()
+                        )
+                    )
+                )
             case let .open(id):
                 // The workout may be gone by now; then there is nothing to show.
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }

@@ -530,7 +530,14 @@ public struct WorkoutEditorView: View {
 #Preview("New") {
     NavigationStack {
         WorkoutEditorView(
-            store: Store(initialState: WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1))) {
+            store: Store(
+                initialState: WorkoutEditorFeature.State(
+                    newWorkoutID: UUID(0),
+                    warmUpStageID: UUID(1),
+                    trainingStageID: UUID(2),
+                    coolDownStageID: UUID(3)
+                )
+            ) {
                 WorkoutEditorFeature()
             }
         )

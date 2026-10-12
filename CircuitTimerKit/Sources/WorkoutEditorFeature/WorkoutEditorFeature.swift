@@ -60,9 +60,14 @@ public struct WorkoutEditorFeature: Sendable {
         public internal(set) var saveTipSuppressed = false
         @Presents public var destination: Destination.State?
 
-        /// A new workout starts with one work stage in the training section.
-        public init(newWorkoutID: Workout.ID, firstStageID: Stage.ID) {
-            let workout = Workout(id: newWorkoutID, training: [State.newStage(id: firstStageID)])
+        /// A new workout starts with an empty stage in every section, as in the original app: a place to type into.
+        public init(newWorkoutID: Workout.ID, warmUpStageID: Stage.ID, trainingStageID: Stage.ID, coolDownStageID: Stage.ID) {
+            let workout = Workout(
+                id: newWorkoutID,
+                warmUp: [State.newStage(id: warmUpStageID)],
+                training: [State.newStage(id: trainingStageID)],
+                coolDown: [State.newStage(id: coolDownStageID)]
+            )
             phase = .new
             self.workout = workout
             original = workout
@@ -151,18 +156,31 @@ public struct WorkoutEditorFeature: Sendable {
             return nil
         }
 
-        /// The workout as Save would judge it: names without the spaces around them.
+        /// The workout as Save would judge it: names without the spaces around them, and without the untouched empty
+        /// stages the editor offers, which a save drops anyway. So deleting or moving one is no change either.
         func comparable(_ workout: Workout) -> Workout {
             var workout = workout
             workout.name = workout.name.trimmingCharacters(in: .whitespacesAndNewlines)
             for section in WorkoutSectionKind.allCases {
-                workout[section] = workout[section].map { stage in
-                    var stage = stage
-                    stage.name = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return stage
-                }
+                workout[section] = workout[section]
+                    .map { stage in
+                        var stage = stage
+                        stage.name = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return stage
+                    }
+                    .filter { !isUntouchedStarter($0) }
             }
             return workout
+        }
+
+        /// A stage the editor offered — a new workout's or one from «+» — still exactly as offered. A stored stage
+        /// that the user emptied is not one: it was there before and is a change.
+        private func isUntouchedStarter(_ stage: Stage) -> Bool {
+            guard stage == Self.newStage(id: stage.id) else { return false }
+
+            return phase == .new || !WorkoutSectionKind.allCases.contains { section in
+                original[section].contains { $0.id == stage.id }
+            }
         }
 
         private var endsEditingUntouched: Bool {
@@ -231,7 +249,7 @@ public struct WorkoutEditorFeature: Sendable {
         }
 
         static func newStage(id: Stage.ID) -> Stage {
-            Stage(id: id, name: "", duration: .seconds(30), intensity: .work)
+            Stage(id: id, name: "", duration: .zero, intensity: .work)
         }
     }
 
