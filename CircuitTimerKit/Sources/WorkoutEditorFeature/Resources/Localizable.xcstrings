@@ -325,6 +325,22 @@
         }
       }
     },
+    "editor.saveBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't save yet"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока нельзя сохранить"
+          }
+        }
+      }
+    },
     "editor.saveBlocked.zeroStages" : {
       "localizations" : {
         "en" : {

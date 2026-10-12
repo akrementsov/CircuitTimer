@@ -16,11 +16,14 @@ public struct WorkoutEditorFeature: Sendable {
         @ReducerCaseIgnored
         case saveFailedAlert(AlertState<Never>)
         @ReducerCaseIgnored
+        case saveBlockedAlert(AlertState<Never>)
+        @ReducerCaseIgnored
         case discardConfirmation(AlertState<DiscardConfirmation>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case saveFailedAlert(Never)
+            case saveBlockedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
         }
     }
@@ -246,6 +249,8 @@ public struct WorkoutEditorFeature: Sendable {
             case stageIntensityTapped(WorkoutSectionKind, Stage.ID)
             case backButtonTapped
             case saveButtonTapped
+            /// A tap on the dimmed Save, which asks why it is dimmed.
+            case saveBlockedTapped
             case editButtonTapped
             case startButtonTapped
         }
@@ -350,6 +355,10 @@ public struct WorkoutEditorFeature: Sendable {
                 state.destination = .discardConfirmation(.discardChanges)
             case .saveButtonTapped:
                 return save(&state)
+            case .saveBlockedTapped:
+                guard let blocker = state.saveBlocker else { return .none }
+
+                state.destination = .saveBlockedAlert(.saveBlocked(blocker))
             case .editButtonTapped:
                 state.original = State.editable(state.workout)
                 state.draft = state.original
@@ -475,6 +484,17 @@ extension AlertState where Action == Never {
             TextState("editor.saveFailed.title", bundle: .module)
         } message: {
             TextState("editor.saveFailed.message", bundle: .module)
+        }
+    }
+
+    static func saveBlocked(_ blocker: WorkoutEditorFeature.State.SaveBlocker) -> Self {
+        AlertState {
+            TextState("editor.saveBlocked.title", bundle: .module)
+        } message: {
+            switch blocker {
+                case .incomplete: TextState("editor.saveHint", bundle: .module)
+                case .unsavableStage: TextState("editor.saveBlocked.zeroStages", bundle: .module)
+            }
         }
     }
 }

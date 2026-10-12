@@ -49,6 +49,7 @@ public struct WorkoutEditorView: View {
         .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
+        .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
 
@@ -92,6 +93,13 @@ public struct WorkoutEditorView: View {
                 isEnabled: store.canSave,
                 action: { send(afterClearingFocus: .saveButtonTapped) }
             )
+            // A disabled button takes no taps; while Save is dimmed for a reason, a tap on it asks why instead.
+            .gesture(
+                TapGesture().onEnded { send(afterClearingFocus: .saveBlockedTapped) },
+                including: store.saveBlocker != nil ? .all : .subviews
+            )
+            // VoiceOver's double tap never reaches a disabled button; the reason is read with it instead.
+            .accessibilityHint(store.saveBlocker.map(Self.explanation(of:)) ?? Text(verbatim: ""))
         } else {
             BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
                 send(.startButtonTapped)
