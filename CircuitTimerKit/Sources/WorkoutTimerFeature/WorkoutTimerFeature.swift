@@ -70,8 +70,8 @@ public struct WorkoutTimerFeature: Sendable {
         var awakeRevision = 0
         /// What the record file holds, as far as this screen knows.
         var recordSync = RecordSync.unknown
-        /// Set while the newest record write failed; the screen says what a relaunch would bring back.
-        public internal(set) var recordWarning: RecordWarning?
+        /// Set while the newest record write failed: a relaunch may bring back no run, or an earlier state of one.
+        public internal(set) var hasRecordFailed = false
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @Presents public var destination: Destination.State?
@@ -134,7 +134,7 @@ public struct WorkoutTimerFeature: Sendable {
             /// `isFinal`: the loop saw its copy stop and has ended.
             case ticked(generation: Int, isFinal: Bool)
             case clockFailed(generation: Int)
-            case recordWritten(revision: Int, outcome: RecordOutcome)
+            case recordWritten(revision: Int, succeeded: Bool)
         }
     }
 
@@ -206,8 +206,8 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
-            case let .recordWritten(revision, outcome):
-                recordWritten(revision: revision, outcome: outcome, &state)
+            case let .recordWritten(revision, succeeded):
+                recordWritten(revision: revision, succeeded: succeeded, &state)
                 return .none
             case let .countdownTicked(generation):
                 if let stale = stopIfStale(generation, state) { return stale }

@@ -25,34 +25,13 @@ actor RunRecordFile {
         lastAppliedRevision = revision
         let url = RunRecordLayout.fileURL(in: directory, sessionID: sessionID)
         if let record {
-            do {
-                try prepareDirectory()
-                let data = try JSONEncoder().encode(record)
-                try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-            } catch {
-                try replaceFailed(record, at: url, error: error)
-            }
+            try prepareDirectory()
+            let data = try JSONEncoder().encode(record)
+            try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } else {
             try remove(url)
         }
         removeOtherSessions(keeping: url)
-    }
-
-    /// The file is read back, whichever process wrote it. A record the new one only continues, such as the one the
-    /// refresh on leaving the screen rewrites, still restores the same state, so it stays. Any other older record would
-    /// bring back a phase the user has left, such as running after a pause, so it goes; no record is better than that.
-    private func replaceFailed(_ record: WorkoutRunRecord, at url: URL, error: any Error) throws {
-        if let kept = readKept(url), record.continues(kept) {
-            throw RunRecordError.refreshFailed(error)
-        }
-
-        do {
-            try remove(url)
-        } catch let removal {
-            Logger.runRecord.error("Removing an outdated run record failed: \(String(reflecting: removal), privacy: .public)")
-            throw RunRecordError.outdatedRecordKept(error)
-        }
-        throw error
     }
 
     private func prepareDirectory() throws {
@@ -69,17 +48,6 @@ actor RunRecordFile {
             isExclusionApplied = true
         } catch {
             Logger.runRecord.error("Excluding run records from backup failed: \(String(reflecting: error), privacy: .public)")
-        }
-    }
-
-    private func readKept(_ url: URL) -> WorkoutRunRecord? {
-        do {
-            return try JSONDecoder().decode(WorkoutRunRecord.self, from: Data(contentsOf: url))
-        } catch where RunRecordLayout.isMissingFile(error) {
-            return nil
-        } catch {
-            Logger.runRecord.error("Reading the run record back failed: \(String(reflecting: error), privacy: .public)")
-            return nil
         }
     }
 

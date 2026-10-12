@@ -4,21 +4,6 @@ import WorkoutDomain
 import WorkoutStorage
 
 extension WorkoutTimerFeature {
-    /// What a relaunch would bring back after the newest record write failed.
-    public enum RecordWarning: Equatable, Sendable {
-        /// Nothing: the run is lost if the app closes.
-        case notSaved
-        /// An older record the file could not drop: a state the user has left, or another run.
-        case olderKept
-    }
-
-    public enum RecordOutcome: Equatable, Sendable {
-        case written
-        /// The next sync writes again; `warning` says what a relaunch would bring back meanwhile, `nil` when the file
-        /// still restores the same state.
-        case failed(warning: RecordWarning?)
-    }
-
     /// What the record file holds, as far as the screen knows.
     enum RecordSync: Equatable, Sendable {
         /// The next sync writes whatever the run is. Nothing written yet, where the file may still hold a run an earlier
@@ -51,40 +36,30 @@ extension WorkoutTimerFeature {
         let token = backgroundTask.begin("Save the workout run")
         state.recordSync = .pending(revision: revision, record: record)
         return .run { [workoutRunRecord, backgroundTask, sessionID = state.sceneSessionID] send in
-            let outcome: RecordOutcome
+            let succeeded: Bool
             do {
                 try await workoutRunRecord.write(record, sessionID, revision)
-                outcome = .written
+                succeeded = true
             } catch is CancellationError {
                 await backgroundTask.end(token)
                 return
-            } catch RunRecordError.refreshFailed(let error) {
-                Self.logger.notice("Refreshing the saved run failed; the file still restores it: \(String(reflecting: error), privacy: .public)")
-                outcome = .failed(warning: nil)
-            } catch RunRecordError.outdatedRecordKept(let error) {
-                Self.logger.error("Saving the run failed, and its older record stays: \(String(reflecting: error), privacy: .public)")
-                outcome = .failed(warning: .olderKept)
             } catch {
                 Self.logger.error("Saving the run failed: \(String(reflecting: error), privacy: .public)")
-                // A failed clear leaves the older record in the file.
-                outcome = .failed(warning: record == nil ? .olderKept : .notSaved)
+                succeeded = false
             }
             await backgroundTask.end(token)
-            await send(.internal(.recordWritten(revision: revision, outcome: outcome)))
+            await send(.internal(.recordWritten(revision: revision, succeeded: succeeded)))
         }
     }
 
     /// Only the newest write decides what the file holds and whether the screen warns.
-    func recordWritten(revision: Int, outcome: RecordOutcome, _ state: inout State) {
+    ///
+    /// A failed write leaves the file as it was: it may hold no run, or an earlier state of this one or of another run.
+    /// The screen says so until a later sync writes again and succeeds.
+    func recordWritten(revision: Int, succeeded: Bool, _ state: inout State) {
         guard case let .pending(pending, record) = state.recordSync, pending == revision else { return }
 
-        switch outcome {
-            case .written:
-                state.recordSync = .stored(record)
-                state.recordWarning = nil
-            case let .failed(warning):
-                state.recordSync = .failed(record)
-                state.recordWarning = warning
-        }
+        state.recordSync = succeeded ? .stored(record) : .failed(record)
+        state.hasRecordFailed = !succeeded
     }
 }

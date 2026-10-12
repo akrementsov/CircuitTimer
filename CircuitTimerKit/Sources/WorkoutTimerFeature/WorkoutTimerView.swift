@@ -43,8 +43,8 @@ public struct WorkoutTimerView: View {
                 .frame(height: 98 * unit)
                 .padding(.horizontal, .token(spacing: .xxxl))
                 .padding(.top, .token(spacing: .xxl))
-                if let text = store.recordWarningText {
-                    Text(text)
+                if store.hasRecordFailed {
+                    Text("timer.record.failed", bundle: .module)
                         .font(.token(.footnote))
                         .foregroundStyle(.text(.secondary))
                         .multilineTextAlignment(.center)
@@ -120,7 +120,7 @@ private enum PreviewTimer {
         _ workout: Workout = workout,
         countdown: WorkoutTimerFeature.Countdown? = nil,
         hasClockFailed: Bool = false,
-        recordWarning: WorkoutTimerFeature.RecordWarning? = nil,
+        hasRecordFailed: Bool = false,
         play: (inout WorkoutRun) -> Void = { $0.start(at: PreviewTimer.start) }
     ) -> WorkoutTimerFeature.State {
         var state = WorkoutTimerFeature.State(
@@ -135,7 +135,7 @@ private enum PreviewTimer {
         state.snapshot = state.run.snapshot(at: now)
         state.countdown = countdown
         state.hasClockFailed = hasClockFailed
-        state.recordWarning = recordWarning
+        state.hasRecordFailed = hasRecordFailed
         return state
     }
 
@@ -215,11 +215,7 @@ private enum PreviewTimer {
 }
 
 #Preview("Save failed") {
-    PreviewTimer.view(PreviewTimer.state(recordWarning: .notSaved))
-}
-
-#Preview("Older run kept") {
-    PreviewTimer.view(PreviewTimer.state(recordWarning: .olderKept))
+    PreviewTimer.view(PreviewTimer.state(hasRecordFailed: true))
 }
 
 #Preview("Longest names") {

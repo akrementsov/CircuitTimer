@@ -124,28 +124,6 @@ public struct WorkoutRunRecord: Codable, Hashable, Sendable {
         sinceEpochMs = try container.decodeIfPresent(Int64.self, forKey: .sinceEpochMs)
     }
 
-    /// Whether restoring `self` lands where restoring `earlier` does: the same run, with only time passing between
-    /// the two. A pause, a skip, a manual pause reached or a rebase after a clock change breaks it.
-    public func continues(_ earlier: Self) -> Bool {
-        guard
-            schemaVersion == earlier.schemaVersion,
-            workoutID == earlier.workoutID,
-            scheduleFingerprint == earlier.scheduleFingerprint,
-            phase == earlier.phase
-        else { return false }
-
-        switch phase {
-            case .paused, .awaitingUser:
-                return positionMs == earlier.positionMs && cursor == earlier.cursor
-            case .running:
-                guard let since = sinceEpochMs, let earlierSince = earlier.sinceEpochMs else { return false }
-
-                // Running settles position and anchor forward together, so their difference holds until something else
-                // happens to the run.
-                return positionMs - since == earlier.positionMs - earlierSince
-        }
-    }
-
     /// The running anchor as a date, for logs and checks outside the domain.
     public var since: Date? {
         sinceEpochMs.map { Date(millisecondsSince1970: $0) }

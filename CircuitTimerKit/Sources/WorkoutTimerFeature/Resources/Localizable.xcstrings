@@ -437,34 +437,18 @@
         }
       }
     },
-    "timer.record.notSaved" : {
+    "timer.record.failed" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Progress won't be restored if the app closes."
+            "value" : "Couldn't save progress: if the app closes, the workout may not come back or may open in an earlier state."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Прогресс не восстановится, если приложение закроется."
-          }
-        }
-      }
-    },
-    "timer.record.olderKept" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If the app closes, an earlier state of a workout may open instead."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Если приложение закроется, вместо этого может открыться прежнее состояние тренировки."
+            "value" : "Не удалось сохранить прогресс: если приложение закроется, тренировка может не восстановиться или открыться в прежнем состоянии."
           }
         }
       }
