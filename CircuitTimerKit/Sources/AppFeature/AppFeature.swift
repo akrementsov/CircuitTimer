@@ -233,6 +233,7 @@ public struct AppFeature: Sendable {
                     state.needsReload = true
                     return .none
                 }
+                // Defensive: the write that overtook this read normally cancels it with a newer load.
                 if state.needsReload {
                     state.needsReload = false
                     return loadWorkouts(&state)

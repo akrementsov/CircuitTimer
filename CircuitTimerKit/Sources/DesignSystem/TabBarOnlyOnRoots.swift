@@ -1,9 +1,9 @@
 import SwiftUI
 
 extension View {
-    /// For a `TabView` whose navigation stacks show the tab bar only on their roots, together with
-    /// `tabBarOnlyOnRoot(isPushed:)` on each root. Measured outside the tabs, the screen's own bottom inset reaches the
-    /// pushed screens, where a bottom panel stands on it before iOS 26; no root has a bottom panel.
+    /// For a `TabView` some of whose navigation stacks keep the tab bar to their roots with
+    /// `tabBarOnlyOnRoot(isPushed:)`. Measured outside the tabs, the screen's own bottom inset reaches the pushed
+    /// screens, where a bottom panel stands on it before iOS 26; no root has a bottom panel.
     public func tabBarOnlyOnRoots() -> some View {
         modifier(ScreenBottomInsetProvider())
     }

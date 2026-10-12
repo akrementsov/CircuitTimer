@@ -61,6 +61,9 @@ struct AutoScrollDriver: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject {
+        /// A stalled main thread catches up by this many frames at most instead of jumping.
+        private static let maxCatchUpFrames: CGFloat = 3
+
         weak var scrollView: UIScrollView?
         private var displayLink: CADisplayLink?
         private var lastTimestamp: CFTimeInterval?
@@ -84,9 +87,8 @@ struct AutoScrollDriver: UIViewRepresentable {
         }
 
         @objc private func step(_ link: CADisplayLink) {
-            // Points per frame at 60 frames a second, whatever the display's rate; a stalled main thread catches up
-            // by a few frames at most instead of jumping.
-            let frames = lastTimestamp.map { min(CGFloat((link.timestamp - $0) * 60), 3) } ?? 1
+            // Points per frame at 60 frames a second, whatever the display's rate.
+            let frames = lastTimestamp.map { min(CGFloat((link.timestamp - $0) * 60), Self.maxCatchUpFrames) } ?? 1
             lastTimestamp = link.timestamp
             guard let scrollView else { return }
 

@@ -67,7 +67,7 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
                 let coordinator = transitionCoordinator,
                 snapshot != nil,
                 // A pop under a full-screen cover: lifted onto the window, the picture would show over the cover.
-                tabBarController.presentedViewController == nil
+                !Self.isCovered(tabBarController)
             else {
                 finish()
                 return
@@ -97,6 +97,12 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
                 CATransaction.commit()
                 perform(#selector(removeSnapshot), with: nil, afterDelay: Self.glassSettleDuration)
             }
+        }
+
+        private static func isCovered(_ controller: UIViewController) -> Bool {
+            guard let presented = controller.presentedViewController else { return false }
+
+            return presented.modalPresentationStyle == .fullScreen || presented.modalPresentationStyle == .overFullScreen
         }
 
         private func finish() {
