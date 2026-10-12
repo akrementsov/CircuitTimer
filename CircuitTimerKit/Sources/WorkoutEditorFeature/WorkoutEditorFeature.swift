@@ -52,7 +52,7 @@ public struct WorkoutEditorFeature: Sendable {
         public var isSaving = false
         /// Start was tapped and the timer is on its way; a second tap must not ask again.
         public internal(set) var isStarting = false
-        /// The screen has stood still long enough since it appeared or changed its phase for the tip to point at Save.
+        /// The screen has stood still long enough since its layout last changed for the tip to point at Save.
         public internal(set) var hasSettled = false
         /// Tells the latest wait for `hasSettled` from an older one whose result arrives late.
         public internal(set) var settleGeneration = 0
@@ -154,6 +154,12 @@ public struct WorkoutEditorFeature: Sendable {
                 return .incomplete
             }
             return nil
+        }
+
+        /// The tip may point at the dimmed Save: there is a reason, the screen stands still, no alert is up, and a tap
+        /// has not explained it already. The view adds that no field is focused.
+        public var showsSaveTip: Bool {
+            saveBlocker != nil && hasSettled && !saveTipSuppressed && destination == nil
         }
 
         /// The workout as Save would judge it: names without the spaces around them, and without the untouched empty
@@ -261,9 +267,13 @@ public struct WorkoutEditorFeature: Sendable {
 
         @CasePathable
         public enum View: Equatable, Sendable {
-            /// The screen appeared or changed its phase.
-            case appeared
+            /// The screen appeared, changed its phase or let the keyboard go: its layout moves for a moment.
+            case layoutChanged
             case nameChanged(String)
+            /// The workout name's field lost focus.
+            case nameFieldLeft
+            /// A stage name's field lost focus.
+            case stageNameFieldLeft(Stage.ID)
             case trainingRoundsChanged(Int)
             case pauseAfterWarmUpChanged(Bool)
             case pauseAfterTrainingChanged(Bool)
@@ -342,16 +352,25 @@ public struct WorkoutEditorFeature: Sendable {
         // The read-only screen draws no editing controls; a late action from the editor it replaced changes nothing.
         switch state.phase {
             case .viewing:
-                guard [.appeared, .backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
+                guard [.layoutChanged, .backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
             case .new, .editing:
                 guard action != .editButtonTapped, action != .startButtonTapped else { return .none }
         }
 
         switch action {
-            case .appeared:
+            case .layoutChanged:
                 return settle(&state)
             case let .nameChanged(name):
                 state.draft.name = WorkoutLimits.limitedName(name, previous: state.draft.name)
+            case .nameFieldLeft:
+                // A save trims names anyway; trimming the one just left shows it before Back or Save is judged.
+                state.draft.name = state.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            case let .stageNameFieldLeft(id):
+                guard let section = WorkoutSectionKind.allCases.first(where: { section in
+                    state.draft[section].contains { $0.id == id }
+                }) else { return .none }
+
+                updateStage(id, in: section, of: &state) { $0.name = $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
             case let .trainingRoundsChanged(rounds):
                 let range = State.trainingRoundsRange
                 state.draft.trainingRounds = min(max(rounds, range.lowerBound), range.upperBound)
@@ -388,7 +407,11 @@ public struct WorkoutEditorFeature: Sendable {
             case let .stageIntensityTapped(section, id):
                 updateStage(id, in: section, of: &state) { $0.intensity = $0.intensity == .work ? .rest : .work }
             case .backButtonTapped:
-                guard state.hasChanges else { return .run { [dismiss] _ in await dismiss() } }
+                guard state.hasChanges else {
+                    // The screen is going away; the tip must not show on it while it slides out.
+                    state.hasSettled = false
+                    return .run { [dismiss] _ in await dismiss() }
+                }
 
                 state.destination = .discardConfirmation(.discardChanges)
             case .saveButtonTapped:
@@ -440,8 +463,8 @@ public struct WorkoutEditorFeature: Sendable {
         }
     }
 
-    /// Waits for the screen to stand still before the tip may show; every appearance or phase change starts over,
-    /// and a wait it replaced may still deliver late, so the generation must match.
+    /// Waits for the screen to stand still before the tip may show; every layout change starts over, and a wait it
+    /// replaced may still deliver late, so the generation must match.
     private func settle(_ state: inout State) -> Effect<Action> {
         state.hasSettled = false
         state.settleGeneration += 1

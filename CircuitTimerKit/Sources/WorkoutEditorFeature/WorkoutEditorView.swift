@@ -50,7 +50,7 @@ public struct WorkoutEditorView: View {
         .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
         // A phase change moves the cells like a push moves the screen; the tip waits for both to end.
-        .task(id: store.phase) { send(.appeared) }
+        .task(id: store.phase) { send(.layoutChanged) }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
@@ -115,11 +115,8 @@ public struct WorkoutEditorView: View {
     /// itself comes and goes.
     @ViewBuilder
     private var saveTipAnchor: some View {
-        if let blocker = store.saveBlocker,
-           store.hasSettled,
-           !store.saveTipSuppressed,
-           focusedField == nil,
-           store.destination == nil {
+        // A request waiting for the focus to clear is about to leave or explain; the tip must not slip in before it.
+        if store.showsSaveTip, let blocker = store.saveBlocker, focusedField == nil, actionAfterFocusLoss == nil {
             // After the tip: its anchor takes taps of its own, and the dimmed Save's tap must reach the panel under it.
             Spacer(minLength: .zero)
                 .popoverTip(SaveWorkoutTip(blocker: blocker), arrowEdge: .bottom)
@@ -436,36 +433,21 @@ public struct WorkoutEditorView: View {
 
     private func focusChanged(from oldField: EditorField?, to field: EditorField?) {
         // Before the pending Back or Save, so a name left with spaces around it is no change to ask about.
-        trimName(of: oldField)
+        switch oldField {
+            case .name: send(.nameFieldLeft)
+            case let .stageName(id): send(.stageNameFieldLeft(id))
+            case .stageDuration, nil: break
+        }
+        // The keyboard slides away, and the panel with it.
+        if field == nil {
+            send(.layoutChanged)
+        }
         guard let action = actionAfterFocusLoss else { return }
 
         actionAfterFocusLoss = nil
         // Focusing a field again cancels the request instead of leaving under the user's typing.
         if field == nil {
             send(action)
-        }
-    }
-
-    /// A save trims names anyway; trimming the one just left shows it, and sends nothing when there is nothing to trim.
-    private func trimName(of field: EditorField?) {
-        switch field {
-            case .name:
-                let trimmed = store.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed != store.draft.name {
-                    send(.nameChanged(trimmed))
-                }
-            case let .stageName(id):
-                for section in WorkoutSectionKind.allCases {
-                    guard let stage = store.draft[section].first(where: { $0.id == id }) else { continue }
-
-                    let trimmed = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmed != stage.name {
-                        send(.stageNameChanged(section, id, trimmed))
-                    }
-                    return
-                }
-            case .stageDuration, nil:
-                break
         }
     }
 
