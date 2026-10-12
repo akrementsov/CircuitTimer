@@ -21,7 +21,7 @@ struct WorkoutEditorViewingTests {
     }
 
     @Test
-    func test_viewActions_viewing_ignoreEverythingButBackEditAndStart() async {
+    func test_viewActions_viewing_ignoreEverythingButBackEditStartAndLayout() async {
         // Storage and dismissal are left unimplemented: a write or a dismissal fails the test.
         let store = makeStore(WorkoutEditorFeature.State(viewing: makeWorkout()))
         let stage = UUID(fixture: 20)
@@ -39,7 +39,10 @@ struct WorkoutEditorViewingTests {
             .stageNameChanged(.training, stage, "Other"),
             .stageDurationTextChanged(.training, stage, "1"),
             .stageIntensityTapped(.training, stage),
+            .nameFieldLeft,
+            .stageNameFieldLeft(stage),
             .saveButtonTapped,
+            .saveBlockedTapped,
         ]
 
         for action in actions {

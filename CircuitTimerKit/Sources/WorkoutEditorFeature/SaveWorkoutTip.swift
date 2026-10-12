@@ -15,10 +15,7 @@ struct SaveWorkoutTip: Tip {
     }
 
     var message: Text? {
-        switch blocker {
-            case .incomplete: Text("editor.saveHint", bundle: .module)
-            case .unsavableStage: Text("editor.saveBlocked.zeroStages", bundle: .module)
-        }
+        Text(blocker.messageKey, bundle: .module)
     }
 
     var options: [any TipOption] {

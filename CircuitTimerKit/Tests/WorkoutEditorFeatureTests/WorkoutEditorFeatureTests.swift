@@ -169,7 +169,7 @@ struct WorkoutEditorFeatureTests {
     }
 
     @Test
-    func test_save_changedDraft_savesNormalizedCopyThenReturnsToViewing() async {
+    func test_save_changedDraft_savesTrimmedCopyThenReturnsToViewing() async {
         let events = LockIsolated<[String]>([])
         let saved = LockIsolated<Workout?>(nil)
         let store = makeStore {
@@ -347,8 +347,12 @@ struct WorkoutEditorFeatureTests {
             .stageNameChanged(.training, stage, "Other"),
             .stageDurationTextChanged(.training, stage, "1"),
             .stageIntensityTapped(.training, stage),
+            .nameFieldLeft,
+            .stageNameFieldLeft(stage),
+            .layoutChanged,
             .backButtonTapped,
             .saveButtonTapped,
+            .saveBlockedTapped,
         ]
 
         for action in actions {

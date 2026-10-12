@@ -57,11 +57,13 @@ public struct WorkoutEditorView: View {
     }
 
     private var content: some View {
-        VStack(spacing: .zero) {
+        // Once for all three cards: it compares the whole draft with the original.
+        let unsavableStageIDs = store.state.unsavableStageIDs
+        return VStack(spacing: .zero) {
             nameRow
             totalTimeRow
             VStack(spacing: .token(spacing: .m)) {
-                stagesCard(.warmUp)
+                stagesCard(.warmUp, unsavableStageIDs: unsavableStageIDs)
                 if store.state.showsPause(after: .warmUp) {
                     PauseCard(
                         isOn: $store.draft.pauseAfterWarmUp.sending(\.view.pauseAfterWarmUpChanged),
@@ -70,7 +72,7 @@ public struct WorkoutEditorView: View {
                     )
                     .transition(PlaqueReveal())
                 }
-                stagesCard(.training)
+                stagesCard(.training, unsavableStageIDs: unsavableStageIDs)
                 if store.state.showsPause(after: .training) {
                     PauseCard(
                         isOn: $store.draft.pauseAfterTraining.sending(\.view.pauseAfterTrainingChanged),
@@ -79,7 +81,7 @@ public struct WorkoutEditorView: View {
                     )
                     .transition(PlaqueReveal())
                 }
-                stagesCard(.coolDown)
+                stagesCard(.coolDown, unsavableStageIDs: unsavableStageIDs)
             }
         }
         .padding(.horizontal, .token(spacing: .l))
@@ -101,7 +103,7 @@ public struct WorkoutEditorView: View {
                 including: store.saveBlocker != nil ? .all : .subviews
             )
             // VoiceOver's double tap never reaches a disabled button; the reason is read with it instead.
-            .accessibilityHint(store.saveBlocker.map(Self.explanation(of:)) ?? Text(verbatim: ""))
+            .accessibilityHint(store.saveBlocker.map { Text($0.messageKey, bundle: .module) } ?? Text(verbatim: ""))
             .overlay { saveTipAnchor }
         } else {
             BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
@@ -220,6 +222,7 @@ public struct WorkoutEditorView: View {
                 } label: {
                     Text("editor.keyboard.done", bundle: .module)
                 }
+                .tint(.brand)
             }
         }
     }
@@ -233,16 +236,15 @@ public struct WorkoutEditorView: View {
     }
 
     @ViewBuilder
-    private func stagesCard(_ section: WorkoutSectionKind) -> some View {
+    private func stagesCard(_ section: WorkoutSectionKind, unsavableStageIDs: Set<Stage.ID>) -> some View {
         if store.state.showsSection(section) {
-            stagesCardContent(section)
+            stagesCardContent(section, unsavableStageIDs: unsavableStageIDs)
                 .transition(PlaqueReveal())
         }
     }
 
-    private func stagesCardContent(_ section: WorkoutSectionKind) -> some View {
+    private func stagesCardContent(_ section: WorkoutSectionKind, unsavableStageIDs: Set<Stage.ID>) -> some View {
         let stages = store.state.shownStages(in: section)
-        let unsavableStageIDs = store.state.unsavableStageIDs
         let isEditable = store.isEditable
         return EditorCard {
             TitleAndTimeRow(title: sectionTitle(section), duration: store.state.shownDuration(of: section), style: .adaptive, font: .body)
@@ -451,26 +453,17 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    /// What Save's dimming means, in words.
-    private static func explanation(of blocker: WorkoutEditorFeature.State.SaveBlocker) -> Text {
-        switch blocker {
-            case .incomplete: Text("editor.saveHint", bundle: .module)
-            case .unsavableStage: Text("editor.saveBlocked.zeroStages", bundle: .module)
-        }
-    }
-
     /// What VoiceOver adds to a stage's duration: a changed stage that keeps Save dimmed says so, and one that would
     /// not play says that a save drops it.
     private static func durationHint(for stage: Stage, isUnsavable: Bool) -> Text? {
         if isUnsavable {
-            Text("editor.hint.zeroStage", bundle: .module)
+            Text("editor.stage.duration.unsavableHint", bundle: .module)
         } else if !WorkoutLimits.isPlayable(stage) {
             Text("editor.stage.skipped", bundle: .module)
         } else {
             nil
         }
     }
-
 }
 
 #Preview("Viewing") {

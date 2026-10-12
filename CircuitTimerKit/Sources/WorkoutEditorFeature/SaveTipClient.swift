@@ -1,5 +1,4 @@
 import ComposableArchitecture
-import Foundation
 import TipKit
 
 /// The one write to TipKit's store: the dimmed Save was explained, so its tip is not shown any more.

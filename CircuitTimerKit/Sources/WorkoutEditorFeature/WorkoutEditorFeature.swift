@@ -104,6 +104,14 @@ public struct WorkoutEditorFeature: Sendable {
             case incomplete
             /// A stage was changed so that it would not play: Save would drop it without a word.
             case unsavableStage
+
+            /// The reason in words, one text for the alert, the tip and VoiceOver.
+            var messageKey: LocalizedStringKey {
+                switch self {
+                    case .incomplete: "editor.saveHint"
+                    case .unsavableStage: "editor.saveBlocked.zeroStages"
+                }
+            }
         }
 
         /// Judged on the comparable draft: spaces around a name, which a save trims, are no change.
@@ -580,10 +588,7 @@ extension AlertState where Action == Never {
         AlertState {
             TextState("editor.saveBlocked.title", bundle: .module)
         } message: {
-            switch blocker {
-                case .incomplete: TextState("editor.saveHint", bundle: .module)
-                case .unsavableStage: TextState("editor.saveBlocked.zeroStages", bundle: .module)
-            }
+            TextState(blocker.messageKey, bundle: .module)
         }
     }
 }
