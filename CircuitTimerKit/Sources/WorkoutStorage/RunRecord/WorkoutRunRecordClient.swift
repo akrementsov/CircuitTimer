@@ -23,10 +23,7 @@ public enum RunRecordError: Error {
     case unsupportedSchema(Int)
 }
 
-/// The saved run of each scene session: one file per session, named after its identifier.
-///
-/// A run is restored only from the file of the scene session connected now, so a session the
-/// user closed in the App Switcher leaves nothing to restore.
+/// The saved run: one file that holds the newest record written.
 @DependencyClient
 public struct WorkoutRunRecordClient: Sendable {
     /// An increasing revision for the next `write`. Take it in the reducer: effects can start out
@@ -34,13 +31,12 @@ public struct WorkoutRunRecordClient: Sendable {
     /// The default is what the unimplemented `testValue` returns after reporting the call; the
     /// file ignores it.
     public var nextRevision: @Sendable () -> Int = { 0 }
-    /// The record of `sessionID`, or `nil` when that session has none. Never changes the disk.
-    public var load: @Sendable (_ sessionID: String) async throws -> StoredRunRecord?
-    /// Replaces the record of `sessionID`, or removes it for `nil`. A failed write leaves the file
-    /// as it was; the caller warns and writes again later.
-    /// The first applied writes also remove the files left by earlier sessions, until one pass
-    /// succeeds. Ignored when `revision` is not newer than any write applied before.
-    public var write: @Sendable (_ record: WorkoutRunRecord?, _ sessionID: String, _ revision: Int) async throws -> Void
+    /// The saved record, or `nil` when there is none. Never changes the disk.
+    public var load: @Sendable () async throws -> StoredRunRecord?
+    /// Replaces the record, or removes it for `nil`. A failed write leaves the file as it was;
+    /// the caller warns and writes again later. Ignored when `revision` is not newer than any
+    /// write applied before.
+    public var write: @Sendable (_ record: WorkoutRunRecord?, _ revision: Int) async throws -> Void
 }
 
 extension WorkoutRunRecordClient {
@@ -55,8 +51,8 @@ extension WorkoutRunRecordClient {
                     return $0
                 }
             },
-            load: { try await reader.load(sessionID: $0) },
-            write: { try await file.write($0, sessionID: $1, revision: $2) }
+            load: { try await reader.load() },
+            write: { try await file.write($0, revision: $1) }
         )
     }
 }
@@ -68,8 +64,8 @@ extension WorkoutRunRecordClient: DependencyKey {
     /// Keeps nothing: a preview never relaunches, so there is no run to restore.
     public static let previewValue = Self(
         nextRevision: { 1 },
-        load: { _ in nil },
-        write: { _, _, _ in }
+        load: { nil },
+        write: { _, _ in }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()

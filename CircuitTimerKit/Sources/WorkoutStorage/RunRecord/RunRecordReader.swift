@@ -2,7 +2,7 @@ import Foundation
 import os
 import WorkoutDomain
 
-/// Reads one session's record without touching anything else on disk.
+/// Reads the record without touching anything on disk.
 ///
 /// The blocking read runs on its own queue, apart from the writer, so a stalled read can hold
 /// neither a write nor a thread of the cooperative pool.
@@ -14,8 +14,8 @@ final class RunRecordReader: Sendable {
         self.directory = directory
     }
 
-    func load(sessionID: String) async throws -> StoredRunRecord? {
-        let url = RunRecordLayout.fileURL(in: directory, sessionID: sessionID)
+    func load() async throws -> StoredRunRecord? {
+        let url = RunRecordLayout.fileURL(in: directory)
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 continuation.resume(with: Result { try Self.read(url) })

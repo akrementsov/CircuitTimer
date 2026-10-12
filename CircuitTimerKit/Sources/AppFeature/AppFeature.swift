@@ -55,8 +55,6 @@ public struct AppFeature: Sendable {
         /// A reload of a list that stays on screen meanwhile.
         var isReloading = false
         var deferredScreen: DeferredScreen?
-        /// The scene session this launch files its runs under; set before the list first loads.
-        var sceneSessionID: String?
         /// The launch's check for a run saved before the process was gone.
         var runRestore = RunRestore.idle
 
@@ -102,7 +100,6 @@ public struct AppFeature: Sendable {
             case workoutsLoadingFailed
             case mutationFinished(WorkoutWriteOutcome)
             case mutationFailed
-            case sceneSessionIdentified(String?)
             case runRecordLoaded(StoredRunRecord?)
             case runRecordLoadingFailed(RunRecordLoadFailure)
             case runRecordReadTimedOut
@@ -120,7 +117,6 @@ public struct AppFeature: Sendable {
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date) var date
-    @Dependency(\.sceneSession) private var sceneSession
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutRunRecord) var workoutRunRecord
@@ -157,11 +153,9 @@ public struct AppFeature: Sendable {
             case .task:
                 guard state.workouts == .idle else { return .none }
 
-                // The list waits for the session: a timer started from it files its run under that session.
+                // The list waits for the saved run, so a restored timer opens before any row or screen exists.
                 state.workouts = .loading
-                return .run { [sceneSession] send in
-                    await send(.internal(.sceneSessionIdentified(sceneSession.currentID())))
-                }
+                return readRunRecord(&state)
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -296,17 +290,6 @@ public struct AppFeature: Sendable {
                     state.destination = .alert(.mutationFailed)
                 }
                 return loadWorkouts(&state)
-            case let .sceneSessionIdentified(id):
-                guard state.sceneSessionID == nil else { return .none }
-
-                if let id {
-                    state.sceneSessionID = id
-                } else {
-                    // The same fallback as a closed session: runs filed under an identifier no launch has again.
-                    Self.logger.error("The connected scene session is unknown; runs of this launch will not be restored")
-                    state.sceneSessionID = "unknown-\(uuid().uuidString)"
-                }
-                return readRunRecord(&state)
             case let .runRecordLoaded(stored):
                 return runRecordLoaded(stored, &state)
             case let .runRecordLoadingFailed(failure):
@@ -356,43 +339,24 @@ public struct AppFeature: Sendable {
             Self.logger.error("Refused to start a workout with nothing to play")
             return .none
         }
-        // The list, and so the workout's screen, loads only after the session is known.
-        guard let sceneSessionID = state.sceneSessionID else {
-            Self.logger.error("Refused to start a workout before the scene session is known")
-            return .none
-        }
-
-        state.destination = .timer(timerState(for: workout, sceneSessionID: sceneSessionID))
+        state.destination = .timer(timerState(for: workout))
         return .none
     }
 
     // A timer's state is built only here and in `restoredTimerState`, so both get the same identifiers and title.
 
-    private func timerState(for workout: Workout, sceneSessionID: String) -> WorkoutTimerFeature.State {
+    private func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
         WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
-            schedule: WorkoutSchedule(workout: workout),
-            sceneSessionID: sceneSessionID
+            schedule: WorkoutSchedule(workout: workout)
         )
     }
 
     /// A timer over a saved run already settled at `now`.
-    func restoredTimerState(
-        for workout: Workout,
-        sceneSessionID: String,
-        run: WorkoutRun,
-        at now: Date
-    ) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: uuid(),
-            workoutID: workout.id,
-            title: workout.displayName,
-            sceneSessionID: sceneSessionID,
-            restoring: run,
-            at: now
-        )
+    func restoredTimerState(for workout: Workout, run: WorkoutRun, at now: Date) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(id: uuid(), workoutID: workout.id, title: workout.displayName, restoring: run, at: now)
     }
 
     private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
@@ -452,7 +416,7 @@ public struct AppFeature: Sendable {
         let end = Effect<Action>.run { [timerSession, id = timer.id] _ in
             await timerSession.end(owner: id)
         }
-        return .merge(end, discardRunRecord(state))
+        return .merge(end, discardRunRecord())
     }
 
     /// Storage appends a new workout, so a new one goes to the end here too.

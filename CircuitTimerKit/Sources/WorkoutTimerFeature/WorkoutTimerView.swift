@@ -127,8 +127,7 @@ private enum PreviewTimer {
             id: UUID(0),
             workoutID: workout.id,
             title: workout.name,
-            schedule: WorkoutSchedule(workout: workout),
-            sceneSessionID: "preview"
+            schedule: WorkoutSchedule(workout: workout)
         )
         play(&state.run)
         state.run.tick(at: now)

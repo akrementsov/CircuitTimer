@@ -10,7 +10,7 @@ extension AppFeature {
     /// row, screen or write exists yet when a restored timer opens.
     enum RunRestore: Equatable, Sendable {
         case idle
-        /// Reading this session's record; the list waits.
+        /// Reading the record; the list waits.
         case reading
         /// Found; decided once the workouts are loaded.
         case found(StoredRunRecord)
@@ -29,16 +29,13 @@ extension AppFeature {
     /// A run left paused or waiting this long was abandoned, not interrupted.
     static let restoreAgeLimit: Duration = .seconds(24 * 60 * 60)
 
-    /// Reads only this session's record. A session the user closed in the App Switcher has no file, so its run is
-    /// dropped without a word. The read and its timeout race as two effects: the file read cannot be interrupted, and
+    /// Reads the saved run. The read and its timeout race as two effects: the file read cannot be interrupted, and
     /// whichever answers first while reading decides.
     func readRunRecord(_ state: inout State) -> Effect<Action> {
-        guard let sceneSessionID = state.sceneSessionID else { return loadWorkouts(&state) }
-
         state.runRestore = .reading
         let read = Effect<Action>.run { [workoutRunRecord] send in
             do {
-                await send(.internal(.runRecordLoaded(try await workoutRunRecord.load(sceneSessionID))))
+                await send(.internal(.runRecordLoaded(try await workoutRunRecord.load())))
             } catch is CancellationError {
                 return
             } catch where Task.isCancelled {
@@ -77,27 +74,26 @@ extension AppFeature {
         let stopTimeout = Effect<Action>.cancel(id: CancelID.readRunRecordTimeout)
         guard let stored else {
             state.runRestore = .resolved
-            // Nothing of this session to remove; the write sweeps away the files of earlier sessions.
-            return .merge(stopTimeout, discardRunRecord(state), loadWorkouts(&state))
+            return .merge(stopTimeout, loadWorkouts(&state))
         }
 
         state.runRestore = .found(stored)
         return .merge(stopTimeout, loadWorkouts(&state))
     }
 
-    /// This session's file exists but cannot be used: the run would have come back, so the user is told.
+    /// The file exists but cannot be used: the run would have come back, so the user is told.
     func runRecordLoadingFailed(_ failure: RunRecordLoadFailure, _ state: inout State) -> Effect<Action> {
         guard state.runRestore == .reading else { return .none }
 
         state.runRestore = .resolved
         state.destination = .alert(.runNotRestored)
         // An unreadable or newer file is kept for the next launch; a new timer's first write replaces it.
-        let discard = failure == .corrupt ? discardRunRecord(state) : .none
+        let discard = failure == .corrupt ? discardRunRecord() : .none
         return .merge(.cancel(id: CancelID.readRunRecordTimeout), discard, loadWorkouts(&state))
     }
 
-    /// The read stalled before the app could tell whether this session has a file. Rare enough to accept the alert
-    /// even when there is none; the file, if any, is kept under the same session.
+    /// The read stalled before the app could tell whether a file exists. Rare enough to accept the alert
+    /// even when there is none; the file, if any, is kept for the next launch.
     func runRecordReadTimedOut(_ state: inout State) -> Effect<Action> {
         guard state.runRestore == .reading else { return .none }
 
@@ -118,12 +114,12 @@ extension AppFeature {
         // An old pause is dropped before its workout is looked up: an abandoned run is no error, even if the workout is
         // gone by now.
         if record.phase != .running, age > Self.restoreAgeLimit {
-            return discardRunRecord(state)
+            return discardRunRecord()
         }
         guard let workout = workouts[id: record.workoutID] else {
             Self.logger.notice("The saved run's workout is gone; dropping the run")
             state.destination = .alert(.runNotRestored)
-            return discardRunRecord(state)
+            return discardRunRecord()
         }
 
         let run: WorkoutRun
@@ -132,7 +128,7 @@ extension AppFeature {
         } catch {
             Self.logger.notice("The saved run no longer fits its workout: \(String(reflecting: error), privacy: .public)")
             state.destination = .alert(.runNotRestored)
-            return discardRunRecord(state)
+            return discardRunRecord()
         }
         if let since = record.since, since > now {
             Self.logger.notice("The clock went back while the app was closed; the run continues from its saved position")
@@ -140,33 +136,31 @@ extension AppFeature {
         switch run.phase {
             case .idle, .finished:
                 // It ended while the app was closed: nothing is left to show.
-                return discardRunRecord(state)
+                return discardRunRecord()
             case .paused, .awaitingUser:
                 // A run that kept going into a manual pause long ago was abandoned there too.
-                guard age <= Self.restoreAgeLimit else { return discardRunRecord(state) }
+                guard age <= Self.restoreAgeLimit else { return discardRunRecord() }
             case .running:
                 break
         }
-        guard let sceneSessionID = state.sceneSessionID, state.destination == nil else {
+        guard state.destination == nil else {
             Self.logger.error("Refused to restore a run over another presentation; it stays for the next launch")
             return .none
         }
 
         state.selectedTab = .workouts
-        state.destination = .timer(restoredTimerState(for: workout, sceneSessionID: sceneSessionID, run: run, at: now))
+        state.destination = .timer(restoredTimerState(for: workout, run: run, at: now))
         return .none
     }
 
-    /// Clears this session's record; the write also sweeps away the files of earlier sessions. Like every record write,
-    /// it holds a background-task assertion taken here, before the effect is scheduled.
-    func discardRunRecord(_ state: State) -> Effect<Action> {
-        guard let sceneSessionID = state.sceneSessionID else { return .none }
-
+    /// Clears the saved run. Like every record write, it holds a background-task assertion taken here, before the
+    /// effect is scheduled.
+    func discardRunRecord() -> Effect<Action> {
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the saved workout run")
         return .run { [workoutRunRecord, backgroundTask] _ in
             do {
-                try await workoutRunRecord.write(nil, sceneSessionID, revision)
+                try await workoutRunRecord.write(nil, revision)
             } catch is CancellationError {
                 // Only the root store going away cancels it; the write has run regardless.
                 await backgroundTask.end(token)

@@ -53,8 +53,6 @@ public struct WorkoutTimerFeature: Sendable {
         public let id: UUID
         public let workoutID: Workout.ID
         public let title: String
-        /// The scene session whose record file holds this run.
-        let sceneSessionID: String
         var run: WorkoutRun
         public internal(set) var snapshot: WorkoutRun.Snapshot
         /// `.start` with 3 s at init, unless the schedule is empty.
@@ -77,11 +75,10 @@ public struct WorkoutTimerFeature: Sendable {
         @Presents public var destination: Destination.State?
         public internal(set) var path = StackState<Path.State>()
 
-        public init(id: UUID, workoutID: Workout.ID, title: String, schedule: WorkoutSchedule, sceneSessionID: String) {
+        public init(id: UUID, workoutID: Workout.ID, title: String, schedule: WorkoutSchedule) {
             self.id = id
             self.workoutID = workoutID
             self.title = title
-            self.sceneSessionID = sceneSessionID
             // `@ObservableState` makes stored properties computed, so `self.run` can't be read before every property is set.
             let run = WorkoutRun(schedule: schedule)
             self.run = run
@@ -93,11 +90,10 @@ public struct WorkoutTimerFeature: Sendable {
         /// A saved run brought back after the process was gone; `run` is already settled at `now`.
         ///
         /// No countdown: the user saw the run going before, so it continues as it was, running or paused.
-        public init(id: UUID, workoutID: Workout.ID, title: String, sceneSessionID: String, restoring run: WorkoutRun, at now: Date) {
+        public init(id: UUID, workoutID: Workout.ID, title: String, restoring run: WorkoutRun, at now: Date) {
             self.id = id
             self.workoutID = workoutID
             self.title = title
-            self.sceneSessionID = sceneSessionID
             var run = run
             // Already settled at `now`; the tick keeps the rule that a snapshot follows a tick.
             run.tick(at: now)
@@ -374,13 +370,13 @@ public struct WorkoutTimerFeature: Sendable {
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        return .run { [timerSession, dismiss, workoutRunRecord, backgroundTask, id = state.id, sessionID = state.sceneSessionID] _ in
+        return .run { [timerSession, dismiss, workoutRunRecord, backgroundTask, id = state.id] _ in
             await timerSession.end(owner: id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that, so a cancellation is no failure.
             do {
-                try await workoutRunRecord.write(nil, sessionID, revision)
+                try await workoutRunRecord.write(nil, revision)
             } catch is CancellationError {
                 await backgroundTask.end(token)
                 return

@@ -35,10 +35,10 @@ extension WorkoutTimerFeature {
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Save the workout run")
         state.recordSync = .pending(revision: revision, record: record)
-        return .run { [workoutRunRecord, backgroundTask, sessionID = state.sceneSessionID] send in
+        return .run { [workoutRunRecord, backgroundTask] send in
             let succeeded: Bool
             do {
-                try await workoutRunRecord.write(record, sessionID, revision)
+                try await workoutRunRecord.write(record, revision)
                 succeeded = true
             } catch is CancellationError {
                 await backgroundTask.end(token)

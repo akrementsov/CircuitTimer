@@ -23,7 +23,6 @@ extension UUID {
 
 let timerID = UUID(fixture: 1)
 let workoutID = UUID(fixture: 2)
-let sceneSessionID = "scene-session"
 
 func makeStage(_ number: Int, seconds: Int, _ intensity: Stage.Intensity = .work, name: String? = nil) -> Stage {
     Stage(id: UUID(fixture: 100 + number), name: name ?? "Stage \(number)", duration: .seconds(seconds), intensity: intensity)
@@ -61,7 +60,7 @@ enum TimerPhase: CaseIterable, Sendable {
 
 extension WorkoutTimerFeature.State {
     static func fresh(_ schedule: WorkoutSchedule = Schedules.workRest) -> Self {
-        Self(id: timerID, workoutID: workoutID, title: "Workout", schedule: schedule, sceneSessionID: sceneSessionID)
+        Self(id: timerID, workoutID: workoutID, title: "Workout", schedule: schedule)
     }
 
     /// The state the reducer leaves at `origin` in `phase` after the clock's first sync, without the loop itself.
