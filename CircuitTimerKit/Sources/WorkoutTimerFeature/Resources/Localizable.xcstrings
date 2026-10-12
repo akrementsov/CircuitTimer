@@ -437,6 +437,22 @@
         }
       }
     },
+    "timer.recordFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progress won't be restored if the app closes."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прогресс не восстановится, если приложение закроется."
+          }
+        }
+      }
+    },
     "timer.stage.finished" : {
       "localizations" : {
         "en" : {

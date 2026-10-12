@@ -55,6 +55,8 @@ public struct AppFeature: Sendable {
         /// A reload of a list that stays on screen meanwhile.
         var isReloading = false
         var deferredScreen: DeferredScreen?
+        /// The scene session this launch files its runs under; set before the list first loads.
+        var sceneSessionID: String?
 
         public init() {}
 
@@ -98,6 +100,7 @@ public struct AppFeature: Sendable {
             case workoutsLoadingFailed
             case mutationFinished(WorkoutWriteOutcome)
             case mutationFailed
+            case sceneSessionIdentified(String?)
         }
     }
 
@@ -107,8 +110,10 @@ public struct AppFeature: Sendable {
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.sceneSession) private var sceneSession
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
+    @Dependency(\.workoutRunRecord) private var workoutRunRecord
     @Dependency(\.workoutStorage) private var workoutStorage
 
     public init() {}
@@ -142,7 +147,11 @@ public struct AppFeature: Sendable {
             case .task:
                 guard state.workouts == .idle else { return .none }
 
-                return loadWorkouts(&state)
+                // The list waits for the session: a timer started from it files its run under that session.
+                state.workouts = .loading
+                return .run { [sceneSession] send in
+                    await send(.internal(.sceneSessionIdentified(sceneSession.currentID())))
+                }
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -275,6 +284,17 @@ public struct AppFeature: Sendable {
                     state.destination = .alert(.mutationFailed)
                 }
                 return loadWorkouts(&state)
+            case let .sceneSessionIdentified(id):
+                guard state.sceneSessionID == nil else { return .none }
+
+                if let id {
+                    state.sceneSessionID = id
+                } else {
+                    // The same fallback as a closed session: runs filed under an identifier no launch has again.
+                    Self.logger.error("The connected scene session is unknown; runs of this launch will not be restored")
+                    state.sceneSessionID = "unknown-\(uuid().uuidString)"
+                }
+                return loadWorkouts(&state)
         }
     }
 
@@ -318,14 +338,25 @@ public struct AppFeature: Sendable {
             Self.logger.error("Refused to start a workout with nothing to play")
             return .none
         }
+        // The list, and so the workout's screen, loads only after the session is known.
+        guard let sceneSessionID = state.sceneSessionID else {
+            Self.logger.error("Refused to start a workout before the scene session is known")
+            return .none
+        }
 
-        state.destination = .timer(timerState(for: workout))
+        state.destination = .timer(timerState(for: workout, sceneSessionID: sceneSessionID))
         return .none
     }
 
     /// The one place a timer's state is built.
-    private func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
+    private func timerState(for workout: Workout, sceneSessionID: String) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(
+            id: uuid(),
+            workoutID: workout.id,
+            title: workout.displayName,
+            schedule: WorkoutSchedule(workout: workout),
+            sceneSessionID: sceneSessionID
+        )
     }
 
     private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
@@ -376,13 +407,22 @@ public struct AppFeature: Sendable {
         return copy
     }
 
-    /// The timer closes itself after ending its session, but a system dismissal, such as a back button the timer failed
-    /// to hide, skips that; ending it again here is harmless.
+    /// The timer closes itself after ending its session and clearing its run, but a system dismissal, such as a back
+    /// button the timer failed to hide, skips that; doing both again here is harmless. The second clear also retries
+    /// one that failed: its revision is newer than the timer's, and older than any write of a timer started later.
     private func timerDismissed(_ state: State) -> Effect<Action> {
-        guard case let .timer(timer) = state.destination else { return .none }
+        guard case let .timer(timer) = state.destination, let sceneSessionID = state.sceneSessionID else { return .none }
 
-        return .run { [timerSession, id = timer.id] _ in
+        let revision = workoutRunRecord.nextRevision()
+        return .run { [timerSession, workoutRunRecord, id = timer.id] _ in
             await timerSession.end(owner: id)
+            do {
+                try await workoutRunRecord.write(nil, sceneSessionID, revision)
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
+            }
         }
     }
 

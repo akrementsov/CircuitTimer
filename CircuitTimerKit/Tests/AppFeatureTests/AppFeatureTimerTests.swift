@@ -38,7 +38,13 @@ struct AppFeatureTimerTests {
         await start(
             untitled,
             in: store,
-            timer: WorkoutTimerFeature.State(id: UUID(0), title: "Untitled workout", schedule: WorkoutSchedule(workout: untitled))
+            timer: WorkoutTimerFeature.State(
+                id: UUID(0),
+                workoutID: untitled.id,
+                title: "Untitled workout",
+                schedule: WorkoutSchedule(workout: untitled),
+                sceneSessionID: "scene-session"
+            )
         )
 
         await closeTimer(store)
@@ -221,7 +227,13 @@ struct AppFeatureTimerTests {
     }
 
     private static func timer(_ id: UUID, for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(id: id, title: workout.name, schedule: WorkoutSchedule(workout: workout))
+        WorkoutTimerFeature.State(
+            id: id,
+            workoutID: workout.id,
+            title: workout.name,
+            schedule: WorkoutSchedule(workout: workout),
+            sceneSessionID: "scene-session"
+        )
     }
 }
 

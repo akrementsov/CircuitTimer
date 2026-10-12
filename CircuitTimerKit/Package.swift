@@ -102,6 +102,7 @@ let package = Package(
             dependencies: [
                 "DesignSystem",
                 "WorkoutDomain",
+                "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
@@ -145,6 +146,7 @@ let package = Package(
             name: "WorkoutTimerFeatureTests",
             dependencies: [
                 "WorkoutDomain",
+                "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
