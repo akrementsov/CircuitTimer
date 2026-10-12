@@ -30,12 +30,12 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | Module | Depends on | Owns |
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
-| `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome |
+| `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; the card rows and the bottom action panel the features share; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
-| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
-| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient` |
+| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
+| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`; its own stack with the stage list |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the editor onto the Workouts stack, presenting the timer full screen; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start; composes Settings |
 
 Layering:
 
@@ -101,13 +101,21 @@ public struct SomeFeature: Sendable {
 - Views are `@ViewAction(for:)` and only `send` actions; no logic in `body`.
 - Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
 - A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
-- The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action.
+- The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action, but only while it is read-only.
+- The editor has phases: `new`, `viewing` (a saved workout, read-only) and `editing` (after the pencil). `workout` is the workout exactly as stored and is what plays; `original` is the base of the draft, with the rounds lifted into the editor's range. A save returns to `viewing`. Start sends `startRequested` with `workout`; `AppFeature` presents the timer only into an empty destination and empties the Workouts stack once the cover has appeared.
 - The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends the session afterwards, which drops the keep-awake vote.
+- The timer owns its own stack, `WorkoutTimerStack`; the stage list is a `@ReducerCaseIgnored` case of `WorkoutTimerFeature.Path` that carries a `WorkoutOutline`. Opening it pauses a running stage or drops a 3-2-1, and leaving it keeps the run paused.
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
 - Bridge callback APIs through an `AsyncStream` that the effect stays suspended on; never let `send` escape the effect.
 - Add only the action groups a feature needs (the root feature has no `Delegate`).
+
+## Screens
+
+- The tab bar shows only on a stack's root: `tabBarOnlyOnRoots()` on the `TabView` and `tabBarOnlyOnRoot(isPushed:)` on each stack's root. Before iOS 26 the root hides it through SwiftUI, as hidden by the pushed screen it would come back only after the pop, and a bottom panel on a pushed screen stands on the home indicator's inset so it doesn't drop when the bar goes at the end of the push; no root has a bottom panel. On iOS 26 SwiftUI's tab bar ignores `hidesBottomBarWhenPushed`, so `TabBarRidesWithRoot` carries a picture of the bar away with the root, hides the bar through UIKit and covers it for a moment after the pop while its glass settles. Measured on iOS 17.5 and 26.5 only, not on 18–25. With the bar gone from the workout screen, a Workouts tab re-tap no longer reaches it from the UI; the reducer still handles it.
+- `ReorderableRows` measures every row, so it never sits in a lazy container, and only inside a `CardScrollView`, the one place that injects `RowInteraction`.
+- Swiped and reordered rows read only the items their list captured: a row that reads the store observes them on its own and is redrawn apart from the list while a drag settles, showing the wrong item.
 
 ## Time
 
@@ -173,6 +181,8 @@ let now = Date()
 ## Localization
 
 String Catalogs only: `Localizable.xcstrings` in each module that shows text (`Text("key", bundle: .module)`), semantic keys, English and Russian. The app's `InfoPlist.xcstrings` gives the main bundle a Russian localization — iOS needs it before it picks Russian strings from packages.
+
+DesignSystem has no catalog: a feature passes its own strings into DesignSystem views as `Text("key", bundle: .module)`.
 
 ## Git
 
