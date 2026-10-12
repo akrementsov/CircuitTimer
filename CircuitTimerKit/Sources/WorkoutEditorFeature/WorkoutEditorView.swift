@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Foundation
 import SwiftUI
+import TipKit
 import WorkoutDomain
 import WorkoutStorage
 
@@ -48,6 +49,8 @@ public struct WorkoutEditorView: View {
         .toolbar { toolbar }
         .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
+        // A phase change moves the cells like a push moves the screen; the tip waits for both to end.
+        .task(id: store.phase) { send(.appeared) }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
@@ -87,7 +90,6 @@ public struct WorkoutEditorView: View {
         if store.isEditable {
             BottomActionPanel(
                 title: Text("editor.saveWorkout", bundle: .module),
-                hint: store.saveBlocker.map(Self.explanation(of:)),
                 isBusy: store.isSaving,
                 busyLabel: Text("editor.saving", bundle: .module),
                 isEnabled: store.canSave,
@@ -100,10 +102,28 @@ public struct WorkoutEditorView: View {
             )
             // VoiceOver's double tap never reaches a disabled button; the reason is read with it instead.
             .accessibilityHint(store.saveBlocker.map(Self.explanation(of:)) ?? Text(verbatim: ""))
+            .overlay { saveTipAnchor }
         } else {
             BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
                 send(.startButtonTapped)
             }
+        }
+    }
+
+    /// The tip shows once, by TipKit's count, and only when it can point at a still Save: not while typing, under
+    /// an alert, or before the screen has settled. Before iOS 26 a tip cannot be hidden by a binding, so the anchor
+    /// itself comes and goes.
+    @ViewBuilder
+    private var saveTipAnchor: some View {
+        if let blocker = store.saveBlocker,
+           store.hasSettled,
+           !store.saveTipSuppressed,
+           focusedField == nil,
+           store.destination == nil {
+            // After the tip: its anchor takes taps of its own, and the dimmed Save's tap must reach the panel under it.
+            Spacer(minLength: .zero)
+                .popoverTip(SaveWorkoutTip(blocker: blocker), arrowEdge: .bottom)
+                .allowsHitTesting(false)
         }
     }
 

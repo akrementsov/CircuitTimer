@@ -52,6 +52,12 @@ public struct WorkoutEditorFeature: Sendable {
         public var isSaving = false
         /// Start was tapped and the timer is on its way; a second tap must not ask again.
         public internal(set) var isStarting = false
+        /// The screen has stood still long enough since it appeared or changed its phase for the tip to point at Save.
+        public internal(set) var hasSettled = false
+        /// Tells the latest wait for `hasSettled` from an older one whose result arrives late.
+        public internal(set) var settleGeneration = 0
+        /// A tap on the dimmed Save explained it, so the tip must not follow the alert.
+        public internal(set) var saveTipSuppressed = false
         @Presents public var destination: Destination.State?
 
         /// A new workout starts with one work stage in the training section.
@@ -80,6 +86,9 @@ public struct WorkoutEditorFeature: Sendable {
             workout.trainingRounds = max(Self.trainingRoundsRange.lowerBound, rounds)
             return workout
         }
+
+        /// Longer than the push and the iOS 26 tab bar's glass settling, so the tip never points at a moving button.
+        static let tipSettleDelay: Duration = .seconds(1)
 
         /// The rounds the editor offers: a workout without training rounds is not edited here.
         static let trainingRoundsRange = 1...WorkoutLimits.maxTrainingRounds
@@ -234,6 +243,8 @@ public struct WorkoutEditorFeature: Sendable {
 
         @CasePathable
         public enum View: Equatable, Sendable {
+            /// The screen appeared or changed its phase.
+            case appeared
             case nameChanged(String)
             case trainingRoundsChanged(Int)
             case pauseAfterWarmUpChanged(Bool)
@@ -260,6 +271,7 @@ public struct WorkoutEditorFeature: Sendable {
             case saveFailed
             case saveSucceeded(Workout)
             case editingEnded
+            case settled(generation: Int)
         }
 
         @CasePathable
@@ -271,13 +283,19 @@ public struct WorkoutEditorFeature: Sendable {
         }
     }
 
+    private enum CancelID: Hashable, Sendable {
+        case settle
+    }
+
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutEditor")
 
     /// The pencil and a save switch the screen with the short curve of a collection view's batch update, as the
     /// original screen did; a spring's long settle would drag the rows after it.
     static let phaseChangeAnimation: Animation = .easeInOut(duration: 0.3)
 
+    @Dependency(\.continuousClock) private var clock
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.saveTip) private var saveTip
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -306,12 +324,14 @@ public struct WorkoutEditorFeature: Sendable {
         // The read-only screen draws no editing controls; a late action from the editor it replaced changes nothing.
         switch state.phase {
             case .viewing:
-                guard [.backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
+                guard [.appeared, .backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
             case .new, .editing:
                 guard action != .editButtonTapped, action != .startButtonTapped else { return .none }
         }
 
         switch action {
+            case .appeared:
+                return settle(&state)
             case let .nameChanged(name):
                 state.draft.name = name
             case let .trainingRoundsChanged(rounds):
@@ -358,7 +378,10 @@ public struct WorkoutEditorFeature: Sendable {
             case .saveBlockedTapped:
                 guard let blocker = state.saveBlocker else { return .none }
 
+                // At once, in the state: the tip must not show when the alert closes, whenever TipKit takes the write.
+                state.saveTipSuppressed = true
                 state.destination = .saveBlockedAlert(.saveBlocked(blocker))
+                return .run { [saveTip] _ in await saveTip.markExplained() }
             case .editButtonTapped:
                 state.original = State.editable(state.workout)
                 state.draft = state.original
@@ -391,7 +414,32 @@ public struct WorkoutEditorFeature: Sendable {
             case .editingEnded:
                 endEditing(&state)
                 return .none
+            case let .settled(generation):
+                guard generation == state.settleGeneration else { return .none }
+
+                state.hasSettled = true
+                return .none
         }
+    }
+
+    /// Waits for the screen to stand still before the tip may show; every appearance or phase change starts over,
+    /// and a wait it replaced may still deliver late, so the generation must match.
+    private func settle(_ state: inout State) -> Effect<Action> {
+        state.hasSettled = false
+        state.settleGeneration += 1
+        let generation = state.settleGeneration
+        return .run { [clock] send in
+            do {
+                try await clock.sleep(for: State.tipSettleDelay)
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("The tip's settle clock failed: \(String(reflecting: error), privacy: .public)")
+                return
+            }
+            await send(.internal(.settled(generation: generation)))
+        }
+        .cancellable(id: CancelID.settle, cancelInFlight: true)
     }
 
     private func endEditing(_ state: inout State) {
