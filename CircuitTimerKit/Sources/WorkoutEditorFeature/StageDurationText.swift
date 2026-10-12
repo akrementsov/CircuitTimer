@@ -37,10 +37,14 @@ enum StageDurationText {
     }
 
     /// The digits of the text as ASCII, whatever script they were typed in: a number pad or a paste may bring
-    /// Arabic-Indic or Devanagari digits. Fractions such as «½» are not digits and are dropped.
+    /// Arabic-Indic or Devanagari digits. Only decimal digits count; «½», «³» or «Ⅳ» are dropped.
     private static func digits(of text: String) -> String {
         String(text.compactMap { character in
-            guard let value = character.wholeNumberValue, (0...9).contains(value) else { return nil }
+            guard
+                character.unicodeScalars.count == 1,
+                character.unicodeScalars.first?.properties.numericType == .decimal,
+                let value = character.wholeNumberValue
+            else { return nil }
 
             return Character(String(value))
         })
