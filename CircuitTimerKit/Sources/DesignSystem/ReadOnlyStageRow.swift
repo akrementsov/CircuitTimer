@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// A stage that cannot be changed: its intensity marker and name in one field and its duration in another,

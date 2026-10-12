@@ -9,7 +9,7 @@ import WorkoutStorage
 /// that is saved or discarded as a whole; a new workout opens in the editor. Leaving with changes asks first.
 @Reducer
 public struct WorkoutEditorFeature: Sendable {
-    // A dialog with actions needs a hand-written `Action`: with a macro-generated one the scoped
+    // An alert with actions needs a hand-written `Action`: with a macro-generated one the scoped
     // binding would drop the user's choice. See AGENTS.md › TCA.
     @Reducer
     public enum Destination {
@@ -112,6 +112,16 @@ public struct WorkoutEditorFeature: Sendable {
         /// turns them into the draft's controls, as the original app did.
         public var isEditable: Bool {
             phase != .viewing
+        }
+
+        /// The read-only screen's title: the stored name, or `nil` when it has none and the screen says so.
+        public var viewingTitle: String? {
+            workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : workout.name
+        }
+
+        /// A section's stages reorder while editing, when there are at least two to swap.
+        public func canReorderStages(in section: WorkoutSectionKind) -> Bool {
+            isEditable && !isSaving && draft[section].count > 1
         }
 
         /// The stages a section shows: the draft's while editing; while read-only, the ones that play.
@@ -423,7 +433,7 @@ extension AlertState where Action == Never {
 }
 
 // An alert, not a confirmation dialog: on iOS 26 the dialog becomes a popover that drops its Cancel button,
-// leaving no way to answer «stay».
+// leaving no way to answer "stay".
 extension AlertState where Action == WorkoutEditorFeature.DiscardConfirmation {
     static var discardChanges: Self {
         AlertState {

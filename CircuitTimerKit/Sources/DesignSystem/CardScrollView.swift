@@ -54,6 +54,7 @@ public struct CardScrollView<ID: Hashable, Content: View>: View {
         if interaction.swipedID != nil, let anchor = interaction.swipeAnchorMinY, abs(frame.minY - anchor) > .token(spacing: .xs) {
             interaction.closeSwipe()
         }
+        // A point of slack: layout settles in fractions of one at rest.
         let isScrolled = frame.minY < interaction.geometry.visibleRect.minY + topMargin - 1
         if isScrolled != interaction.isScrolled {
             interaction.isScrolled = isScrolled

@@ -1,10 +1,12 @@
+import os
 import SwiftUI
 import UIKit
 
-/// On iOS 26 the tab bar leaves with the stack's root screen, as a UIKit push carries it away. A zero-size child of the root screen pins a
-/// picture of the bar to the root's view when a push starts, so it slides out with the root and back in on the pop,
-/// and hides the real bar through UIKit. The glass bar glows when it shows and settles for a moment after it moves, so
-/// the picture covers it until it is still.
+/// On iOS 26 the tab bar leaves with the stack's root screen, as a UIKit push carries it away. A zero-size child of
+/// the root screen pins a picture of the bar to the root's view when a push starts, so it slides out with the root and
+/// back in on the pop, and hides the real bar through UIKit. The glass bar glows when it shows and settles for a moment
+/// after it moves, so the picture covers it until it is still.
+@available(iOS 26, *)
 struct TabBarRidesWithRoot: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> Probe {
         Probe()
@@ -13,6 +15,13 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: Probe, context: Context) {}
 
     final class Probe: UIViewController {
+        /// How long the bar's glass takes to settle after it shows or moves.
+        private static let glassSettleDuration: TimeInterval = 0.7
+        /// The real bar draws on the next frame; the picture covers its place until then.
+        private static let nextFrameDelay: TimeInterval = 0.05
+        /// How far above the bar the list's scroll edge effect reaches; it also settles after the bar shows.
+        private static let edgeEffectReach: CGFloat = 72
+
         private var snapshot: UIView?
 
         /// The root screen's controller: the probe's ancestor the navigation controller holds.
@@ -30,15 +39,19 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
             guard let root = rootController, let navigation = root.navigationController, navigation.topViewController !== root
             else { return }
 
-            defer { setTabBarHidden(true) }
-            guard let tabBar = root.tabBarController?.tabBar, snapshot == nil, let window = root.view.window else { return }
+            defer { root.tabBarController?.setTabBarHidden(true, animated: false) }
+            // A push right after a pop finds the last picture still over the settling bar; it belongs to that pop.
+            removeSnapshot()
+            guard let tabBar = root.tabBarController?.tabBar, let window = root.view.window else { return }
 
-            // From the window: a view snapshot leaves the bar's glass out. The picture reaches above the bar over the
-            // list's scroll edge effect, which also settles after the bar shows.
+            // From the window: a view snapshot leaves the bar's glass out.
             let barFrame = tabBar.convert(tabBar.bounds, to: window)
             let top = barFrame.minY - Self.edgeEffectReach
             let frame = CGRect(x: 0, y: top, width: window.bounds.width, height: window.bounds.maxY - top)
-            guard let image = window.resizableSnapshotView(from: frame, afterScreenUpdates: false, withCapInsets: .zero) else { return }
+            guard let image = window.resizableSnapshotView(from: frame, afterScreenUpdates: false, withCapInsets: .zero) else {
+                Logger.designSystem.error("No picture of the tab bar; it fades in place on this push")
+                return
+            }
 
             image.frame = window.convert(frame, to: root.view)
             // Over the real bar for a moment after the pop; taps go through to it.
@@ -49,7 +62,12 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            guard let coordinator = transitionCoordinator, snapshot != nil, let tabBar = rootController?.tabBarController?.tabBar
+            guard
+                let tabBarController = rootController?.tabBarController,
+                let coordinator = transitionCoordinator,
+                snapshot != nil,
+                // A pop under a full-screen cover: lifted onto the window, the picture would show over the cover.
+                tabBarController.presentedViewController == nil
             else {
                 finish()
                 return
@@ -58,14 +76,15 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
             // The bar shows at once but off screen, where its appearing glow goes unseen, while the picture rides in
             // with the root. When the root lands, the bar steps into place under the picture, lifted onto the window
             // until the bar's glass settles from the jump.
-            setTabBarHidden(false)
+            let tabBar = tabBarController.tabBar
+            tabBarController.setTabBarHidden(false, animated: false)
             tabBar.transform = CGAffineTransform(translationX: -3 * tabBar.bounds.width, y: 0)
             coordinator.animate(alongsideTransition: nil) { [weak self] context in
                 guard let self else { return }
 
                 if context.isCancelled {
                     tabBar.transform = .identity
-                    setTabBarHidden(true)
+                    tabBarController.setTabBarHidden(true, animated: false)
                     return
                 }
                 CATransaction.begin()
@@ -80,32 +99,15 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
             }
         }
 
-        private static var glassSettleDuration: TimeInterval { 0.7 }
-        private static var edgeEffectReach: CGFloat { 72 }
-
         private func finish() {
-            setTabBarHidden(false)
-            removeSnapshotSoon()
-        }
-
-        /// The real bar draws on the next frame; the picture covers its place until then.
-        private func removeSnapshotSoon() {
-            perform(#selector(removeSnapshot), with: nil, afterDelay: 0.05)
+            rootController?.tabBarController?.setTabBarHidden(false, animated: false)
+            perform(#selector(removeSnapshot), with: nil, afterDelay: Self.nextFrameDelay)
         }
 
         @objc private func removeSnapshot() {
+            NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(removeSnapshot), object: nil)
             snapshot?.removeFromSuperview()
             snapshot = nil
-        }
-
-        private func setTabBarHidden(_ isHidden: Bool) {
-            guard let tabBarController = rootController?.tabBarController else { return }
-
-            if #available(iOS 18, *) {
-                tabBarController.setTabBarHidden(isHidden, animated: false)
-            } else {
-                tabBarController.tabBar.isHidden = isHidden
-            }
         }
     }
 }

@@ -105,7 +105,7 @@ struct StageRow: View {
         }
     }
 
-    /// What VoiceOver reads for a read-only stage: its name, or its intensity when it has none.
+    /// What VoiceOver reads for a stage: its name, or its intensity when it has none.
     private var shownName: Text {
         if stage.name.isEmpty {
             intensityName

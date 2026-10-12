@@ -84,8 +84,9 @@ struct AutoScrollDriver: UIViewRepresentable {
         }
 
         @objc private func step(_ link: CADisplayLink) {
-            // Points per frame at 60 frames a second, whatever the display's rate.
-            let frames = lastTimestamp.map { CGFloat((link.timestamp - $0) * 60) } ?? 1
+            // Points per frame at 60 frames a second, whatever the display's rate; a stalled main thread catches up
+            // by a few frames at most instead of jumping.
+            let frames = lastTimestamp.map { min(CGFloat((link.timestamp - $0) * 60), 3) } ?? 1
             lastTimestamp = link.timestamp
             guard let scrollView else { return }
 

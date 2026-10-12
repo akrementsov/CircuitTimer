@@ -1,21 +1,16 @@
 import ComposableArchitecture
 import DesignSystem
+import Foundation
 import SwiftUI
 import WorkoutDomain
 import WorkoutStorage
 
 /// A text field of the editor. Every `TextField` here is bound to one case through `.focused`:
 /// leaving or saving waits until the focused field has committed its text, and an unbound field
-/// would be read before its last edit arrives.
+/// would be read before its last edit arrives. The field's row carries it as its scroll `id` too.
 enum EditorField: Hashable {
     case name
     case stageName(Stage.ID)
-}
-
-/// Where the screen scrolls to keep a focused field in sight.
-enum EditorScrollTarget: Hashable {
-    case name
-    case stageField(Stage.ID)
 }
 
 @ViewAction(for: WorkoutEditorFeature.self)
@@ -51,8 +46,8 @@ public struct WorkoutEditorView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
         .onChange(of: focusedField) { _, field in focusChanged(to: field) }
-        .onChange(of: store.draft) { closeSwipe() }
-        .onChange(of: store.expandedStageID) { closeSwipe() }
+        .onChange(of: store.draft) { rowInteraction.closeSwipe() }
+        .onChange(of: store.expandedStageID) { rowInteraction.closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
@@ -127,7 +122,7 @@ public struct WorkoutEditorView: View {
         // The whole card focuses the field, like the legacy field's insets.
         .contentShape(Rectangle())
         .onTapGesture { focusedField = .name }
-        .id(EditorScrollTarget.name)
+        .id(EditorField.name)
     }
 
     private var totalTimeRow: some View {
@@ -148,10 +143,10 @@ public struct WorkoutEditorView: View {
             case .new:
                 Text("editor.title.new", bundle: .module)
             case .viewing:
-                if store.workout.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("editor.title.untitled", bundle: .module)
+                if let name = store.viewingTitle {
+                    Text(verbatim: name)
                 } else {
-                    Text(verbatim: store.workout.name)
+                    Text("editor.title.untitled", bundle: .module)
                 }
             case .editing:
                 Text("editor.title.edit", bundle: .module)
@@ -229,7 +224,7 @@ public struct WorkoutEditorView: View {
             ReorderableRows(
                 items: stages,
                 spacing: .zero,
-                isEnabled: isEditable && focusedField == nil && rowInteraction.swipedID == nil && !store.isSaving && stages.count > 1,
+                isEnabled: store.state.canReorderStages(in: section) && focusedField == nil && rowInteraction.swipedID == nil,
                 canLift: { $0.id != store.expandedStageID },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
@@ -304,7 +299,7 @@ public struct WorkoutEditorView: View {
                 }
             }
         }
-        .id(EditorScrollTarget.stageField(stage.id))
+        .id(EditorField.stageName(stage.id))
     }
 
     private func addStageButton(_ section: WorkoutSectionKind) -> some View {
@@ -343,23 +338,14 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    private func closeSwipe() {
-        rowInteraction.closeSwipe()
-    }
-
     /// Keeps the focused field above the bottom panel and the keyboard, scrolling as little as it takes.
     private func scrollToFocusedField(_ proxy: ScrollViewProxy) {
-        switch focusedField {
-            case .name:
-                withAnimation { proxy.scrollTo(EditorScrollTarget.name) }
-            case let .stageName(id):
-                withAnimation { proxy.scrollTo(EditorScrollTarget.stageField(id)) }
-            case nil:
-                break
-        }
+        guard let focusedField else { return }
+
+        withAnimation { proxy.scrollTo(focusedField) }
     }
 
-    /// On iOS 26 a tap anywhere in a row with a text field focuses the field, as the system list did there.
+    /// On iOS 26 a tap anywhere in a row with a text field focuses the field, as a system list row does there.
     private static var focusesWholeRow: Bool {
         if #available(iOS 26, *) {
             true
@@ -369,7 +355,7 @@ public struct WorkoutEditorView: View {
     }
 
     private func leave() {
-        closeSwipe()
+        rowInteraction.closeSwipe()
         send(afterClearingFocus: .backButtonTapped)
     }
 

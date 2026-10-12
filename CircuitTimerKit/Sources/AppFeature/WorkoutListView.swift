@@ -71,7 +71,7 @@ struct WorkoutListView: View {
                     Text("workouts.moveDown", bundle: .module)
                 }
             }
-            // VoiceOver offers these last first: Delete, then Duplicate, as the system swipe did.
+            // VoiceOver offers these last first: Delete, then Duplicate, in the order of the plaques from the edge.
             Button {
                 duplicate(workout.id)
             } label: {

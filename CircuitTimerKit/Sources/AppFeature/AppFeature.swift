@@ -227,11 +227,15 @@ public struct AppFeature: Sendable {
         switch action {
             case let .workoutsLoaded(stored):
                 state.isReloading = false
-                // A write made on the shown list during the reload may be missing from what was read; read again
-                // once the queue drains instead of dropping it from the list.
+                // A write made on the shown list during the reload may be missing from what was read: read again once
+                // the queue drains instead of dropping the write from the list.
                 if !state.pendingMutations.isEmpty {
                     state.needsReload = true
                     return .none
+                }
+                if state.needsReload {
+                    state.needsReload = false
+                    return loadWorkouts(&state)
                 }
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
@@ -257,7 +261,8 @@ public struct AppFeature: Sendable {
                     state.needsReload = false
                     return loadWorkouts(&state)
                 }
-                return presentDeferredScreen(&state)
+                // A reload still in flight presents it when it lands.
+                return state.isReloading ? .none : presentDeferredScreen(&state)
             case .mutationFailed:
                 // Later writes were derived from a list that storage did not accept; drop them and resync.
                 state.pendingMutations = []
@@ -329,6 +334,10 @@ public struct AppFeature: Sendable {
 
     private func enqueue(_ mutation: ListMutation, _ state: inout State) -> Effect<Action> {
         state.pendingMutations.append(mutation)
+        // The reload in flight may read storage before this write lands, whichever answers first.
+        if state.isReloading {
+            state.needsReload = true
+        }
         guard state.pendingMutations.count == 1 else { return .none }
 
         return write(mutation)

@@ -10,7 +10,7 @@ extension View {
             .contentMargins(.top, .token(spacing: .m), for: .scrollContent)
             // Rows set their own heights; the system minimum would stretch the thin ones.
             .environment(\.defaultMinListRowHeight, .zero)
-            // A swiped row is cut at the card's edge, while the content still scrolls under the bars.
+            // Rows are cut at the cards' sides, while the content still scrolls under the bars.
             .mask { Rectangle().ignoresSafeArea(edges: .vertical) }
             .padding(.horizontal, .token(spacing: .l))
             // Under the keyboard too: its rounded top corners would show the black window behind the screen.

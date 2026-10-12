@@ -116,6 +116,9 @@ private struct SwipePlaques: ViewModifier {
         .overlay(alignment: .trailing) {
             plaques
                 .offset(x: reveal.revealWidth + offset)
+                // Closed, they wait past the row's trailing edge, where a card's clip hides them from sight but not
+                // from touches.
+                .allowsHitTesting(isOpen)
         }
         .modifier(
             HorizontalDrag(
