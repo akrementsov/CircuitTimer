@@ -108,4 +108,110 @@ struct WorkoutEditorStateTests {
         #expect(flags.state.canSave == flags.canSave)
         #expect(flags.state.showsSaveHint == flags.showsSaveHint)
     }
+
+    @Test(arguments: [
+        ("Morning", "Morning"),
+        ("  Morning  ", "  Morning  "),
+        ("", nil),
+        (" \t", nil),
+    ])
+    func test_viewingTitle_storedName_showsItOrNothingWhenBlank(name: String, expected: String?) {
+        var workout = makeWorkout()
+        workout.name = name
+
+        #expect(WorkoutEditorFeature.State(viewing: workout).viewingTitle == expected)
+    }
+
+    @Test
+    func test_canReorderStages_phaseSavingAndCount_needTwoEditableStages() {
+        let editing = editingState(makeWorkout())
+        var saving = editing
+        saving.isSaving = true
+        var new = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+
+        #expect(editing.canReorderStages(in: .training))
+        #expect(!editing.canReorderStages(in: .warmUp))
+        #expect(!saving.canReorderStages(in: .training))
+        #expect(!WorkoutEditorFeature.State(viewing: makeWorkout()).canReorderStages(in: .training))
+        #expect(!new.canReorderStages(in: .training))
+        new.draft.training.append(makeStage(3))
+        #expect(new.canReorderStages(in: .training))
+    }
+
+    @Test
+    func test_shownStagesAndSections_viewingOrEditing_followStoredOrDraft() {
+        let workout = Workout(
+            id: UUID(fixture: 1),
+            name: "Workout",
+            warmUp: [makeStage(10, seconds: 0)],
+            training: [makeStage(20), makeStage(21, .rest)],
+            trainingRounds: 0,
+            coolDown: [makeStage(30, .rest)]
+        )
+        let viewing = WorkoutEditorFeature.State(viewing: workout)
+        let editing = editingState(workout)
+
+        #expect(viewing.shownStages(in: .warmUp).isEmpty)
+        #expect(viewing.shownStages(in: .training).isEmpty)
+        #expect(viewing.shownStages(in: .coolDown) == workout.coolDown)
+        #expect(WorkoutSectionKind.allCases.map(viewing.showsSection) == [false, false, true])
+        #expect(editing.shownStages(in: .warmUp) == workout.warmUp)
+        #expect(editing.shownStages(in: .training) == workout.training)
+        #expect(WorkoutSectionKind.allCases.allSatisfy(editing.showsSection))
+    }
+
+    @Test
+    func test_shownDurationsAndRounds_viewingOrEditing_followStoredOrDraft() {
+        var workout = makeWorkout()
+        workout.trainingRounds = 0
+        let viewing = WorkoutEditorFeature.State(viewing: workout)
+        let editing = editingState(workout)
+
+        #expect(viewing.shownTrainingRounds == 0)
+        #expect(viewing.shownDuration(of: .training) == .zero)
+        #expect(viewing.shownTotalDuration == .seconds(20))
+        #expect(editing.shownTrainingRounds == 1)
+        #expect(editing.shownDuration(of: .training) == .seconds(20))
+        #expect(editing.shownTotalDuration == .seconds(40))
+    }
+
+    @Test(arguments: [
+        // The pause after the warm-up plays over an empty training before a cool-down.
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)], pauseAfterWarmUp: true), true),
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)]), false),
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], pauseAfterWarmUp: true), false),
+    ])
+    func test_showsPauseAfterWarmUp_viewing_onlyAPauseThatPlays(workout: Workout, expected: Bool) {
+        #expect(WorkoutEditorFeature.State(viewing: workout).showsPause(after: .warmUp) == expected)
+    }
+
+    @Test
+    func test_showsPause_trainingEditingAndCoolDown_followTheirRules() {
+        let withCoolDown = Workout(id: UUID(fixture: 1), training: [makeStage(20)], coolDown: [makeStage(30)], pauseAfterTraining: true)
+        let withoutCoolDown = Workout(id: UUID(fixture: 1), training: [makeStage(20)], pauseAfterTraining: true)
+        // While editing, the switch shows wherever a pause would play, whatever its state.
+        let editingOff = editingState(Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)]))
+
+        #expect(WorkoutEditorFeature.State(viewing: withCoolDown).showsPause(after: .training))
+        #expect(!WorkoutEditorFeature.State(viewing: withoutCoolDown).showsPause(after: .training))
+        #expect(editingOff.showsPause(after: .warmUp))
+        #expect(!editingOff.showsPause(after: .coolDown))
+        #expect(!WorkoutEditorFeature.State(viewing: withCoolDown).showsPause(after: .coolDown))
+    }
+
+    @Test
+    func test_canStart_onlyAPlayableStoredWorkoutOnce() {
+        var starting = WorkoutEditorFeature.State(viewing: makeWorkout())
+        starting.isStarting = true
+        var silent = makeWorkout()
+        silent.trainingRounds = 0
+        silent.warmUp = []
+        silent.coolDown = []
+
+        #expect(WorkoutEditorFeature.State(viewing: makeWorkout()).canStart)
+        #expect(!starting.canStart)
+        #expect(!WorkoutEditorFeature.State(viewing: silent).canStart)
+        #expect(!editingState(makeWorkout()).canStart)
+        #expect(!WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)).canStart)
+    }
 }
