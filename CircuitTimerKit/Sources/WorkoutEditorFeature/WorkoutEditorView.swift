@@ -46,7 +46,7 @@ public struct WorkoutEditorView: View {
         // Hiding the system back button also turns off the back gestures, so leaving goes only through Back.
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
-        .onChange(of: focusedField) { _, field in focusChanged(to: field) }
+        .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
@@ -86,7 +86,7 @@ public struct WorkoutEditorView: View {
         if store.isEditable {
             BottomActionPanel(
                 title: Text("editor.saveWorkout", bundle: .module),
-                hint: store.showsSaveHint ? Text("editor.saveHint", bundle: .module) : nil,
+                hint: store.saveBlocker.map(Self.explanation(of:)),
                 isBusy: store.isSaving,
                 busyLabel: Text("editor.saving", bundle: .module),
                 isEnabled: store.canSave,
@@ -216,6 +216,7 @@ public struct WorkoutEditorView: View {
 
     private func stagesCardContent(_ section: WorkoutSectionKind) -> some View {
         let stages = store.state.shownStages(in: section)
+        let unsavableStageIDs = store.state.unsavableStageIDs
         let isEditable = store.isEditable
         return EditorCard {
             TitleAndTimeRow(title: sectionTitle(section), duration: store.state.shownDuration(of: section), style: .adaptive, font: .body)
@@ -247,7 +248,7 @@ public struct WorkoutEditorView: View {
                 canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
-                row: { stageRow($0, in: section, stages: stages) }
+                row: { stageRow($0, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
             )
 
             addStageButton(section)
@@ -262,7 +263,7 @@ public struct WorkoutEditorView: View {
 
     /// Rows read only the stages captured by the card: a row that reads the store observes the stages on its own
     /// and is redrawn apart from the card while a drag settles, showing the wrong stage.
-    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage]) -> some View {
+    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage], isUnsavable: Bool) -> some View {
         let isEditable = store.isEditable
         let offersActions = isEditable && focusedField == nil
         return StageRow(
@@ -270,6 +271,7 @@ public struct WorkoutEditorView: View {
             isEditable: isEditable,
             name: stageNameBinding(stage, in: section),
             focus: $focusedField,
+            durationHint: Self.durationHint(for: stage, isUnsavable: isUnsavable),
             onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
             onDurationTextChange: { send(.stageDurationTextChanged(section, stage.id, $0)) }
         )
@@ -403,13 +405,58 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    private func focusChanged(to field: EditorField?) {
+    private func focusChanged(from oldField: EditorField?, to field: EditorField?) {
+        // Before the pending Back or Save, so a name left with spaces around it is no change to ask about.
+        trimName(of: oldField)
         guard let action = actionAfterFocusLoss else { return }
 
         actionAfterFocusLoss = nil
         // Focusing a field again cancels the request instead of leaving under the user's typing.
         if field == nil {
             send(action)
+        }
+    }
+
+    /// A save trims names anyway; trimming the one just left shows it, and sends nothing when there is nothing to trim.
+    private func trimName(of field: EditorField?) {
+        switch field {
+            case .name:
+                let trimmed = store.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed != store.draft.name {
+                    send(.nameChanged(trimmed))
+                }
+            case let .stageName(id):
+                for section in WorkoutSectionKind.allCases {
+                    guard let stage = store.draft[section].first(where: { $0.id == id }) else { continue }
+
+                    let trimmed = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed != stage.name {
+                        send(.stageNameChanged(section, id, trimmed))
+                    }
+                    return
+                }
+            case .stageDuration, nil:
+                break
+        }
+    }
+
+    /// What Save's dimming means, in words.
+    private static func explanation(of blocker: WorkoutEditorFeature.State.SaveBlocker) -> Text {
+        switch blocker {
+            case .incomplete: Text("editor.saveHint", bundle: .module)
+            case .unsavableStage: Text("editor.saveBlocked.zeroStages", bundle: .module)
+        }
+    }
+
+    /// What VoiceOver adds to a stage's duration: a changed stage that keeps Save dimmed says so, and one that would
+    /// not play says that a save drops it.
+    private static func durationHint(for stage: Stage, isUnsavable: Bool) -> Text? {
+        if isUnsavable {
+            Text("editor.hint.zeroStage", bundle: .module)
+        } else if !WorkoutLimits.isPlayable(stage) {
+            Text("editor.stage.skipped", bundle: .module)
+        } else {
+            nil
         }
     }
 

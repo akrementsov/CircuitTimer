@@ -11,7 +11,7 @@ struct WorkoutEditorStateTests {
         let state: WorkoutEditorFeature.State
         let isDraftComplete: Bool
         let canSave: Bool
-        let showsSaveHint: Bool
+        let saveBlocker: WorkoutEditorFeature.State.SaveBlocker?
     }
 
     static let flagsCases: [FlagsCase] = {
@@ -40,49 +40,49 @@ struct WorkoutEditorStateTests {
                 state: untouchedNew,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .incomplete
             ),
             FlagsCase(
                 testDescription: "saved workout untouched",
                 state: untouched,
                 isDraftComplete: true,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "complete and changed",
                 state: changed,
                 isDraftComplete: true,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "blank name",
                 state: blankName,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .incomplete
             ),
             FlagsCase(
                 testDescription: "nothing to play",
                 state: nothingToPlay,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .unsavableStage
             ),
             FlagsCase(
                 testDescription: "stored without a name, untouched",
                 state: untouchedNameless,
                 isDraftComplete: false,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "saving",
                 state: saving,
                 isDraftComplete: true,
                 canSave: false,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
         ]
     }()
@@ -116,7 +116,7 @@ struct WorkoutEditorStateTests {
     func test_flags_followDraftAndSaving(flags: FlagsCase) {
         #expect(flags.state.isDraftComplete == flags.isDraftComplete)
         #expect(flags.state.canSave == flags.canSave)
-        #expect(flags.state.showsSaveHint == flags.showsSaveHint)
+        #expect(flags.state.saveBlocker == flags.saveBlocker)
     }
 
     @Test(arguments: [

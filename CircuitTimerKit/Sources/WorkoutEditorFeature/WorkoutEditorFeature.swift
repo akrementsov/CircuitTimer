@@ -81,8 +81,17 @@ public struct WorkoutEditorFeature: Sendable {
         /// The rounds the editor offers: a workout without training rounds is not edited here.
         static let trainingRoundsRange = 1...WorkoutLimits.maxTrainingRounds
 
+        /// Why Save is dimmed, when the user can do something about it.
+        public enum SaveBlocker: Equatable, Sendable {
+            /// The draft has no name or nothing to play.
+            case incomplete
+            /// A stage was changed so that it would not play: Save would drop it without a word.
+            case unsavableStage
+        }
+
+        /// Judged on the comparable draft: spaces around a name, which a save trims, are no change.
         public var hasChanges: Bool {
-            draft != original
+            comparable(draft) != comparable(original)
         }
 
         /// A workout needs a name and something to play.
@@ -90,16 +99,58 @@ public struct WorkoutEditorFeature: Sendable {
             !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero
         }
 
+        /// The draft's stages that would not play and differ from the same stage of the original. An untouched one
+        /// the stored workout already had is saved without it as before, and a deleted one is gone either way.
+        public var unsavableStageIDs: Set<Stage.ID> {
+            let comparableOriginal = comparable(original)
+            let originalStages = Dictionary(
+                WorkoutSectionKind.allCases.flatMap { comparableOriginal[$0] }.map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let comparableDraft = comparable(draft)
+            let unsavable = WorkoutSectionKind.allCases
+                .flatMap { comparableDraft[$0] }
+                .filter { !WorkoutLimits.isPlayable($0) && originalStages[$0.id] != $0 }
+            return Set(unsavable.map(\.id))
+        }
+
+        public var hasUnsavableStageEdits: Bool {
+            !unsavableStageIDs.isEmpty
+        }
+
         /// A new workout's Save waits for a change. A saved workout's Save is the way back to Start, as in the
         /// original app: untouched, it writes nothing and only ends the editing, even for a stored workout the editor
         /// would not accept as it is.
         public var canSave: Bool {
-            !isSaving && (endsEditingUntouched || isDraftComplete && hasChanges)
+            !isSaving && (endsEditingUntouched || isDraftComplete && hasChanges && !hasUnsavableStageEdits)
         }
 
-        /// Explains what the draft is missing; a saving draft, or an untouched one Save only closes, needs no hint.
-        public var showsSaveHint: Bool {
-            !isDraftComplete && !isSaving && !endsEditingUntouched
+        /// What keeps Save dimmed, or `nil` when it is not dimmed or there is nothing to explain: read-only, saving,
+        /// or a complete draft that only waits for a change.
+        public var saveBlocker: SaveBlocker? {
+            guard isEditable, !isSaving, !canSave else { return nil }
+
+            if hasUnsavableStageEdits {
+                return .unsavableStage
+            }
+            if !isDraftComplete {
+                return .incomplete
+            }
+            return nil
+        }
+
+        /// The workout as Save would judge it: names without the spaces around them.
+        func comparable(_ workout: Workout) -> Workout {
+            var workout = workout
+            workout.name = workout.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            for section in WorkoutSectionKind.allCases {
+                workout[section] = workout[section].map { stage in
+                    var stage = stage
+                    stage.name = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return stage
+                }
+            }
+            return workout
         }
 
         private var endsEditingUntouched: Bool {

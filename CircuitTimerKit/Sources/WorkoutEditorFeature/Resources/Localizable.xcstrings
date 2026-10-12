@@ -113,6 +113,22 @@
         }
       }
     },
+    "editor.hint.zeroStage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a time for this stage or delete it to save the workout."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы сохранить тренировку, задайте этапу время или удалите его."
+          }
+        }
+      }
+    },
     "editor.intensity.rest" : {
       "localizations" : {
         "en" : {
@@ -305,6 +321,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Круги"
+          }
+        }
+      }
+    },
+    "editor.saveBlocked.zeroStages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a time for the stages you changed to 00:00, or delete them."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Задайте время этапам, изменённым на 00:00, или удалите их."
           }
         }
       }

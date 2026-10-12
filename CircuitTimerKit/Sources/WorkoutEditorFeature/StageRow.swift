@@ -10,23 +10,17 @@ struct StageRow: View {
     let isEditable: Bool
     let name: Binding<String>
     let focus: FocusState<EditorField?>.Binding
+    /// What VoiceOver adds to the duration; the screen shows no hints, as in the original app.
+    let durationHint: Text?
     let onIntensityTap: () -> Void
     let onDurationTextChange: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
-            HStack(spacing: .token(spacing: .xs)) {
-                nameField
-                duration
-            }
-            .foregroundStyle(.text(.primary))
-
-            if stage.duration == .zero {
-                Text("editor.stage.skipped", bundle: .module)
-                    .font(.token(.footnote))
-                    .foregroundStyle(.text(.secondary))
-            }
+        HStack(spacing: .token(spacing: .xs)) {
+            nameField
+            duration
         }
+        .foregroundStyle(.text(.primary))
         .contentTransition(.identity)
         // Parameters, not branches: the row stays the same view in both phases and only restyles; only the duration
         // swaps its text for a field, since read-only there is nothing to type. Read-only the row reads as one
@@ -66,7 +60,7 @@ struct StageRow: View {
     @ViewBuilder
     private var duration: some View {
         if isEditable {
-            StageDurationField(stage: stage, focus: focus, onTextChange: onDurationTextChange)
+            StageDurationField(stage: stage, focus: focus, hint: durationHint, onTextChange: onDurationTextChange)
                 .transition(.identity)
         } else {
             Text(stage.duration.clockText(.minutesSeconds))

@@ -8,6 +8,7 @@ import WorkoutDomain
 struct StageDurationField: View {
     let stage: Stage
     let focus: FocusState<EditorField?>.Binding
+    let hint: Text?
     let onTextChange: (String) -> Void
 
     /// What the field shows; a rejected edit stays here only until `.onChange` puts `lastAccepted` back.
@@ -17,9 +18,10 @@ struct StageDurationField: View {
     /// Whether this focus accepted an edit: without one, the field keeps showing the stored duration.
     @State private var didEdit = false
 
-    init(stage: Stage, focus: FocusState<EditorField?>.Binding, onTextChange: @escaping (String) -> Void) {
+    init(stage: Stage, focus: FocusState<EditorField?>.Binding, hint: Text?, onTextChange: @escaping (String) -> Void) {
         self.stage = stage
         self.focus = focus
+        self.hint = hint
         self.onTextChange = onTextChange
         let text = StageDurationText.text(for: stage.duration)
         _text = State(initialValue: text)
@@ -42,6 +44,7 @@ struct StageDurationField: View {
                 // Unconditional, so the field keeps its identity and its focus: VoiceOver edits the typed text and
                 // otherwise hears the stored duration in words.
                 .accessibilityValue(isFocused ? Text(verbatim: text) : Text(spokenDuration))
+                .accessibilityHint(hint ?? Text(verbatim: ""))
             }
             .font(.token(.body))
             .monospacedDigit()

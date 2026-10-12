@@ -181,7 +181,7 @@ struct WorkoutEditorFeatureTests {
         }
         await store.send(.view(.nameChanged("  Morning  "))) { $0.draft.name = "  Morning  " }
         await store.send(.view(.stageNameChanged(.warmUp, UUID(fixture: 10), " Jog "))) { $0.draft.warmUp[0].name = " Jog " }
-        await store.send(.view(.stageDurationTextChanged(.coolDown, UUID(fixture: 30), ""))) { $0.draft.coolDown[0].duration = .zero }
+        await store.send(.view(.stageDeleteButtonTapped(.coolDown, UUID(fixture: 30)))) { $0.draft.coolDown = [] }
         let draft = store.state.draft
         var expected = draft
         expected.name = "Morning"
