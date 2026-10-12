@@ -37,9 +37,8 @@ struct WorkoutEditorViewingTests {
             .stageMovedUp(.training, UUID(fixture: 21)),
             .stageMovedDown(.training, UUID(fixture: 20)),
             .stageNameChanged(.training, stage, "Other"),
-            .stageDurationChanged(.training, stage, .seconds(1)),
+            .stageDurationTextChanged(.training, stage, "1"),
             .stageIntensityTapped(.training, stage),
-            .stageDurationTapped(stage),
             .saveButtonTapped,
         ]
 
@@ -54,13 +53,11 @@ struct WorkoutEditorViewingTests {
         workout.trainingRounds = 0
         var state = WorkoutEditorFeature.State(viewing: workout)
         state.draft.name = "Stale"
-        state.expandedStageID = UUID(fixture: 10)
         state.isStarting = true
         let store = makeStore(state)
 
         await store.send(.view(.editButtonTapped)) {
             $0.draft = $0.original
-            $0.expandedStageID = nil
             $0.isStarting = false
             $0.phase = .editing
         }

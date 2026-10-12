@@ -75,7 +75,7 @@ struct WorkoutEditorFeatureTests {
         let rest = UUID(fixture: 21)
 
         await store.send(.view(.stageNameChanged(.training, rest, "Breathe"))) { $0.draft.training[1].name = "Breathe" }
-        await store.send(.view(.stageDurationChanged(.training, rest, .seconds(45)))) {
+        await store.send(.view(.stageDurationTextChanged(.training, rest, "00:45"))) {
             $0.draft.training[1].duration = .seconds(45)
         }
         await store.send(.view(.stageIntensityTapped(.training, rest))) { $0.draft.training[1].intensity = .work }
@@ -84,32 +84,25 @@ struct WorkoutEditorFeatureTests {
         await store.send(.view(.stageNameChanged(.training, UUID(fixture: 999), "Unknown")))
     }
 
-    @Test(arguments: [(-1, 0), (WorkoutLimits.maxStageDuration.components.seconds + 1, WorkoutLimits.maxStageDuration.components.seconds)])
-    func test_stageDurationChanged_clampsToStageLimits(input: Int64, expected: Int64) async {
+    @Test(arguments: [("99:99", WorkoutLimits.maxStageDuration), ("", .zero)])
+    func test_stageDurationTextChanged_parsesWithinStageLimits(text: String, expected: Duration) async {
         let store = makeStore()
 
-        await store.send(.view(.stageDurationChanged(.warmUp, UUID(fixture: 10), .seconds(input)))) {
-            $0.draft.warmUp[0].duration = .seconds(expected)
+        await store.send(.view(.stageDurationTextChanged(.warmUp, UUID(fixture: 10), text))) {
+            $0.draft.warmUp[0].duration = expected
         }
     }
 
     @Test
-    func test_stageDeleteMoveAndExpand_expandedStage_keepsPickerConsistent() async {
+    func test_stageDeleteAndMove_addressedStages_changeTheDraft() async {
         let store = makeStore()
-        let first = UUID(fixture: 20)
-        let second = UUID(fixture: 21)
 
-        await store.send(.view(.stageDurationTapped(first))) { $0.expandedStageID = first }
-        await store.send(.view(.stageDurationTapped(second))) { $0.expandedStageID = second }
-        await store.send(.view(.stageDurationTapped(second))) { $0.expandedStageID = nil }
-        await store.send(.view(.stageDurationTapped(second))) { $0.expandedStageID = second }
         await store.send(.view(.stagesMoved(.training, IndexSet(integer: 1), 0))) {
             $0.draft.training = [makeStage(21, .rest), makeStage(20)]
         }
         await store.send(.view(.stageDeleteButtonTapped(.coolDown, UUID(fixture: 30)))) { $0.draft.coolDown = [] }
         await store.send(.view(.stageDeleteButtonTapped(.training, UUID(fixture: 21)))) {
             $0.draft.training = [makeStage(20)]
-            $0.expandedStageID = nil
         }
     }
 
@@ -117,10 +110,9 @@ struct WorkoutEditorFeatureTests {
         (WorkoutSectionKind.training, UUID(fixture: 99)),
         (.warmUp, UUID(fixture: 20)),
     ])
-    func test_stageDeleteButtonTapped_idNotInSection_isNoOpAndKeepsExpanded(section: WorkoutSectionKind, id: UUID) async {
+    func test_stageDeleteButtonTapped_idNotInSection_isNoOp(section: WorkoutSectionKind, id: UUID) async {
         let store = makeStore()
 
-        await store.send(.view(.stageDurationTapped(id))) { $0.expandedStageID = id }
         await store.send(.view(.stageDeleteButtonTapped(section, id)))
     }
 
@@ -145,7 +137,6 @@ struct WorkoutEditorFeatureTests {
         workout.training = [first, middle, last]
         let store = makeStore(editingState(workout))
 
-        await store.send(.view(.stageDurationTapped(middle.id))) { $0.expandedStageID = middle.id }
         await store.send(.view(.stageMovedUp(.training, middle.id))) { $0.draft.training = [middle, first, last] }
         #expect(store.state.hasChanges)
         await store.send(.view(.stageMovedDown(.training, middle.id))) { $0.draft.training = [first, middle, last] }
@@ -190,7 +181,7 @@ struct WorkoutEditorFeatureTests {
         }
         await store.send(.view(.nameChanged("  Morning  "))) { $0.draft.name = "  Morning  " }
         await store.send(.view(.stageNameChanged(.warmUp, UUID(fixture: 10), " Jog "))) { $0.draft.warmUp[0].name = " Jog " }
-        await store.send(.view(.stageDurationChanged(.coolDown, UUID(fixture: 30), .zero))) { $0.draft.coolDown[0].duration = .zero }
+        await store.send(.view(.stageDurationTextChanged(.coolDown, UUID(fixture: 30), ""))) { $0.draft.coolDown[0].duration = .zero }
         let draft = store.state.draft
         var expected = draft
         expected.name = "Morning"
@@ -219,13 +210,9 @@ struct WorkoutEditorFeatureTests {
         workout.trainingRounds = 0
         // Storage is left unimplemented: a write fails the test.
         let store = makeStore(editingState(workout))
-        await store.send(.view(.stageDurationTapped(UUID(fixture: 10)))) { $0.expandedStageID = UUID(fixture: 10) }
 
         await store.send(.view(.saveButtonTapped))
-        await store.receive(\.internal.editingEnded) {
-            $0.expandedStageID = nil
-            $0.phase = .viewing
-        }
+        await store.receive(\.internal.editingEnded) { $0.phase = .viewing }
 
         #expect(store.state.workout == workout)
         #expect(store.state.canStart)
@@ -358,9 +345,8 @@ struct WorkoutEditorFeatureTests {
             .stageMovedUp(.training, UUID(fixture: 21)),
             .stageMovedDown(.training, UUID(fixture: 20)),
             .stageNameChanged(.training, stage, "Other"),
-            .stageDurationChanged(.training, stage, .seconds(1)),
+            .stageDurationTextChanged(.training, stage, "1"),
             .stageIntensityTapped(.training, stage),
-            .stageDurationTapped(stage),
             .backButtonTapped,
             .saveButtonTapped,
         ]

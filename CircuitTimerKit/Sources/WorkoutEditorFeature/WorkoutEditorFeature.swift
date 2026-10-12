@@ -49,8 +49,6 @@ public struct WorkoutEditorFeature: Sendable {
         public var isSaving = false
         /// Start was tapped and the timer is on its way; a second tap must not ask again.
         public internal(set) var isStarting = false
-        /// The stage whose duration picker is open; one at a time.
-        public var expandedStageID: Stage.ID?
         @Presents public var destination: Destination.State?
 
         /// A new workout starts with one work stage in the training section.
@@ -192,9 +190,9 @@ public struct WorkoutEditorFeature: Sendable {
             case stageMovedUp(WorkoutSectionKind, Stage.ID)
             case stageMovedDown(WorkoutSectionKind, Stage.ID)
             case stageNameChanged(WorkoutSectionKind, Stage.ID, String)
-            case stageDurationChanged(WorkoutSectionKind, Stage.ID, Duration)
+            /// The duration's MM:SS text as typed; the draft takes its duration at once.
+            case stageDurationTextChanged(WorkoutSectionKind, Stage.ID, String)
             case stageIntensityTapped(WorkoutSectionKind, Stage.ID)
-            case stageDurationTapped(Stage.ID)
             case backButtonTapped
             case saveButtonTapped
             case editButtonTapped
@@ -274,9 +272,6 @@ public struct WorkoutEditorFeature: Sendable {
             case let .stageDeleteButtonTapped(section, id):
                 guard let index = state.draft[section].firstIndex(where: { $0.id == id }) else { return .none }
 
-                if state.expandedStageID == id {
-                    state.expandedStageID = nil
-                }
                 state.draft[section].remove(at: index)
             case let .stagesMoved(section, source, destination):
                 // Offsets come from the rows as they were drawn; stale ones would trap in `move`, so they are ignored.
@@ -294,12 +289,10 @@ public struct WorkoutEditorFeature: Sendable {
                 state.draft[section].swapAt(index, index + 1)
             case let .stageNameChanged(section, id, name):
                 updateStage(id, in: section, of: &state) { $0.name = name }
-            case let .stageDurationChanged(section, id, duration):
-                updateStage(id, in: section, of: &state) { $0.duration = min(max(duration, .zero), WorkoutLimits.maxStageDuration) }
+            case let .stageDurationTextChanged(section, id, text):
+                updateStage(id, in: section, of: &state) { $0.duration = StageDurationText.duration(from: text) }
             case let .stageIntensityTapped(section, id):
                 updateStage(id, in: section, of: &state) { $0.intensity = $0.intensity == .work ? .rest : .work }
-            case let .stageDurationTapped(id):
-                state.expandedStageID = state.expandedStageID == id ? nil : id
             case .backButtonTapped:
                 guard state.hasChanges else { return .run { [dismiss] _ in await dismiss() } }
 
@@ -309,7 +302,6 @@ public struct WorkoutEditorFeature: Sendable {
             case .editButtonTapped:
                 state.original = State.editable(state.workout)
                 state.draft = state.original
-                state.expandedStageID = nil
                 state.phase = .editing
                 state.isStarting = false
             case .startButtonTapped:
@@ -345,7 +337,6 @@ public struct WorkoutEditorFeature: Sendable {
     private func endEditing(_ state: inout State) {
         state.original = State.editable(state.workout)
         state.draft = state.original
-        state.expandedStageID = nil
         state.phase = .viewing
     }
 

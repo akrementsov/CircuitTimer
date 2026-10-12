@@ -97,70 +97,6 @@
         }
       }
     },
-    "editor.duration.minutes %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld min"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld мин"
-          }
-        }
-      }
-    },
-    "editor.duration.minutesLabel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minutes"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Минуты"
-          }
-        }
-      }
-    },
-    "editor.duration.seconds %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld s"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld с"
-          }
-        }
-      }
-    },
-    "editor.duration.secondsLabel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seconds"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Секунды"
-          }
-        }
-      }
-    },
     "editor.edit" : {
       "localizations" : {
         "en" : {
@@ -205,6 +141,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Работа"
+          }
+        }
+      }
+    },
+    "editor.keyboard.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
           }
         }
       }

@@ -7,10 +7,11 @@ import WorkoutStorage
 
 /// A text field of the editor. Every `TextField` here is bound to one case through `.focused`:
 /// leaving or saving waits until the focused field has committed its text, and an unbound field
-/// would be read before its last edit arrives. The field's row carries it as its scroll `id` too.
+/// would be read before its last edit arrives. A stage's row carries its name's case as its scroll `id`.
 enum EditorField: Hashable {
     case name
     case stageName(Stage.ID)
+    case stageDuration(Stage.ID)
 }
 
 @ViewAction(for: WorkoutEditorFeature.self)
@@ -47,7 +48,6 @@ public struct WorkoutEditorView: View {
         .toolbar { toolbar }
         .onChange(of: focusedField) { _, field in focusChanged(to: field) }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
-        .onChange(of: store.expandedStageID) { rowInteraction.closeSwipe() }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
@@ -185,6 +185,25 @@ public struct WorkoutEditorView: View {
                 .tint(.brand)
             }
         }
+        // The number pad has no return key; this is its way out. The text keyboards close with their own return.
+        if isEditingDuration {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button {
+                    focusedField = nil
+                } label: {
+                    Text("editor.keyboard.done", bundle: .module)
+                }
+            }
+        }
+    }
+
+    private var isEditingDuration: Bool {
+        if case .stageDuration = focusedField {
+            true
+        } else {
+            false
+        }
     }
 
     @ViewBuilder
@@ -225,7 +244,7 @@ public struct WorkoutEditorView: View {
                 items: stages,
                 spacing: .zero,
                 isEnabled: store.state.canReorderStages(in: section) && focusedField == nil && rowInteraction.swipedID == nil,
-                canLift: { $0.id != store.expandedStageID },
+                canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
                 row: { stageRow($0, in: section, stages: stages) }
@@ -249,12 +268,10 @@ public struct WorkoutEditorView: View {
         return StageRow(
             stage: stage,
             isEditable: isEditable,
-            isExpanded: store.expandedStageID == stage.id,
             name: stageNameBinding(stage, in: section),
             focus: $focusedField,
             onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
-            onDurationTap: { send(.stageDurationTapped(stage.id), animation: WorkoutEditorFeature.phaseChangeAnimation) },
-            onDurationChange: { send(.stageDurationChanged(section, stage.id, $0)) }
+            onDurationTextChange: { send(.stageDurationTextChanged(section, stage.id, $0)) }
         )
         .swipePlaques(
             isOpen: rowInteraction.swipeBinding(for: stage.id),
@@ -342,7 +359,11 @@ public struct WorkoutEditorView: View {
     private func scrollToFocusedField(_ proxy: ScrollViewProxy) {
         guard let focusedField else { return }
 
-        withAnimation { proxy.scrollTo(focusedField) }
+        let rowID = switch focusedField {
+            case let .stageDuration(id): EditorField.stageName(id)
+            case .name, .stageName: focusedField
+        }
+        withAnimation { proxy.scrollTo(rowID) }
     }
 
     /// On iOS 26 a tap anywhere in a row with a text field focuses the field, as a system list row does there.

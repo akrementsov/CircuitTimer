@@ -3,23 +3,21 @@ import Foundation
 import SwiftUI
 import WorkoutDomain
 
-/// One stage of the workout screen: intensity marker, name, duration and, when expanded, the duration picker.
+/// One stage of the workout screen: intensity marker, name and duration.
 /// Read-only it keeps its layout on the inactive field color and takes no taps, like the original cell.
 struct StageRow: View {
     let stage: Stage
     let isEditable: Bool
-    let isExpanded: Bool
     let name: Binding<String>
     let focus: FocusState<EditorField?>.Binding
     let onIntensityTap: () -> Void
-    let onDurationTap: () -> Void
-    let onDurationChange: (Duration) -> Void
+    let onDurationTextChange: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
             HStack(spacing: .token(spacing: .xs)) {
                 nameField
-                durationButton
+                duration
             }
             .foregroundStyle(.text(.primary))
 
@@ -28,17 +26,11 @@ struct StageRow: View {
                     .font(.token(.footnote))
                     .foregroundStyle(.text(.secondary))
             }
-
-            if isExpanded {
-                StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
-                    .transition(.opacity)
-            }
         }
-        // The picker opens inside the row's growing height instead of spilling over the rows under it.
-        .clipped()
         .contentTransition(.identity)
-        // Parameters, not branches: the row stays the same view in both phases and only restyles. Read-only it reads
-        // as one element, like a row of the stage list.
+        // Parameters, not branches: the row stays the same view in both phases and only restyles; only the duration
+        // swaps its text for a field, since read-only there is nothing to type. Read-only the row reads as one
+        // element, like a row of the stage list.
         .accessibilityElement(children: isEditable ? .contain : .ignore)
         .accessibilityLabel(shownName)
         .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
@@ -68,40 +60,23 @@ struct StageRow: View {
         }
         .padding(.vertical, .token(spacing: .s))
         .padding(.horizontal, .token(spacing: .xs))
-        .background { fieldPlaque(isFocused: focus.wrappedValue == .stageName(stage.id)) }
+        .background { StageFieldPlaque(isFocused: focus.wrappedValue == .stageName(stage.id), isEditable: isEditable) }
     }
 
-    private var durationButton: some View {
-        Button(action: onDurationTap) {
+    @ViewBuilder
+    private var duration: some View {
+        if isEditable {
+            StageDurationField(stage: stage, focus: focus, onTextChange: onDurationTextChange)
+                .transition(.identity)
+        } else {
             Text(stage.duration.clockText(.minutesSeconds))
                 .font(.token(.body))
                 .monospacedDigit()
                 .fixedSize()
                 .padding(.vertical, .token(spacing: .s))
                 .padding(.horizontal, .token(spacing: .m))
-                .background { fieldPlaque(isFocused: isExpanded) }
-        }
-        .buttonStyle(.borderless)
-        .allowsHitTesting(isEditable)
-        // A borderless button paints its label with the accent; the original field's time is white.
-        .foregroundStyle(.text(.primary))
-        .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
-        .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
-    }
-
-    /// The plaque moves and resizes with the row, and only its color switches at once, like the original cell's.
-    private func fieldPlaque(isFocused: Bool) -> some View {
-        RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
-            .animation(nil) { $0.foregroundStyle(fieldColor(isFocused: isFocused)) }
-    }
-
-    private func fieldColor(isFocused: Bool) -> Color {
-        if isFocused {
-            .surface(.focused)
-        } else if isEditable {
-            .surface(.field)
-        } else {
-            .surface(.fieldInactive)
+                .background { StageFieldPlaque(isFocused: false, isEditable: false) }
+                .transition(.identity)
         }
     }
 
@@ -125,6 +100,28 @@ struct StageRow: View {
         switch stage.intensity {
             case .work: Text("editor.intensity.work", bundle: .module)
             case .rest: Text("editor.intensity.rest", bundle: .module)
+        }
+    }
+}
+
+/// The plaque behind a stage's name and duration. It moves and resizes with the row, and only its color switches at
+/// once, like the original cell's.
+struct StageFieldPlaque: View {
+    let isFocused: Bool
+    let isEditable: Bool
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
+            .animation(nil) { $0.foregroundStyle(color) }
+    }
+
+    private var color: Color {
+        if isFocused {
+            .surface(.focused)
+        } else if isEditable {
+            .surface(.field)
+        } else {
+            .surface(.fieldInactive)
         }
     }
 }
