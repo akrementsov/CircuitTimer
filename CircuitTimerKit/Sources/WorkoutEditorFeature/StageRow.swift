@@ -8,7 +8,7 @@ import WorkoutDomain
 struct StageRow: View {
     let stage: Stage
     let isEditable: Bool
-    let name: Binding<String>
+    let onNameChange: (String) -> Void
     let focus: FocusState<EditorField?>.Binding
     /// What VoiceOver adds to the duration; the screen shows no hints, as in the original app.
     let durationHint: Text?
@@ -45,9 +45,12 @@ struct StageRow: View {
 
             // The same field in both phases, so turning editable changes only its color. Disabled, it takes no focus,
             // not even from the iOS 26 tap anywhere in the row.
-            TextField(text: name, prompt: intensityName.foregroundStyle(.text(.secondary))) {
-                Text("editor.stage.name", bundle: .module)
-            }
+            LimitedNameField(
+                name: stage.name,
+                prompt: intensityName.foregroundStyle(.text(.secondary)),
+                label: Text("editor.stage.name", bundle: .module),
+                onChange: onNameChange
+            )
             .focused(focus, equals: .stageName(stage.id))
             .font(.token(.body))
             .animation(nil) { $0.disabled(!isEditable) }

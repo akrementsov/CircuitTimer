@@ -4,6 +4,14 @@ public enum WorkoutLimits {
     public static let maxTrainingRounds = 99
     public static let maxStagesPerSection = 50
     public static let maxStageDuration: Duration = .seconds(5_999)
+    /// Characters a typed workout or stage name may have, as in the original app.
+    public static let maxNameLength = 30
+
+    /// A name as typed over `previous`: kept within the limit, or when it does not grow a longer name stored before
+    /// the limit; otherwise `previous`, so an edit past the limit, a long paste included, is rejected whole.
+    public static func limitedName(_ name: String, previous: String) -> String {
+        name.count <= maxNameLength || name.count <= previous.count ? name : previous
+    }
 
     /// Drops the stages that are empty once clamped and quantized, then keeps the first
     /// `maxStagesPerSection` usable ones with their durations clamped and quantized. The order

@@ -129,11 +129,12 @@ public struct WorkoutEditorView: View {
 
     private var nameRow: some View {
         let isEditable = store.isEditable
-        return TextField(
-            text: $store.draft.name.sending(\.view.nameChanged),
-            prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary))
+        return LimitedNameField(
+            name: store.draft.name,
+            prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary)),
+            label: Text("editor.name", bundle: .module)
         ) {
-            Text("editor.name", bundle: .module)
+            send(.nameChanged($0))
         }
         .focused($focusedField, equals: .name)
         .font(.token(.fieldTitle))
@@ -297,7 +298,7 @@ public struct WorkoutEditorView: View {
         return StageRow(
             stage: stage,
             isEditable: isEditable,
-            name: stageNameBinding(stage, in: section),
+            onNameChange: { send(.stageNameChanged(section, stage.id, $0)) },
             focus: $focusedField,
             durationHint: Self.durationHint(for: stage, isUnsavable: isUnsavable),
             onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
@@ -488,12 +489,6 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    private func stageNameBinding(_ stage: Stage, in section: WorkoutSectionKind) -> Binding<String> {
-        Binding(
-            get: { stage.name },
-            set: { send(.stageNameChanged(section, stage.id, $0)) }
-        )
-    }
 }
 
 #Preview("Viewing") {

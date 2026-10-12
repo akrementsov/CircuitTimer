@@ -351,7 +351,7 @@ public struct WorkoutEditorFeature: Sendable {
             case .appeared:
                 return settle(&state)
             case let .nameChanged(name):
-                state.draft.name = name
+                state.draft.name = WorkoutLimits.limitedName(name, previous: state.draft.name)
             case let .trainingRoundsChanged(rounds):
                 let range = State.trainingRoundsRange
                 state.draft.trainingRounds = min(max(rounds, range.lowerBound), range.upperBound)
@@ -382,7 +382,7 @@ public struct WorkoutEditorFeature: Sendable {
 
                 state.draft[section].swapAt(index, index + 1)
             case let .stageNameChanged(section, id, name):
-                updateStage(id, in: section, of: &state) { $0.name = name }
+                updateStage(id, in: section, of: &state) { $0.name = WorkoutLimits.limitedName(name, previous: $0.name) }
             case let .stageDurationTextChanged(section, id, text):
                 updateStage(id, in: section, of: &state) { $0.duration = StageDurationText.duration(from: text) }
             case let .stageIntensityTapped(section, id):
