@@ -43,8 +43,8 @@ public struct WorkoutTimerView: View {
                 .frame(height: 98 * unit)
                 .padding(.horizontal, .token(spacing: .xxxl))
                 .padding(.top, .token(spacing: .xxl))
-                if let warning = store.recordWarning {
-                    Text(warning == .notSaved ? "timer.record.notSaved" : "timer.record.olderKept", bundle: .module)
+                if let text = store.recordWarningText {
+                    Text(text)
                         .font(.token(.footnote))
                         .foregroundStyle(.text(.secondary))
                         .multilineTextAlignment(.center)

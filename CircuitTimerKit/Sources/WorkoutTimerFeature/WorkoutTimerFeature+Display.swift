@@ -74,6 +74,18 @@ extension WorkoutTimerFeature.State {
         return CurrentCard(tone: .dark, content: .pauseGlyph, name: name, spokenValue: name)
     }
 
+    /// What a relaunch would bring back after the newest record write failed, if the screen must say so.
+    var recordWarningText: String? {
+        switch recordWarning {
+            case .notSaved:
+                String(localized: "timer.record.notSaved", bundle: .module)
+            case .olderKept:
+                String(localized: "timer.record.olderKept", bundle: .module)
+            case nil:
+                nil
+        }
+    }
+
     /// `nil` once the workout is over: the next card stays empty.
     var nextStageName: String? {
         switch snapshot.status {

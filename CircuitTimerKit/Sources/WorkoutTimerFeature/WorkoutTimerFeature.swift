@@ -134,8 +134,7 @@ public struct WorkoutTimerFeature: Sendable {
             /// `isFinal`: the loop saw its copy stop and has ended.
             case ticked(generation: Int, isFinal: Bool)
             case clockFailed(generation: Int)
-            /// `failure` is `nil` when the file holds what was written.
-            case recordWritten(revision: Int, failure: RecordWarning?)
+            case recordWritten(revision: Int, outcome: RecordOutcome)
         }
     }
 
@@ -207,8 +206,8 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
-            case let .recordWritten(revision, failure):
-                recordWritten(revision: revision, failure: failure, &state)
+            case let .recordWritten(revision, outcome):
+                recordWritten(revision: revision, outcome: outcome, &state)
                 return .none
             case let .countdownTicked(generation):
                 if let stale = stopIfStale(generation, state) { return stale }

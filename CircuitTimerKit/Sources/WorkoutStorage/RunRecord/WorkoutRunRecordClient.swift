@@ -23,6 +23,8 @@ public enum RunRecordError: Error {
     case unsupportedSchema(Int)
     /// The write failed, and so did removing the older record, which may still be restored.
     case outdatedRecordKept(any Error)
+    /// The write failed, but the file still holds a record that restores to the same state; only its date is old.
+    case refreshFailed(any Error)
 }
 
 /// The saved run of each scene session: one file per session, named after its identifier.
@@ -38,9 +40,9 @@ public struct WorkoutRunRecordClient: Sendable {
     public var nextRevision: @Sendable () -> Int = { 0 }
     /// The record of `sessionID`, or `nil` when that session has none. Never changes the disk.
     public var load: @Sendable (_ sessionID: String) async throws -> StoredRunRecord?
-    /// Replaces the record of `sessionID`, or removes it for `nil`. A record that fails to write
-    /// removes an older, different one, and throws `outdatedRecordKept` if that fails too; a
-    /// failed rewrite of the record the file already holds succeeds, as the file is still right.
+    /// Replaces the record of `sessionID`, or removes it for `nil`. When a record fails to write,
+    /// a file it only continues stays and `refreshFailed` is thrown; any other older record is
+    /// removed, and `outdatedRecordKept` is thrown if that fails too.
     /// The first applied writes also remove the files left by earlier sessions, until one pass
     /// succeeds. Ignored when `revision` is not newer than any write applied before.
     public var write: @Sendable (_ record: WorkoutRunRecord?, _ sessionID: String, _ revision: Int) async throws -> Void
