@@ -37,7 +37,7 @@ struct StageDurationField: View {
                     Text("editor.stage.duration", bundle: .module)
                 }
                 .focused(focus, equals: .stageDuration(stage.id))
-                .keyboardType(.numberPad)
+                .keyboardType(.asciiCapableNumberPad)
                 .autocorrectionDisabled()
                 .multilineTextAlignment(.center)
                 .tint(.text(.primary))
@@ -78,7 +78,8 @@ struct StageDurationField: View {
     }
 
     /// Sends each accepted edit at once, from the setter: a send from `.onChange` could come after the focus loss
-    /// that Back or Save waits for. A rejected edit only shows until `.onChange` puts the accepted text back.
+    /// that Back or Save waits for. The edit shows as typed until `.onChange` puts the masked text in: assigning
+    /// a text the field already has would not reach it, and a rejected edit would stay on screen.
     private var typedText: Binding<String> {
         Binding(
             get: { text },

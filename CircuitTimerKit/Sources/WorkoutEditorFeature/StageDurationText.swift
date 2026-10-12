@@ -36,8 +36,13 @@ enum StageDurationText {
         return clamped.clockText(.minutesSeconds)
     }
 
-    /// Only ASCII digits: the number pad's, and those of a hardware keyboard or a paste.
+    /// The digits of the text as ASCII, whatever script they were typed in: a number pad or a paste may bring
+    /// Arabic-Indic or Devanagari digits. Fractions such as «½» are not digits and are dropped.
     private static func digits(of text: String) -> String {
-        text.filter { $0.isASCII && $0.isWholeNumber }
+        String(text.compactMap { character in
+            guard let value = character.wholeNumberValue, (0...9).contains(value) else { return nil }
+
+            return Character(String(value))
+        })
     }
 }
