@@ -72,11 +72,25 @@ extension View {
 private struct BottomActionPanelPlacement<Panel: View>: ViewModifier {
     let panel: () -> Panel
 
+    @Environment(\.bottomPanelBaseInset) private var baseInset
+    @State private var keyboardInset: CGFloat = .zero
+
     func body(content: Content) -> some View {
         // Scrolling to a focused field brings only its text above the panel; the spacing keeps the field's own
         // padding and background clear of the button too.
         if #available(iOS 26, *) {
             content.safeAreaBar(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
+        } else if let baseInset {
+            // Before iOS 26 the tab bar hides only once the push ends and the safe area shrinks then, which would
+            // drop the panel by the bar's height. The panel keeps its place on the screen's own inset instead; above
+            // the keyboard, which the container's safe area leaves in, it needs none.
+            content
+                .safeAreaInset(edge: .bottom, spacing: .token(spacing: .xs)) {
+                    panel()
+                        .padding(.bottom, keyboardInset > .zero ? .zero : baseInset)
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { keyboardInset = $0 }
+                .ignoresSafeArea(.container, edges: .bottom)
         } else {
             content.safeAreaInset(edge: .bottom, spacing: .token(spacing: .xs), content: panel)
         }
