@@ -10,7 +10,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
    - Fonts ship in `Sources/DesignSystem/Resources/Fonts/` with their license and are registered at runtime from `Bundle.module`; `Font.custom` lives only in `DesignSystem`.
 4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions. A pushed screen that must not close unasked hides the system back button: a SwiftUI pop reaches the reducer as `popFrom`, which removes the element without a veto.
-6. **Every commit passes `make verify-clean`.**
+6. **Every commit passes `make verify-clean`.** A squash-merged pull request may run it at milestones instead; its last commit always passes it.
 
 ## Engineering principles
 
@@ -30,12 +30,12 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | Module | Depends on | Owns |
 |---|---|---|
 | `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
-| `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome |
+| `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
-| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout editor: a draft saved or discarded as a whole |
-| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient` |
+| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
+| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`; its own stack with the stage list |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the editor onto the Workouts stack, presenting the timer full screen; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start; composes Settings |
 
 Layering:
 
@@ -55,7 +55,7 @@ Layering:
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
 | `make resolve` | Re-resolves both lockfiles |
 | `make ci` | `lint`, `check-resolved`, `test`, `build-app` |
-| `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit |
+| `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
@@ -101,13 +101,21 @@ public struct SomeFeature: Sendable {
 - Views are `@ViewAction(for:)` and only `send` actions; no logic in `body`.
 - Presentation goes through `$store.scope(\.$destination, action: \.destination).<case>`. An alert without actions is a plain `case alert(AlertState<Never>)`; a confirmation dialog or an alert with actions is a `@ReducerCaseIgnored` case with a hand-written `Destination.Action`, otherwise the scoped binding drops the chosen action (see `WorkoutEditorFeature`).
 - A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
-- The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action.
+- The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action, but only while it is read-only.
+- The editor has phases: `new`, `viewing` (a saved workout, read-only) and `editing` (after the pencil). `workout` is the workout exactly as stored and is what plays; `original` is the base of the draft, with the rounds lifted into the editor's range. A save returns to `viewing`. Start sends `startRequested` with `workout`; `AppFeature` presents the timer only into an empty destination and empties the Workouts stack once the cover has appeared.
 - The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends the session afterwards, which drops the keep-awake vote.
+- The timer owns its own stack, `WorkoutTimerStack`; the stage list is a `@ReducerCaseIgnored` case of `WorkoutTimerFeature.Path` that carries a `WorkoutOutline`. Opening it pauses a running stage or drops a 3-2-1, and leaving it keeps the run paused.
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
 - Bridge callback APIs through an `AsyncStream` that the effect stays suspended on; never let `send` escape the effect.
 - Add only the action groups a feature needs (the root feature has no `Delegate`).
+
+## Screens
+
+- A stack that keeps the tab bar to its root puts `tabBarOnlyOnRoot(isPushed:)` on the root, under `tabBarOnlyOnRoots()` on the `TabView`; the Workouts stack does. Before iOS 26 the root hides it through SwiftUI, as hidden by the pushed screen it would come back only after the pop, and a bottom panel on a pushed screen stands on the home indicator's inset so it doesn't drop when the bar goes at the end of the push; no root has a bottom panel. On iOS 26 SwiftUI's tab bar ignores `hidesBottomBarWhenPushed`, so `TabBarRidesWithRoot` carries a picture of the bar away with the root, hides the bar through UIKit and covers it for a moment after the pop while its glass settles. Measured on iOS 17.5 and 26.5 only, not on 18–25. With the bar gone from the workout screen, a Workouts tab re-tap no longer reaches it from the UI; the reducer still handles it.
+- `ReorderableRows` measures every row, so it never sits in a lazy container, and only inside a `CardScrollView`, the one place that injects `RowInteraction`.
+- Swiped and reordered rows read only the items their list captured: a row that reads the store observes them on its own and is redrawn apart from the list while a drag settles, showing the wrong item.
 
 ## Time
 
@@ -174,9 +182,11 @@ let now = Date()
 
 String Catalogs only: `Localizable.xcstrings` in each module that shows text (`Text("key", bundle: .module)`), semantic keys, English and Russian. The app's `InfoPlist.xcstrings` gives the main bundle a Russian localization — iOS needs it before it picks Russian strings from packages.
 
+DesignSystem has no catalog: a feature passes its own strings into DesignSystem views as `Text("key", bundle: .module)`.
+
 ## Git
 
 - Branch `CT-<n>-short-slug` from `main`; commits `CT-<n>: Imperative description`. A milestone split into slices uses `CT-<milestone>-<n>` instead of `CT-<n>` (`CT-UI-1-dark-tokens`, `CT-UI-1: …`).
-- One logical change per commit, and every commit passes `make verify-clean`.
+- One logical change per commit, and every commit passes `make verify-clean` (at milestones only in a squash-merged pull request, see core rule 6).
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.

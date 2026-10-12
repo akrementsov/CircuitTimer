@@ -31,9 +31,8 @@ public struct AppFeature: Sendable {
     /// A screen the user asked for while the list was being written or reloaded.
     enum DeferredScreen: Equatable, Sendable {
         case create
-        case edit(Workout.ID)
-        /// Plays the workout in the full-screen timer.
-        case start(Workout.ID)
+        /// Opens the workout's screen, read-only.
+        case open(Workout.ID)
     }
 
     public enum RootTab: Hashable, Sendable {
@@ -53,6 +52,8 @@ public struct AppFeature: Sendable {
         var pendingMutations: [ListMutation] = []
         /// Set when a write reports that storage no longer matches the list; reload once the queue drains.
         var needsReload = false
+        /// A reload of a list that stays on screen meanwhile.
+        var isReloading = false
         var deferredScreen: DeferredScreen?
 
         public init() {}
@@ -83,12 +84,12 @@ public struct AppFeature: Sendable {
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
-            case startButtonTapped(Workout.ID)
             case deleteButtonTapped(Workout.ID)
             case duplicateButtonTapped(Workout.ID)
             case workoutsMoved(IndexSet, Int)
             case workoutMovedUp(Workout.ID)
             case workoutMovedDown(Workout.ID)
+            case timerCoverAppeared
         }
 
         @CasePathable
@@ -124,6 +125,8 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
+                case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
+                    startWorkout(workout, &state)
                 case .destination(.dismiss):
                     timerDismissed(state)
                 case .destination, .path, .settings:
@@ -145,10 +148,14 @@ public struct AppFeature: Sendable {
                     // A tap on the selected tab returns it to its root.
                     switch tab {
                         case .workouts:
-                            // The editor hides the tab bar, so a re-tap reaches here only while the editor is being pushed.
-                            guard let id = state.path.ids.last, state.path[id: id, case: \.editor] != nil else { return .none }
+                            // Only a read-only screen leaves, through its own Back. An editor may have a field focused
+                            // whose last edit reaches the draft only through the view: a re-tap would drop that edit
+                            // or leave without the discard dialog.
+                            guard
+                                let id = state.path.ids.last,
+                                state.path[id: id, case: \.editor]?.phase == .viewing
+                            else { return .none }
 
-                            // Leaving goes through the editor, so a changed draft asks first and a save in flight finishes.
                             return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
                         case .settings:
                             state.settings.popToRoot()
@@ -165,14 +172,12 @@ public struct AppFeature: Sendable {
             case .addButtonTapped:
                 return openScreen(.create, &state)
             case let .workoutTapped(id):
-                return openScreen(.edit(id), &state)
-            case let .startButtonTapped(id):
-                return openScreen(.start(id), &state)
+                return openScreen(.open(id), &state)
             case let .deleteButtonTapped(id):
                 guard case var .loaded(workouts) = state.workouts, workouts.remove(id: id) != nil else { return .none }
 
                 state.workouts = .loaded(workouts)
-                if state.deferredScreen == .edit(id) || state.deferredScreen == .start(id) {
+                if state.deferredScreen == .open(id) {
                     state.deferredScreen = nil
                 }
                 return enqueue(.delete(id), &state)
@@ -211,17 +216,34 @@ public struct AppFeature: Sendable {
 
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
+            case .timerCoverAppeared:
+                // Under the cover, so the pop is not seen; closing the timer lands on the list.
+                state.path.removeAll()
+                return .none
         }
     }
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
             case let .workoutsLoaded(stored):
+                state.isReloading = false
+                // A write made on the shown list during the reload may be missing from what was read: read again once
+                // the queue drains instead of dropping the write from the list.
+                if !state.pendingMutations.isEmpty {
+                    state.needsReload = true
+                    return .none
+                }
+                // Defensive: the write that overtook this read normally cancels it with a newer load.
+                if state.needsReload {
+                    state.needsReload = false
+                    return loadWorkouts(&state)
+                }
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
                 return presentDeferredScreen(&state)
             case .workoutsLoadingFailed:
+                state.isReloading = false
                 state.workouts = .failed
                 state.deferredScreen = nil
                 return .none
@@ -240,7 +262,8 @@ public struct AppFeature: Sendable {
                     state.needsReload = false
                     return loadWorkouts(&state)
                 }
-                return presentDeferredScreen(&state)
+                // A reload still in flight presents it when it lands.
+                return state.isReloading ? .none : presentDeferredScreen(&state)
             case .mutationFailed:
                 // Later writes were derived from a list that storage did not accept; drop them and resync.
                 state.pendingMutations = []
@@ -258,7 +281,7 @@ public struct AppFeature: Sendable {
     /// Opens the screen now, or once pending writes and reloads are done so it never shows a stale workout.
     private func openScreen(_ request: DeferredScreen, _ state: inout State) -> Effect<Action> {
         state.deferredScreen = request
-        guard state.pendingMutations.isEmpty, case .loaded = state.workouts else { return .none }
+        guard state.pendingMutations.isEmpty, !state.isReloading, case .loaded = state.workouts else { return .none }
 
         return presentDeferredScreen(&state)
     }
@@ -275,24 +298,34 @@ public struct AppFeature: Sendable {
         switch request {
             case .create:
                 state.path.append(.editor(WorkoutEditorFeature.State(newWorkoutID: uuid(), firstStageID: uuid())))
-            case let .edit(id):
-                // The workout may be gone by now; then there is nothing to edit.
+            case let .open(id):
+                // The workout may be gone by now; then there is nothing to show.
                 guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
 
-                state.path.append(.editor(WorkoutEditorFeature.State(editing: workout)))
-            case let .start(id):
-                // The workout may be gone by now, and one with nothing to play has no timer.
-                guard
-                    case let .loaded(workouts) = state.workouts,
-                    let workout = workouts[id: id],
-                    workout.isPlayable
-                else { return .none }
-
-                state.destination = .timer(
-                    WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
-                )
+                state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
         }
         return .none
+    }
+
+    /// Presents the timer over the tab bar; the Workouts stack returns to the list once the cover is up.
+    private func startWorkout(_ workout: Workout, _ state: inout State) -> Effect<Action> {
+        // The workout's screen offers Start only for a playable workout and never under a presentation.
+        guard state.destination == nil else {
+            Self.logger.error("Refused to start a workout while something is presented")
+            return .none
+        }
+        guard workout.isPlayable else {
+            Self.logger.error("Refused to start a workout with nothing to play")
+            return .none
+        }
+
+        state.destination = .timer(timerState(for: workout))
+        return .none
+    }
+
+    /// The one place a timer's state is built.
+    private func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
+        WorkoutTimerFeature.State(id: uuid(), title: workout.displayName, schedule: WorkoutSchedule(workout: workout))
     }
 
     private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
@@ -302,6 +335,10 @@ public struct AppFeature: Sendable {
 
     private func enqueue(_ mutation: ListMutation, _ state: inout State) -> Effect<Action> {
         state.pendingMutations.append(mutation)
+        // The reload in flight may read storage before this write lands, whichever answers first.
+        if state.isReloading {
+            state.needsReload = true
+        }
         guard state.pendingMutations.count == 1 else { return .none }
 
         return write(mutation)
@@ -359,7 +396,13 @@ public struct AppFeature: Sendable {
     }
 
     private func loadWorkouts(_ state: inout State) -> Effect<Action> {
-        state.workouts = .loading
+        // A shown list stays until the new one arrives: a spinner in its place would flash, and a push right after the
+        // reload would carry the spinner's picture of the tab bar on iOS 26.
+        if case .loaded = state.workouts {
+            state.isReloading = true
+        } else {
+            state.workouts = .loading
+        }
         return .run { [workoutStorage] send in
             do {
                 let stored = try await workoutStorage.fetchAll()

@@ -29,4 +29,11 @@ func makeWorkout() -> Workout {
     )
 }
 
+/// A stored workout after the pencil: the editor of `workout`.
+func editingState(_ workout: Workout = makeWorkout()) -> WorkoutEditorFeature.State {
+    var state = WorkoutEditorFeature.State(viewing: workout)
+    state.phase = .editing
+    return state
+}
+
 struct SaveFailure: Error {}

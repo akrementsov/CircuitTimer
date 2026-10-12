@@ -77,9 +77,10 @@ struct AppFeatureTests {
 
         shouldFail.setValue(true)
         await store.send(.view(.retryButtonTapped)) {
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoadingFailed) {
+            $0.isReloading = false
             $0.workouts = .failed
         }
     }

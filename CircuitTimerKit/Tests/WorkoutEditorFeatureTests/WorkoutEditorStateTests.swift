@@ -16,7 +16,7 @@ struct WorkoutEditorStateTests {
 
     static let flagsCases: [FlagsCase] = {
         let untouchedNew = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
-        let untouched = WorkoutEditorFeature.State(editing: makeWorkout())
+        let untouched = editingState(makeWorkout())
         var changed = untouched
         changed.draft.name = "Changed"
         var blankName = untouched
@@ -29,6 +29,9 @@ struct WorkoutEditorStateTests {
                 return stage
             }
         }
+        var storedNameless = makeWorkout()
+        storedNameless.name = ""
+        let untouchedNameless = editingState(storedNameless)
         var saving = changed
         saving.isSaving = true
         return [
@@ -40,10 +43,10 @@ struct WorkoutEditorStateTests {
                 showsSaveHint: true
             ),
             FlagsCase(
-                testDescription: "complete but untouched",
+                testDescription: "saved workout untouched",
                 state: untouched,
                 isDraftComplete: true,
-                canSave: false,
+                canSave: true,
                 showsSaveHint: false
             ),
             FlagsCase(
@@ -68,6 +71,13 @@ struct WorkoutEditorStateTests {
                 showsSaveHint: true
             ),
             FlagsCase(
+                testDescription: "stored without a name, untouched",
+                state: untouchedNameless,
+                isDraftComplete: false,
+                canSave: true,
+                showsSaveHint: false
+            ),
+            FlagsCase(
                 testDescription: "saving",
                 state: saving,
                 isDraftComplete: true,
@@ -81,7 +91,7 @@ struct WorkoutEditorStateTests {
     func test_initNew_givesOneWorkStageInTraining() {
         let state = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
 
-        #expect(state.mode == .create)
+        #expect(state.phase == .new)
         #expect(state.draft == Workout(
             id: UUID(fixture: 1),
             training: [Stage(id: UUID(fixture: 2), name: "", duration: .seconds(30), intensity: .work)]
@@ -90,13 +100,13 @@ struct WorkoutEditorStateTests {
     }
 
     @Test(arguments: [(-5, 1), (0, 1), (7, 7), (WorkoutLimits.maxTrainingRounds + 1, WorkoutLimits.maxTrainingRounds)])
-    func test_initEditing_liftsRoundsIntoEditorRangeWithoutChanges(stored: Int, expected: Int) {
+    func test_initViewing_liftsRoundsIntoEditorRangeWithoutChanges(stored: Int, expected: Int) {
         var workout = makeWorkout()
         workout.trainingRounds = stored
 
-        let state = WorkoutEditorFeature.State(editing: workout)
+        let state = WorkoutEditorFeature.State(viewing: workout)
 
-        #expect(state.mode == .edit)
+        #expect(state.phase == .viewing)
         #expect(state.draft.trainingRounds == expected)
         #expect(state.original == state.draft)
         #expect(!state.hasChanges)
@@ -107,5 +117,111 @@ struct WorkoutEditorStateTests {
         #expect(flags.state.isDraftComplete == flags.isDraftComplete)
         #expect(flags.state.canSave == flags.canSave)
         #expect(flags.state.showsSaveHint == flags.showsSaveHint)
+    }
+
+    @Test(arguments: [
+        ("Morning", "Morning"),
+        ("  Morning  ", "  Morning  "),
+        ("", nil),
+        (" \t", nil),
+    ])
+    func test_viewingTitle_storedName_showsItOrNothingWhenBlank(name: String, expected: String?) {
+        var workout = makeWorkout()
+        workout.name = name
+
+        #expect(WorkoutEditorFeature.State(viewing: workout).viewingTitle == expected)
+    }
+
+    @Test
+    func test_canReorderStages_phaseSavingAndCount_needTwoEditableStages() {
+        let editing = editingState(makeWorkout())
+        var saving = editing
+        saving.isSaving = true
+        var new = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+
+        #expect(editing.canReorderStages(in: .training))
+        #expect(!editing.canReorderStages(in: .warmUp))
+        #expect(!saving.canReorderStages(in: .training))
+        #expect(!WorkoutEditorFeature.State(viewing: makeWorkout()).canReorderStages(in: .training))
+        #expect(!new.canReorderStages(in: .training))
+        new.draft.training.append(makeStage(3))
+        #expect(new.canReorderStages(in: .training))
+    }
+
+    @Test
+    func test_shownStagesAndSections_viewingOrEditing_followStoredOrDraft() {
+        let workout = Workout(
+            id: UUID(fixture: 1),
+            name: "Workout",
+            warmUp: [makeStage(10, seconds: 0)],
+            training: [makeStage(20), makeStage(21, .rest)],
+            trainingRounds: 0,
+            coolDown: [makeStage(30, .rest)]
+        )
+        let viewing = WorkoutEditorFeature.State(viewing: workout)
+        let editing = editingState(workout)
+
+        #expect(viewing.shownStages(in: .warmUp).isEmpty)
+        #expect(viewing.shownStages(in: .training).isEmpty)
+        #expect(viewing.shownStages(in: .coolDown) == workout.coolDown)
+        #expect(WorkoutSectionKind.allCases.map(viewing.showsSection) == [false, false, true])
+        #expect(editing.shownStages(in: .warmUp) == workout.warmUp)
+        #expect(editing.shownStages(in: .training) == workout.training)
+        #expect(WorkoutSectionKind.allCases.allSatisfy(editing.showsSection))
+    }
+
+    @Test
+    func test_shownDurationsAndRounds_viewingOrEditing_followStoredOrDraft() {
+        var workout = makeWorkout()
+        workout.trainingRounds = 0
+        let viewing = WorkoutEditorFeature.State(viewing: workout)
+        let editing = editingState(workout)
+
+        #expect(viewing.shownTrainingRounds == 0)
+        #expect(viewing.shownDuration(of: .training) == .zero)
+        #expect(viewing.shownTotalDuration == .seconds(20))
+        #expect(editing.shownTrainingRounds == 1)
+        #expect(editing.shownDuration(of: .training) == .seconds(20))
+        #expect(editing.shownTotalDuration == .seconds(40))
+    }
+
+    @Test(arguments: [
+        // The pause after the warm-up plays over an empty training before a cool-down.
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)], pauseAfterWarmUp: true), true),
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)]), false),
+        (Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], pauseAfterWarmUp: true), false),
+    ])
+    func test_showsPauseAfterWarmUp_viewing_onlyAPauseThatPlays(workout: Workout, expected: Bool) {
+        #expect(WorkoutEditorFeature.State(viewing: workout).showsPause(after: .warmUp) == expected)
+    }
+
+    @Test
+    func test_showsPause_trainingEditingAndCoolDown_followTheirRules() {
+        let withCoolDown = Workout(id: UUID(fixture: 1), training: [makeStage(20)], coolDown: [makeStage(30)], pauseAfterTraining: true)
+        let withoutCoolDown = Workout(id: UUID(fixture: 1), training: [makeStage(20)], pauseAfterTraining: true)
+        // While editing, the switch shows wherever a pause would play, whatever its state.
+        let editingOff = editingState(Workout(id: UUID(fixture: 1), warmUp: [makeStage(10)], coolDown: [makeStage(30)]))
+
+        #expect(WorkoutEditorFeature.State(viewing: withCoolDown).showsPause(after: .training))
+        #expect(!WorkoutEditorFeature.State(viewing: withoutCoolDown).showsPause(after: .training))
+        #expect(editingOff.showsPause(after: .warmUp))
+        #expect(!editingOff.showsPause(after: .coolDown))
+        #expect(!WorkoutEditorFeature.State(viewing: withCoolDown).showsPause(after: .coolDown))
+    }
+
+    @Test
+    func test_canStart_onlyAPlayableStoredWorkoutOnce() {
+        var starting = WorkoutEditorFeature.State(viewing: makeWorkout())
+        starting.isStarting = true
+        var silent = makeWorkout()
+        silent.trainingRounds = 0
+        silent.warmUp = []
+        silent.coolDown = []
+
+        #expect(WorkoutEditorFeature.State(viewing: makeWorkout()).canStart)
+        #expect(!starting.canStart)
+        #expect(!WorkoutEditorFeature.State(viewing: silent).canStart)
+        #expect(!editingState(makeWorkout()).canStart)
+        #expect(!WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)).canStart)
     }
 }

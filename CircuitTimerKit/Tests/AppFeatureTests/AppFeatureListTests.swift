@@ -30,8 +30,9 @@ struct AppFeatureListTests {
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2)])
             $0.hiddenRecordCount = 2
         }
-        await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
+        await store.send(.view(.retryButtonTapped)) { $0.isReloading = true }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([])
             $0.hiddenRecordCount = 0
         }
@@ -60,7 +61,7 @@ struct AppFeatureListTests {
         }
         await store.send(.path(.popFrom(id: 0))) { $0.path = StackState() }
         await store.send(.view(.workoutTapped(first.id))) {
-            $0.path[id: 1] = .editor(WorkoutEditorFeature.State(editing: self.first))
+            $0.path[id: 1] = .editor(WorkoutEditorFeature.State(viewing: self.first))
         }
         await store.send(.path(.popFrom(id: 1))) { $0.path = StackState() }
         await store.send(.view(.workoutTapped(UUID(fixture: 99))))
@@ -71,7 +72,7 @@ struct AppFeatureListTests {
         var renamed = first
         renamed.name = "Renamed"
         var state = loaded([first, second])
-        state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+        state.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
         let id = try #require(state.path.ids.first)
         let store = makeStore(state)
 
@@ -85,7 +86,7 @@ struct AppFeatureListTests {
 
         var failed = AppFeature.State()
         failed.workouts = .failed
-        failed.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
+        failed.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
         let failedID = try #require(failed.path.ids.first)
         let notLoaded = makeStore(failed) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(3)]) }
@@ -290,9 +291,10 @@ struct AppFeatureListTests {
         await store.receive(\.internal.mutationFinished) {
             $0.pendingMutations = []
             $0.needsReload = false
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(2), makeWorkout(1, name: "Copy")])
         }
     }
@@ -329,9 +331,10 @@ struct AppFeatureListTests {
             $0.pendingMutations = []
             $0.deferredScreen = nil
             $0.destination = .alert(.mutationFailed)
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2)])
         }
 
@@ -380,7 +383,7 @@ struct AppFeatureListTests {
         let store = makeStore(state)
 
         await store.send(.view(.addButtonTapped)) { $0.deferredScreen = .create }
-        await store.send(.view(.workoutTapped(second.id))) { $0.deferredScreen = .edit(self.second.id) }
+        await store.send(.view(.workoutTapped(second.id))) { $0.deferredScreen = .open(self.second.id) }
 
         var loading = AppFeature.State()
         loading.workouts = .loading
@@ -409,19 +412,20 @@ struct AppFeatureListTests {
         let renamed = makeWorkout(2, name: "Reloaded")
         var state = loaded([first, second])
         state.pendingMutations = [.reorder([second.id, first.id])]
-        state.deferredScreen = .edit(second.id)
+        state.deferredScreen = .open(second.id)
         let store = makeStore(state) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(1), renamed]) }
         }
 
         await store.send(.internal(.mutationFinished(.storeDiverged))) {
             $0.pendingMutations = []
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), renamed])
             $0.deferredScreen = nil
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(editing: renamed))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: renamed))
         }
     }
 
@@ -429,7 +433,7 @@ struct AppFeatureListTests {
     func test_deferredEdit_isDroppedForDeletedOrMissingWorkoutAndOnLoadFailure() async {
         var state = loaded([first, second])
         state.pendingMutations = [.reorder([UUID(fixture: 99)])]
-        state.deferredScreen = .edit(first.id)
+        state.deferredScreen = .open(first.id)
         let store = makeStore(state) {
             $0.workoutStorage.delete = { _ in .applied }
         }
@@ -437,7 +441,7 @@ struct AppFeatureListTests {
             $0.workouts = .loaded([self.first])
             $0.pendingMutations.append(.delete(self.second.id))
         }
-        #expect(store.state.deferredScreen == .edit(first.id))
+        #expect(store.state.deferredScreen == .open(first.id))
         await store.send(.view(.deleteButtonTapped(first.id))) {
             $0.workouts = .loaded([])
             $0.pendingMutations.append(.delete(self.first.id))
@@ -445,7 +449,7 @@ struct AppFeatureListTests {
         }
 
         var missing = loaded([second])
-        missing.deferredScreen = .edit(first.id)
+        missing.deferredScreen = .open(first.id)
         let missingStore = makeStore(missing)
         await missingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [second])))) { $0.deferredScreen = nil }
 
@@ -474,7 +478,7 @@ struct AppFeatureListTests {
         var loading = AppFeature.State()
         loading.workouts = .loading
         loading.selectedTab = .settings
-        loading.deferredScreen = .edit(first.id)
+        loading.deferredScreen = .open(first.id)
         let loadingStore = makeStore(loading)
         await loadingStore.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [first])))) {
             $0.workouts = .loaded([self.first])

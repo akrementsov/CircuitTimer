@@ -43,12 +43,12 @@ graph TD
 | Module | Responsibility |
 |---|---|
 | `WorkoutDomain` | Workout model, normalization limits, the linear schedule and the `WorkoutRun` timer engine. Foundation only, so the widget can use it. |
-| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome. Lint rejects literal styles anywhere else. |
+| `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows, the caption plate and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll; the tab bar kept to the stacks' roots. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. |
-| `WorkoutEditorFeature` | The workout editor in the original app's cards: a draft saved with the bottom Save workout button or discarded with Back, stage editing within `WorkoutLimits`. |
-| `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs. |
+| `WorkoutEditorFeature` | The workout screen in the original app's cards: a saved workout opens read-only with Start workout at the bottom; the pencil edits a draft that the bottom Save workout button saves, back to read-only, or Back discards; stage editing within `WorkoutLimits`. |
+| `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs. |
 | `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
-| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the editor onto the Workouts stack and presents the timer full screen. |
+| `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -107,7 +107,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 - [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
 - [ ] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
-  - [ ] **CT-3-2** — the original start path: the workout screen and its Start workout button
+  - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button
   - [ ] **CT-3-3** — background and restore
   - [ ] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
   - [ ] **CT-3-5** — cues in the background through local notifications

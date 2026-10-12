@@ -19,6 +19,13 @@ public struct WorkoutTimerFeature: Sendable {
         }
     }
 
+    /// Screens pushed over the timer. The stage list has no logic of its own: it carries its outline.
+    @Reducer
+    public enum Path {
+        @ReducerCaseIgnored
+        case stageList(WorkoutOutline)
+    }
+
     public enum CloseConfirmation: Equatable, Sendable {
         case finish
         /// Stays on the timer; a purpose starts that countdown again.
@@ -57,6 +64,7 @@ public struct WorkoutTimerFeature: Sendable {
         var requestedAwake = false
         var awakeRevision = 0
         @Presents public var destination: Destination.State?
+        public internal(set) var path = StackState<Path.State>()
 
         public init(id: UUID, title: String, schedule: WorkoutSchedule) {
             self.id = id
@@ -79,6 +87,7 @@ public struct WorkoutTimerFeature: Sendable {
         case view(View)
         case `internal`(Internal)
         case destination(PresentationAction<Destination.Action>)
+        case path(StackActionOf<Path>)
 
         @CasePathable
         public enum View: Equatable, Sendable {
@@ -86,6 +95,7 @@ public struct WorkoutTimerFeature: Sendable {
             case closeButtonTapped
             case playPauseButtonTapped
             case nextButtonTapped
+            case stagesButtonTapped
         }
 
         @CasePathable
@@ -124,9 +134,13 @@ public struct WorkoutTimerFeature: Sendable {
                     closeConfirmed(choice, &state)
                 case .destination:
                     .none
+                case .path:
+                    // Leaving the stage list keeps the run paused, like the original app.
+                    .none
             }
         }
         .ifLet(\.$destination, action: \.destination)
+        .forEach(\.path, action: \.path)
     }
 
     // Every action decides on the phase settled at `now`. It syncs the clock only when the settle changed the
@@ -150,6 +164,8 @@ public struct WorkoutTimerFeature: Sendable {
                 return playPause(&state, at: now)
             case .nextButtonTapped:
                 return next(&state, at: now)
+            case .stagesButtonTapped:
+                return showStageList(&state, at: now)
         }
     }
 
@@ -234,6 +250,24 @@ public struct WorkoutTimerFeature: Sendable {
                 return mustSync ? syncClock(&state, at: now) : .none
         }
         return syncClock(&state, at: now)
+    }
+
+    /// The list hides the clock, so a running stage pauses and a 3-2-1 stops while it is open; Play starts either
+    /// again, as the original app did.
+    private func showStageList(_ state: inout State, at now: Date) -> Effect<Action> {
+        // A second tap while the list is being pushed opens nothing.
+        guard state.path.isEmpty else { return .none }
+
+        var mustSync = advance(&state, at: now)
+        if state.countdown != nil {
+            state.countdown = nil
+            mustSync = true
+        } else if state.snapshot.status == .running {
+            state.run.pause(at: now)
+            mustSync = true
+        }
+        state.path.append(.stageList(state.outline))
+        return mustSync ? syncClock(&state, at: now) : .none
     }
 
     private func close(_ state: inout State, at now: Date) -> Effect<Action> {
@@ -472,6 +506,8 @@ public struct WorkoutTimerFeature: Sendable {
 }
 
 extension WorkoutTimerFeature.Destination.State: Equatable, Sendable {}
+extension WorkoutTimerFeature.Path.State: Equatable, Sendable {}
+extension WorkoutTimerFeature.Path.Action: Equatable, Sendable {}
 
 extension WorkoutTimerFeature.Countdown {
     init(_ purpose: Purpose) {

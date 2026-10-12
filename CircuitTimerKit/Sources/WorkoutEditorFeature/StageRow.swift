@@ -3,9 +3,11 @@ import Foundation
 import SwiftUI
 import WorkoutDomain
 
-/// One stage of the editor: intensity marker, name, duration and, when expanded, the duration picker.
+/// One stage of the workout screen: intensity marker, name, duration and, when expanded, the duration picker.
+/// Read-only it keeps its layout on the inactive field color and takes no taps, like the original cell.
 struct StageRow: View {
     let stage: Stage
+    let isEditable: Bool
     let isExpanded: Bool
     let name: Binding<String>
     let focus: FocusState<EditorField?>.Binding
@@ -29,8 +31,17 @@ struct StageRow: View {
 
             if isExpanded {
                 StageDurationPicker(duration: stage.duration, onChange: onDurationChange)
+                    .transition(.opacity)
             }
         }
+        // The picker opens inside the row's growing height instead of spilling over the rows under it.
+        .clipped()
+        .contentTransition(.identity)
+        // Parameters, not branches: the row stays the same view in both phases and only restyles. Read-only it reads
+        // as one element, like a row of the stage list.
+        .accessibilityElement(children: isEditable ? .contain : .ignore)
+        .accessibilityLabel(shownName)
+        .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
     }
 
     /// The marker sits inside the name's field, like the original app's title inset.
@@ -42,21 +53,22 @@ struct StageRow: View {
                     .frame(width: .token(size: .marker), height: .token(size: .marker))
             }
             .buttonStyle(.borderless)
+            .allowsHitTesting(isEditable)
             .accessibilityLabel(intensityName)
             .accessibilityHint(Text("editor.stage.intensity.hint", bundle: .module))
 
+            // The same field in both phases, so turning editable changes only its color. Disabled, it takes no focus,
+            // not even from the iOS 26 tap anywhere in the row.
             TextField(text: name, prompt: intensityName.foregroundStyle(.text(.secondary))) {
                 Text("editor.stage.name", bundle: .module)
             }
             .focused(focus, equals: .stageName(stage.id))
             .font(.token(.body))
+            .animation(nil) { $0.disabled(!isEditable) }
         }
         .padding(.vertical, .token(spacing: .s))
         .padding(.horizontal, .token(spacing: .xs))
-        .background(
-            focus.wrappedValue == .stageName(stage.id) ? .surface(.focused) : .surface(.field),
-            in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
-        )
+        .background { fieldPlaque(isFocused: focus.wrappedValue == .stageName(stage.id)) }
     }
 
     private var durationButton: some View {
@@ -67,16 +79,39 @@ struct StageRow: View {
                 .fixedSize()
                 .padding(.vertical, .token(spacing: .s))
                 .padding(.horizontal, .token(spacing: .m))
-                .background(
-                    isExpanded ? .surface(.focused) : .surface(.field),
-                    in: RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
-                )
+                .background { fieldPlaque(isFocused: isExpanded) }
         }
         .buttonStyle(.borderless)
+        .allowsHitTesting(isEditable)
         // A borderless button paints its label with the accent; the original field's time is white.
         .foregroundStyle(.text(.primary))
         .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
         .accessibilityValue(Text(stage.duration.formatted(.units(allowed: [.minutes, .seconds], width: .wide))))
+    }
+
+    /// The plaque moves and resizes with the row, and only its color switches at once, like the original cell's.
+    private func fieldPlaque(isFocused: Bool) -> some View {
+        RoundedRectangle(cornerRadius: .token(radius: .s), style: .continuous)
+            .animation(nil) { $0.foregroundStyle(fieldColor(isFocused: isFocused)) }
+    }
+
+    private func fieldColor(isFocused: Bool) -> Color {
+        if isFocused {
+            .surface(.focused)
+        } else if isEditable {
+            .surface(.field)
+        } else {
+            .surface(.fieldInactive)
+        }
+    }
+
+    /// What VoiceOver reads for a stage: its name, or its intensity when it has none.
+    private var shownName: Text {
+        if stage.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            intensityName
+        } else {
+            Text(verbatim: stage.name) + Text(verbatim: ", ") + intensityName
+        }
     }
 
     private var intensityColor: Color {

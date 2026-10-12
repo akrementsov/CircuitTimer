@@ -36,6 +36,7 @@ public struct WorkoutTimerView: View {
                     playButton: store.playButton,
                     isPlayEnabled: store.isPlayEnabled,
                     isNextEnabled: store.isNextEnabled,
+                    onStages: { send(.stagesButtonTapped) },
                     onPlayPause: { send(.playPauseButtonTapped) },
                     onNext: { send(.nextButtonTapped) }
                 )
@@ -207,12 +208,10 @@ private enum PreviewTimer {
 }
 
 #Preview("Live") {
-    NavigationStack {
-        WorkoutTimerView(
-            store: Store(initialState: PreviewTimer.state(countdown: WorkoutTimerFeature.Countdown(.start)) { _ in }) {
-                WorkoutTimerFeature()
-            }
-        )
-    }
+    WorkoutTimerStack(
+        store: Store(initialState: PreviewTimer.state(countdown: WorkoutTimerFeature.Countdown(.start)) { _ in }) {
+            WorkoutTimerFeature()
+        }
+    )
     .preferredColorScheme(.dark)
 }

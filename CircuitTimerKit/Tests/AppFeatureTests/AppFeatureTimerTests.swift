@@ -1,11 +1,11 @@
 @testable import AppFeature
+@testable import WorkoutEditorFeature
 @testable import WorkoutTimerFeature
 
 import ComposableArchitecture
 import Foundation
 import Testing
 import WorkoutDomain
-import WorkoutEditorFeature
 import WorkoutStorage
 
 /// The timer session's endpoints that a test does not override stay unimplemented, so presenting the timer
@@ -15,21 +15,13 @@ import WorkoutStorage
 struct AppFeatureTimerTests {
     private struct WriteFailure: Error {}
 
-    enum DroppedStart: CaseIterable {
-        case missingWorkout
-        case notPlayable
-        case alertShown
-        case editorPushed
-        case settingsTab
-    }
-
     private let first = makeWorkout(1)
     private let second = makeWorkout(2)
     /// Nothing to play: it has no stages.
     private let empty = Workout(id: UUID(fixture: 5), name: "Empty")
 
     @Test
-    func test_startButtonTapped_idleQueue_presentsTimerWithNewIDTitleAndSchedule() async {
+    func test_startRequested_openWorkout_presentsTimerWithNewIDTitleAndScheduleAndPops() async {
         let untitled = Workout(
             id: UUID(fixture: 3),
             name: "  ",
@@ -42,150 +34,44 @@ struct AppFeatureTimerTests {
             $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
         }
 
-        await store.send(.view(.startButtonTapped(untitled.id))) {
-            // `make test` runs in English, so the catalog's English variant applies.
-            $0.destination = .timer(
-                WorkoutTimerFeature.State(id: UUID(0), title: "Untitled workout", schedule: WorkoutSchedule(workout: untitled))
-            )
-        }
+        // `make test` runs in English, so the catalog's English variant applies.
+        await start(
+            untitled,
+            in: store,
+            timer: WorkoutTimerFeature.State(id: UUID(0), title: "Untitled workout", schedule: WorkoutSchedule(workout: untitled))
+        )
 
         await closeTimer(store)
         #expect(ends.value == [UUID(0)])
     }
 
     @Test
-    func test_startButtonTapped_whileLoading_opensTimerOnceListLoads() async {
-        var state = AppFeature.State()
-        state.workouts = .loading
+    func test_startRequested_notPlayableAlertOrTimerShown_presentsNothing() async throws {
+        var notPlayable = loaded([first, empty])
+        notPlayable.path.append(.editor(WorkoutEditorFeature.State(viewing: empty)))
+        let notPlayableID = try #require(notPlayable.path.ids.first)
+        let notPlayableStore = makeStore(notPlayable)
+        await notPlayableStore.send(.path(.element(id: notPlayableID, action: .editor(.delegate(.startRequested(empty))))))
+
+        var alertShown = loaded([first])
+        alertShown.destination = .alert(.mutationFailed)
+        alertShown.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
+        let alertShownID = try #require(alertShown.path.ids.first)
+        let alertShownStore = makeStore(alertShown)
+        await alertShownStore.send(.path(.element(id: alertShownID, action: .editor(.delegate(.startRequested(first))))))
+
+        var timerShown = loaded([first])
+        timerShown.destination = .timer(Self.timer(UUID(fixture: 7), for: first))
+        timerShown.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
+        let timerShownID = try #require(timerShown.path.ids.first)
         let ends = LockIsolated<[UUID]>([])
-        let store = makeStore(state) {
+        let timerShownStore = makeStore(timerShown) {
             $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
         }
+        await timerShownStore.send(.path(.element(id: timerShownID, action: .editor(.delegate(.startRequested(first))))))
 
-        await store.send(.view(.startButtonTapped(second.id))) { $0.deferredScreen = .start(self.second.id) }
-        await store.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [first, second])))) {
-            $0.workouts = .loaded([self.first, self.second])
-            $0.deferredScreen = nil
-            $0.destination = .timer(Self.timer(UUID(0), for: self.second))
-        }
-
-        await closeTimer(store)
-        #expect(ends.value == [UUID(0)])
-    }
-
-    @Test
-    func test_startButtonTapped_whileWriting_opensTimerOnceQueueDrains() async {
-        let clock = TestClock()
-        let ends = LockIsolated<[UUID]>([])
-        let store = makeStore(loaded([first, second])) {
-            $0.workoutStorage.delete = { _ in
-                try await clock.sleep(for: .seconds(1))
-                return .applied
-            }
-            $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
-        }
-
-        await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([self.second])
-            $0.pendingMutations = [.delete(self.first.id)]
-        }
-        await store.send(.view(.startButtonTapped(second.id))) { $0.deferredScreen = .start(self.second.id) }
-        await clock.advance(by: .seconds(1))
-        await store.receive(\.internal.mutationFinished) {
-            $0.pendingMutations = []
-            $0.deferredScreen = nil
-            $0.destination = .timer(Self.timer(UUID(0), for: self.second))
-        }
-
-        await closeTimer(store)
-        #expect(ends.value == [UUID(0)])
-    }
-
-    @Test
-    func test_deferredStart_afterDivergence_opensTimerWithReloadedWorkout() async {
-        let renamed = makeWorkout(2, name: "Reloaded")
-        var state = loaded([first, second])
-        state.pendingMutations = [.reorder([second.id, first.id])]
-        state.deferredScreen = .start(second.id)
-        let ends = LockIsolated<[UUID]>([])
-        let store = makeStore(state) {
-            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(1), renamed]) }
-            $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
-        }
-
-        await store.send(.internal(.mutationFinished(.storeDiverged))) {
-            $0.pendingMutations = []
-            $0.workouts = .loading
-        }
-        await store.receive(\.internal.workoutsLoaded) {
-            $0.workouts = .loaded([makeWorkout(1), renamed])
-            $0.deferredScreen = nil
-            $0.destination = .timer(Self.timer(UUID(0), for: renamed))
-        }
-
-        await closeTimer(store)
-        #expect(ends.value == [UUID(0)])
-    }
-
-    @Test(arguments: DroppedStart.allCases)
-    func test_deferredStart_screenCannotOpen_isDroppedWithoutPresenting(reason: DroppedStart) async {
-        var state = loaded([first, empty])
-        state.pendingMutations = [.delete(UUID(fixture: 99))]
-        state.deferredScreen = .start(first.id)
-        switch reason {
-            case .missingWorkout:
-                state.deferredScreen = .start(UUID(fixture: 99))
-            case .notPlayable:
-                state.deferredScreen = .start(empty.id)
-            case .alertShown:
-                state.destination = .alert(.mutationFailed)
-            case .editorPushed:
-                state.path.append(.editor(WorkoutEditorFeature.State(editing: first)))
-            case .settingsTab:
-                state.selectedTab = .settings
-        }
-        let store = makeStore(state)
-
-        await store.send(.internal(.mutationFinished(.applied))) {
-            $0.pendingMutations = []
-            $0.deferredScreen = nil
-        }
-    }
-
-    @Test
-    func test_startButtonTapped_notPlayableOrTimerShown_presentsNothing() async {
-        let ends = LockIsolated<[UUID]>([])
-        let store = makeStore(loaded([first, empty])) {
-            $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
-        }
-
-        await store.send(.view(.startButtonTapped(empty.id)))
-        await store.send(.view(.startButtonTapped(first.id))) {
-            $0.destination = .timer(Self.timer(UUID(0), for: self.first))
-        }
-        await store.send(.view(.startButtonTapped(first.id)))
-
-        await closeTimer(store)
-        #expect(ends.value == [UUID(0)])
-    }
-
-    @Test
-    func test_deleteButtonTapped_pendingStart_clearsOnlyStartOfDeletedWorkout() async {
-        var state = loaded([first, second])
-        state.pendingMutations = [.reorder([second.id, first.id])]
-        state.deferredScreen = .start(first.id)
-        let store = makeStore(state)
-
-        await store.send(.view(.deleteButtonTapped(second.id))) {
-            $0.workouts = .loaded([self.first])
-            $0.pendingMutations.append(.delete(self.second.id))
-        }
-        #expect(store.state.deferredScreen == .start(first.id))
-        await store.send(.view(.deleteButtonTapped(first.id))) {
-            $0.workouts = .loaded([])
-            $0.pendingMutations.append(.delete(self.first.id))
-            $0.deferredScreen = nil
-        }
+        await closeTimer(timerShownStore)
+        #expect(ends.value == [UUID(fixture: 7)])
     }
 
     @Test
@@ -204,9 +90,7 @@ struct AppFeatureTimerTests {
             $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
         }
 
-        await store.send(.view(.startButtonTapped(first.id))) {
-            $0.destination = .timer(Self.timer(UUID(0), for: self.first))
-        }
+        await start(first, in: store)
         await store.send(.view(.deleteButtonTapped(third.id))) {
             $0.workouts = .loaded([self.first, self.second, fourth])
             $0.pendingMutations = [.delete(third.id)]
@@ -215,7 +99,7 @@ struct AppFeatureTimerTests {
             $0.workouts = .loaded([self.first, self.second])
             $0.pendingMutations = [.delete(third.id), .delete(fourth.id)]
         }
-        await store.send(.view(.startButtonTapped(second.id))) { $0.deferredScreen = .start(self.second.id) }
+        await store.send(.view(.workoutTapped(second.id))) { $0.deferredScreen = .open(self.second.id) }
         await clock.advance(by: .seconds(1))
         await store.receive(\.internal.mutationFinished) {
             $0.pendingMutations = [.delete(fourth.id)]
@@ -226,9 +110,10 @@ struct AppFeatureTimerTests {
             $0.pendingMutations = []
             $0.needsReload = false
             $0.deferredScreen = nil
-            $0.workouts = .loading
+            $0.isReloading = true
         }
         await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2), makeWorkout(4)])
         }
 
@@ -255,9 +140,7 @@ struct AppFeatureTimerTests {
         }
         let id = UUID(0)
 
-        await store.send(.view(.startButtonTapped(first.id))) {
-            $0.destination = .timer(Self.timer(id, for: self.first))
-        }
+        await start(first, in: store)
         await store.send(.destination(.presented(.timer(.view(.task))))) {
             $0.$destination[case: \.timer]?.clockGeneration = 1
             $0.$destination[case: \.timer]?.requestedAwake = true
@@ -290,9 +173,7 @@ struct AppFeatureTimerTests {
             $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
         }
 
-        await store.send(.view(.startButtonTapped(first.id))) {
-            $0.destination = .timer(Self.timer(UUID(0), for: self.first))
-        }
+        await start(first, in: store)
         await closeTimer(store)
 
         #expect(ends.value == [UUID(0)])
@@ -305,6 +186,32 @@ struct AppFeatureTimerTests {
         let store = makeStore(state)
 
         await store.send(.destination(.dismiss)) { $0.destination = nil }
+    }
+
+    @Test
+    func test_timerCoverAppeared_emptyStack_changesNothing() async {
+        var state = loaded([first])
+        state.destination = .timer(Self.timer(UUID(fixture: 7), for: first))
+        let store = makeStore(state) { $0.timerSession.end = { _ in } }
+
+        await store.send(.view(.timerCoverAppeared))
+
+        await closeTimer(store)
+    }
+
+    /// The user's route: the workout's screen opens, Start presents the timer, and the stack empties under the cover.
+    /// The timer takes the store's first UUID: a read-only screen draws none.
+    private func start(_ workout: Workout, in store: TestStoreOf<AppFeature>, timer: WorkoutTimerFeature.State? = nil) async {
+        await store.send(.view(.workoutTapped(workout.id))) {
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: workout))
+        }
+        await store.send(.path(.element(id: 0, action: .editor(.view(.startButtonTapped))))) {
+            $0.path[id: 0, case: \.editor]?.isStarting = true
+        }
+        await store.receive(.path(.element(id: 0, action: .editor(.delegate(.startRequested(workout)))))) {
+            $0.destination = .timer(timer ?? Self.timer(UUID(0), for: workout))
+        }
+        await store.send(.view(.timerCoverAppeared)) { $0.path = StackState() }
     }
 
     /// A presented timer keeps the presentation's effect running until it is dismissed.
