@@ -90,6 +90,19 @@ public struct WorkoutTimerFeature: Sendable {
             countdown = schedule.stages.isEmpty ? nil : Countdown(.start)
         }
 
+        /// A saved run brought back after the process was gone; `run` is already settled at `now`.
+        ///
+        /// No countdown: the user saw the run going before, so it continues as it was, running or paused.
+        public init(id: UUID, workoutID: Workout.ID, title: String, sceneSessionID: String, restoring run: WorkoutRun, at now: Date) {
+            self.id = id
+            self.workoutID = workoutID
+            self.title = title
+            self.sceneSessionID = sceneSessionID
+            self.run = run
+            snapshot = run.snapshot(at: now)
+            countdown = nil
+        }
+
         /// A run waiting for the user lets the screen lock.
         var keepsScreenAwake: Bool {
             countdown != nil || snapshot.status == .running

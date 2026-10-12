@@ -57,6 +57,8 @@ public struct AppFeature: Sendable {
         var deferredScreen: DeferredScreen?
         /// The scene session this launch files its runs under; set before the list first loads.
         var sceneSessionID: String?
+        /// The launch's check for a run saved before the process was gone.
+        var runRestore = RunRestore.idle
 
         public init() {}
 
@@ -101,19 +103,26 @@ public struct AppFeature: Sendable {
             case mutationFinished(WorkoutWriteOutcome)
             case mutationFailed
             case sceneSessionIdentified(String?)
+            case runRecordLoaded(StoredRunRecord?)
+            case runRecordLoadingFailed(RunRecordLoadFailure)
+            case runRecordReadTimedOut
         }
     }
 
-    private enum CancelID {
+    enum CancelID {
         case load
+        case readRunRecord
+        case readRunRecordTimeout
     }
 
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
+    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.date) var date
     @Dependency(\.sceneSession) private var sceneSession
     @Dependency(\.timerSession) private var timerSession
-    @Dependency(\.uuid) private var uuid
-    @Dependency(\.workoutRunRecord) private var workoutRunRecord
+    @Dependency(\.uuid) var uuid
+    @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.workoutStorage) private var workoutStorage
 
     public init() {}
@@ -250,7 +259,9 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
-                return presentDeferredScreen(&state)
+                // Restored before any screen: a presented timer makes the deferred one drop.
+                let restore = resolveRestore(&state)
+                return .merge(restore, presentDeferredScreen(&state))
             case .workoutsLoadingFailed:
                 state.isReloading = false
                 state.workouts = .failed
@@ -294,7 +305,13 @@ public struct AppFeature: Sendable {
                     Self.logger.error("The connected scene session is unknown; runs of this launch will not be restored")
                     state.sceneSessionID = "unknown-\(uuid().uuidString)"
                 }
-                return loadWorkouts(&state)
+                return readRunRecord(&state)
+            case let .runRecordLoaded(stored):
+                return runRecordLoaded(stored, &state)
+            case let .runRecordLoadingFailed(failure):
+                return runRecordLoadingFailed(failure, &state)
+            case .runRecordReadTimedOut:
+                return runRecordReadTimedOut(&state)
         }
     }
 
@@ -348,9 +365,23 @@ public struct AppFeature: Sendable {
         return .none
     }
 
-    /// The one place a timer's state is built.
-    private func timerState(for workout: Workout, sceneSessionID: String) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
+    /// The one place a timer's state is built: a new run, or a saved one already settled at `now`.
+    func timerState(
+        for workout: Workout,
+        sceneSessionID: String,
+        restoring restored: (run: WorkoutRun, now: Date)? = nil
+    ) -> WorkoutTimerFeature.State {
+        if let restored {
+            return WorkoutTimerFeature.State(
+                id: uuid(),
+                workoutID: workout.id,
+                title: workout.displayName,
+                sceneSessionID: sceneSessionID,
+                restoring: restored.run,
+                at: restored.now
+            )
+        }
+        return WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
@@ -435,7 +466,7 @@ public struct AppFeature: Sendable {
         return .none
     }
 
-    private func loadWorkouts(_ state: inout State) -> Effect<Action> {
+    func loadWorkouts(_ state: inout State) -> Effect<Action> {
         // A shown list stays until the new one arrives: a spinner in its place would flash, and a push right after the
         // reload would carry the spinner's picture of the tab bar on iOS 26.
         if case .loaded = state.workouts {

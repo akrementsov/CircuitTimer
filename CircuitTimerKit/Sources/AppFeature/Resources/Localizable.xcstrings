@@ -245,6 +245,38 @@
         }
       }
     },
+    "workouts.restoreFailed.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It was changed or deleted, or its saved progress can't be read."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка изменена или удалена, либо её сохранённый прогресс не читается."
+          }
+        }
+      }
+    },
+    "workouts.restoreFailed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't resume the workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось продолжить тренировку"
+          }
+        }
+      }
+    },
     "workouts.title" : {
       "localizations" : {
         "en" : {

@@ -35,7 +35,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
 | `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run; its own stack with the stage list |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture, UIKit | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start; the scene session runs are filed under; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture, UIKit | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start or to restore a saved run; the scene session runs are filed under; composes Settings |
 
 Layering:
 
@@ -150,6 +150,7 @@ Public initializers take `id` explicitly; features get identifiers from `@Depend
 - Run records live outside SwiftData: one JSON file per scene session in Application Support (`RunRecord/<SHA-256 of the session's persistent identifier>.json`), excluded from backup on a best-effort basis. The body is exactly the v1 record; the name pairs it with its session in one atomic write.
 - Writes go through one actor in the order of a revision the reducer takes from `nextRevision()`; each applied write also removes the files of other sessions. Reads only open the current session's file, on their own queue. This holds while the app has one window scene per process; more scenes or an App Group container need another cleanup rule.
 - `AppFeature` identifies the scene session (`SceneSessionClient`) before the list first loads, so every timer files its run under it. The timer writes its run on every clock sync, never on a tick, and clears it after the cover is dismissed; `AppFeature` clears it once more when the cover goes.
+- At launch `AppFeature` reads only the current scene session's record, racing the read against a 2 s timeout, and then loads the workouts; the restore decision is made at the first load, before any row or screen exists. A session closed in the App Switcher has a new identifier, so its run is dropped silently; so is a run that ended while the app was gone or a paused one older than 24 hours. A record that cannot be restored (workout changed or gone, file corrupt, unreadable or from another version) shows one alert; only a corrupt file is removed. A stall while reading shows that alert before the app knows whether a file exists — accepted. Restoring tells a kept scene session from a closed one, not a system kill from a crash.
 
 ## Errors
 
