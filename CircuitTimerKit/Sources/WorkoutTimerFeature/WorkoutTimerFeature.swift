@@ -70,8 +70,8 @@ public struct WorkoutTimerFeature: Sendable {
         var awakeRevision = 0
         /// What the record file holds, as far as this screen knows.
         var recordSync = RecordSync.unknown
-        /// Set while the newest record write failed: the run would not come back after the app is closed.
-        public internal(set) var hasRecordFailed = false
+        /// Set while the newest record write failed; the screen says what a relaunch would bring back.
+        public internal(set) var recordWarning: RecordWarning?
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @Presents public var destination: Destination.State?
@@ -134,7 +134,8 @@ public struct WorkoutTimerFeature: Sendable {
             /// `isFinal`: the loop saw its copy stop and has ended.
             case ticked(generation: Int, isFinal: Bool)
             case clockFailed(generation: Int)
-            case recordWritten(revision: Int, succeeded: Bool)
+            /// `failure` is `nil` when the file holds what was written.
+            case recordWritten(revision: Int, failure: RecordWarning?)
         }
     }
 
@@ -151,8 +152,8 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.continuousClock) private var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
-    @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.timerSession) private var timerSession
+    @Dependency(\.workoutRunRecord) var workoutRunRecord
 
     public init() {}
 
@@ -206,8 +207,8 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
-            case let .recordWritten(revision, succeeded):
-                recordWritten(revision: revision, succeeded: succeeded, &state)
+            case let .recordWritten(revision, failure):
+                recordWritten(revision: revision, failure: failure, &state)
                 return .none
             case let .countdownTicked(generation):
                 if let stale = stopIfStale(generation, state) { return stale }
@@ -378,11 +379,10 @@ public struct WorkoutTimerFeature: Sendable {
             await timerSession.end(owner: id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
-            // write does not stop for that.
+            // write does not stop for that, so a cancellation is no failure.
             do {
                 try await workoutRunRecord.write(nil, sessionID, revision)
             } catch is CancellationError {
-                // The teardown cancels this effect, but the write has run regardless; nothing failed.
                 await backgroundTask.end(token)
                 return
             } catch {

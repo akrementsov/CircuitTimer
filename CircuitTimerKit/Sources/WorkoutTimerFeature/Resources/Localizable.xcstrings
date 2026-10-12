@@ -437,7 +437,7 @@
         }
       }
     },
-    "timer.recordFailed" : {
+    "timer.record.notSaved" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -449,6 +449,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Прогресс не восстановится, если приложение закроется."
+          }
+        }
+      }
+    },
+    "timer.record.olderKept" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the app closes, an earlier state of a workout may open instead."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если приложение закроется, вместо этого может открыться прежнее состояние тренировки."
           }
         }
       }
