@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import os
+import SwiftUI
 import WorkoutDomain
 import WorkoutStorage
 
@@ -71,6 +72,8 @@ public struct WorkoutTimerFeature: Sendable {
         var recordSync = RecordSync.unknown
         /// Set while the newest record write failed: the run would not come back after the app is closed.
         public internal(set) var hasRecordFailed = false
+        /// Between `.background` and the next `.active`; no countdown runs meanwhile.
+        var isInBackground = false
         @Presents public var destination: Destination.State?
         public internal(set) var path = StackState<Path.State>()
 
@@ -106,6 +109,7 @@ public struct WorkoutTimerFeature: Sendable {
             case playPauseButtonTapped
             case nextButtonTapped
             case stagesButtonTapped
+            case scenePhaseChanged(ScenePhase)
         }
 
         @CasePathable
@@ -127,6 +131,7 @@ public struct WorkoutTimerFeature: Sendable {
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutTimer")
 
+    @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.continuousClock) private var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
@@ -160,8 +165,8 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         // The close alert relies on a stopped clock; a control that slips under it would restart the clock or
-        // replace the alert.
-        if action != .task, state.destination != nil { return .none }
+        // replace the alert. Leaving and coming back still count: the clock is stopped, and the run is saved.
+        if action != .task, !action.is(\.scenePhaseChanged), state.destination != nil { return .none }
 
         let now = date()
         switch action {
@@ -178,6 +183,8 @@ public struct WorkoutTimerFeature: Sendable {
                 return next(&state, at: now)
             case .stagesButtonTapped:
                 return showStageList(&state, at: now)
+            case let .scenePhaseChanged(phase):
+                return scenePhaseChanged(phase, &state, at: now)
         }
     }
 
@@ -342,27 +349,32 @@ public struct WorkoutTimerFeature: Sendable {
     private func closeScreen(_ state: State) -> Effect<Action> {
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
         let revision = runRecord.nextRevision()
+        let token = backgroundTask.begin("Clear the closed workout run")
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        return .run { [timerSession, dismiss, runRecord, id = state.id, sessionID = state.sceneSessionID] _ in
+        return .run { [timerSession, dismiss, runRecord, backgroundTask, id = state.id, sessionID = state.sceneSessionID] _ in
             await timerSession.end(owner: id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that.
+            let failure: (any Error)?
             do {
                 try await runRecord.write(nil, sessionID, revision)
-            } catch is CancellationError {
-                return
+                failure = nil
             } catch {
-                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
+                failure = error
             }
+            if let failure, !(failure is CancellationError) {
+                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: failure), privacy: .public)")
+            }
+            await backgroundTask.end(token)
         }
     }
 
     /// Handles a clock jump, commits the progress made by `now` and returns whether the clock must follow:
     /// a jump was found or the status changed.
-    private func advance(_ state: inout State, at now: Date) -> Bool {
+    func advance(_ state: inout State, at now: Date) -> Bool {
         let status = state.snapshot.status
         let jumped = reconcile(&state, at: now)
         state.run.tick(at: now)
@@ -405,7 +417,7 @@ public struct WorkoutTimerFeature: Sendable {
     /// the screen awake exactly while a clock runs. The only place where the keep-awake vote changes and, apart from
     /// the clear on close, where the run is saved: every operation, jump and change of status reaches the record file,
     /// and no tick does.
-    private func syncClock(_ state: inout State, at now: Date) -> Effect<Action> {
+    func syncClock(_ state: inout State, at now: Date) -> Effect<Action> {
         let loop = Effect.merge(replaceClockLoop(&state, at: now), persist(&state))
         guard state.keepsScreenAwake != state.requestedAwake else { return loop }
 
@@ -429,6 +441,8 @@ public struct WorkoutTimerFeature: Sendable {
 
         if let countdown = state.countdown {
             state.hasClockFailed = false
+            guard !state.isInBackground else { return replaced }
+
             return .merge(replaced, runCountdown(remaining: countdown.remaining, owner: state.id, generation: state.clockGeneration))
         }
         if state.snapshot.status == .running {

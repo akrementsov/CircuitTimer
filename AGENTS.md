@@ -108,6 +108,7 @@ public struct SomeFeature: Sendable {
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
+- Reducers call only synchronous generator dependencies: `uuid`, `date`, `continuousClock` (`now` for an anchor), `nextRevision`. The single exception with an effect on the outside world is `backgroundTask.begin`: a `.run` effect starts as a later main-actor task, and the app can be suspended before it runs, so the assertion is taken in the reducer and the effect returned in the same pass ends it. Don't copy this for anything else.
 - Bridge callback APIs through an `AsyncStream` that the effect stays suspended on; never let `send` escape the effect.
 - Add only the action groups a feature needs (the root feature has no `Delegate`).
 
@@ -127,6 +128,8 @@ public struct SomeFeature: Sendable {
 - `snapshot` without `tick` appears in two places only: the tick loop's own copy of the run, which schedules wake-ups and is never shown or committed, and the state's initial snapshot at `.distantPast` of a run that is idle or finished.
 - A tick loop that ends while the committed run still runs reports `isFinal`, and the reducer starts a new one.
 - One clock instance per timer session: a `MonotonicInstant` checks only the type of its instant.
+- `WorkoutTimerStack` forwards `scenePhase`; the reducer acts on `.background` and `.active` only (`.inactive` also covers Control Center and the App Switcher). Leaving resets a 3-2-1 to its full length and runs no countdown until the app is back, then counts it from 3. A running run takes a fresh anchor as it leaves, so on return the same process's anchor measures the time away and a clock moved back is rebased. Every write is under a background-task assertion; what the file holds is the newest write that completed.
+- Across a process restart only the record's `sinceEpochMs` survives: a clock moved back past it re-anchors at the saved position, a smaller backward move undercounts, a forward one counts as elapsed time (`docs/timer-engine.md` › Saved runs).
 
 ## Domain limits
 

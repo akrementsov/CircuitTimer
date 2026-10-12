@@ -17,6 +17,9 @@ extension WorkoutTimerFeature {
     ///
     /// A running record changes with every sync, as its anchor and position move together, so only a paused or
     /// waiting run is ever skipped. A failed record is written again with a new revision.
+    ///
+    /// Takes a background-task assertion before the effect is scheduled, so the write can finish if the app leaves
+    /// the screen; the effect ends it. Always return the effect: a discarded one keeps the assertion until it expires.
     func persist(_ state: inout State) -> Effect<Action> {
         let record = WorkoutRunRecord(workoutID: state.workoutID, run: state.run)
         switch state.recordSync {
@@ -29,16 +32,22 @@ extension WorkoutTimerFeature {
         }
 
         let revision = runRecord.nextRevision()
+        let token = backgroundTask.begin("Save the workout run")
         state.recordSync = .pending(revision: revision, record: record)
-        return .run { [runRecord, sessionID = state.sceneSessionID] send in
+        return .run { [runRecord, backgroundTask, sessionID = state.sceneSessionID] send in
+            let succeeded: Bool?
             do {
                 try await runRecord.write(record, sessionID, revision)
-                await send(.internal(.recordWritten(revision: revision, succeeded: true)))
+                succeeded = true
             } catch is CancellationError {
-                return
+                succeeded = nil
             } catch {
                 Self.logger.error("Saving the run failed: \(String(reflecting: error), privacy: .public)")
-                await send(.internal(.recordWritten(revision: revision, succeeded: false)))
+                succeeded = false
+            }
+            await backgroundTask.end(token)
+            if let succeeded {
+                await send(.internal(.recordWritten(revision: revision, succeeded: succeeded)))
             }
         }
     }
