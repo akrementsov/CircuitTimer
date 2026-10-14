@@ -41,7 +41,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 
 Layering:
 
-- `*Feature` → `DesignSystem`, `Workout*`, `BackgroundExecution`. A feature never imports another feature; composition happens in `AppFeature`.
+- `*Feature` → `DesignSystem`, `Workout*`, `TimerPreferences`, `BackgroundExecution`. A feature never imports another feature; composition happens in `AppFeature`.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `SettingsFeature` needs no workout module and imports none.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
