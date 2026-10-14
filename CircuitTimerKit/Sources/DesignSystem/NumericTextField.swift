@@ -100,8 +100,7 @@ public struct NumericTextField: UIViewRepresentable {
         }
 
         private static func bodyFont() -> UIFont {
-            // The body token uses subheadline; keep its Dynamic Type metrics while making the digits monospaced.
-            let font = UIFont.preferredFont(forTextStyle: .subheadline)
+            let font = UIFont.token(.body)
             let descriptor = font.fontDescriptor.addingAttributes([
                 .featureSettings: [
                     [

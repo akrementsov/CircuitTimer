@@ -140,7 +140,7 @@ Anything that edits a workout applies `WorkoutLimits.normalizedStages(_:)` and `
 
 A stage name may be empty; anything that displays a stage shows its intensity name instead. Storage keeps the empty name, so the fallback follows the current language.
 
-New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:previous:)`: at most `maxNameLength` characters, an edit past it rejected whole. A longer name stored before the limit shows in full and can only get shorter.
+New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:previous:)`: at most `maxNameLength` characters, an edit past it rejected whole. A longer name stored before the limit shows in full. While it remains over the limit, any edit is accepted only if it reduces the character count, including a replacement with unrelated shorter text; an edit of the same length or longer is rejected whole.
 
 ## Identifiers
 

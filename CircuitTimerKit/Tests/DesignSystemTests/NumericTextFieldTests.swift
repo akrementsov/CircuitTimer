@@ -1,12 +1,43 @@
 @testable import DesignSystem
 
 import Foundation
+import SwiftUI
 import Testing
 import UIKit
 
 @MainActor
 @Suite
 struct NumericTextFieldTests {
+    @available(iOS 26, *)
+    @Test(arguments: [DynamicTypeSize.large, .xxxLarge])
+    func test_font_bodyToken_matchesAtEachDynamicTypeSize(size: DynamicTypeSize) throws {
+        let category: UIContentSizeCategory = size == .large ? .large : .extraExtraExtraLarge
+        let controller = UIViewController()
+        let window = UIWindow()
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        let field = NumericTextField(
+            text: "12:34",
+            placeholder: "00:00",
+            isFocused: false,
+            onEdit: { _, _ in nil },
+            onFocusChange: { _ in }
+        ).makeCoordinator().makeField()
+        controller.view.addSubview(field)
+        controller.view.traitOverrides.preferredContentSizeCategory = category
+        controller.view.layoutIfNeeded()
+        let nativeFont = try #require(field.font)
+        var environment = EnvironmentValues()
+        environment.dynamicTypeSize = size
+        let context = environment.fontResolutionContext
+        let token = Font.token(.body).resolve(in: context)
+        let numeric = Font(nativeFont).resolve(in: context)
+
+        #expect(numeric.pointSize == token.pointSize)
+        #expect(numeric.weight == token.weight)
+    }
+
     @Test(arguments: [1, 4])
     func test_tokenizer_betweenDigits_allowsInsertionAtTappedCharacter(offset: Int) throws {
         let field = NativeNumericField()

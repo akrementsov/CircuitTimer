@@ -7,8 +7,8 @@ public enum WorkoutLimits {
     /// Characters a typed workout or stage name may have, as in the original app.
     public static let maxNameLength = 30
 
-    /// A name as typed over `previous`: kept within the limit, or when it shortens a longer name stored before the
-    /// limit; otherwise `previous`, so an edit past the limit, a long paste included, is rejected whole.
+    /// Accepts text within the limit or any edit that reduces a longer stored name's character count, including
+    /// replacement with unrelated text. Otherwise keeps `previous`, rejecting the whole edit.
     public static func limitedName(_ name: String, previous: String) -> String {
         name.count <= maxNameLength || name.count < previous.count ? name : previous
     }
