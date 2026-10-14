@@ -5,14 +5,13 @@ import SwiftData
 import Testing
 import WorkoutDomain
 
-@MainActor
 @Suite
 struct WorkoutStoreWritingTests {
     private let bogusSection: (WorkoutModel) -> Void = { $0.sortedStages[0].section = "bogus" }
 
     @Test
     func test_save_newWorkout_appendsAfterLastOrderKeepingOthers() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1), order: 5, in: container)
         try insertRecord(makeWorkout(2), order: 7, in: container)
 
@@ -25,7 +24,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_emptyStore_startsOrderAtZero() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
 
         try await store.save(makeWorkout(1))
 
@@ -34,7 +33,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_lastOrderAtMaximum_renumbersBeforeAppending() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1), order: .max, in: container)
         try insertRecord(makeWorkout(2), order: 3, in: container)
 
@@ -47,7 +46,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_existingWorkout_updatesStagesInPlace() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         let original = Workout(
             id: UUID(fixture: 1),
             name: "Before",
@@ -74,7 +73,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_unnormalizedWorkout_storesNormalizedCopy() async throws {
-        let (store, _) = try makeEmptyStore()
+        let (store, _) = try await makeEmptyStore()
         let tooMany = (1...(WorkoutLimits.maxStagesPerSection + 1)).map { makeStage($0) }
         var workout = makeWorkout(1, training: [makeStage(900, seconds: 0)] + tooMany)
         workout.trainingRounds = WorkoutLimits.maxTrainingRounds + 50
@@ -87,8 +86,8 @@ struct WorkoutStoreWritingTests {
     }
 
     @Test
-    func test_update_unchangedWorkout_leavesContextUnchanged() throws {
-        let container = try makeContainer()
+    func test_update_unchangedWorkout_leavesContextUnchanged() async throws {
+        let container = try await makeContainer()
         let context = ModelContext(container)
         let workout = makeWorkout(1, training: [makeStage(1), makeStage(2)])
         let model = WorkoutModel(workoutID: workout.id)
@@ -108,7 +107,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_workoutWithHiddenCopy_editsVisibleRecordOnly() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         let shared = makeStage(1)
         try insertRecord(makeWorkout(1, name: "Visible", training: [shared]), order: 0, in: container)
         try insertRecord(makeWorkout(1, name: "Copy", training: [shared]), order: 1, in: container)
@@ -125,7 +124,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_save_idWithOnlyDamagedRecord_appendsNewRecordAndKeepsDamaged() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "Damaged"), order: 0, in: container, damage: bogusSection)
 
         try await store.save(makeWorkout(1, name: "Fresh"))
@@ -138,7 +137,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_saveAndInsert_repeatedStageIDs_rejectWithoutWriting() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try await store.save(makeWorkout(1))
         let sameSection = makeWorkout(2, training: [makeStage(5), makeStage(5)])
         let acrossSections = Workout(id: UUID(fixture: 3), warmUp: [makeStage(6)], training: [makeStage(6)])
@@ -168,7 +167,7 @@ struct WorkoutStoreWritingTests {
         ]
 
         for insertCase in cases {
-            let (store, container) = try makeEmptyStore()
+            let (store, container) = try await makeEmptyStore()
             for (order, (number, name)) in insertCase.layout.enumerated() {
                 try insertRecord(makeWorkout(number, name: name), order: order, in: container)
             }
@@ -184,7 +183,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_insert_withoutVisibleAnchor_appendsAndReportsDivergence() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "A"), order: 0, in: container)
         try insertRecord(makeWorkout(2, name: "Damaged"), order: 1, in: container, damage: bogusSection)
 
@@ -198,7 +197,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_delete_visibleWorkoutWithoutCopies_removesItAndItsStages() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try await store.save(makeWorkout(1, training: [makeStage(1), makeStage(2)]))
         try await store.save(makeWorkout(2))
 
@@ -211,7 +210,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_delete_notVisible_changesNothingAndReportsDivergence() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "Damaged"), order: 0, in: container, damage: bogusSection)
 
         #expect(try await store.delete(UUID(fixture: 99)) == .storeDiverged)
@@ -221,7 +220,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_delete_visibleWorkoutWithCopy_deletesVisibleOnlyAndReportsDivergence() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "Visible"), order: 0, in: container)
         try insertRecord(makeWorkout(1, name: "Copy"), order: 1, in: container)
 
@@ -233,7 +232,7 @@ struct WorkoutStoreWritingTests {
 
     @Test
     func test_reorder_exactVisibleSet_keepsCopiesWithTheirWorkoutAndOthersAfter() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "A"), order: 0, in: container)
         try insertRecord(makeWorkout(4, name: "Damaged"), order: 1, in: container, damage: bogusSection)
         try insertRecord(makeWorkout(2, name: "B"), order: 2, in: container)
@@ -262,7 +261,7 @@ struct WorkoutStoreWritingTests {
         ]
 
         for reorderCase in cases {
-            let (store, container) = try makeEmptyStore()
+            let (store, container) = try await makeEmptyStore()
             try insertRecord(makeWorkout(1, name: "A"), order: 0, in: container)
             try insertRecord(makeWorkout(2, name: "B"), order: 1, in: container)
 
@@ -270,13 +269,13 @@ struct WorkoutStoreWritingTests {
             #expect(try storedNames(in: container) == ["B", "A"])
         }
 
-        let (emptyStore, _) = try makeEmptyStore()
+        let (emptyStore, _) = try await makeEmptyStore()
         #expect(try await emptyStore.reorder([]) == .applied)
     }
 
     @Test
     func test_insert_withDamagedRecord_changesOnlyItsOrder() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "A"), order: 0, in: container)
         try insertRecord(makeWorkout(2, name: "Damaged"), order: 1, in: container, damage: bogusSection)
 
@@ -295,7 +294,7 @@ struct WorkoutStoreWritingTests {
     @Test(arguments: Operation.allCases)
     func test_write_saveFails_rollsBackToPreviousState(operation: Operation) async throws {
         let saveSwitch = SaveSwitch()
-        let (store, container) = try makeEmptyStore(saveContext: saveSwitch.save)
+        let (store, container) = try await makeEmptyStore(saveContext: saveSwitch.save)
         try await store.save(makeWorkout(1, name: "A"))
         try await store.save(makeWorkout(2, name: "B"))
         let before = try await store.fetchAll()
