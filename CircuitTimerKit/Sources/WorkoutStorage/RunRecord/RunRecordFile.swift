@@ -1,16 +1,22 @@
+import Dispatch
 import Foundation
 import os
 import WorkoutDomain
 
 /// Applies run record writes in revision order.
 ///
-/// Each write is one synchronous actor turn, from the revision check to the last file
-/// operation, so no other write can interleave with it. The file is a few hundred bytes, so
-/// doing the I/O inside that turn is cheaper than the ordering a suspension would cost.
+/// Each write is one synchronous actor turn on a dedicated serial queue, from the revision
+/// check to the last file operation. No other write can interleave with it, and filesystem
+/// I/O never blocks the cooperative pool.
 actor RunRecordFile {
+    nonisolated let writerQueue = DispatchSerialQueue(label: "CircuitTimer.RunRecordFile")
     private let directory: URL
     private var lastAppliedRevision = 0
     private var isExclusionApplied = false
+
+    nonisolated var unownedExecutor: UnownedSerialExecutor {
+        writerQueue.asUnownedSerialExecutor()
+    }
 
     init(directory: URL) {
         self.directory = directory
@@ -33,6 +39,9 @@ actor RunRecordFile {
     }
 
     private func prepareDirectory() throws {
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            isExclusionApplied = false
+        }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard !isExclusionApplied else { return }
 

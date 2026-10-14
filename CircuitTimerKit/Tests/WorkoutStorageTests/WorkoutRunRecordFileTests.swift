@@ -1,5 +1,6 @@
 @testable import WorkoutStorage
 
+import Dispatch
 import Foundation
 import Testing
 import WorkoutDomain
@@ -37,6 +38,32 @@ struct WorkoutRunRecordFileTests {
             #expect(try JSONDecoder().decode(WorkoutRunRecord.self, from: Data(contentsOf: file)) == record)
             try await relaunched.write(makeRunRecord(2), relaunched.nextRevision())
             #expect(try await client.load()?.record == makeRunRecord(2))
+        }
+    }
+
+    @Test
+    func test_write_actorTurn_runsOnWriterQueue() async throws {
+        try await withRunRecordFolder { root in
+            let file = RunRecordFile(directory: root)
+
+            #expect(await file.isOnWriterQueue())
+        }
+    }
+
+    @Test
+    func test_write_removedDirectory_recreatesExcludedDirectoryAndRecord() async throws {
+        try await withRunRecordFolder { root in
+            let directory = root.appending(path: "RunRecord", directoryHint: .isDirectory)
+            let client = WorkoutRunRecordClient.file(directory: directory)
+            try await client.write(makeRunRecord(1), 1)
+            #expect(try directory.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+            try FileManager.default.removeItem(at: directory)
+
+            try await client.write(makeRunRecord(2), 2)
+
+            #expect(try await client.load()?.record == makeRunRecord(2))
+            let recreated = URL(fileURLWithPath: directory.path, isDirectory: true)
+            #expect(try recreated.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
         }
     }
 
@@ -102,5 +129,14 @@ struct WorkoutRunRecordFileTests {
             #expect(revisions.sorted() == Array(1...100))
             #expect(client.nextRevision() == 101)
         }
+    }
+}
+
+extension RunRecordFile {
+    func isOnWriterQueue() -> Bool {
+        let key = DispatchSpecificKey<Bool>()
+        writerQueue.setSpecific(key: key, value: true)
+        defer { writerQueue.setSpecific(key: key, value: nil) }
+        return DispatchQueue.getSpecific(key: key) == true
     }
 }
