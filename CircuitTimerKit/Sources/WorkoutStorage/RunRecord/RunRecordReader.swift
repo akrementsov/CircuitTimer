@@ -27,9 +27,14 @@ final class RunRecordReader: Sendable {
         let handle: FileHandle
         do {
             handle = try FileHandle(forReadingFrom: url)
-        } catch where RunRecordLayout.isMissingFile(error) {
-            return nil
         } catch {
+            // Some runtimes reject a directory before a handle exists, so it cannot reach the descriptor check.
+            var isDirectory = ObjCBool(false)
+            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                throw RunRecordError.unreadable(POSIXError(.EISDIR))
+            }
+            if RunRecordLayout.isMissingFile(error) { return nil }
+
             throw RunRecordError.unreadable(error)
         }
         defer {
@@ -45,8 +50,8 @@ final class RunRecordReader: Sendable {
         let data: Data
         let savedAt: Date
         do {
-            data = try handle.readToEnd() ?? Data()
             savedAt = try modificationDate(of: handle)
+            data = try handle.readToEnd() ?? Data()
         } catch {
             throw RunRecordError.unreadable(error)
         }
@@ -65,6 +70,9 @@ final class RunRecordReader: Sendable {
         guard fstat(handle.fileDescriptor, &info) == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
+
+        // Reading a directory through FileHandle differs across runtimes; reject it before reading any bytes.
+        guard info.st_mode & S_IFMT != S_IFDIR else { throw POSIXError(.EISDIR) }
 
         let modified = info.st_mtimespec
         return Date(timeIntervalSince1970: TimeInterval(modified.tv_sec) + TimeInterval(modified.tv_nsec) / 1_000_000_000)

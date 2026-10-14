@@ -54,7 +54,7 @@ struct WorkoutRunRecordReaderTests {
                 _ = try await client.load()
                 Issue.record("An unreadable record must not load")
             } catch RunRecordError.unreadable(let underlying) {
-                #expect(!(underlying is DecodingError))
+                #expect((underlying as? POSIXError)?.code == .EISDIR)
             }
 
             var isDirectory = ObjCBool(false)
