@@ -362,13 +362,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restart the app to try continuing your workout again."
+            "value" : "Your workout progress is saved. You can try opening the timer again."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Перезапустите приложение, чтобы снова попробовать продолжить тренировку."
+            "value" : "Прогресс тренировки сохранён. Можно повторить открытие таймера."
+          }
+        }
+      }
+    },
+    "workouts.timerPresentationFailed.retry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try again"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
           }
         }
       }

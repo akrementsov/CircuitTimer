@@ -17,6 +17,8 @@ extension AppFeature {
         case found(StoredRunRecord)
         /// The list asks whether to continue it.
         case offered(StoredRunRecord)
+        /// Accepted; kept until the timer cover appears so a failed presentation can be retried.
+        case presenting(StoredRunRecord)
         case resolved
     }
 
@@ -203,6 +205,7 @@ extension AppFeature {
         }
 
         state.selectedTab = .workouts
+        state.runRestore = .presenting(stored)
         state.destination = .timer(restoredTimerState(for: workout, run: run, at: now))
         return .none
     }
@@ -231,6 +234,21 @@ extension AppFeature {
 }
 
 extension AlertState where Action == AppFeature.ResumeRunChoice {
+    static var retryTimer: Self {
+        AlertState {
+            TextState("workouts.timerPresentationFailed.title", bundle: .module)
+        } actions: {
+            ButtonState(role: .cancel, action: .resume) {
+                TextState("workouts.timerPresentationFailed.retry", bundle: .module)
+            }
+            ButtonState(role: .destructive, action: .finish) {
+                TextState("workouts.resumeRun.finish", bundle: .module)
+            }
+        } message: {
+            TextState("workouts.timerPresentationFailed.message", bundle: .module)
+        }
+    }
+
     static func resumeRun(workoutName: String) -> Self {
         AlertState {
             TextState(String(localized: "workouts.resumeRun.title \(workoutName)", bundle: .module))

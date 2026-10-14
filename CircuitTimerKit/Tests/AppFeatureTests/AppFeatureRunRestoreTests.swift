@@ -52,7 +52,7 @@ struct AppFeatureRunRestoreTests {
 
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
-            $0.runRestore = .resolved
+            $0.runRestore = .presenting(saved)
             $0.destination = .timer(WorkoutTimerFeature.State(
                 id: UUID(0),
                 workoutID: workout.id,
@@ -63,7 +63,10 @@ struct AppFeatureRunRestoreTests {
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(4))
         #expect(store.state.destination?[case: \.timer]?.countdown == nil)
-        await store.send(.view(.timerCoverAppeared)) { $0.isTimerCoverUp = true }
+        await store.send(.view(.timerCoverAppeared)) {
+            $0.isTimerCoverUp = true
+            $0.runRestore = .resolved
+        }
         await store.send(.destination(.dismiss)) {
             $0.destination = nil
             $0.isTimerCoverUp = false
@@ -83,7 +86,7 @@ struct AppFeatureRunRestoreTests {
         }
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
-            $0.runRestore = .resolved
+            $0.runRestore = .presenting(saved)
             $0.destination = .timer(WorkoutTimerFeature.State(
                 id: UUID(0),
                 workoutID: workout.id,
@@ -93,7 +96,10 @@ struct AppFeatureRunRestoreTests {
             ))
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.status == .finished)
-        await store.send(.view(.timerCoverAppeared)) { $0.isTimerCoverUp = true }
+        await store.send(.view(.timerCoverAppeared)) {
+            $0.isTimerCoverUp = true
+            $0.runRestore = .resolved
+        }
         await store.send(.destination(.dismiss)) {
             $0.destination = nil
             $0.isTimerCoverUp = false
@@ -204,28 +210,96 @@ struct AppFeatureRunRestoreTests {
         await store.send(.internal(.runRecordLoaded(saved)))
     }
 
-    @Test
-    func test_destinationDismiss_beforeRestoredCoverAppears_reportsFailureAndKeepsRecord() async throws {
-        let saved = try stored(.running)
-        let run = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: saved.record, at: now)
-        var state = loaded([workout])
-        state.runRestore = .resolved
-        state.destination = .timer(WorkoutTimerFeature.State(
-            id: UUID(fixture: 99),
-            workoutID: workout.id,
-            title: workout.name,
-            restoring: run,
-            at: now
-        ))
-        let clears = LockIsolated(0)
-        let store = makeStore(state) {
-            $0.timerSession.end = { _ in }
-            $0.workoutRunRecord.write = { _, _ in clears.withValue { $0 += 1 } }
+    @Test(arguments: [WorkoutRunRecord.Phase.running, .paused])
+    func test_retry_failedRestoredCover_settlesAtEachAttemptAndUsesFreshOwner(phase: WorkoutRunRecord.Phase) async throws {
+        let saved = try stored(phase)
+        let wall = LockIsolated(now)
+        let writes = LockIsolated<[WorkoutRunRecord?]>([])
+        let ends = LockIsolated<[UUID]>([])
+        let store = offered(saved) {
+            $0.date = .init { wall.value }
+            $0.timerSession.end = { id in ends.withValue { $0.append(id) } }
+            $0.workoutRunRecord.write = { record, _ in writes.withValue { $0.append(record) } }
         }
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
-        await store.receive(.internal(.timerPresentationFailed)) { $0.destination = .alert(.timerNotPresented) }
-        #expect(clears.value == 0)
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        for (attempt, elapsed) in [0, 4, 7].enumerated() {
+            let date = now.addingTimeInterval(TimeInterval(elapsed))
+            wall.setValue(date)
+            let run = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: saved.record, at: date)
+            await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
+            await store.receive(.internal(.resumeRunConfirmed)) {
+                $0.runRestore = .presenting(saved)
+                $0.destination = .timer(WorkoutTimerFeature.State(
+                    id: UUID(attempt), workoutID: workout.id, title: workout.name, restoring: run, at: date
+                ))
+            }
+            #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(phase == .running ? elapsed : 3))
+            #expect(store.state.destination?[case: \.timer]?.countdown == nil)
+            if attempt < 2 {
+                await store.send(.destination(.dismiss)) {
+                    $0.destination = nil
+                    $0.runRestore = .offered(saved)
+                }
+                await store.receive(.internal(.timerPresentationFailed)) { $0.destination = .resumeRun(.retryTimer) }
+                await store.finish()
+                #expect(writes.value.isEmpty)
+            } else {
+                await store.send(.view(.timerCoverAppeared)) {
+                    $0.isTimerCoverUp = true
+                    $0.runRestore = .resolved
+                }
+                await store.send(.destination(.dismiss)) {
+                    $0.destination = nil
+                    $0.isTimerCoverUp = false
+                }
+                await store.finish()
+                #expect(writes.value == [nil])
+            }
+        }
+        #expect(ends.value == [UUID(0), UUID(1), UUID(2)])
+    }
+
+    @Test(arguments: [false, true])
+    func test_finish_failedRestoredCover_clearsRecordOrReportsFailure(fails: Bool) async throws {
+        let saved = try stored(.paused)
+        let run = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: saved.record, at: now)
+        let writes = LockIsolated<[WorkoutRunRecord?]>([])
+        let store = offered(saved) {
+            $0.date = .constant(now)
+            $0.timerSession.end = { _ in }
+            $0.workoutRunRecord.write = { record, _ in
+                writes.withValue { $0.append(record) }
+                if fails { throw SaveFailure() }
+            }
+        }
+        await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
+        await store.receive(.internal(.resumeRunConfirmed)) {
+            $0.runRestore = .presenting(saved)
+            $0.destination = .timer(WorkoutTimerFeature.State(
+                id: UUID(0), workoutID: workout.id, title: workout.name, restoring: run, at: now
+            ))
+        }
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            $0.runRestore = .offered(saved)
+        }
+        await store.receive(.internal(.timerPresentationFailed)) { $0.destination = .resumeRun(.retryTimer) }
+        await store.send(.destination(.presented(.resumeRun(.finish)))) {
+            $0.destination = nil
+            $0.runRestore = .resolved
+        }
+        if fails {
+            await store.receive(.internal(.runFinishFailed)) { $0.destination = .alert(.runNotFinished) }
+            await store.send(.destination(.dismiss)) { $0.destination = nil }
+        }
+        await store.finish()
+        #expect(writes.value == [nil])
+    }
+
+    @Test
+    func test_timerPresentationFailed_anotherDestinationIsPresented_doesNotReplaceIt() async throws {
+        let saved = try stored(.running)
+        let store = offered(saved)
+        await store.send(.internal(.timerPresentationFailed))
     }
 
     @Test

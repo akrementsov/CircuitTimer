@@ -256,6 +256,7 @@ public struct AppFeature: Sendable {
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
             case .timerCoverAppeared:
+                if case .presenting = state.runRestore { state.runRestore = .resolved }
                 state.isTimerCoverUp = true
                 // Under the cover, so the pop is not seen; closing the timer lands on the list.
                 state.path.removeAll()
@@ -327,7 +328,11 @@ public struct AppFeature: Sendable {
                 return resumeRunConfirmed(&state)
             case .timerPresentationFailed:
                 if state.destination == nil {
-                    state.destination = .alert(.timerNotPresented)
+                    if case .offered = state.runRestore {
+                        state.destination = .resumeRun(.retryTimer)
+                    } else {
+                        state.destination = .alert(.timerNotPresented)
+                    }
                 }
                 return .none
             case .runFinishFailed:
@@ -461,6 +466,9 @@ public struct AppFeature: Sendable {
                 }
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")
+                    if case let .presenting(stored) = state.runRestore {
+                        state.runRestore = .offered(stored)
+                    }
                     let notice: Effect<Action> = timer.snapshot.status == .idle
                         ? .none
                         : .send(.internal(.timerPresentationFailed))
