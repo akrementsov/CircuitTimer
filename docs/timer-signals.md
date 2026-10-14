@@ -16,6 +16,8 @@ Signals run while the timer is visible and the app is active. Control Center sto
 
 The audio session plays through the silent switch and ducks other audio. After the last output ends it releases the session after 1.5 seconds, keeping music ducked between countdown beeps. Leaving the active scene or closing releases it immediately. With VoiceOver on, stage names use a low-priority accessibility announcement instead of synthesizer speech; delivery can be delayed by other announcements.
 
+Deactivation failures are logged at error level. Except for `isBusy`, which already leaves the session inactive, a failure receives one automatic retry after 1.5 seconds. A successful new activation supersedes that cleanup; VoiceOver-only cues and unavailable activation keep the pending cleanup without replenishing its retry budget.
+
 Audio and missing-voice failures appear under the timer while the affected output is enabled. They do not stop the run. A later successful result clears the corresponding failure.
 
 Regenerate the bundled tones from the repository root:

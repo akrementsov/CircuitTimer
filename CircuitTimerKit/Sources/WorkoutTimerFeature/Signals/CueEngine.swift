@@ -4,9 +4,15 @@ import Foundation
 import os
 
 /// All mutable state belongs to `queue`; state methods check confinement even on iOS 17.
-/// While active without an output, one valid idle deadline exists. Only a started output invalidates it.
+/// While active or awaiting a deactivation retry without output, one valid idle deadline exists.
 /// Cancellation ends the task's wait, while a newer cue, suspend, close or idle deadline owns teardown.
 final class CueEngine: @unchecked Sendable {
+    private enum DeactivationState {
+        case settled
+        case retryPending
+        case retryExhausted
+    }
+
     enum StartResult: Equatable, Sendable {
         case admitted
         case rejected
@@ -40,6 +46,7 @@ final class CueEngine: @unchecked Sendable {
     private var tombstones: Set<UUID> = []
     private var sceneActive = true
     private var sessionActive = false
+    private var deactivationState = DeactivationState.settled
     private var idleToken = 0
     private var output: Output?
     private var nextOutputID = 0
@@ -120,15 +127,19 @@ final class CueEngine: @unchecked Sendable {
                         deactivate()
                         return CueResult(failures: [error])
                 }
-            case let .failed(error): return CueResult(failures: [error])
-            case .rejected, .skipped: return CueResult()
+            case let .failed(error):
+                if deactivationState == .retryPending { scheduleIdle() }
+                return CueResult(failures: [error])
+            case .rejected, .skipped:
+                if deactivationState == .retryPending { scheduleIdle() }
+                return CueResult()
         }
     }
 
     func start(owner: UUID, revision: Int) -> StartResult {
         dispatchPrecondition(condition: .onQueue(queue))
         guard admit(owner: owner, revision: revision) else { return .rejected }
-        defer { if sessionActive { scheduleIdle() } }
+        defer { if sessionActive || deactivationState == .retryPending { scheduleIdle() } }
         return activate()
     }
 
@@ -139,22 +150,26 @@ final class CueEngine: @unchecked Sendable {
         do {
             try session.activate()
             sessionActive = true
+            deactivationState = .settled
             return .admitted
         } catch {
             let code = (error as NSError).code
-            if [560_557_684, 561_017_449, 1_936_290_409, 561_015_905].contains(code) {
-                Self.logger.info("Cue audio session was skipped: \(code)")
-                return .skipped
+            switch AVAudioSession.ErrorCode(rawValue: code) {
+                // System-owned audio or a background transition skips this cue without a persistent failure notice.
+                case .cannotInterruptOthers, .insufficientPriority, .siriIsRecording, .cannotStartPlaying:
+                    Self.logger.info("Cue audio session was skipped: \(code)")
+                    return .skipped
+                default:
+                    Self.logger.error("Activating cue audio failed: \(String(reflecting: error), privacy: .public)")
+                    return .failed(.sessionFailed(code: code))
             }
-            Self.logger.error("Activating cue audio failed: \(String(reflecting: error), privacy: .public)")
-            return .failed(.sessionFailed(code: code))
         }
     }
 
     func preempt(owner: UUID, revision: Int) -> Bool {
         dispatchPrecondition(condition: .onQueue(queue))
         guard admit(owner: owner, revision: revision) else { return false }
-        if sessionActive { scheduleIdle() }
+        if sessionActive || deactivationState == .retryPending { scheduleIdle() }
         return true
     }
 
@@ -307,6 +322,7 @@ final class CueEngine: @unchecked Sendable {
                 stopOutput()
                 clearPreparedPlayers()
                 sessionActive = false
+                deactivationState = .settled
                 idleToken += 1
                 Self.logger.info("Cue audio was interrupted")
             case .interruptionEnded:
@@ -319,6 +335,7 @@ final class CueEngine: @unchecked Sendable {
                 output?.waiter.finish(.stopped)
                 output = nil
                 sessionActive = false
+                deactivationState = .settled
                 idleToken += 1
                 toneData.removeAll()
                 preparedPlayers.removeAll()
@@ -339,16 +356,24 @@ final class CueEngine: @unchecked Sendable {
         output.waiter.finish(.stopped)
     }
 
-    private func deactivate() {
+    private func deactivate(retrying: Bool = false) {
         dispatchPrecondition(condition: .onQueue(queue))
         clearPreparedPlayers()
         idleToken += 1
+        sessionActive = false
         do {
             try session.deactivate()
+            deactivationState = .settled
         } catch {
-            Self.logger.info("Deactivating cue audio failed: \(String(reflecting: error), privacy: .public)")
+            Self.logger.error("Deactivating cue audio failed: \(String(reflecting: error), privacy: .public)")
+            // isBusy already deactivates the session on iOS 17; rearming a deadline cannot replenish its retry budget.
+            if (error as NSError).code == AVAudioSession.ErrorCode.isBusy.rawValue {
+                deactivationState = .settled
+            } else {
+                deactivationState = retrying ? .retryExhausted : .retryPending
+                if deactivationState == .retryPending { scheduleIdle() }
+            }
         }
-        sessionActive = false
     }
 
     private func scheduleIdle() {
@@ -363,8 +388,8 @@ final class CueEngine: @unchecked Sendable {
 
     private func idleFired(_ token: Int) {
         dispatchPrecondition(condition: .onQueue(queue))
-        guard token == idleToken, output == nil, sessionActive else { return }
+        guard token == idleToken, output == nil, sessionActive || deactivationState == .retryPending else { return }
 
-        deactivate()
+        deactivate(retrying: deactivationState == .retryPending)
     }
 }

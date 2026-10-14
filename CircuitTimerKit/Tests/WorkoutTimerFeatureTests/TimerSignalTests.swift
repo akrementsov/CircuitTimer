@@ -50,6 +50,7 @@ struct TimerSignalTests {
         }
         await timer.store.finish()
     }
+
     @Test
     func test_scenePhaseChanged_stageCrossedWhileInactive_doesNotAnnounceItOnReturn() async {
         var state = WorkoutTimerFeature.State.fixture(.running)
@@ -216,5 +217,4 @@ struct TimerSignalTests {
         }
         await timer.cancelClockLoop()
     }
-
 }

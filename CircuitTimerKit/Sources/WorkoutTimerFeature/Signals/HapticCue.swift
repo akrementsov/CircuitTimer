@@ -8,9 +8,3 @@ struct HapticCue: Equatable, Sendable {
     let kind: Kind
     let revision: Int
 }
-
-enum CueFailure: Hashable, Sendable {
-    case tone
-    case session
-    case voice
-}

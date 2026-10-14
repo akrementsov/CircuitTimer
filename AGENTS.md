@@ -125,7 +125,6 @@ public struct SomeFeature: Sendable {
 ## Time
 
 - `keepScreenOn` is on by default. A timer prevents automatic screen lock only while this preference is on and its countdown or a timed stage is running; a paused, waiting or finished run lets the screen lock. Its awake vote follows preference changes without restarting the clock.
-
 - UI must call `WorkoutRun.tick(at:)` and then `snapshot(at:)` on every update; `snapshot` alone never commits progress.
 - Never convert between `Date` and `Duration` outside `TimeMath`.
 - `rebase(at:keepingTotalElapsed:)` is the recovery point after a backward clock change.
