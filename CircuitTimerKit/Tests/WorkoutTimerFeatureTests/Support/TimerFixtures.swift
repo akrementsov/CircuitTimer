@@ -1,3 +1,4 @@
+@testable import BackgroundExecution
 @testable import WorkoutDomain
 @testable import WorkoutTimerFeature
 

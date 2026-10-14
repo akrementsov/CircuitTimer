@@ -1,5 +1,6 @@
 @testable import AppFeature
 
+import BackgroundExecution
 import ComposableArchitecture
 import Foundation
 import WorkoutDomain

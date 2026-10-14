@@ -14,6 +14,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.iOS(.v17)],
     products: [
+        .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
@@ -34,6 +35,7 @@ let package = Package(
         .target(
             name: "AppFeature",
             dependencies: [
+                "BackgroundExecution",
                 "DesignSystem",
                 "SettingsFeature",
                 "WorkoutDomain",
@@ -48,6 +50,7 @@ let package = Package(
         .testTarget(
             name: "AppFeatureTests",
             dependencies: [
+                "BackgroundExecution",
                 "AppFeature",
                 "SettingsFeature",
                 "WorkoutDomain",
@@ -55,6 +58,14 @@ let package = Package(
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "BackgroundExecution",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
         ),
@@ -100,6 +111,7 @@ let package = Package(
         .target(
             name: "WorkoutTimerFeature",
             dependencies: [
+                "BackgroundExecution",
                 "DesignSystem",
                 "WorkoutDomain",
                 "WorkoutStorage",
@@ -145,6 +157,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutTimerFeatureTests",
             dependencies: [
+                "BackgroundExecution",
                 "WorkoutDomain",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",

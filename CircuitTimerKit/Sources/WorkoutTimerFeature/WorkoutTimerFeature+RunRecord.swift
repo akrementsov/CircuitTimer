@@ -1,3 +1,4 @@
+import BackgroundExecution
 import ComposableArchitecture
 import os
 import WorkoutDomain
