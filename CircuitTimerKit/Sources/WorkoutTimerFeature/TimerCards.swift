@@ -66,6 +66,8 @@ struct CurrentStageCard: View {
                 StageClockText(text)
             case let .countdownDigit(digit):
                 StageClockText("\(digit)")
+            case .preparing:
+                ProgressView().tint(contentColor)
             case .pauseGlyph:
                 Image(systemName: "pause.fill")
                     .resizable()

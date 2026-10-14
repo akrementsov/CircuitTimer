@@ -16,6 +16,7 @@ let package = Package(
     products: [
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
+        .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
@@ -30,6 +31,7 @@ let package = Package(
             traits: ["ComposableArchitecture2Deprecations"]
         ),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.10.1"),
     ],
     targets: [
         .target(
@@ -77,10 +79,18 @@ let package = Package(
         .target(
             name: "SettingsFeature",
             dependencies: [
+                "TimerPreferences",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "TimerPreferences",
+            dependencies: [
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
             swiftSettings: strictSettings
         ),
         .target(
@@ -111,6 +121,7 @@ let package = Package(
         .target(
             name: "WorkoutTimerFeature",
             dependencies: [
+                "TimerPreferences",
                 "BackgroundExecution",
                 "DesignSystem",
                 "WorkoutDomain",
@@ -128,6 +139,7 @@ let package = Package(
         .testTarget(
             name: "SettingsFeatureTests",
             dependencies: [
+                "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),

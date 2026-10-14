@@ -21,6 +21,30 @@ struct AppFeatureTimerTests {
     private let empty = Workout(id: UUID(fixture: 5), name: "Empty")
 
     @Test
+    func test_destinationDismissed_timerShown_releasesCueAudioSession() async {
+        let owner = UUID(fixture: 7)
+        let calls = LockIsolated<[Bool]>([])
+        let scheduler = DispatchQueue.test
+        let engine = CueEngine(
+            session: CueAudioSession(
+                activate: { calls.withValue { $0.append(true) } },
+                deactivate: { calls.withValue { $0.append(false) } }
+            ),
+            idleScheduler: scheduler.eraseToAnyScheduler()
+        )
+        _ = await engine.perform { $0.start(owner: owner, revision: 1) }
+        var state = loaded([first])
+        state.destination = .timer(Self.timer(owner, for: first))
+        state.isTimerCoverUp = true
+        let store = makeStore(state) {
+            $0.timerSession.end = { _ in }
+            $0.cues.end = { id in await engine.perform { $0.end(owner: id) } }
+        }
+        await closeTimer(store)
+        #expect(calls.value == [true, false])
+    }
+
+    @Test
     func test_startRequested_openWorkout_presentsTimerWithNewIDTitleAndScheduleAndPops() async {
         let untitled = Workout(
             id: UUID(fixture: 3),
@@ -157,6 +181,7 @@ struct AppFeatureTimerTests {
         }
         await store.send(.destination(.presented(.timer(.view(.closeButtonTapped))))) {
             $0.$destination[case: \.timer]?.countdown = nil
+            $0.$destination[case: \.timer]?.isPreparingCountdown = false
             $0.$destination[case: \.timer]?.clockGeneration = 2
             $0.$destination[case: \.timer]?.requestedAwake = false
             $0.$destination[case: \.timer]?.awakeRevision = 2

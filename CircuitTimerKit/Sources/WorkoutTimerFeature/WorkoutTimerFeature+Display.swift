@@ -16,6 +16,7 @@ extension WorkoutTimerFeature.State {
             case clock(String)
             /// The stay countdown, one big digit in place of the pause glyph.
             case countdownDigit(Int)
+            case preparing
             case pauseGlyph
         }
 
@@ -135,6 +136,13 @@ extension WorkoutTimerFeature.State {
     }
 
     private func countdownCard(_ countdown: WorkoutTimerFeature.Countdown) -> CurrentCard {
+        if isPreparingCountdown {
+            let isStart = countdown.purpose == .start
+            let name = isStart
+                ? String(localized: "timer.stage.getReady", bundle: .module)
+                : String(localized: "timer.stage.pause", bundle: .module)
+            return CurrentCard(tone: isStart ? .rest : .dark, content: .preparing, name: name, spokenValue: name)
+        }
         switch countdown.purpose {
             case .start:
                 let name = String(localized: "timer.stage.getReady", bundle: .module)

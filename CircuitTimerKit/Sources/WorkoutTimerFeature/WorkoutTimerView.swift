@@ -7,6 +7,7 @@ import WorkoutDomain
 /// The full-screen timer, laid out after the original app.
 @ViewAction(for: WorkoutTimerFeature.self)
 public struct WorkoutTimerView: View {
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Bindable public var store: StoreOf<WorkoutTimerFeature>
 
     public init(store: StoreOf<WorkoutTimerFeature>) {
@@ -43,6 +44,12 @@ public struct WorkoutTimerView: View {
                 .frame(height: 98 * unit)
                 .padding(.horizontal, .token(spacing: .xxxl))
                 .padding(.top, .token(spacing: .xxl))
+                if store.showsAudioFailure {
+                    signalFootnote("timer.signals.failed")
+                }
+                if store.showsVoiceFailure, !voiceOverEnabled {
+                    signalFootnote("timer.signals.noVoice")
+                }
                 if store.hasRecordFailed {
                     Text("timer.record.failed", bundle: .module)
                         .font(.token(.footnote))
@@ -55,6 +62,7 @@ public struct WorkoutTimerView: View {
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .screenChrome()
+        .sensoryFeedback(trigger: store.haptic) { _, cue in cue?.kind.feedback }
         // On iOS 17 the editor toolbar role adds a system back button to the cover's root, which would close a running
         // workout without asking.
         .navigationBarBackButtonHidden(true)
@@ -65,6 +73,15 @@ public struct WorkoutTimerView: View {
         // Not `await send(.task).finish()`: that would tie the first clock loop to this view, a screen pushed over
         // the timer would cancel it, and `.task` acts only once, so nothing would start it again.
         .task { send(.task) }
+    }
+
+    private func signalFootnote(_ key: LocalizedStringKey) -> some View {
+        Text(key, bundle: .module)
+            .font(.token(.footnote))
+            .foregroundStyle(.text(.secondary))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, .token(spacing: .l))
+            .padding(.top, .token(spacing: .m))
     }
 
     @ToolbarContentBuilder
@@ -121,6 +138,7 @@ private enum PreviewTimer {
         countdown: WorkoutTimerFeature.Countdown? = nil,
         hasClockFailed: Bool = false,
         hasRecordFailed: Bool = false,
+        cueFailures: Set<CueFailure> = [],
         play: (inout WorkoutRun) -> Void = { $0.start(at: PreviewTimer.start) }
     ) -> WorkoutTimerFeature.State {
         var state = WorkoutTimerFeature.State(
@@ -133,8 +151,12 @@ private enum PreviewTimer {
         state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
         state.countdown = countdown
+        state.isPreparingCountdown = false
+        // Fixed preview stores receive no scene events from the timer container.
+        state.isSceneActive = true
         state.hasClockFailed = hasClockFailed
         state.hasRecordFailed = hasRecordFailed
+        state.cueFailures = cueFailures
         return state
     }
 
@@ -154,6 +176,7 @@ private enum PreviewTimer {
                 } withDependencies: {
                     $0.date = .constant(now)
                     $0.continuousClock = TestClock()
+                    $0.cues = .previewValue
                 }
             )
         }
@@ -217,6 +240,14 @@ private enum PreviewTimer {
     PreviewTimer.view(PreviewTimer.state(hasRecordFailed: true))
 }
 
+#Preview("Audio signals failed") {
+    PreviewTimer.view(PreviewTimer.state(cueFailures: [.tone, .session]))
+}
+
+#Preview("App voice unavailable") {
+    PreviewTimer.view(PreviewTimer.state(cueFailures: [.voice]))
+}
+
 #Preview("Longest names") {
     PreviewTimer.view(PreviewTimer.state(PreviewTimer.longNames))
 }
@@ -233,4 +264,14 @@ private enum PreviewTimer {
         }
     )
     .preferredColorScheme(.dark)
+}
+
+private extension HapticCue.Kind {
+    var feedback: SensoryFeedback {
+        switch self {
+            case .countdown: .impact(weight: .light)
+            case .stageStart: .impact(weight: .heavy)
+            case .finish: .success
+        }
+    }
 }
