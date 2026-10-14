@@ -19,11 +19,15 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 All code lives in one local Swift package, `CircuitTimerKit`. The Xcode project is a thin shell that only launches `AppFeature` and configures TipKit.
 
-The modules form four layers, and a module imports only from the layers below it:
+The app and the planned widget extension are thin targets over the package's modules, which form four layers; a module imports only from the layers below it:
 
 ```mermaid
 flowchart TD
-    App["CircuitTimer app"] --> AppFeature
+    Shell["CircuitTimer app"] --> AppFeature
+
+    subgraph AppLayer["App"]
+        AppFeature
+    end
 
     subgraph Features
         direction LR
@@ -60,7 +64,7 @@ flowchart TD
     WorkoutActivity -.-> WorkoutDomain
 ```
 
-Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. `Package.swift` is the exact list.
+Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. `Package.swift` is the exact list. The planned `WorkoutActivity` (CT-4) joins Core; the widget extension is a thin target like the app.
 
 | Module | Layer | Responsibility |
 |---|---|---|
@@ -74,7 +78,7 @@ Not drawn, to keep the picture readable: `AppFeature`, the composition root, als
 | `BackgroundExecution` | Core | `BackgroundTaskClient`: a background-task assertion around the run record writes of the timer and `AppFeature`. |
 | `WorkoutDomain` | Domain | Workout model, normalization limits, the linear schedule and its fingerprint, and the `WorkoutRun` timer engine. Foundation and CryptoKit only, so the widget can use it. |
 
-Features never import each other, Core imports no feature, and the domain imports none of our modules and never TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
+Features never import each other, Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
 Foreground signal policy and the device checklist: [Timer signals](docs/timer-signals.md).
 
