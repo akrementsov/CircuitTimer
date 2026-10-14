@@ -124,7 +124,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 ## Roadmap
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
-- [ ] **CT-8 Delivery** — TestFlight builds from GitHub Actions; the workflow is in place, the first tagged build is pending
+- [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
 - [x] **CT-2** — workout list and editor, SwiftData persistence
 - [x] **CT-UI** — dark design of the original app, in slices:
   - [x] **CT-UI-1** — dark design tokens and the launch screen
