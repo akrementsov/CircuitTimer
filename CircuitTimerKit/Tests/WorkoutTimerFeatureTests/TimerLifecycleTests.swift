@@ -23,17 +23,17 @@ struct TimerLifecycleTests {
         let timer = TimerHarness(initial)
         let store = timer.store
 
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 1 }
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 1 }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) {
+        await timer.receive(.internal(.countdownTicked(generation: 1)), saving: true) {
             $0.countdown = nil
             $0.run.start(at: moment(3))
             $0.settle(at: moment(3))
@@ -44,7 +44,7 @@ struct TimerLifecycleTests {
         #expect(store.state.snapshot.totalElapsed == .zero)
         #expect(timer.calls.value == [.awake(true, 1)])
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(3))
             $0.settle(at: moment(3))
             $0.clockGeneration = 3
@@ -62,14 +62,14 @@ struct TimerLifecycleTests {
 
         await timer.appearRunning()
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 1, isFinal: false))) {
             $0.settle(at: moment(1))
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(1))
         }
         await timer.advance(seconds: 1)
         // The reducer's own reading reaches the end first and replaces the loop, so the loop's final tick is
         // dropped with it.
-        await store.receive(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.settle(at: moment(2))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -88,12 +88,12 @@ struct TimerLifecycleTests {
 
         await timer.appearRunning()
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 1, isFinal: false))) {
             $0.settle(at: moment(1))
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(1))
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.settle(at: moment(2))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -103,7 +103,7 @@ struct TimerLifecycleTests {
         #expect(store.state.snapshot.status == .awaitingUser)
         await timer.advance(seconds: 5)
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.resume(at: moment(7))
             $0.settle(at: moment(7))
             $0.clockGeneration = 3
@@ -114,7 +114,7 @@ struct TimerLifecycleTests {
         #expect(store.state.snapshot.currentStage?.index == 2)
         #expect(store.state.snapshot.status == .running)
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(7))
             $0.settle(at: moment(7))
             $0.clockGeneration = 4
@@ -133,10 +133,10 @@ struct TimerLifecycleTests {
         let timer = TimerHarness(state)
         let store = timer.store
 
-        await store.send(.view(.task)) { $0.clockGeneration = 1 }
-        await store.send(.view(.playPauseButtonTapped))
-        await store.send(.view(.nextButtonTapped))
-        await store.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
+        await timer.send(.view(.task), saving: true) { $0.clockGeneration = 1 }
+        await timer.send(.view(.playPauseButtonTapped))
+        await timer.send(.view(.nextButtonTapped))
+        await timer.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
         await store.finish()
 
         #expect(timer.calls.value == [.end(owner: timerID), .dismiss])
@@ -145,17 +145,16 @@ struct TimerLifecycleTests {
     @Test
     func test_task_sentAgainAfterAppearing_keepsTheRunningLoop() async {
         let timer = TimerHarness(.appearing())
-        let store = timer.store
         await timer.appearRunning()
 
-        await store.send(.view(.task))
+        await timer.send(.view(.task))
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 1, isFinal: false))) {
             $0.settle(at: moment(1))
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(1))
         }
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(1))
             $0.settle(at: moment(1))
             $0.clockGeneration = 2
@@ -169,20 +168,19 @@ struct TimerLifecycleTests {
     @Test
     func test_ticked_finalWhileTheRunStillRuns_startsANewLoop() async {
         let timer = TimerHarness(.appearing())
-        let store = timer.store
         await timer.appearRunning()
 
-        await store.send(.internal(.ticked(generation: 1, isFinal: true))) {
+        await timer.send(.internal(.ticked(generation: 1, isFinal: true))) {
             $0.clockGeneration = 2
             $0.clockAnchor = timer.anchor(totalElapsed: .zero)
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.ticked(generation: 2, isFinal: false))) {
+        await timer.receive(.internal(.ticked(generation: 2, isFinal: false))) {
             $0.settle(at: moment(1))
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(1))
         }
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(1))
             $0.settle(at: moment(1))
             $0.clockGeneration = 3

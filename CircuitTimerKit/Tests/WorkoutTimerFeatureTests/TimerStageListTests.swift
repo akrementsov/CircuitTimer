@@ -21,7 +21,7 @@ struct TimerStageListTests {
         switch phase {
             case .startCountdown, .resumeCountdown:
                 let status = store.state.snapshot.status
-                await store.send(.view(.stagesButtonTapped)) {
+                await timer.send(.view(.stagesButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.clockGeneration = 2
                     $0.requestedAwake = false
@@ -31,7 +31,7 @@ struct TimerStageListTests {
                 #expect(store.state.snapshot.status == status)
                 expectedCalls = [.awake(false, 2)]
             case .running:
-                await store.send(.view(.stagesButtonTapped)) {
+                await timer.send(.view(.stagesButtonTapped), saving: true) {
                     $0.run.pause(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -43,7 +43,7 @@ struct TimerStageListTests {
                 #expect(store.state.snapshot.status == .paused)
                 expectedCalls = [.awake(false, 2)]
             case .idle, .paused, .awaitingUser, .finished:
-                await store.send(.view(.stagesButtonTapped)) { $0.path.append(.stageList($0.outline)) }
+                await timer.send(.view(.stagesButtonTapped)) { $0.path.append(.stageList($0.outline)) }
                 expectedCalls = []
         }
         #expect(store.state.outline == WorkoutOutline(schedule: schedule))
@@ -55,17 +55,17 @@ struct TimerStageListTests {
     func test_stagesButtonTapped_runningTickLoop_cancelsIt() async {
         let timer = TimerHarness(.fresh())
         let store = timer.store
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
         for remaining in [2, 1] {
             await timer.advance(seconds: 1)
-            await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = remaining }
+            await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = remaining }
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) {
+        await timer.receive(.internal(.countdownTicked(generation: 1)), saving: true) {
             $0.countdown = nil
             $0.run.start(at: moment(3))
             $0.settle(at: moment(3))
@@ -73,7 +73,7 @@ struct TimerStageListTests {
             $0.clockAnchor = timer.anchor(totalElapsed: .zero)
         }
 
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped), saving: true) {
             $0.run.pause(at: moment(3))
             $0.settle(at: moment(3))
             $0.clockGeneration = 3
@@ -94,15 +94,15 @@ struct TimerStageListTests {
     func test_stagesButtonTapped_countdownLoop_cancelsItAndIgnoresItsLateTick() async {
         let timer = TimerHarness(.fresh())
         let store = timer.store
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
 
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped)) {
             $0.countdown = nil
             $0.clockGeneration = 2
             $0.requestedAwake = false
@@ -111,7 +111,7 @@ struct TimerStageListTests {
         }
         await timer.advance(seconds: 5)
         // A tick the old loop sent before its cancel landed only cancels that loop again.
-        await store.send(.internal(.countdownTicked(generation: 1)))
+        await timer.send(.internal(.countdownTicked(generation: 1)))
         await store.finish()
 
         #expect(store.state.snapshot.status == .idle)
@@ -124,7 +124,7 @@ struct TimerStageListTests {
         state.path.append(.stageList(state.outline))
         let timer = TimerHarness(state)
 
-        await timer.store.send(.view(.stagesButtonTapped))
+        await timer.send(.view(.stagesButtonTapped))
 
         #expect(timer.calls.value.isEmpty)
         await timer.cancelClockLoop()
@@ -134,7 +134,7 @@ struct TimerStageListTests {
     func test_pop_listOpenedOverARunningStage_keepsTheRunPaused() async throws {
         let timer = TimerHarness(.fixture(.running))
         let store = timer.store
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.clockGeneration = 2
@@ -145,7 +145,7 @@ struct TimerStageListTests {
         }
 
         let listID = try #require(store.state.path.ids.first)
-        await store.send(.path(.popFrom(id: listID))) { $0.path = StackState() }
+        await timer.send(.path(.popFrom(id: listID))) { $0.path = StackState() }
         await timer.advance(seconds: 20)
         await store.finish()
 
@@ -157,7 +157,7 @@ struct TimerStageListTests {
     func test_playAfterPop_listOpenedOverTheStartCountdown_startsItAgain() async throws {
         let timer = TimerHarness(.fixture(.startCountdown))
         let store = timer.store
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped), saving: true) {
             $0.countdown = nil
             $0.clockGeneration = 2
             $0.requestedAwake = false
@@ -165,9 +165,9 @@ struct TimerStageListTests {
             $0.path.append(.stageList($0.outline))
         }
         let listID = try #require(store.state.path.ids.first)
-        await store.send(.path(.popFrom(id: listID))) { $0.path = StackState() }
+        await timer.send(.path(.popFrom(id: listID))) { $0.path = StackState() }
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped)) {
             $0.countdown = Countdown(.start)
             $0.clockGeneration = 3
             $0.requestedAwake = true
@@ -184,7 +184,7 @@ struct TimerStageListTests {
         let store = timer.store
         await timer.advance(seconds: 2)
 
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped), saving: true) {
             $0.settle(at: moment(2))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -203,7 +203,7 @@ struct TimerStageListTests {
         let store = timer.store
         await timer.advance(seconds: 20)
 
-        await store.send(.view(.stagesButtonTapped)) {
+        await timer.send(.view(.stagesButtonTapped), saving: true) {
             $0.settle(at: moment(20))
             $0.clockGeneration = 2
             $0.clockAnchor = nil

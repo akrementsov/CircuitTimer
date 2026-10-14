@@ -3,6 +3,7 @@
 import ComposableArchitecture
 import Foundation
 import WorkoutDomain
+import WorkoutTimerFeature
 
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
     var state = AppFeature.State()
@@ -15,10 +16,21 @@ func makeStore(
     _ state: AppFeature.State,
     dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<AppFeature> {
-    TestStore(initialState: state) {
+    let revisions = LockIsolated(0)
+    return TestStore(initialState: state) {
         AppFeature()
     } withDependencies: {
         $0.uuid = .incrementing
+        $0.continuousClock = TestClock<Duration>()
+        $0.backgroundTask = BackgroundTaskClient(begin: { _ in .invalid }, end: { _ in })
+        $0.workoutRunRecord.load = { nil }
+        $0.workoutRunRecord.nextRevision = {
+            revisions.withValue {
+                $0 += 1
+                return $0
+            }
+        }
+        $0.workoutRunRecord.write = { _, _ in }
         dependencies(&$0)
     }
 }

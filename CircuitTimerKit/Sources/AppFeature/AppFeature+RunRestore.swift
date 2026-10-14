@@ -6,8 +6,8 @@ import WorkoutStorage
 import WorkoutTimerFeature
 
 extension AppFeature {
-    /// The launch's check for a run saved before the process was gone. It ends before the first list is shown, so no
-    /// row, screen or write exists yet when a restored timer opens.
+    /// The launch's check for a saved run. A viable record is offered over the first loaded list before another
+    /// screen can be opened.
     enum RunRestore: Equatable, Sendable {
         case idle
         /// Reading the record; the list waits.
@@ -168,7 +168,7 @@ extension AppFeature {
                 state.runRestore = .resolved
                 return discardRunRecord(reportingFailure: true)
             case .resume:
-                // The alert is still leaving the screen; the cover comes with the next action, so the two never overlap.
+                // Request the cover from a later action, after the presentation reducer clears the chosen alert.
                 return .run { send in
                     await send(.internal(.resumeRunConfirmed))
                 }
@@ -251,6 +251,14 @@ extension AlertState where Action == Never {
             TextState("workouts.restoreFailed.title", bundle: .module)
         } message: {
             TextState("workouts.restoreFailed.message", bundle: .module)
+        }
+    }
+
+    static var timerNotPresented: Self {
+        AlertState {
+            TextState("workouts.timerPresentationFailed.title", bundle: .module)
+        } message: {
+            TextState("workouts.timerPresentationFailed.message", bundle: .module)
         }
     }
 

@@ -125,6 +125,7 @@ public struct AppFeature: Sendable {
             /// Sent after the resume alert has gone, so the timer's cover never overlaps it.
             case resumeRunConfirmed
             case runFinishFailed
+            case timerPresentationFailed
         }
     }
 
@@ -177,7 +178,7 @@ public struct AppFeature: Sendable {
             case .task:
                 guard state.workouts == .idle else { return .none }
 
-                // The list waits for the saved run, so a restored timer opens before any row or screen exists.
+                // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
                 return readRunRecord(&state)
             case let .tabSelected(tab):
@@ -279,7 +280,7 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
-                // Restored before any screen: a presented timer makes the deferred one drop.
+                // A continuation prompt takes precedence over any deferred screen.
                 let restore = resolveRestore(&state)
                 return .merge(restore, presentDeferredScreen(&state))
             case .workoutsLoadingFailed:
@@ -323,6 +324,11 @@ public struct AppFeature: Sendable {
                 return runRecordReadTimedOut(&state)
             case .resumeRunConfirmed:
                 return resumeRunConfirmed(&state)
+            case .timerPresentationFailed:
+                if state.destination == nil {
+                    state.destination = .alert(.timerNotPresented)
+                }
+                return .none
             case .runFinishFailed:
                 // Shown only over the list; the run may be offered again at the next launch.
                 if state.destination == nil {
@@ -454,7 +460,10 @@ public struct AppFeature: Sendable {
                 }
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")
-                    return end
+                    let notice: Effect<Action> = timer.snapshot.status == .idle
+                        ? .none
+                        : .send(.internal(.timerPresentationFailed))
+                    return .merge(end, notice)
                 }
                 return .merge(end, discardRunRecord())
             case .resumeRun:

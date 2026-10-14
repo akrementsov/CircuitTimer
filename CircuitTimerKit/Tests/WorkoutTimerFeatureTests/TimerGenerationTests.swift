@@ -16,7 +16,7 @@ struct TimerGenerationTests {
         let timer = TimerHarness(.fixture(.running))
         let store = timer.store
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.clockGeneration = 2
@@ -27,7 +27,7 @@ struct TimerGenerationTests {
         await timer.clock.advance(by: .seconds(10))
         timer.moveWall(seconds: -30)
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.resume(at: moment(-30))
             $0.settle(at: moment(-30))
             $0.clockGeneration = 3
@@ -37,7 +37,7 @@ struct TimerGenerationTests {
         }
         #expect(store.state.snapshot.totalElapsed == .seconds(3))
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(-30))
             $0.settle(at: moment(-30))
             $0.clockGeneration = 4
@@ -59,7 +59,7 @@ struct TimerGenerationTests {
         let timer = TimerHarness(state)
         await timer.advance(seconds: 1)
 
-        await timer.store.send(.internal(action))
+        await timer.send(.internal(action))
         #expect(!timer.store.state.hasClockFailed)
         #expect(timer.calls.value.isEmpty)
     }
@@ -69,14 +69,14 @@ struct TimerGenerationTests {
         let timer = TimerHarness(.fresh())
         let store = timer.store
 
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
+        await timer.send(.view(.playPauseButtonTapped)) {
             $0.countdown = nil
             $0.clockGeneration = 2
             $0.requestedAwake = false
@@ -96,7 +96,7 @@ struct TimerGenerationTests {
         timer.failures.setValue(1)
 
         await timer.appearRunning()
-        await store.receive(.internal(.clockFailed(generation: 1))) {
+        await timer.receive(.internal(.clockFailed(generation: 1)), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.hasClockFailed = true
@@ -115,12 +115,12 @@ struct TimerGenerationTests {
         let store = timer.store
         timer.failures.setValue(1)
 
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
-        await store.receive(.internal(.clockFailed(generation: 1))) {
+        await timer.receive(.internal(.clockFailed(generation: 1))) {
             $0.countdown = nil
             $0.hasClockFailed = true
             $0.clockGeneration = 2
@@ -129,14 +129,14 @@ struct TimerGenerationTests {
         }
         #expect(store.state.currentCard.name == String(localized: "timer.failed.start", bundle: .module))
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped)) {
             $0.countdown = Countdown(.start)
             $0.hasClockFailed = false
             $0.clockGeneration = 3
             $0.requestedAwake = true
             $0.awakeRevision = 3
         }
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped)) {
             $0.countdown = nil
             $0.clockGeneration = 4
             $0.requestedAwake = false
@@ -151,14 +151,14 @@ struct TimerGenerationTests {
         let timer = TimerHarness(state)
         let store = timer.store
 
-        await store.send(.view(.nextButtonTapped)) {
+        await timer.send(.view(.nextButtonTapped), saving: true) {
             $0.run.skipToNextStage(at: origin)
             $0.settle(at: origin)
             $0.clockGeneration = 2
         }
         #expect(store.state.hasClockFailed)
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.resume(at: origin)
             $0.settle(at: origin)
             $0.hasClockFailed = false
@@ -176,7 +176,7 @@ struct TimerGenerationTests {
         let store = timer.store
         await timer.advance(seconds: 2)
 
-        await store.send(.internal(.clockFailed(generation: 1))) {
+        await timer.send(.internal(.clockFailed(generation: 1)), saving: true) {
             $0.settle(at: moment(2))
             $0.hasClockFailed = true
             $0.clockGeneration = 2
@@ -187,7 +187,7 @@ struct TimerGenerationTests {
         #expect(store.state.snapshot.status == .awaitingUser)
         #expect(store.state.currentCard.name == String(localized: "timer.failed.resume", bundle: .module))
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.resume(at: moment(2))
             $0.settle(at: moment(2))
             $0.hasClockFailed = false
@@ -206,7 +206,7 @@ struct TimerGenerationTests {
         let store = timer.store
         await timer.advance(seconds: 20)
 
-        await store.send(.internal(.clockFailed(generation: 1))) {
+        await timer.send(.internal(.clockFailed(generation: 1)), saving: true) {
             $0.settle(at: moment(20))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -223,7 +223,7 @@ struct TimerGenerationTests {
         state.hasClockFailed = true
         let timer = TimerHarness(state)
 
-        await timer.store.send(.view(.nextButtonTapped)) {
+        await timer.send(.view(.nextButtonTapped), saving: true) {
             $0.run.skipToNextStage(at: origin)
             $0.settle(at: origin)
             $0.hasClockFailed = false

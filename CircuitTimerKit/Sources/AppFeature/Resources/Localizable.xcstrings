@@ -357,6 +357,38 @@
         }
       }
     },
+    "workouts.timerPresentationFailed.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart the app to try continuing your workout again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустите приложение, чтобы снова попробовать продолжить тренировку."
+          }
+        }
+      }
+    },
+    "workouts.timerPresentationFailed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the timer"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось открыть таймер"
+          }
+        }
+      }
+    },
     "workouts.title" : {
       "localizations" : {
         "en" : {

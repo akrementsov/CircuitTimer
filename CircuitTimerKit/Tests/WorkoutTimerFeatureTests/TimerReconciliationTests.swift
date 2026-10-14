@@ -19,7 +19,7 @@ struct TimerReconciliationTests {
         timer.moveWall(seconds: 1 + Double(milliseconds) / 1_000)
         let now = timer.now
 
-        await store.send(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.send(.internal(.ticked(generation: 1, isFinal: false)), saving: abs(milliseconds) > 250) {
             switch milliseconds {
                 case -251:
                     $0.run.rebase(at: now, keepingTotalElapsed: .seconds(4))
@@ -50,7 +50,7 @@ struct TimerReconciliationTests {
         timer.moveWall(seconds: wall)
         let now = timer.now
 
-        await store.send(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.send(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.run.rebase(at: now, keepingTotalElapsed: .seconds(5))
             $0.settle(at: now)
             $0.clockGeneration = 2
@@ -67,7 +67,7 @@ struct TimerReconciliationTests {
         await timer.clock.advance(by: .seconds(2))
         timer.moveWall(seconds: 0.5)
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.rebase(at: moment(0.5), keepingTotalElapsed: .seconds(5))
             $0.run.pause(at: moment(0.5))
             $0.settle(at: moment(0.5))
@@ -88,7 +88,7 @@ struct TimerReconciliationTests {
         timer.moveWall(seconds: wall)
         let now = timer.now
 
-        await store.send(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.send(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.settle(at: now)
             $0.clockGeneration = 2
             if $0.snapshot.status == .running {
@@ -122,7 +122,7 @@ struct TimerReconciliationTests {
             await timer.clock.advance(by: .seconds(1))
             timer.moveWall(seconds: 1.1)
             let now = timer.now
-            await store.send(.internal(.ticked(generation: 1, isFinal: false))) {
+            await timer.send(.internal(.ticked(generation: 1, isFinal: false))) {
                 $0.settle(at: now)
                 $0.clockAnchor = timer.anchor(totalElapsed: $0.snapshot.totalElapsed)
             }
@@ -144,7 +144,7 @@ struct TimerReconciliationTests {
         await timer.clock.advance(by: .seconds(2))
         timer.moveWall(seconds: -5)
 
-        await store.send(.internal(.ticked(generation: 1, isFinal: false))) {
+        await timer.send(.internal(.ticked(generation: 1, isFinal: false))) {
             $0.settle(at: moment(-5))
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(3))
         }
