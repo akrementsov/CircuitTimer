@@ -30,7 +30,7 @@ struct WorkoutStoreProviderTests {
 
     @Test
     func test_store_failedOpen_isRetriedThenCached() async throws {
-        let opener = Opener(container: try makeContainer())
+        let opener = Opener(container: try await makeContainer())
         let provider = WorkoutStoreProvider(makeContainer: opener.open)
 
         await #expect(throws: SaveFailure.self) { try await provider.store() }

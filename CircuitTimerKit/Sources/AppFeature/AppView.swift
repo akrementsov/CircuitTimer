@@ -41,6 +41,7 @@ public struct AppView: View {
         .task { send(.task) }
         // Presented over the tab bar, so the write-failure alert shows on either tab.
         .alert($store.scope(\.$destination, action: \.destination).alert)
+        .alert($store.scope(\.$destination, action: \.destination).resumeRun)
         // Full screen over the tab bar, with no swipe to dismiss: the timer closes only through its own X.
         .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
             WorkoutTimerStack(store: timerStore)

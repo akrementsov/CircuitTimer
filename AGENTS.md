@@ -29,19 +29,21 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 
 | Module | Depends on | Owns |
 |---|---|---|
-| `WorkoutDomain` | Foundation | Workout model, `WorkoutLimits`, `WorkoutSchedule`, `WorkoutRun`, `TimeMath` |
+| `BackgroundExecution` | Dependencies, DependenciesMacros, Foundation, UIKit, os | `BackgroundTaskClient` and its token for bounded background work |
+| `WorkoutDomain` | Foundation, CryptoKit | Workout model, `WorkoutLimits`, `WorkoutSchedule` and its fingerprint, `WorkoutRun`, `TimeMath` |
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
-| `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store |
+| `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record file |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
-| `WorkoutTimerFeature` | `DesignSystem`, `WorkoutDomain`, ComposableArchitecture | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`; its own stack with the stage list |
+| `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
 | `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
-| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start; composes Settings |
+| `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start, or after a relaunch when the user continues a saved run; composes Settings |
 
 Layering:
 
-- `*Feature` → `DesignSystem`, `Workout*`. A feature never imports another feature; composition happens in `AppFeature`.
+- `*Feature` → `DesignSystem`, `Workout*`, `BackgroundExecution`. A feature never imports another feature; composition happens in `AppFeature`.
+- `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `SettingsFeature` needs no workout module and imports none.
-- `WorkoutTimerFeature` imports no storage module: `AppFeature` hands it a `WorkoutSchedule`.
+- `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
 - `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - Planned: `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
 
@@ -108,6 +110,7 @@ public struct SomeFeature: Sendable {
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
 - Clocks, dates and UUIDs come from `@Dependency` (`continuousClock`, `date`, `uuid`); lint rejects `Date()` and `UUID()`.
+- Reducers call only synchronous generator dependencies: `uuid`, `date`, `continuousClock` (`now` for an anchor), `nextRevision`. The single exception with an effect on the outside world is `backgroundTask.begin`, used by the timer and by `AppFeature` around record writes: a `.run` effect starts as a later main-actor task, and the app can be suspended before it runs, so the assertion is taken in the reducer and the effect returned in the same pass ends it. Don't copy this for anything else.
 - Bridge callback APIs through an `AsyncStream` that the effect stays suspended on; never let `send` escape the effect.
 - Add only the action groups a feature needs (the root feature has no `Delegate`).
 
@@ -127,6 +130,8 @@ public struct SomeFeature: Sendable {
 - `snapshot` without `tick` appears in two places only: the tick loop's own copy of the run, which schedules wake-ups and is never shown or committed, and the state's initial snapshot at `.distantPast` of a run that is idle or finished.
 - A tick loop that ends while the committed run still runs reports `isFinal`, and the reducer starts a new one.
 - One clock instance per timer session: a `MonotonicInstant` checks only the type of its instant.
+- `WorkoutTimerStack` forwards `scenePhase`; the reducer acts on `.background` and `.active` only (`.inactive` also covers Control Center and the App Switcher). Leaving resets a 3-2-1 to its full length and runs no countdown until the app is back, then counts it from 3. A running run takes a fresh anchor as it leaves, so on return the same process's anchor measures the time away and a clock moved back is rebased. Every write is under a background-task assertion; what the file holds is the newest write that completed.
+- Across a process restart only the record's `sinceEpochMs` survives: a clock moved back past it re-anchors at the saved position, a smaller backward move undercounts, a forward one counts as elapsed time (`docs/timer-engine.md` › Saved runs).
 
 ## Domain limits
 
@@ -144,6 +149,10 @@ Public initializers take `id` explicitly; features get identifiers from `@Depend
 - Durations are stored as `Int` milliseconds.
 - CloudKit sync: no `@Attribute(.unique)`; every property optional or defaulted; relationships optional; stage order kept in an explicit `order` field.
 - A saved run is `WorkoutRunRecord` v1 with explicit `CodingKeys`: `schemaVersion`, `workoutID`, `scheduleFingerprint`, `phase`, `positionMs`, `cursor`, `sinceEpochMs`. The fingerprint is a SHA-256 of the normalized schedule structure (index, section, round, round count, kind, stage id, duration in ms; not the name). On restore, rebuild the schedule and drop the record if the fingerprint differs or `cursor` is out of range.
+- Run records live outside SwiftData: one JSON file in Application Support (`RunRecord/WorkoutRun.json`), excluded from backup on a best-effort basis. The body is exactly the v1 record.
+- Writes go through one actor on a dedicated serial queue executor, in the order of a revision the reducer takes from `nextRevision()`; a failed write leaves the file as it was and is retried at the next sync, and until one succeeds the timer warns that the run may not come back or may come back in an earlier state. These writes have no `CancelID`: the revision orders them, and an in-flight write must finish. Reads open the file on their own queue.
+- The timer writes its run on every clock sync — every operation, jump and change of status, and every time the app leaves the screen — but not on a tick that changes none of them, and clears it after the cover is dismissed; `AppFeature` clears it once more when the cover goes.
+- At launch `AppFeature` reads the record, racing the read against a 2 s timeout, and then loads the workouts; the restore decision is made at the first load, before another screen can be opened. A run that ended while the app was gone, or a paused one older than 24 hours, is dropped silently. A record that cannot be restored (workout changed or gone, file corrupt, unreadable or from another version) shows one alert; only a corrupt file is removed. A stall while reading shows that alert before the app knows whether a file exists — accepted. Otherwise the list asks «Continue the workout “<name>”?»: Continue settles the run at the tap and opens the timer in its saved phase, after the alert has gone. The accepted record stays until the cover appears; if presentation fails, an error offers Retry (settled at the new tap, with a fresh timer owner) or Finish in the same session. Finish clears the record and says so if that fails. iOS keeps the scene session after an App Switcher swipe (seen on iOS 26.5 and 26.7.1), so the app cannot tell a force quit from a system kill or a crash: every process death asks, and a return from the background never does.
 
 ## Errors
 

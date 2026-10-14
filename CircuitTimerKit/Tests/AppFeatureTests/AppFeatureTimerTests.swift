@@ -38,7 +38,12 @@ struct AppFeatureTimerTests {
         await start(
             untitled,
             in: store,
-            timer: WorkoutTimerFeature.State(id: UUID(0), title: "Untitled workout", schedule: WorkoutSchedule(workout: untitled))
+            timer: WorkoutTimerFeature.State(
+                id: UUID(0),
+                workoutID: untitled.id,
+                title: "Untitled workout",
+                schedule: WorkoutSchedule(workout: untitled)
+            )
         )
 
         await closeTimer(store)
@@ -142,9 +147,13 @@ struct AppFeatureTimerTests {
 
         await start(first, in: store)
         await store.send(.destination(.presented(.timer(.view(.task))))) {
+            $0.$destination[case: \.timer]?.recordSync = .pending(revision: 1, record: nil)
             $0.$destination[case: \.timer]?.clockGeneration = 1
             $0.$destination[case: \.timer]?.requestedAwake = true
             $0.$destination[case: \.timer]?.awakeRevision = 1
+        }
+        await store.receive(.destination(.presented(.timer(.internal(.recordWritten(revision: 1, succeeded: true)))))) {
+            $0.$destination[case: \.timer]?.recordSync = .stored(nil)
         }
         await store.send(.destination(.presented(.timer(.view(.closeButtonTapped))))) {
             $0.$destination[case: \.timer]?.countdown = nil
@@ -156,7 +165,10 @@ struct AppFeatureTimerTests {
         await store.send(.destination(.presented(.timer(.destination(.presented(.closeConfirmation(.finish))))))) {
             $0.$destination[case: \.timer]?.destination = nil
         }
-        await store.receive(\.destination.dismiss) { $0.destination = nil }
+        await store.receive(\.destination.dismiss) {
+            $0.destination = nil
+            $0.isTimerCoverUp = false
+        }
         await store.finish()
 
         // Each vote is its own effect, so only the revisions order them.
@@ -189,12 +201,12 @@ struct AppFeatureTimerTests {
     }
 
     @Test
-    func test_timerCoverAppeared_emptyStack_changesNothing() async {
+    func test_timerCoverAppeared_emptyStack_marksCoverAsPresented() async {
         var state = loaded([first])
         state.destination = .timer(Self.timer(UUID(fixture: 7), for: first))
         let store = makeStore(state) { $0.timerSession.end = { _ in } }
 
-        await store.send(.view(.timerCoverAppeared))
+        await store.send(.view(.timerCoverAppeared)) { $0.isTimerCoverUp = true }
 
         await closeTimer(store)
     }
@@ -211,17 +223,28 @@ struct AppFeatureTimerTests {
         await store.receive(.path(.element(id: 0, action: .editor(.delegate(.startRequested(workout)))))) {
             $0.destination = .timer(timer ?? Self.timer(UUID(0), for: workout))
         }
-        await store.send(.view(.timerCoverAppeared)) { $0.path = StackState() }
+        await store.send(.view(.timerCoverAppeared)) {
+            $0.path = StackState()
+            $0.isTimerCoverUp = true
+        }
     }
 
     /// A presented timer keeps the presentation's effect running until it is dismissed.
     private func closeTimer(_ store: TestStoreOf<AppFeature>) async {
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            $0.isTimerCoverUp = false
+        }
         await store.finish()
     }
 
     private static func timer(_ id: UUID, for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(id: id, title: workout.name, schedule: WorkoutSchedule(workout: workout))
+        WorkoutTimerFeature.State(
+            id: id,
+            workoutID: workout.id,
+            title: workout.name,
+            schedule: WorkoutSchedule(workout: workout)
+        )
     }
 }
 

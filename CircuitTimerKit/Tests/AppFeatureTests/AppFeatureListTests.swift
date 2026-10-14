@@ -25,7 +25,11 @@ struct AppFeatureListTests {
             $0.workoutStorage.fetchAll = { responses.withValue { $0.removeFirst() } }
         }
 
-        await store.send(.view(.task)) { $0.workouts = .loading }
+        await store.send(.view(.task)) {
+            $0.workouts = .loading
+            $0.runRestore = .reading
+        }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([makeWorkout(1), makeWorkout(2)])
             $0.hiddenRecordCount = 2

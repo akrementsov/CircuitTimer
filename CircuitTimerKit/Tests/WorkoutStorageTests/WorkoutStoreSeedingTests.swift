@@ -9,7 +9,7 @@ import WorkoutDomain
 struct WorkoutStoreSeedingTests {
     @Test
     func test_fetchAll_emptyStore_seedsSampleAndMarker() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         let store = WorkoutStore(modelContainer: container)
 
         let stored = try await store.fetchAll()
@@ -20,7 +20,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_repeatedAndFromNewStore_seedsOnce() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         let store = WorkoutStore(modelContainer: container)
 
         _ = try await store.fetchAll()
@@ -34,7 +34,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_sampleDeleted_doesNotSeedAgain() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         let store = WorkoutStore(modelContainer: container)
         _ = try await store.fetchAll()
 
@@ -46,7 +46,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_sampleIDStoredWithoutMarker_writesMarkerWithoutDuplicate() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         var mine = Workout.sample
         mine.name = "Mine"
         try insertRecord(mine, order: 0, in: container)
@@ -59,8 +59,8 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_seedingFailsWithNothingToShow_throws() async throws {
-        let emptyContainer = try makeContainer()
-        let damagedContainer = try makeContainer()
+        let emptyContainer = try await makeContainer()
+        let damagedContainer = try await makeContainer()
         try insertRecord(makeWorkout(1), order: 0, in: damagedContainer) { $0.workoutID = nil }
         let saveSwitch = SaveSwitch()
         saveSwitch.fails = true
@@ -73,7 +73,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_seedingFailsWithWorkoutsToShow_loadsThemAndRetriesSeeding() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         try insertRecord(makeWorkout(1), order: 0, in: container)
         let saveSwitch = SaveSwitch()
         saveSwitch.fails = true
@@ -89,7 +89,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_seedingFails_leavesNoSampleOrMarker() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         let saveSwitch = SaveSwitch()
         saveSwitch.fails = true
         let store = WorkoutStore(modelContainer: container, saveContext: saveSwitch.save)
@@ -102,7 +102,7 @@ struct WorkoutStoreSeedingTests {
 
     @Test
     func test_fetchAll_concurrentReadsOnFreshStore_seedsOnce() async throws {
-        let container = try makeContainer()
+        let container = try await makeContainer()
         let store = WorkoutStore(modelContainer: container)
 
         try await withThrowingTaskGroup(of: StoredWorkouts.self) { group in

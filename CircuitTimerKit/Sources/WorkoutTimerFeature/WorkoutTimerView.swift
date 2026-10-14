@@ -43,6 +43,14 @@ public struct WorkoutTimerView: View {
                 .frame(height: 98 * unit)
                 .padding(.horizontal, .token(spacing: .xxxl))
                 .padding(.top, .token(spacing: .xxl))
+                if store.hasRecordFailed {
+                    Text("timer.record.failed", bundle: .module)
+                        .font(.token(.footnote))
+                        .foregroundStyle(.text(.secondary))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, .token(spacing: .l))
+                        .padding(.top, .token(spacing: .m))
+                }
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
@@ -112,14 +120,21 @@ private enum PreviewTimer {
         _ workout: Workout = workout,
         countdown: WorkoutTimerFeature.Countdown? = nil,
         hasClockFailed: Bool = false,
+        hasRecordFailed: Bool = false,
         play: (inout WorkoutRun) -> Void = { $0.start(at: PreviewTimer.start) }
     ) -> WorkoutTimerFeature.State {
-        var state = WorkoutTimerFeature.State(id: UUID(0), title: workout.name, schedule: WorkoutSchedule(workout: workout))
+        var state = WorkoutTimerFeature.State(
+            id: UUID(0),
+            workoutID: workout.id,
+            title: workout.name,
+            schedule: WorkoutSchedule(workout: workout)
+        )
         play(&state.run)
         state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
         state.countdown = countdown
         state.hasClockFailed = hasClockFailed
+        state.hasRecordFailed = hasRecordFailed
         return state
     }
 
@@ -196,6 +211,10 @@ private enum PreviewTimer {
             $0.pause(at: PreviewTimer.now)
         }
     )
+}
+
+#Preview("Save failed") {
+    PreviewTimer.view(PreviewTimer.state(hasRecordFailed: true))
 }
 
 #Preview("Longest names") {

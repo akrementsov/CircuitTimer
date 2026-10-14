@@ -27,7 +27,7 @@ struct WorkoutStoreReadingTests {
 
     @Test
     func test_saveThenFetch_fullWorkout_readsBackEqual() async throws {
-        let (store, _) = try makeEmptyStore()
+        let (store, _) = try await makeEmptyStore()
         let workout = Workout(
             id: UUID(fixture: 1),
             name: "Full",
@@ -57,7 +57,7 @@ struct WorkoutStoreReadingTests {
 
     @Test
     func test_fetchAll_recordWithoutStagesOrTraining_isReadable() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, training: []), order: 0, in: container) { $0.stages = nil }
         try insertRecord(Workout(id: UUID(fixture: 2), name: "No training", trainingRounds: 3), order: 1, in: container)
 
@@ -70,7 +70,7 @@ struct WorkoutStoreReadingTests {
 
     @Test(arguments: damages)
     func test_fetchAll_damagedRecord_isHiddenAndLeftAsStored(damage: Damage) async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         let workout = makeWorkout(1, training: [makeStage(1), makeStage(2)])
         try insertRecord(workout, order: 0, in: container, damage: damage.apply)
         let before = try snapshot(of: container)
@@ -83,7 +83,7 @@ struct WorkoutStoreReadingTests {
 
     @Test
     func test_fetchAll_tooManyStages_isHidden() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         let stages = (1...WorkoutLimits.maxStagesPerSection).map { makeStage($0) }
         try insertRecord(makeWorkout(1, training: stages), order: 0, in: container) { model in
             let extra = StageModel(stageID: UUID(fixture: 999))
@@ -99,7 +99,7 @@ struct WorkoutStoreReadingTests {
 
     @Test
     func test_fetchAll_stageOrderAndTies_followStoredOrderDeterministically() async throws {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         let workout = makeWorkout(1, training: [makeStage(1), makeStage(2), makeStage(3)])
         try insertRecord(workout, order: 0, in: container) { model in
             for stage in model.sortedStages {
@@ -139,7 +139,7 @@ struct WorkoutStoreReadingTests {
         damagingSecond: Bool,
         damage: @escaping (WorkoutModel) -> Void
     ) async throws -> StoredWorkouts {
-        let (store, container) = try makeEmptyStore()
+        let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(number, name: "First"), order: 0, in: container) { if damagingFirst { damage($0) } }
         try insertRecord(makeWorkout(number, name: "Second"), order: 1, in: container) { if damagingSecond { damage($0) } }
         return try await store.fetchAll()

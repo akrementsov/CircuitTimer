@@ -13,15 +13,15 @@ struct AppFeatureTests {
 
     @Test
     func test_task_idle_loadsWorkouts() async {
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(AppFeature.State()) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [.sample]) }
         }
 
         await store.send(.view(.task)) {
             $0.workouts = .loading
+            $0.runRestore = .reading
         }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([.sample])
         }
@@ -32,9 +32,7 @@ struct AppFeatureTests {
         let fetchCount = LockIsolated(0)
         var state = AppFeature.State()
         state.workouts = content
-        let store = TestStore(initialState: state) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(state) {
             $0.workoutStorage.fetchAll = {
                 fetchCount.withValue { $0 += 1 }
                 return StoredWorkouts(workouts: [])
@@ -49,9 +47,7 @@ struct AppFeatureTests {
     @Test
     func test_retry_afterFailure_reloadsAndCanFailAgain() async {
         let shouldFail = LockIsolated(true)
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(AppFeature.State()) {
             $0.workoutStorage.fetchAll = {
                 if shouldFail.value {
                     throw LoadingFailure()
@@ -62,7 +58,9 @@ struct AppFeatureTests {
 
         await store.send(.view(.task)) {
             $0.workouts = .loading
+            $0.runRestore = .reading
         }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.receive(\.internal.workoutsLoadingFailed) {
             $0.workouts = .failed
         }
@@ -87,24 +85,22 @@ struct AppFeatureTests {
 
     @Test
     func test_task_cancelledLoad_isNotReportedAsFailure() async {
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(AppFeature.State()) {
             $0.workoutStorage.fetchAll = { throw CancellationError() }
         }
 
         await store.send(.view(.task)) {
             $0.workouts = .loading
+            $0.runRestore = .reading
         }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.finish()
     }
 
     @Test
     func test_retry_duringLoad_cancelsFirstLoadAndKeepsSecondResult() async {
         let callCount = LockIsolated(0)
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(AppFeature.State()) {
             $0.workoutStorage.fetchAll = {
                 let call = callCount.withValue { count in
                     count += 1
@@ -119,7 +115,9 @@ struct AppFeatureTests {
 
         await store.send(.view(.task)) {
             $0.workouts = .loading
+            $0.runRestore = .reading
         }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.send(.view(.retryButtonTapped))
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([.sample])
@@ -131,9 +129,7 @@ struct AppFeatureTests {
     @Test(arguments: [true, false])
     func test_retry_supersededLoadFinishingLate_keepsNewerResult(lateLoadFails: Bool) async {
         let callCount = LockIsolated(0)
-        let store = TestStore(initialState: AppFeature.State()) {
-            AppFeature()
-        } withDependencies: {
+        let store = makeStore(AppFeature.State()) {
             $0.workoutStorage.fetchAll = {
                 let call = callCount.withValue { count in
                     count += 1
@@ -152,7 +148,9 @@ struct AppFeatureTests {
 
         await store.send(.view(.task)) {
             $0.workouts = .loading
+            $0.runRestore = .reading
         }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
         await store.send(.view(.retryButtonTapped))
         await store.receive(\.internal.workoutsLoaded) {
             $0.workouts = .loaded([.sample])

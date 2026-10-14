@@ -5,6 +5,8 @@ import SwiftData
 import WorkoutDomain
 
 /// The schema and migration plan the app uses, kept in memory.
+/// Only container creation is serialized: concurrent schema initialization races in Core Data trigger generation.
+@MainActor
 func makeContainer() throws -> ModelContainer {
     try .workouts(isStoredInMemoryOnly: true)
 }
@@ -51,8 +53,8 @@ func insertSeedMarker(in container: ModelContainer) throws {
 }
 
 /// A store over an empty list: the sample counts as seeded.
-func makeEmptyStore(saveContext: (@Sendable (ModelContext) throws -> Void)? = nil) throws -> (WorkoutStore, ModelContainer) {
-    let container = try makeContainer()
+func makeEmptyStore(saveContext: (@Sendable (ModelContext) throws -> Void)? = nil) async throws -> (WorkoutStore, ModelContainer) {
+    let container = try await makeContainer()
     try insertSeedMarker(in: container)
     let store = saveContext.map { WorkoutStore(modelContainer: container, saveContext: $0) }
         ?? WorkoutStore(modelContainer: container)

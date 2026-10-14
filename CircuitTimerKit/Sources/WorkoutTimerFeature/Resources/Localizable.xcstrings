@@ -437,6 +437,22 @@
         }
       }
     },
+    "timer.record.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save progress: if the app closes, the workout may not come back or may open in an earlier state."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось сохранить прогресс: если приложение закроется, тренировка может не восстановиться или открыться в прежнем состоянии."
+          }
+        }
+      }
+    },
     "timer.stage.finished" : {
       "localizations" : {
         "en" : {

@@ -1,8 +1,11 @@
+@testable import BackgroundExecution
 @testable import WorkoutDomain
 @testable import WorkoutTimerFeature
 
 import ComposableArchitecture
 import Foundation
+import Testing
+import WorkoutStorage
 
 /// A fixed date of the current epoch, so `Date` arithmetic has production precision.
 let origin = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -22,6 +25,7 @@ extension UUID {
 }
 
 let timerID = UUID(fixture: 1)
+let timerWorkoutID = UUID(fixture: 2)
 
 func makeStage(_ number: Int, seconds: Int, _ intensity: Stage.Intensity = .work, name: String? = nil) -> Stage {
     Stage(id: UUID(fixture: 100 + number), name: name ?? "Stage \(number)", duration: .seconds(seconds), intensity: intensity)
@@ -59,7 +63,7 @@ enum TimerPhase: CaseIterable, Sendable {
 
 extension WorkoutTimerFeature.State {
     static func fresh(_ schedule: WorkoutSchedule = Schedules.workRest) -> Self {
-        Self(id: timerID, title: "Workout", schedule: schedule)
+        Self(id: timerID, workoutID: timerWorkoutID, title: "Workout", schedule: schedule)
     }
 
     /// The state the reducer leaves at `origin` in `phase` after the clock's first sync, without the loop itself.
@@ -201,6 +205,12 @@ final class TimerHarness {
     let ended: LockIsolated<Set<UUID>>
     /// How many of the next sleeps fail.
     let failures: LockIsolated<Int>
+    let revisions: LockIsolated<Int>
+    let writes: LockIsolated<[RecordWrite]>
+    let assertions: LockIsolated<[BackgroundTaskToken]>
+    let releasedAssertions: LockIsolated<[BackgroundTaskToken]>
+    let recordFailures: LockIsolated<Int>
+    var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
     init(_ state: WorkoutTimerFeature.State) {
@@ -209,6 +219,16 @@ final class TimerHarness {
         let calls = LockIsolated<[TimerCall]>([])
         let ended = LockIsolated<Set<UUID>>([])
         let failures = LockIsolated(0)
+        let revisions = LockIsolated(0)
+        let writes = LockIsolated<[RecordWrite]>([])
+        let assertions = LockIsolated<[BackgroundTaskToken]>([])
+        let releasedAssertions = LockIsolated<[BackgroundTaskToken]>([])
+        let recordFailures = LockIsolated(0)
+        self.revisions = revisions
+        self.writes = writes
+        self.assertions = assertions
+        self.releasedAssertions = releasedAssertions
+        self.recordFailures = recordFailures
         self.clock = clock
         self.wall = wall
         self.calls = calls
@@ -217,6 +237,28 @@ final class TimerHarness {
         store = TestStore(initialState: state) {
             WorkoutTimerFeature()
         } withDependencies: {
+            $0.workoutRunRecord = WorkoutRunRecordClient(
+                nextRevision: { revisions.withValue { $0 += 1; return $0 } },
+                load: { nil },
+                write: { record, revision in
+                    writes.withValue { $0.append(RecordWrite(record: record, revision: revision)) }
+                    let fails = recordFailures.withValue { count in
+                        defer { count = max(count - 1, 0) }
+                        return count > 0
+                    }
+                    if fails { throw ClockFailure() }
+                }
+            )
+            $0.backgroundTask = BackgroundTaskClient(
+                begin: { _ in
+                    assertions.withValue {
+                        let token = BackgroundTaskToken(rawValue: $0.count + 1)
+                        $0.append(token)
+                        return token
+                    }
+                },
+                end: { token in releasedAssertions.withValue { $0.append(token) } }
+            )
             $0.continuousClock = FailingClock(base: clock, failures: failures)
             $0.date = DateGenerator { wall.value }
             $0.dismiss = DismissEffect { calls.withValue { $0.append(.dismiss) } }
@@ -252,7 +294,7 @@ final class TimerHarness {
 
     /// Sends the first `.task` to a running state, which starts the tick loop of generation 1.
     func appearRunning() async {
-        await store.send(.view(.task)) {
+        await send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.clockAnchor = self.anchor(totalElapsed: $0.snapshot.totalElapsed)
             $0.requestedAwake = true
@@ -260,14 +302,74 @@ final class TimerHarness {
         }
     }
 
-    /// Cancels the clock loop a test left running once it has asserted everything it checks.
+    /// Stops tracking a clock loop after its behavior has been asserted; store teardown cancels it.
     func cancelClockLoop() async {
-        store.exhaustivity = .off(showSkippedAssertions: false)
         await store.skipInFlightEffects(strict: false)
+    }
+
+    /// Asserts a requested write against the expected run, then receives its completion exhaustively.
+    func send(
+        _ action: WorkoutTimerFeature.Action,
+        saving: Bool = false,
+        assert update: ((inout WorkoutTimerFeature.State) -> Void)? = nil
+    ) async {
+        if !saving, update == nil {
+            await store.send(action)
+            return
+        }
+        if saving { expectedRecordRevision += 1 }
+        let revision = expectedRecordRevision
+        await store.send(action) {
+            update?(&$0)
+            if saving {
+                $0.recordSync = .pending(
+                    revision: revision,
+                    record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run)
+                )
+            }
+        }
+        if saving { await recordSaved(revision: revision) }
+    }
+
+    func receive(
+        _ action: WorkoutTimerFeature.Action,
+        saving: Bool = false,
+        assert update: ((inout WorkoutTimerFeature.State) -> Void)? = nil
+    ) async {
+        if !saving, update == nil {
+            await store.receive(action)
+            return
+        }
+        if saving { expectedRecordRevision += 1 }
+        let revision = expectedRecordRevision
+        await store.receive(action) {
+            update?(&$0)
+            if saving {
+                $0.recordSync = .pending(
+                    revision: revision,
+                    record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run)
+                )
+            }
+        }
+        if saving { await recordSaved(revision: revision) }
+    }
+
+    func recordSaved(revision: Int) async {
+        let record = WorkoutRunRecord(workoutID: store.state.workoutID, run: store.state.run)
+        await store.receive(.internal(.recordWritten(revision: revision, succeeded: true))) {
+            $0.recordSync = .stored(record)
+            $0.hasRecordFailed = false
+        }
+        #expect(writes.value.contains(RecordWrite(record: record, revision: revision)))
     }
 
     /// The anchor the reducer takes now.
     func anchor(totalElapsed: Duration) -> ClockAnchor {
         ClockAnchor(date: now, instant: MonotonicInstant(now: clock), totalElapsed: totalElapsed)
     }
+}
+
+struct RecordWrite: Equatable, Sendable {
+    let record: WorkoutRunRecord?
+    let revision: Int
 }

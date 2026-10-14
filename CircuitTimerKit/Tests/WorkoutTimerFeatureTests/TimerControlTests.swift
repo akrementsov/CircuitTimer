@@ -24,7 +24,7 @@ struct TimerControlTests {
         switch phase {
             case .startCountdown, .resumeCountdown:
                 let status = store.state.snapshot.status
-                await store.send(.view(.playPauseButtonTapped)) {
+                await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.clockGeneration = 2
                     $0.requestedAwake = false
@@ -33,7 +33,7 @@ struct TimerControlTests {
                 #expect(store.state.snapshot.status == status)
                 expectedCalls = [.awake(false, 2)]
             case .idle:
-                await store.send(.view(.playPauseButtonTapped)) {
+                await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.countdown = Countdown(.start)
                     $0.clockGeneration = 2
                     $0.requestedAwake = true
@@ -41,7 +41,7 @@ struct TimerControlTests {
                 }
                 expectedCalls = [.awake(true, 3)]
             case .running:
-                await store.send(.view(.playPauseButtonTapped)) {
+                await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.run.pause(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -51,7 +51,7 @@ struct TimerControlTests {
                 }
                 expectedCalls = [.awake(false, 2)]
             case .paused, .awaitingUser:
-                await store.send(.view(.playPauseButtonTapped)) {
+                await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.run.resume(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -62,7 +62,7 @@ struct TimerControlTests {
                 #expect(store.state.snapshot.status == .running)
                 expectedCalls = [.awake(true, 3)]
             case .finished:
-                await store.send(.view(.playPauseButtonTapped))
+                await timer.send(.view(.playPauseButtonTapped))
                 expectedCalls = []
         }
         await timer.cancelClockLoop()
@@ -78,7 +78,7 @@ struct TimerControlTests {
         switch phase {
             case .startCountdown, .idle:
                 // Next before the start starts the first stage; it does not skip it.
-                await store.send(.view(.nextButtonTapped)) {
+                await timer.send(.view(.nextButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.run.start(at: origin)
                     $0.settle(at: origin)
@@ -91,7 +91,7 @@ struct TimerControlTests {
                 expectedCalls = phase == .idle ? [.awake(true, 3)] : []
             case .resumeCountdown:
                 // The stay countdown was about to resume, so the next stage runs.
-                await store.send(.view(.nextButtonTapped)) {
+                await timer.send(.view(.nextButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.run.resume(at: origin)
                     $0.run.skipToNextStage(at: origin)
@@ -102,7 +102,7 @@ struct TimerControlTests {
                 #expect(store.state.snapshot.status == .running)
                 expectedCalls = []
             case .running:
-                await store.send(.view(.nextButtonTapped)) {
+                await timer.send(.view(.nextButtonTapped), saving: true) {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -111,7 +111,7 @@ struct TimerControlTests {
                 expectedCalls = []
             case .paused:
                 // A plain pause stays paused on the next stage.
-                await store.send(.view(.nextButtonTapped)) {
+                await timer.send(.view(.nextButtonTapped), saving: true) {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -120,7 +120,7 @@ struct TimerControlTests {
                 #expect(store.state.snapshot.currentStage?.index == 1)
                 expectedCalls = []
             case .awaitingUser:
-                await store.send(.view(.nextButtonTapped)) {
+                await timer.send(.view(.nextButtonTapped), saving: true) {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
@@ -131,7 +131,7 @@ struct TimerControlTests {
                 #expect(store.state.snapshot.currentStage?.index == 2)
                 expectedCalls = [.awake(true, 3)]
             case .finished:
-                await store.send(.view(.nextButtonTapped))
+                await timer.send(.view(.nextButtonTapped))
                 expectedCalls = []
         }
         await timer.cancelClockLoop()
@@ -143,7 +143,7 @@ struct TimerControlTests {
         let timer = TimerHarness(.fixture(.running, elapsed: 12))
         let store = timer.store
 
-        await store.send(.view(.nextButtonTapped)) {
+        await timer.send(.view(.nextButtonTapped), saving: true) {
             $0.run.skipToNextStage(at: origin)
             $0.settle(at: origin)
             $0.clockGeneration = 2
@@ -161,7 +161,7 @@ struct TimerControlTests {
         let store = timer.store
         await timer.advance(seconds: 20)
 
-        await store.send(.view(isNext ? .nextButtonTapped : .playPauseButtonTapped)) {
+        await timer.send(.view(isNext ? .nextButtonTapped : .playPauseButtonTapped), saving: true) {
             $0.settle(at: moment(20))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -170,21 +170,20 @@ struct TimerControlTests {
         }
         #expect(store.state.snapshot.status == .finished)
         // Once finished, nothing changes: no sync, no request.
-        await store.send(.view(isNext ? .nextButtonTapped : .playPauseButtonTapped))
+        await timer.send(.view(isNext ? .nextButtonTapped : .playPauseButtonTapped))
         #expect(timer.calls.value == [.awake(false, 2)])
     }
 
     @Test(arguments: [TimerPhase.startCountdown, .resumeCountdown, .running, .idle, .paused, .awaitingUser])
     func test_closeThenStay_eachPhase_restartsTheCountdownItStopped(phase: TimerPhase) async {
         let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)))
-        let store = timer.store
         let restart: Countdown.Purpose? = switch phase {
             case .startCountdown: .start
             case .resumeCountdown, .running: .resume
             case .idle, .paused, .awaitingUser, .finished: nil
         }
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: restart != nil) {
             $0.destination = .closeConfirmation(.closeConfirmation(restart: restart))
             guard restart != nil else { return }
 
@@ -198,7 +197,7 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await store.send(.destination(.presented(.closeConfirmation(.stay(restart: restart))))) {
+        await timer.send(.destination(.presented(.closeConfirmation(.stay(restart: restart))))) {
             $0.destination = nil
             guard let restart else { return }
 
@@ -217,7 +216,7 @@ struct TimerControlTests {
         let store = timer.store
         await timer.advance(seconds: 2)
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.settle(at: moment(2))
             $0.destination = .closeConfirmation(.closeConfirmation(restart: nil))
             $0.clockGeneration = 2
@@ -240,9 +239,8 @@ struct TimerControlTests {
     @Test
     func test_close_systemDismissesTheAlert_leavesTheClockStopped() async {
         let timer = TimerHarness(.fixture(.running))
-        let store = timer.store
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
@@ -251,7 +249,7 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await timer.send(.destination(.dismiss)) { $0.destination = nil }
         #expect(timer.calls.value == [.awake(false, 2)])
     }
 
@@ -261,7 +259,7 @@ struct TimerControlTests {
         let store = timer.store
         await timer.appearRunning()
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
@@ -270,7 +268,7 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await store.send(.destination(.presented(.closeConfirmation(.stay(restart: .resume))))) {
+        await timer.send(.destination(.presented(.closeConfirmation(.stay(restart: .resume))))) {
             $0.destination = nil
             $0.countdown = Countdown(.resume)
             $0.clockGeneration = 3
@@ -278,11 +276,11 @@ struct TimerControlTests {
             $0.awakeRevision = 3
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 3))) { $0.countdown?.remaining = 2 }
+        await timer.receive(.internal(.countdownTicked(generation: 3))) { $0.countdown?.remaining = 2 }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 3))) { $0.countdown?.remaining = 1 }
+        await timer.receive(.internal(.countdownTicked(generation: 3))) { $0.countdown?.remaining = 1 }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 3))) {
+        await timer.receive(.internal(.countdownTicked(generation: 3)), saving: true) {
             $0.countdown = nil
             $0.run.resume(at: moment(3))
             $0.settle(at: moment(3))
@@ -292,7 +290,7 @@ struct TimerControlTests {
         #expect(store.state.run.phase == .running(since: moment(3)))
         #expect(store.state.snapshot.totalElapsed == .seconds(3))
 
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: moment(3))
             $0.settle(at: moment(3))
             $0.clockGeneration = 5
@@ -308,7 +306,7 @@ struct TimerControlTests {
         let timer = TimerHarness(.fixture(.finished))
         let store = timer.store
 
-        await store.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
+        await timer.send(.view(.closeButtonTapped), saving: true) { $0.clockGeneration = 2 }
         await store.finish()
 
         #expect(store.state.destination == nil)
@@ -321,7 +319,7 @@ struct TimerControlTests {
         let store = timer.store
         await timer.advance(seconds: 20)
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.settle(at: moment(20))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
@@ -341,7 +339,7 @@ struct TimerControlTests {
         let timer = TimerHarness(.fixture(.running))
         let store = timer.store
 
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
@@ -350,7 +348,7 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await store.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
+        await timer.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
         await store.finish()
 
         #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .dismiss])
@@ -367,7 +365,7 @@ struct TimerControlTests {
         state.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
         let timer = TimerHarness(state)
 
-        await timer.store.send(.view(action))
+        await timer.send(.view(action))
         #expect(timer.calls.value.isEmpty)
     }
 
@@ -378,34 +376,33 @@ struct TimerControlTests {
         state.destination = .closeConfirmation(.closeConfirmation(restart: nil))
         let timer = TimerHarness(state)
 
-        await timer.store.send(.view(.task)) { $0.clockGeneration = 1 }
+        await timer.send(.view(.task), saving: true) { $0.clockGeneration = 1 }
         #expect(timer.calls.value.isEmpty)
     }
 
     @Test
     func test_keepAwakeVote_acrossControls_isSentOnlyWhenItChanges() async {
         let timer = TimerHarness(.fresh())
-        let store = timer.store
 
-        await store.send(.view(.task)) {
+        await timer.send(.view(.task), saving: true) {
             $0.clockGeneration = 1
             $0.requestedAwake = true
             $0.awakeRevision = 1
         }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 2 }
         await timer.advance(seconds: 1)
-        await store.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 1 }
+        await timer.receive(.internal(.countdownTicked(generation: 1))) { $0.countdown?.remaining = 1 }
         await timer.advance(seconds: 1)
         let now = moment(3)
-        await store.receive(.internal(.countdownTicked(generation: 1))) {
+        await timer.receive(.internal(.countdownTicked(generation: 1)), saving: true) {
             $0.countdown = nil
             $0.run.start(at: now)
             $0.settle(at: now)
             $0.clockGeneration = 2
             $0.clockAnchor = timer.anchor(totalElapsed: .zero)
         }
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.pause(at: now)
             $0.settle(at: now)
             $0.clockGeneration = 3
@@ -413,12 +410,12 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await store.send(.view(.nextButtonTapped)) {
+        await timer.send(.view(.nextButtonTapped), saving: true) {
             $0.run.skipToNextStage(at: now)
             $0.settle(at: now)
             $0.clockGeneration = 4
         }
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.resume(at: now)
             $0.settle(at: now)
             $0.clockGeneration = 5
@@ -426,7 +423,7 @@ struct TimerControlTests {
             $0.requestedAwake = true
             $0.awakeRevision = 3
         }
-        await store.send(.view(.closeButtonTapped)) {
+        await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.run.pause(at: now)
             $0.settle(at: now)
             $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
@@ -435,14 +432,14 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 4
         }
-        await store.send(.destination(.presented(.closeConfirmation(.stay(restart: .resume))))) {
+        await timer.send(.destination(.presented(.closeConfirmation(.stay(restart: .resume))))) {
             $0.destination = nil
             $0.countdown = Countdown(.resume)
             $0.clockGeneration = 7
             $0.requestedAwake = true
             $0.awakeRevision = 5
         }
-        await store.send(.view(.playPauseButtonTapped)) {
+        await timer.send(.view(.playPauseButtonTapped)) {
             $0.countdown = nil
             $0.clockGeneration = 8
             $0.requestedAwake = false
