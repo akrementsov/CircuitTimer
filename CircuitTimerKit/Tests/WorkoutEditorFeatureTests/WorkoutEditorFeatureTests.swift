@@ -8,6 +8,90 @@ import WorkoutDomain
 @MainActor
 @Suite
 struct WorkoutEditorFeatureTests {
+    @Test
+    func test_save_whitespaceAndUntouchedStarter_endsEditingWithoutWriteOrDiscardPrompt() async {
+        var state = editingState()
+        state.draft.name = "  Workout  "
+        state.draft.training.append(Stage(id: UUID(fixture: 99), name: "", duration: .zero, intensity: .work))
+        let dismissed = LockIsolated(false)
+        let store = makeStore(state) { $0.dismiss = DismissEffect { dismissed.setValue(true) } }
+
+        await store.send(.view(.saveButtonTapped))
+        await store.receive(\.internal.editingEnded) {
+            $0.draft = makeWorkout()
+            $0.phase = .viewing
+        }
+        await store.send(.view(.backButtonTapped))
+        #expect(dismissed.value)
+    }
+
+    @Test
+    func test_nameChanged_oversizedPaste_rejectsWorkoutAndStageEdits() async {
+        let store = makeStore()
+        let oversized = String(repeating: "x", count: 31)
+
+        await store.send(.view(.nameChanged(oversized)))
+        await store.send(.view(.stageNameChanged(.warmUp, UUID(fixture: 10), oversized)))
+    }
+
+    @Test
+    func test_save_changedZeroStage_doesNotWriteToStorage() async {
+        let store = makeStore()
+        await store.send(.view(.stageDurationTextChanged(.training, UUID(fixture: 20), ""))) {
+            $0.draft.training[0].duration = .zero
+        }
+
+        await store.send(.view(.saveButtonTapped))
+    }
+
+    @Test
+    func test_saveBlockedTapped_explainsAndInvalidatesTip_keepsItSuppressedAfterSettling() async {
+        let clock = TestClock()
+        let invalidations = LockIsolated(0)
+        let store = makeStore(newDraftState()) {
+            $0.continuousClock = clock
+            $0.saveTip.markExplained = { invalidations.withValue { $0 += 1 } }
+        }
+        await store.send(.view(.saveBlockedTapped)) {
+            $0.saveTipSuppressed = true
+            $0.destination = .saveBlockedAlert(.saveBlocked(.incomplete))
+        }
+        await store.finish()
+        #expect(invalidations.value == 1)
+        await store.send(.destination(.dismiss)) { $0.destination = nil }
+        await store.send(.view(.layoutChanged)) { $0.settleGeneration = 1 }
+        await clock.advance(by: .seconds(1))
+        await store.receive(.internal(.settled(generation: 1))) { $0.hasSettled = true }
+        #expect(!store.state.showsSaveTip)
+    }
+
+    @Test
+    func test_layoutChanged_replacedWait_ignoresStaleGenerationAndCancelsOnLeave() async {
+        let clock = TestClock()
+        let dismissals = LockIsolated(0)
+        let store = makeStore(newDraftState()) {
+            $0.continuousClock = clock
+            $0.dismiss = DismissEffect { dismissals.withValue { $0 += 1 } }
+        }
+        await store.send(.view(.layoutChanged)) { $0.settleGeneration = 1 }
+        await clock.advance(by: .milliseconds(500))
+        await store.send(.view(.layoutChanged)) { $0.settleGeneration = 2 }
+        await store.send(.internal(.settled(generation: 1)))
+        await clock.advance(by: .milliseconds(500))
+        #expect(!store.state.hasSettled)
+        await clock.advance(by: .milliseconds(500))
+        await store.receive(.internal(.settled(generation: 2))) { $0.hasSettled = true }
+        #expect(store.state.showsSaveTip)
+        await store.send(.view(.layoutChanged)) {
+            $0.hasSettled = false
+            $0.settleGeneration = 3
+        }
+        await store.send(.view(.backButtonTapped))
+        await clock.advance(by: .seconds(2))
+        await store.finish()
+        #expect(dismissals.value == 1)
+    }
+
     private func makeStore(
         _ state: WorkoutEditorFeature.State = editingState(makeWorkout()),
         dependencies: (inout DependencyValues) -> Void = { _ in }

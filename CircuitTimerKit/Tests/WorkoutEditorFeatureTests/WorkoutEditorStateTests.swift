@@ -6,6 +6,51 @@ import WorkoutDomain
 
 @Suite
 struct WorkoutEditorStateTests {
+    @Test
+    func test_hasChanges_whitespaceAndUntouchedStarter_doesNotRequireSaving() {
+        var state = editingState()
+        state.draft.name = "  Workout  "
+        state.draft.warmUp[0].name = "  Stage 10  "
+        state.draft.training.insert(Stage(id: UUID(fixture: 99), name: "", duration: .zero, intensity: .work), at: 0)
+
+        #expect(!state.hasChanges)
+        #expect(state.canSave)
+        #expect(state.saveBlocker == nil)
+    }
+
+    @Test
+    func test_canSave_editedStageBecomesZero_blocksUntilStageDeleted() {
+        var state = editingState()
+        state.draft.training[0].duration = .zero
+
+        #expect(state.isDraftComplete)
+        #expect(state.unsavableStageIDs == [UUID(fixture: 20)])
+        #expect(!state.canSave)
+        #expect(state.saveBlocker == .unsavableStage)
+
+        state.draft.training.removeFirst()
+
+        #expect(state.hasChanges)
+        #expect(state.canSave)
+        #expect(state.saveBlocker == nil)
+    }
+
+    @Test
+    func test_canSave_storedZeroStage_blocksOnlyWhenThatStageChanges() {
+        var workout = makeWorkout()
+        workout.warmUp[0].duration = .zero
+        var state = editingState(workout)
+        state.draft.name = "Renamed"
+
+        #expect(state.canSave)
+        #expect(state.unsavableStageIDs.isEmpty)
+
+        state.draft.warmUp[0].name = "Changed empty stage"
+
+        #expect(!state.canSave)
+        #expect(state.unsavableStageIDs == [UUID(fixture: 10)])
+    }
+
     struct FlagsCase: CustomTestStringConvertible, Sendable {
         let testDescription: String
         let state: WorkoutEditorFeature.State
