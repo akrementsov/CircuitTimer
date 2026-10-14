@@ -292,7 +292,7 @@ private struct HorizontalDrag: ViewModifier {
 }
 
 @available(iOS 18, *)
-private struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
+struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
     let isEnabled: Bool
     let onChanged: (CGSize) -> Void
     let onEnded: (CGFloat) -> Void
@@ -331,6 +331,11 @@ private struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            // Moving the caret is a horizontal drag too; only the numeric field should handle that touch.
+            touch.view?.isInsideNumericField != true
+        }
+
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
 

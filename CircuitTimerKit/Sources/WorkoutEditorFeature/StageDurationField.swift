@@ -7,20 +7,20 @@ import WorkoutDomain
 /// each accepted edit as it is typed, so totals follow the typing and Back or Save never miss the last digit.
 struct StageDurationField: View {
     let stage: Stage
-    let focus: FocusState<EditorField?>.Binding
+    @Binding var focus: Stage.ID?
     let hint: Text?
     let onTextChange: (String) -> Void
 
-    /// What the field shows; a rejected edit stays here only until `.onChange` puts `lastAccepted` back.
+    /// The masked text accepted by an edit; the native field applies it before the delegate returns.
     @State private var text: String
     /// The last text the mask accepted, always masked; the base of every check, never a rejected edit.
     @State private var lastAccepted: String
     /// Whether this focus accepted an edit: without one, the field keeps showing the stored duration.
     @State private var didEdit = false
 
-    init(stage: Stage, focus: FocusState<EditorField?>.Binding, hint: Text?, onTextChange: @escaping (String) -> Void) {
+    init(stage: Stage, focus: Binding<Stage.ID?>, hint: Text?, onTextChange: @escaping (String) -> Void) {
         self.stage = stage
-        self.focus = focus
+        _focus = focus
         self.hint = hint
         self.onTextChange = onTextChange
         let text = StageDurationText.text(for: stage.duration)
@@ -29,18 +29,19 @@ struct StageDurationField: View {
     }
 
     var body: some View {
-        // The hidden text sizes the field to the read-only time, so the row keeps its layout in both phases.
+        // The native field includes the horizontal insets so taps beside the digits also position the caret.
         Text(verbatim: "00:00")
             .hidden()
+            .padding(.horizontal, .token(spacing: .m))
             .overlay {
-                TextField(text: typedText, prompt: Text(verbatim: "00:00").foregroundStyle(.text(.secondary))) {
-                    Text("editor.stage.duration", bundle: .module)
+                NumericTextField(text: text, placeholder: "00:00", isFocused: isFocused, onEdit: edit) { focused in
+                    if focused, !isFocused {
+                        focus = stage.id
+                    } else if !focused, isFocused {
+                        focus = nil
+                    }
                 }
-                .focused(focus, equals: .stageDuration(stage.id))
-                .keyboardType(.asciiCapableNumberPad)
-                .autocorrectionDisabled()
-                .multilineTextAlignment(.center)
-                .tint(.text(.primary))
+                .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
                 // Unconditional, so the field keeps its identity and its focus: VoiceOver edits the typed text and
                 // otherwise hears the stored duration in words.
                 .accessibilityValue(isFocused ? Text(verbatim: text) : Text(spokenDuration))
@@ -49,14 +50,12 @@ struct StageDurationField: View {
             .font(.token(.body))
             .monospacedDigit()
             .padding(.vertical, .token(spacing: .s))
-            .padding(.horizontal, .token(spacing: .m))
             .background { StageFieldPlaque(isFocused: isFocused, isEditable: true) }
             // The whole plaque focuses the field; on iOS 26 this beats the row's tap, which focuses the name.
             .contentShape(Rectangle())
-            .onTapGesture { focus.wrappedValue = .stageDuration(stage.id) }
-            .onChange(of: text) {
-                if text != lastAccepted {
-                    text = lastAccepted
+            .onTapGesture {
+                if !isFocused {
+                    focus = stage.id
                 }
             }
             .onChange(of: isFocused) { _, isFocused in
@@ -74,31 +73,25 @@ struct StageDurationField: View {
     }
 
     private var isFocused: Bool {
-        focus.wrappedValue == .stageDuration(stage.id)
+        focus == stage.id
     }
 
-    /// Sends each accepted edit at once, from the setter: a send from `.onChange` could come after the focus loss
-    /// that Back or Save waits for. The edit shows as typed until `.onChange` puts the masked text in: assigning
-    /// a text the field already has would not reach it, and a rejected edit would stay on screen.
-    private var typedText: Binding<String> {
-        Binding(
-            get: { text },
-            set: { newText in
-                text = newText
-                guard let accepted = StageDurationText.masked(newText) else { return }
+    /// Sends from the native edit callback: a send from `.onChange` could arrive after Back or Save clears focus.
+    private func edit(_ newText: String, caretOffset: Int) -> (text: String, caretOffset: Int)? {
+        guard let edit = StageDurationText.masked(newText, caretOffset: caretOffset) else { return nil }
+        let accepted = edit.text
+        text = accepted
 
-                // Zeros typed over a stored fraction of a second read «00:00» as before, yet they set the stage to
-                // zero; so does any accepted edit whose duration differs from what the stage has.
-                let current = didEdit ? StageDurationText.duration(from: lastAccepted) : stage.duration
-                let changesDuration = StageDurationText.duration(from: accepted) != current
-                let changesText = accepted != lastAccepted
-                lastAccepted = accepted
-                guard changesText || changesDuration else { return }
-
-                didEdit = true
-                onTextChange(accepted)
-            }
-        )
+        // Zeros typed over a stored fraction of a second still need to replace its duration with zero.
+        let current = didEdit ? StageDurationText.duration(from: lastAccepted) : stage.duration
+        let changesDuration = StageDurationText.duration(from: accepted) != current
+        let changesText = accepted != lastAccepted
+        lastAccepted = accepted
+        if changesText || changesDuration {
+            didEdit = true
+            onTextChange(accepted)
+        }
+        return edit
     }
 
     private func show(_ duration: Duration) {

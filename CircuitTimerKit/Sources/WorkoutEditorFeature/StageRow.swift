@@ -10,6 +10,7 @@ struct StageRow: View {
     let isEditable: Bool
     let onNameChange: (String) -> Void
     let focus: FocusState<EditorField?>.Binding
+    let durationFocus: Binding<Stage.ID?>
     /// What VoiceOver adds to the duration; the screen shows no hints, as in the original app.
     let durationHint: Text?
     let onIntensityTap: () -> Void
@@ -58,12 +59,19 @@ struct StageRow: View {
         .padding(.vertical, .token(spacing: .s))
         .padding(.horizontal, .token(spacing: .xs))
         .background { StageFieldPlaque(isFocused: focus.wrappedValue == .stageName(stage.id), isEditable: isEditable) }
+        // The whole plaque focuses the name, and its tap comes before the screen's, which lets the keyboard go.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isEditable {
+                focus.wrappedValue = .stageName(stage.id)
+            }
+        }
     }
 
     @ViewBuilder
     private var duration: some View {
         if isEditable {
-            StageDurationField(stage: stage, focus: focus, hint: durationHint, onTextChange: onDurationTextChange)
+            StageDurationField(stage: stage, focus: durationFocus, hint: durationHint, onTextChange: onDurationTextChange)
                 .transition(.identity)
         } else {
             Text(stage.duration.clockText(.minutesSeconds))

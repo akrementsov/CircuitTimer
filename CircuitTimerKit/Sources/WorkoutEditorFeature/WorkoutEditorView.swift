@@ -6,9 +6,8 @@ import TipKit
 import WorkoutDomain
 import WorkoutStorage
 
-/// A text field of the editor. Every `TextField` here is bound to one case through `.focused`:
-/// leaving or saving waits until the focused field has committed its text, and an unbound field
-/// would be read before its last edit arrives. A stage's row carries its name's case as its scroll `id`.
+/// The editor's selected input: name fields use SwiftUI focus, and native duration fields report editing callbacks.
+/// Leaving or saving waits until the selected field commits its text. A row carries its name's case as its scroll `id`.
 enum EditorField: Hashable {
     case name
     case stageName(Stage.ID)
@@ -18,7 +17,8 @@ enum EditorField: Hashable {
 @ViewAction(for: WorkoutEditorFeature.self)
 public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
-    @FocusState private var focusedField: EditorField?
+    @FocusState private var focusedNameField: EditorField?
+    @State private var focusedDurationID: Stage.ID?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
     @State private var rowInteraction = RowInteraction<Stage.ID>()
 
@@ -34,6 +34,9 @@ public struct WorkoutEditorView: View {
                 .onChange(of: focusedField) { scrollToFocusedField(proxy) }
                 .onChange(of: rowInteraction.visibleRect) { scrollToFocusedField(proxy) }
         }
+        // As in the original app, a tap anywhere that takes no input lets the keyboard go: the number pad has no key
+        // of its own for it. Fields and buttons take their taps first.
+        .onTapGesture { focusedField = nil }
         // A style, not a view, under the keyboard too: its rounded top corners would show the black window.
         .background(.surface(.screen))
         .bottomActionPanel { actionPanel }
@@ -48,12 +51,29 @@ public struct WorkoutEditorView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
         .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
+        .onChange(of: focusedNameField) { _, field in
+            if field != nil { focusedDurationID = nil }
+        }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
         // A phase change moves the cells like a push moves the screen; the tip waits for both to end.
         .task(id: store.phase) { send(.layoutChanged) }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
+    }
+
+    // Native fields stay outside FocusState. UIKit ends the previous name's focus when one begins editing;
+    // clearing that FocusState afterwards would resign the newly selected numeric field.
+    private var focusedField: EditorField? {
+        get { focusedDurationID.map(EditorField.stageDuration) ?? focusedNameField }
+        nonmutating set {
+            if case let .stageDuration(id) = newValue {
+                focusedDurationID = id
+            } else {
+                focusedDurationID = nil
+                if focusedNameField != newValue { focusedNameField = newValue }
+            }
+        }
     }
 
     private var content: some View {
@@ -135,7 +155,7 @@ public struct WorkoutEditorView: View {
         ) {
             send(.nameChanged($0))
         }
-        .focused($focusedField, equals: .name)
+        .focused($focusedNameField, equals: .name)
         .font(.token(.fieldTitle))
         .foregroundStyle(.text(.primary))
         .disabled(!isEditable)
@@ -213,26 +233,6 @@ public struct WorkoutEditorView: View {
                 .tint(.brand)
             }
         }
-        // The number pad has no return key; this is its way out. The text keyboards close with their own return.
-        if isEditingDuration {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button {
-                    focusedField = nil
-                } label: {
-                    Text("editor.keyboard.done", bundle: .module)
-                }
-                .tint(.brand)
-            }
-        }
-    }
-
-    private var isEditingDuration: Bool {
-        if case .stageDuration = focusedField {
-            true
-        } else {
-            false
-        }
     }
 
     @ViewBuilder
@@ -298,7 +298,8 @@ public struct WorkoutEditorView: View {
             stage: stage,
             isEditable: isEditable,
             onNameChange: { send(.stageNameChanged(section, stage.id, $0)) },
-            focus: $focusedField,
+            focus: $focusedNameField,
+            durationFocus: $focusedDurationID,
             durationHint: Self.durationHint(for: stage, isUnsavable: isUnsavable),
             onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
             onDurationTextChange: { send(.stageDurationTextChanged(section, stage.id, $0)) }
