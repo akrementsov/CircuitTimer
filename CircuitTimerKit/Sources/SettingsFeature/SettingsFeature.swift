@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import SignalPreferences
 
 /// The Settings tab: its own navigation stack with About and the legal pages.
 @Reducer
@@ -14,6 +15,9 @@ public struct SettingsFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
+        @Shared(.soundSignals) public var isSoundOn = true
+        @Shared(.vibrationSignals) public var isVibrationOn = true
+        @Shared(.spokenStageNames) public var isSpeechOn = true
         public internal(set) var path = StackState<Path.State>()
 
         public init() {}
@@ -30,6 +34,9 @@ public struct SettingsFeature: Sendable {
 
         @CasePathable
         public enum View: Equatable, Sendable {
+            case soundToggled(Bool)
+            case vibrationToggled(Bool)
+            case speechToggled(Bool)
             case aboutTapped
             case legalDocumentTapped(LegalDocument)
         }
@@ -53,6 +60,15 @@ public struct SettingsFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         switch action {
+            case let .soundToggled(value):
+                state.$isSoundOn.withLock { $0 = value }
+                return .none
+            case let .vibrationToggled(value):
+                state.$isVibrationOn.withLock { $0 = value }
+                return .none
+            case let .speechToggled(value):
+                state.$isSpeechOn.withLock { $0 = value }
+                return .none
             case .aboutTapped:
                 state.path.append(.about(version: appVersion.shortVersion()))
                 return .none

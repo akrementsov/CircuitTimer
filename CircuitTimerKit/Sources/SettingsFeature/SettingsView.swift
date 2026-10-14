@@ -13,6 +13,23 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack(path: $store.scope(\.path, action: \.path)) {
             SettingsScroll {
+                SettingsSwitchCard(
+                    title: Text("settings.signals.sound", bundle: .module),
+                    isOn: Binding(get: { store.isSoundOn }, set: { send(.soundToggled($0)) })
+                )
+                SettingsSwitchCard(
+                    title: Text("settings.signals.vibration", bundle: .module),
+                    isOn: Binding(get: { store.isVibrationOn }, set: { send(.vibrationToggled($0)) })
+                )
+                SettingsSwitchCard(
+                    title: Text("settings.signals.speech", bundle: .module),
+                    isOn: Binding(get: { store.isSpeechOn }, set: { send(.speechToggled($0)) })
+                )
+                Text("settings.signals.footnote", bundle: .module)
+                    .font(.token(.footnote))
+                    .foregroundStyle(.text(.secondary))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, .token(spacing: .m))
                 Button {
                     send(.aboutTapped)
                 } label: {
