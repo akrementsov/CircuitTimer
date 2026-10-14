@@ -4,6 +4,7 @@ import Foundation
 import SwiftData
 import Testing
 
+@MainActor
 @Suite
 struct WorkoutStoreProviderTests {
     private final class Opener: @unchecked Sendable {

@@ -5,6 +5,8 @@ import SwiftData
 import WorkoutDomain
 
 /// The schema and migration plan the app uses, kept in memory.
+/// SwiftData suites use the main actor because concurrent container initialization races in Core Data trigger generation.
+@MainActor
 func makeContainer() throws -> ModelContainer {
     try .workouts(isStoredInMemoryOnly: true)
 }
@@ -51,6 +53,7 @@ func insertSeedMarker(in container: ModelContainer) throws {
 }
 
 /// A store over an empty list: the sample counts as seeded.
+@MainActor
 func makeEmptyStore(saveContext: (@Sendable (ModelContext) throws -> Void)? = nil) throws -> (WorkoutStore, ModelContainer) {
     let container = try makeContainer()
     try insertSeedMarker(in: container)

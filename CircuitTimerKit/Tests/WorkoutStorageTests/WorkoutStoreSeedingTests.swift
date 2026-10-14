@@ -5,6 +5,7 @@ import SwiftData
 import Testing
 import WorkoutDomain
 
+@MainActor
 @Suite
 struct WorkoutStoreSeedingTests {
     @Test

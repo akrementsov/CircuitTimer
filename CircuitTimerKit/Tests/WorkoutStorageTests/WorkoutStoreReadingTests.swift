@@ -5,6 +5,7 @@ import SwiftData
 import Testing
 import WorkoutDomain
 
+@MainActor
 @Suite
 struct WorkoutStoreReadingTests {
     /// A way a stored record can be damaged, and the field that proves it was left as it is.
@@ -13,7 +14,7 @@ struct WorkoutStoreReadingTests {
         let apply: @Sendable (WorkoutModel) -> Void
     }
 
-    static let damages: [Damage] = [
+    nonisolated static let damages: [Damage] = [
         Damage(testDescription: "missing workout id") { $0.workoutID = nil },
         Damage(testDescription: "missing stage id") { $0.sortedStages[0].stageID = nil },
         Damage(testDescription: "repeated stage id") { $0.sortedStages[1].stageID = $0.sortedStages[0].stageID },

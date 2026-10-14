@@ -5,6 +5,7 @@ import SwiftData
 import Testing
 import WorkoutDomain
 
+@MainActor
 @Suite
 struct WorkoutStoreWritingTests {
     private let bogusSection: (WorkoutModel) -> Void = { $0.sortedStages[0].section = "bogus" }
