@@ -228,6 +228,35 @@ struct AppFeatureRunRestoreTests {
         await store.send(.destination(.dismiss)) { $0.destination = nil }
     }
 
+    @Test
+    func test_load_runningRecordReachesManualPauseAfterADay_discardsSilently() async throws {
+        let workout = Workout(
+            id: UUID(fixture: 1),
+            warmUp: [makeStage(1)],
+            training: [makeStage(2)],
+            pauseAfterWarmUp: true
+        )
+        var run = WorkoutRun(schedule: WorkoutSchedule(workout: workout))
+        run.start(at: now)
+        let saved = StoredRunRecord(record: try #require(WorkoutRunRecord(workoutID: workout.id, run: run)), savedAt: now)
+        var state = AppFeature.State()
+        state.workouts = .loading
+        state.runRestore = .found(saved)
+        let writes = LockIsolated<[WorkoutRunRecord?]>([])
+        let store = makeStore(state) {
+            $0.date = .constant(now.addingTimeInterval(86_401))
+            $0.workoutRunRecord.write = { record, _ in writes.withValue { $0.append(record) } }
+        }
+
+        await store.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [workout])))) {
+            $0.workouts = .loaded([workout])
+            $0.runRestore = .resolved
+        }
+        await store.finish()
+        #expect(writes.value == [nil])
+        #expect(store.state.destination == nil)
+    }
+
     private func stored(_ phase: WorkoutRunRecord.Phase) throws -> StoredRunRecord {
         var run = WorkoutRun(schedule: WorkoutSchedule(workout: workout))
         run.start(at: now)

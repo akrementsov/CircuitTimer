@@ -7,6 +7,24 @@ import WorkoutDomain
 @MainActor
 @Suite
 struct TimerSceneTests {
+    @Test
+    func test_scenePhaseChanged_closeAlertPresented_refreshesTheSavedRun() async {
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        let record = WorkoutRunRecord(workoutID: state.workoutID, run: state.run)
+        state.recordSync = .stored(record)
+        state.destination = .closeConfirmation(.closeConfirmation(restart: nil))
+        let timer = TimerHarness(state)
+
+        await timer.send(.view(.scenePhaseChanged(.background)), saving: true) {
+            $0.isInBackground = true
+            $0.clockGeneration = 2
+        }
+        await timer.store.finish()
+        #expect(timer.store.state.destination == state.destination)
+        #expect(timer.writes.value == [RecordWrite(record: record, revision: 1)])
+        #expect(timer.releasedAssertions.value == timer.assertions.value)
+    }
+
     @Test(arguments: TimerPhase.allCases)
     func test_scenePhaseChanged_inactive_doesNotChangeTheRunOrSave(phase: TimerPhase) async {
         let schedule = phase == .awaitingUser ? Schedules.withPause : Schedules.workRest
