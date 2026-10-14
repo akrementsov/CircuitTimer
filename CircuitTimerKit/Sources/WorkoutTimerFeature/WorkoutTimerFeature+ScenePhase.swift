@@ -5,8 +5,9 @@ import SwiftUI
 extension WorkoutTimerFeature {
     /// The view only reports the phase; leaving and coming back are decided here.
     ///
-    /// `.inactive` changes nothing: Control Center and the App Switcher pass through it too.
+    /// `.inactive` keeps the run going, while foreground signals stop until the screen is active again.
     func scenePhaseChanged(_ phase: ScenePhase, _ state: inout State, at now: Date) -> Effect<Action> {
+        state.isSceneActive = phase == .active
         switch phase {
             case .background:
                 guard !state.isInBackground else { return .none }
@@ -23,7 +24,10 @@ extension WorkoutTimerFeature {
                 state.recordSync = .unknown
                 return syncClock(&state, at: now)
             case .active:
-                guard state.isInBackground else { return .none }
+                guard state.isInBackground else {
+                    // Settle before the cue baseline: a stage crossed under Control Center is never replayed.
+                    return advance(&state, at: now) ? syncClock(&state, at: now) : .none
+                }
 
                 state.isInBackground = false
                 // The anchor of this process spans the suspension: a clock moved back while away is rebased here.

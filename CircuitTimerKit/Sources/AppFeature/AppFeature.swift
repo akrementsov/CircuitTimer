@@ -140,6 +140,7 @@ public struct AppFeature: Sendable {
 
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
@@ -461,8 +462,9 @@ public struct AppFeature: Sendable {
                 // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
-                let end = Effect<Action>.run { [timerSession, id = timer.id] _ in
+                let end = Effect<Action>.run { [timerSession, cues, id = timer.id] _ in
                     await timerSession.end(owner: id)
+                    await cues.end(id)
                 }
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")

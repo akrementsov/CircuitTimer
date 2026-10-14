@@ -2,6 +2,7 @@ import BackgroundExecution
 import ComposableArchitecture
 import Foundation
 import os
+import SignalPreferences
 import SwiftUI
 import WorkoutDomain
 import WorkoutStorage
@@ -73,6 +74,13 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var hasRecordFailed = false
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
+        @SharedReader(.soundSignals) var isSoundOn = true
+        @SharedReader(.vibrationSignals) var isVibrationOn = true
+        @SharedReader(.spokenStageNames) var isSpeechOn = true
+        var signals = SignalTrack()
+        var isSceneActive = false
+        var haptic: HapticCue?
+        var cueFailures: Set<CueFailure> = []
         @Presents public var destination: Destination.State?
         public internal(set) var path = StackState<Path.State>()
 
@@ -131,12 +139,14 @@ public struct WorkoutTimerFeature: Sendable {
             /// `isFinal`: the loop saw its copy stop and has ended.
             case ticked(generation: Int, isFinal: Bool)
             case clockFailed(generation: Int)
+            case cueFinished(revision: Int, CueResult)
             case recordWritten(revision: Int, succeeded: Bool)
         }
     }
 
-    private enum CancelID: Hashable, Sendable {
+    enum CancelID: Hashable, Sendable {
         case clock(generation: Int)
+        case cues
     }
 
     /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
@@ -145,6 +155,7 @@ public struct WorkoutTimerFeature: Sendable {
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutTimer")
 
     @Dependency(\.backgroundTask) var backgroundTask
+    @Dependency(\.cues) var cues
     @Dependency(\.continuousClock) private var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
@@ -155,7 +166,7 @@ public struct WorkoutTimerFeature: Sendable {
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
-            switch action {
+            let effect: Effect<Action> = switch action {
                 case let .view(action):
                     reduce(into: &state, action)
                 case let .internal(action):
@@ -168,9 +179,16 @@ public struct WorkoutTimerFeature: Sendable {
                     // Leaving the stage list keeps the run paused, like the original app.
                     .none
             }
+            return effect
         }
         .ifLet(\.$destination, action: \.destination)
         .forEach(\.path, action: \.path)
+        Reduce { state, action in
+            // Presentation and stack reducers settle visibility before cues compare the screen's moment.
+            if case .destination(.presented(.closeConfirmation(.finish))) = action { return .none }
+            if case .view(.closeButtonTapped) = action, state.snapshot.status == .finished { return .none }
+            return signal(&state)
+        }
     }
 
     // Every action decides on the phase settled at `now`. It syncs the clock only when the settle changed the
@@ -203,6 +221,9 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
+            case let .cueFinished(revision, result):
+                cueFinished(revision: revision, result: result, &state)
+                return .none
             case let .recordWritten(revision, succeeded):
                 recordWritten(revision: revision, succeeded: succeeded, &state)
                 return .none
@@ -371,8 +392,9 @@ public struct WorkoutTimerFeature: Sendable {
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        return .run { [timerSession, dismiss, workoutRunRecord, backgroundTask, id = state.id] _ in
+        return .merge(.cancel(id: CancelID.cues), .run { [timerSession, cues, dismiss, workoutRunRecord, backgroundTask, id = state.id] _ in
             await timerSession.end(owner: id)
+            await cues.end(id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that, so a cancellation is no failure.
@@ -385,7 +407,7 @@ public struct WorkoutTimerFeature: Sendable {
                 Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
             }
             await backgroundTask.end(token)
-        }
+        })
     }
 
     /// Handles a clock jump, commits the progress made by `now` and returns whether the clock must follow:

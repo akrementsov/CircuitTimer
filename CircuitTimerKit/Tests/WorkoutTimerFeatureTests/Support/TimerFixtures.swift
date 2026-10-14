@@ -213,7 +213,12 @@ final class TimerHarness {
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
-    init(_ state: WorkoutTimerFeature.State) {
+    init(_ state: WorkoutTimerFeature.State, signals: Bool = false) {
+        if !signals {
+            state.$isSoundOn = SharedReader(value: false)
+            state.$isVibrationOn = SharedReader(value: false)
+            state.$isSpeechOn = SharedReader(value: false)
+        }
         let clock = TestClock<Duration>()
         let wall = LockIsolated(origin)
         let calls = LockIsolated<[TimerCall]>([])
@@ -237,6 +242,7 @@ final class TimerHarness {
         store = TestStore(initialState: state) {
             WorkoutTimerFeature()
         } withDependencies: {
+            $0.cues = .previewValue
             $0.workoutRunRecord = WorkoutRunRecordClient(
                 nextRevision: { revisions.withValue { $0 += 1; return $0 } },
                 load: { nil },
@@ -313,7 +319,8 @@ final class TimerHarness {
         saving: Bool = false,
         assert update: ((inout WorkoutTimerFeature.State) -> Void)? = nil
     ) async {
-        if !saving, update == nil {
+        let isActive: Bool? = if case let .view(.scenePhaseChanged(phase)) = action { phase == .active } else { nil }
+        if !saving, update == nil, isActive == nil || isActive == store.state.isSceneActive {
             await store.send(action)
             return
         }
@@ -321,6 +328,7 @@ final class TimerHarness {
         let revision = expectedRecordRevision
         await store.send(action) {
             update?(&$0)
+            if let isActive { $0.isSceneActive = isActive }
             if saving {
                 $0.recordSync = .pending(
                     revision: revision,
