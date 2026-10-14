@@ -453,6 +453,38 @@
         }
       }
     },
+    "timer.signals.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio signals aren't playing."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звуковые сигналы не воспроизводятся."
+          }
+        }
+      }
+    },
+    "timer.signals.noVoice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No voice for the app language; stage names aren't spoken."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нет голоса для языка приложения — названия этапов не произносятся."
+          }
+        }
+      }
+    },
     "timer.stage.finished" : {
       "localizations" : {
         "en" : {

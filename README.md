@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, the Settings tab and a full-screen timer that plays a workout in the foreground are in place; the timer keeps its progress across backgrounding and relaunches; sound and haptics come next (see the roadmap).
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, the Settings tab and a full-screen timer that plays a workout in the foreground are in place; the timer keeps its progress across backgrounding and relaunches; foreground tones, haptics and spoken stage names are controlled by persistent Settings switches (see the roadmap).
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -31,6 +31,8 @@ graph TD
     WorkoutEditorFeature --> DesignSystem
     WorkoutEditorFeature --> WorkoutStorage
     WorkoutEditorFeature --> WorkoutDomain
+    SettingsFeature --> TimerPreferences
+    WorkoutTimerFeature --> TimerPreferences
     SettingsFeature --> DesignSystem
     WorkoutTimerFeature --> DesignSystem
     WorkoutTimerFeature --> WorkoutDomain
@@ -47,11 +49,14 @@ graph TD
 | `DesignSystem` | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows, the caption plate and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll; the tab bar kept to the stacks' roots. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. `WorkoutRunRecordClient`, the saved run as one JSON file. |
 | `WorkoutEditorFeature` | The workout screen in the original app's cards: a saved workout opens read-only with Start workout at the bottom; the pencil edits a draft that the bottom Save workout button saves, back to read-only, or Back discards; stage editing within `WorkoutLimits`. |
-| `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. |
-| `SettingsFeature` | The Settings tab with its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
+| `WorkoutTimerFeature` | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. |
+| `TimerPreferences` | The Sound, Vibration, Speak names and Keep screen on toggles as `@Shared(.appStorage)` keys, shared by Settings and the timer. |
+| `SettingsFeature` | The Settings tab with persistent Sound, Vibration and Speak stage names and Keep screen on switches; its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `AppFeature` | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. At launch it offers to continue or finish a saved run. |
 
 Features never import each other and the domain never imports TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
+
+Foreground signal policy and the device checklist: [Timer signals](docs/timer-signals.md).
 
 ## The timer engine
 
@@ -110,7 +115,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
   - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button
   - [x] **CT-3-3** — background and restore
-  - [ ] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
+  - [x] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
   - [ ] **CT-3-5** — cues in the background through local notifications
 - [ ] **CT-4** — Live Activity and Dynamic Island
 - [ ] **CT-5** — iCloud sync

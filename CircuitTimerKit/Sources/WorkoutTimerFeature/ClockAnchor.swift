@@ -17,6 +17,14 @@ struct MonotonicInstant: Equatable, Sendable {
         base = read(clock)
     }
 
+    func instant<C: Clock<Duration>>(for clock: C) throws -> C.Instant {
+        guard let instant = base as? C.Instant else { throw ClockMismatch() }
+
+        return instant
+    }
+
+    private struct ClockMismatch: Error {}
+
     /// Time from this reading to `clock.now`; nil when the reading was taken on a clock of another type.
     func duration(toNowOf clock: any Clock<Duration>) -> Duration? {
         func measure<C: Clock<Duration>>(_ clock: C) -> Duration? {

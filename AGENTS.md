@@ -34,8 +34,9 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record file |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
-| `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
-| `SettingsFeature` | `DesignSystem`, ComposableArchitecture | The Settings tab: its navigation stack, About with the app version, the legal pages |
+| `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
+| `TimerPreferences` | Sharing | The Sound, Vibration, Speak names and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
+| `SettingsFeature` | `DesignSystem`, `TimerPreferences`, ComposableArchitecture | The Settings tab: signal toggles, its navigation stack, About with the app version, the legal pages |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start, or after a relaunch when the user continues a saved run; composes Settings |
 
 Layering:
@@ -43,6 +44,7 @@ Layering:
 - `*Feature` → `DesignSystem`, `Workout*`, `BackgroundExecution`. A feature never imports another feature; composition happens in `AppFeature`.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `SettingsFeature` needs no workout module and imports none.
+- `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
 - `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - Planned: `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
@@ -105,7 +107,7 @@ public struct SomeFeature: Sendable {
 - A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
 - The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action, but only while it is read-only.
 - The editor has phases: `new`, `viewing` (a saved workout, read-only) and `editing` (after the pencil). `workout` is the workout exactly as stored and is what plays; `original` is the base of the draft, with the rounds lifted into the editor's range. A save returns to `viewing`. Start sends `startRequested` with `workout`; `AppFeature` presents the timer only into an empty destination and empties the Workouts stack once the cover has appeared.
-- The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends the session afterwards, which drops the keep-awake vote.
+- The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session and `CueClient` owner, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends both owners afterwards, which drops the keep-awake vote and stops cue output.
 - The timer owns its own stack, `WorkoutTimerStack`; the stage list is a `@ReducerCaseIgnored` case of `WorkoutTimerFeature.Path` that carries a `WorkoutOutline`. Opening it pauses a running stage or drops a 3-2-1, and leaving it keeps the run paused.
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
 - Catch `CancellationError` before the generic `catch` — cancellation is not a failure.
@@ -122,6 +124,7 @@ public struct SomeFeature: Sendable {
 
 ## Time
 
+- `keepScreenOn` is on by default. A timer prevents automatic screen lock only while this preference is on and its countdown or a timed stage is running; a paused, waiting or finished run lets the screen lock. Its awake vote follows preference changes without restarting the clock.
 - UI must call `WorkoutRun.tick(at:)` and then `snapshot(at:)` on every update; `snapshot` alone never commits progress.
 - Never convert between `Date` and `Duration` outside `TimeMath`.
 - `rebase(at:keepingTotalElapsed:)` is the recovery point after a backward clock change.
@@ -130,7 +133,7 @@ public struct SomeFeature: Sendable {
 - `snapshot` without `tick` appears in two places only: the tick loop's own copy of the run, which schedules wake-ups and is never shown or committed, and the state's initial snapshot at `.distantPast` of a run that is idle or finished.
 - A tick loop that ends while the committed run still runs reports `isFinal`, and the reducer starts a new one.
 - One clock instance per timer session: a `MonotonicInstant` checks only the type of its instant.
-- `WorkoutTimerStack` forwards `scenePhase`; the reducer acts on `.background` and `.active` only (`.inactive` also covers Control Center and the App Switcher). Leaving resets a 3-2-1 to its full length and runs no countdown until the app is back, then counts it from 3. A running run takes a fresh anchor as it leaves, so on return the same process's anchor measures the time away and a clock moved back is rebased. Every write is under a background-task assertion; what the file holds is the newest write that completed.
+- `WorkoutTimerStack` forwards `scenePhase`; the run continues through `.inactive` (Control Center and the App Switcher), while signals stop until `.active`. Leaving resets a 3-2-1 to its full length and runs no countdown until the app is back, then counts it from 3. A running run takes a fresh anchor as it leaves, so on return the same process's anchor measures the time away and a clock moved back is rebased. Every write is under a background-task assertion; what the file holds is the newest write that completed.
 - Across a process restart only the record's `sinceEpochMs` survives: a clock moved back past it re-anchors at the saved position, a smaller backward move undercounts, a forward one counts as elapsed time (`docs/timer-engine.md` › Saved runs).
 
 ## Domain limits
@@ -199,3 +202,17 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 - One logical change per commit, and every commit passes `make verify-clean` (at milestones only in a squash-merged pull request, see core rule 6).
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
+
+## Signals
+
+- `TimerPreferences` keys never change and contain no dots; all signals are on by default.
+- `CueEngine` owns the audio session and outputs on one private serial queue. State methods check `dispatchPrecondition`; never use `assumeIsolated`, which cannot verify that executor on iOS 17.
+- Narrow exception to injected clocks: its 1.5-second idle deactivation uses an `AnySchedulerOf<DispatchQueue>` passed to the initializer, live on the engine queue. The deadline must survive cue task cancellation; no reducer timing depends on it.
+- While the session is active and no output plays, one valid idle deadline is pending. Admission replaces it, successful output start invalidates it, and completion reschedules it. Errors keep it alive.
+- A cancelled task stops waiting; a newer revision, owner-scoped suspend/end, resign-active or the idle deadline stops audio and releases ducking.
+- Tones are reproducible 44.1 kHz mono PCM WAV resources; regenerate with `swift scripts/generate-cue-tones.swift` from the root.
+- `SignalTrack` compares settled snapshots once per reducer action and emits at most one event: countdown digit, finish, new stage (with name), same-stage resume (without name), or the current last three seconds. No skipped event is replayed.
+- A fresh or resumed countdown beeps its current digit once. A restored running run is a silent baseline; a restored paused run announces the stage on resume. Returning from an inactive scene marks the current stage as seen.
+- Signals run only in an active scene with the timer visible, outside its stage list and close alert. Leaving clears the baseline and haptic and suspends through the last cue revision.
+- A VoiceOver-only cue preempts without activating audio, then posts a low-priority announcement only while active and uncancelled. Speech uses the app language; an absent voice reports a failure instead of falling back to another language. `Speech.xcstrings` owns Work/Rest/Pause.
+- Each switch gates only its output. Haptics are state revisions consumed by `.sensoryFeedback`; failure kinds are cleared only by a result proving that output recovered. Signal failures never stop the workout.

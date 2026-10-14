@@ -1,10 +1,10 @@
 @testable import AppFeature
+@testable import WorkoutTimerFeature
 
 import BackgroundExecution
 import ComposableArchitecture
 import Foundation
 import WorkoutDomain
-import WorkoutTimerFeature
 
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
     var state = AppFeature.State()
@@ -21,6 +21,7 @@ func makeStore(
     return TestStore(initialState: state) {
         AppFeature()
     } withDependencies: {
+        $0.cues = .previewValue
         $0.uuid = .incrementing
         $0.continuousClock = TestClock<Duration>()
         $0.backgroundTask = BackgroundTaskClient(begin: { _ in .invalid }, end: { _ in })
