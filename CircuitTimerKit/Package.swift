@@ -16,7 +16,7 @@ let package = Package(
     products: [
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
-        .library(name: "SignalPreferences", targets: ["SignalPreferences"]),
+        .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
@@ -79,7 +79,7 @@ let package = Package(
         .target(
             name: "SettingsFeature",
             dependencies: [
-                "SignalPreferences",
+                "TimerPreferences",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
@@ -87,7 +87,7 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .target(
-            name: "SignalPreferences",
+            name: "TimerPreferences",
             dependencies: [
                 .product(name: "Sharing", package: "swift-sharing"),
             ],
@@ -121,7 +121,7 @@ let package = Package(
         .target(
             name: "WorkoutTimerFeature",
             dependencies: [
-                "SignalPreferences",
+                "TimerPreferences",
                 "BackgroundExecution",
                 "DesignSystem",
                 "WorkoutDomain",
@@ -139,7 +139,7 @@ let package = Package(
         .testTarget(
             name: "SettingsFeatureTests",
             dependencies: [
-                "SignalPreferences",
+                "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),

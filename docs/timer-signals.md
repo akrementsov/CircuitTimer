@@ -1,6 +1,6 @@
 # Timer signals
 
-Settings stores Sound, Vibration and Speak stage names separately; all default to on. Changes persist across app launches. Turning Sound off silences only tones. Speech follows the app language (English or Russian), and a blank stage name uses its intensity name.
+Settings stores Sound, Vibration, Speak stage names and Keep screen on separately; all default to on. Changes persist across app launches. Keep screen on prevents automatic locking during countdowns and running stages; turning it off allows normal auto-lock without stopping the timer. Pauses and finished workouts always allow auto-lock. Turning Sound off silences only tones. Speech follows the app language (English or Russian), and a blank stage name uses its intensity name.
 
 | Moment | Tone | Haptic | Stage announcement |
 |---|---|---|---|

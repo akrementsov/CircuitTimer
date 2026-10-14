@@ -2,8 +2,8 @@ import BackgroundExecution
 import ComposableArchitecture
 import Foundation
 import os
-import SignalPreferences
 import SwiftUI
+import TimerPreferences
 import WorkoutDomain
 import WorkoutStorage
 
@@ -74,6 +74,7 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var hasRecordFailed = false
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
+        @SharedReader(.keepScreenOn) var isKeepScreenOn = true
         @SharedReader(.soundSignals) var isSoundOn = true
         @SharedReader(.vibrationSignals) var isVibrationOn = true
         @SharedReader(.spokenStageNames) var isSpeechOn = true
@@ -113,7 +114,7 @@ public struct WorkoutTimerFeature: Sendable {
 
         /// A run waiting for the user lets the screen lock.
         var keepsScreenAwake: Bool {
-            countdown != nil || snapshot.status == .running
+            isKeepScreenOn && (countdown != nil || snapshot.status == .running)
         }
     }
 
@@ -187,7 +188,7 @@ public struct WorkoutTimerFeature: Sendable {
             // Presentation and stack reducers settle visibility before cues compare the screen's moment.
             if case .destination(.presented(.closeConfirmation(.finish))) = action { return .none }
             if case .view(.closeButtonTapped) = action, state.snapshot.status == .finished { return .none }
-            return signal(&state)
+            return .merge(signal(&state), syncScreenAwake(&state))
         }
     }
 
@@ -451,23 +452,24 @@ public struct WorkoutTimerFeature: Sendable {
         ClockAnchor(date: now, instant: MonotonicInstant(now: clock), totalElapsed: totalElapsed)
     }
 
-    /// Replaces the current clock loop with the one the settled state needs, if any, saves the run, and asks to keep
-    /// the screen awake exactly while a clock runs. The only place where the keep-awake vote changes and, apart from
-    /// the clear on close, where the run is saved: every operation, jump and change of status reaches the record file,
-    /// and a tick that changes none of them does not.
+    /// Replaces the loop and saves the settled run: every operation, jump and status change reaches the record file,
+    /// while a tick that changes none of them does not. Screen wake follows the phase and the stored preference.
     func syncClock(_ state: inout State, at now: Date) -> Effect<Action> {
-        let loop = Effect.merge(replaceClockLoop(&state, at: now), persist(&state))
-        guard state.keepsScreenAwake != state.requestedAwake else { return loop }
+        .merge(replaceClockLoop(&state, at: now), persist(&state), syncScreenAwake(&state))
+    }
+
+    /// Reconcile on every action so a preference change never restarts the clock or rewrites the run.
+    private func syncScreenAwake(_ state: inout State) -> Effect<Action> {
+        guard state.clockGeneration > 0, state.keepsScreenAwake != state.requestedAwake else { return .none }
 
         state.requestedAwake = state.keepsScreenAwake
         state.awakeRevision += 1
         let id = state.id
         let awake = state.requestedAwake
         let revision = state.awakeRevision
-        let request = Effect<Action>.run { [timerSession] _ in
+        return .run { [timerSession] _ in
             await timerSession.requestAwake(owner: id, awake: awake, revision: revision)
         }
-        return .merge(loop, request)
     }
 
     private func replaceClockLoop(_ state: inout State, at now: Date) -> Effect<Action> {

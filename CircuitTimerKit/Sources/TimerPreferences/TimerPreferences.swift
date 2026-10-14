@@ -17,4 +17,9 @@ extension SharedReaderKey where Self == AppStorageKey<Bool>.Default {
     public static var spokenStageNames: Self {
         Self[.appStorage("signalSpokenStageNames"), default: true]
     }
+
+    /// Whether a running timer prevents automatic screen lock.
+    public static var keepScreenOn: Self {
+        Self[.appStorage("timerKeepScreenOn"), default: true]
+    }
 }

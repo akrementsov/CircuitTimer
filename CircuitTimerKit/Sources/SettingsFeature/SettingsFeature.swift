@@ -1,5 +1,5 @@
 import ComposableArchitecture
-import SignalPreferences
+import TimerPreferences
 
 /// The Settings tab: its own navigation stack with About and the legal pages.
 @Reducer
@@ -15,6 +15,7 @@ public struct SettingsFeature: Sendable {
 
     @ObservableState
     public struct State: Equatable, Sendable {
+        @Shared(.keepScreenOn) public var isKeepScreenOn = true
         @Shared(.soundSignals) public var isSoundOn = true
         @Shared(.vibrationSignals) public var isVibrationOn = true
         @Shared(.spokenStageNames) public var isSpeechOn = true
@@ -34,6 +35,7 @@ public struct SettingsFeature: Sendable {
 
         @CasePathable
         public enum View: Equatable, Sendable {
+            case keepScreenOnToggled(Bool)
             case soundToggled(Bool)
             case vibrationToggled(Bool)
             case speechToggled(Bool)
@@ -60,6 +62,9 @@ public struct SettingsFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         switch action {
+            case let .keepScreenOnToggled(value):
+                state.$isKeepScreenOn.withLock { $0 = value }
+                return .none
             case let .soundToggled(value):
                 state.$isSoundOn.withLock { $0 = value }
                 return .none

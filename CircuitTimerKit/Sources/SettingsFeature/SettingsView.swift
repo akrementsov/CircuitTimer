@@ -30,6 +30,10 @@ public struct SettingsView: View {
                     .foregroundStyle(.text(.secondary))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, .token(spacing: .m))
+                SettingsSwitchCard(
+                    title: Text("settings.screen.keepOn", bundle: .module),
+                    isOn: Binding(get: { store.isKeepScreenOn }, set: { send(.keepScreenOnToggled($0)) })
+                )
                 Button {
                     send(.aboutTapped)
                 } label: {

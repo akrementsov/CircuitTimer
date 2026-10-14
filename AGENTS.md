@@ -34,9 +34,9 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record file |
 | `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
-| `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `SignalPreferences`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
-| `SignalPreferences` | Sharing | The Sound, Vibration and Speak names toggles: `@Shared(.appStorage)` keys, on by default |
-| `SettingsFeature` | `DesignSystem`, `SignalPreferences`, ComposableArchitecture | The Settings tab: signal toggles, its navigation stack, About with the app version, the legal pages |
+| `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
+| `TimerPreferences` | Sharing | The Sound, Vibration, Speak names and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
+| `SettingsFeature` | `DesignSystem`, `TimerPreferences`, ComposableArchitecture | The Settings tab: signal toggles, its navigation stack, About with the app version, the legal pages |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start, or after a relaunch when the user continues a saved run; composes Settings |
 
 Layering:
@@ -44,7 +44,7 @@ Layering:
 - `*Feature` → `DesignSystem`, `Workout*`, `BackgroundExecution`. A feature never imports another feature; composition happens in `AppFeature`.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `SettingsFeature` needs no workout module and imports none.
-- `SignalPreferences` depends only on Sharing: Settings writes the signal toggles and the timer reads them, so neither feature imports the other.
+- `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
 - `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - Planned: `WorkoutActivity` (CT-4, ActivityKit + `WorkoutDomain`) with a compact `ContentState` — a Live Activity state is limited to about 4 KB, so it never carries a whole `WorkoutRun`; a widget extension target that depends on `WorkoutActivity` and `DesignSystem`.
@@ -123,6 +123,8 @@ public struct SomeFeature: Sendable {
 - Swiped and reordered rows read only the items their list captured: a row that reads the store observes them on its own and is redrawn apart from the list while a drag settles, showing the wrong item.
 
 ## Time
+
+- `keepScreenOn` is on by default. A timer prevents automatic screen lock only while this preference is on and its countdown or a timed stage is running; a paused, waiting or finished run lets the screen lock. Its awake vote follows preference changes without restarting the clock.
 
 - UI must call `WorkoutRun.tick(at:)` and then `snapshot(at:)` on every update; `snapshot` alone never commits progress.
 - Never convert between `Date` and `Duration` outside `TimeMath`.
@@ -204,7 +206,7 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 
 ## Signals
 
-- `SignalPreferences` keys never change and contain no dots; all signals are on by default.
+- `TimerPreferences` keys never change and contain no dots; all signals are on by default.
 - `CueEngine` owns the audio session and outputs on one private serial queue. State methods check `dispatchPrecondition`; never use `assumeIsolated`, which cannot verify that executor on iOS 17.
 - Narrow exception to injected clocks: its 1.5-second idle deactivation uses an `AnySchedulerOf<DispatchQueue>` passed to the initializer, live on the engine queue. The deadline must survive cue task cancellation; no reducer timing depends on it.
 - While the session is active and no output plays, one valid idle deadline is pending. Admission replaces it, successful output start invalidates it, and completion reschedules it. Errors keep it alive.

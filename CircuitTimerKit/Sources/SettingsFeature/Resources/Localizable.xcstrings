@@ -81,6 +81,22 @@
         }
       }
     },
+    "settings.screen.keepOn" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep screen on"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не выключать экран"
+          }
+        }
+      }
+    },
     "settings.signals.footnote" : {
       "localizations" : {
         "en" : {
