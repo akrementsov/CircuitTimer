@@ -16,11 +16,14 @@ public struct WorkoutEditorFeature: Sendable {
         @ReducerCaseIgnored
         case saveFailedAlert(AlertState<Never>)
         @ReducerCaseIgnored
+        case saveBlockedAlert(AlertState<Never>)
+        @ReducerCaseIgnored
         case discardConfirmation(AlertState<DiscardConfirmation>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case saveFailedAlert(Never)
+            case saveBlockedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
         }
     }
@@ -49,13 +52,22 @@ public struct WorkoutEditorFeature: Sendable {
         public var isSaving = false
         /// Start was tapped and the timer is on its way; a second tap must not ask again.
         public internal(set) var isStarting = false
-        /// The stage whose duration picker is open; one at a time.
-        public var expandedStageID: Stage.ID?
+        /// The screen has stood still long enough since its layout last changed for the tip to point at Save.
+        public internal(set) var hasSettled = false
+        /// Tells the latest wait for `hasSettled` from an older one whose result arrives late.
+        public internal(set) var settleGeneration = 0
+        /// A tap on the dimmed Save explained it, so the tip must not follow the alert.
+        public internal(set) var saveTipSuppressed = false
         @Presents public var destination: Destination.State?
 
-        /// A new workout starts with one work stage in the training section.
-        public init(newWorkoutID: Workout.ID, firstStageID: Stage.ID) {
-            let workout = Workout(id: newWorkoutID, training: [State.newStage(id: firstStageID)])
+        /// A new workout starts with an empty stage in every section, as in the original app: a place to type into.
+        public init(newWorkoutID: Workout.ID, warmUpStageID: Stage.ID, trainingStageID: Stage.ID, coolDownStageID: Stage.ID) {
+            let workout = Workout(
+                id: newWorkoutID,
+                warmUp: [State.newStage(id: warmUpStageID)],
+                training: [State.newStage(id: trainingStageID)],
+                coolDown: [State.newStage(id: coolDownStageID)]
+            )
             phase = .new
             self.workout = workout
             original = workout
@@ -80,11 +92,31 @@ public struct WorkoutEditorFeature: Sendable {
             return workout
         }
 
+        /// Longer than the push and the iOS 26 tab bar's glass settling, so the tip never points at a moving button.
+        static let tipSettleDelay: Duration = .seconds(1)
+
         /// The rounds the editor offers: a workout without training rounds is not edited here.
         static let trainingRoundsRange = 1...WorkoutLimits.maxTrainingRounds
 
+        /// Why Save is dimmed, when the user can do something about it.
+        public enum SaveBlocker: Equatable, Sendable {
+            /// The draft has no name or nothing to play.
+            case incomplete
+            /// A stage was changed so that it would not play: Save would drop it without a word.
+            case unsavableStage
+
+            /// The reason in words, one text for the alert, the tip and VoiceOver.
+            var messageKey: LocalizedStringKey {
+                switch self {
+                    case .incomplete: "editor.saveHint"
+                    case .unsavableStage: "editor.saveBlocked.zeroStages"
+                }
+            }
+        }
+
+        /// Judged on the comparable draft: spaces around a name, which a save trims, are no change.
         public var hasChanges: Bool {
-            draft != original
+            comparable(draft) != comparable(original)
         }
 
         /// A workout needs a name and something to play.
@@ -92,16 +124,77 @@ public struct WorkoutEditorFeature: Sendable {
             !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.totalDuration > .zero
         }
 
+        /// The draft's stages that would not play and differ from the same stage of the original. An untouched one
+        /// the stored workout already had is saved without it as before, and a deleted one is gone either way.
+        public var unsavableStageIDs: Set<Stage.ID> {
+            let comparableOriginal = comparable(original)
+            let originalStages = Dictionary(
+                WorkoutSectionKind.allCases.flatMap { comparableOriginal[$0] }.map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let comparableDraft = comparable(draft)
+            let unsavable = WorkoutSectionKind.allCases
+                .flatMap { comparableDraft[$0] }
+                .filter { !WorkoutLimits.isPlayable($0) && originalStages[$0.id] != $0 }
+            return Set(unsavable.map(\.id))
+        }
+
+        public var hasUnsavableStageEdits: Bool {
+            !unsavableStageIDs.isEmpty
+        }
+
         /// A new workout's Save waits for a change. A saved workout's Save is the way back to Start, as in the
         /// original app: untouched, it writes nothing and only ends the editing, even for a stored workout the editor
         /// would not accept as it is.
         public var canSave: Bool {
-            !isSaving && (endsEditingUntouched || isDraftComplete && hasChanges)
+            !isSaving && (endsEditingUntouched || isDraftComplete && hasChanges && !hasUnsavableStageEdits)
         }
 
-        /// Explains what the draft is missing; a saving draft, or an untouched one Save only closes, needs no hint.
-        public var showsSaveHint: Bool {
-            !isDraftComplete && !isSaving && !endsEditingUntouched
+        /// What keeps Save dimmed, or `nil` when it is not dimmed or there is nothing to explain: read-only, saving,
+        /// or a complete draft that only waits for a change.
+        public var saveBlocker: SaveBlocker? {
+            guard isEditable, !isSaving, !canSave else { return nil }
+
+            if hasUnsavableStageEdits {
+                return .unsavableStage
+            }
+            if !isDraftComplete {
+                return .incomplete
+            }
+            return nil
+        }
+
+        /// The tip may point at the dimmed Save: there is a reason, the screen stands still, no alert is up, and a tap
+        /// has not explained it already. The view adds that no field is focused.
+        public var showsSaveTip: Bool {
+            saveBlocker != nil && hasSettled && !saveTipSuppressed && destination == nil
+        }
+
+        /// The workout as Save would judge it: names without the spaces around them, and without the untouched empty
+        /// stages the editor offers, which a save drops anyway. So deleting or moving one is no change either.
+        func comparable(_ workout: Workout) -> Workout {
+            var workout = workout
+            workout.name = workout.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            for section in WorkoutSectionKind.allCases {
+                workout[section] = workout[section]
+                    .map { stage in
+                        var stage = stage
+                        stage.name = stage.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        return stage
+                    }
+                    .filter { !isUntouchedStarter($0) }
+            }
+            return workout
+        }
+
+        /// A stage the editor offered — a new workout's or one from «+» — still exactly as offered. A stored stage
+        /// that the user emptied is not one: it was there before and is a change.
+        private func isUntouchedStarter(_ stage: Stage) -> Bool {
+            guard stage == Self.newStage(id: stage.id) else { return false }
+
+            return phase == .new || !WorkoutSectionKind.allCases.contains { section in
+                original[section].contains { $0.id == stage.id }
+            }
         }
 
         private var endsEditingUntouched: Bool {
@@ -170,7 +263,7 @@ public struct WorkoutEditorFeature: Sendable {
         }
 
         static func newStage(id: Stage.ID) -> Stage {
-            Stage(id: id, name: "", duration: .seconds(30), intensity: .work)
+            Stage(id: id, name: "", duration: .zero, intensity: .work)
         }
     }
 
@@ -182,7 +275,13 @@ public struct WorkoutEditorFeature: Sendable {
 
         @CasePathable
         public enum View: Equatable, Sendable {
+            /// The screen appeared, changed its phase or let the keyboard go: its layout moves for a moment.
+            case layoutChanged
             case nameChanged(String)
+            /// The workout name's field lost focus.
+            case nameFieldLeft
+            /// A stage name's field lost focus.
+            case stageNameFieldLeft(Stage.ID)
             case trainingRoundsChanged(Int)
             case pauseAfterWarmUpChanged(Bool)
             case pauseAfterTrainingChanged(Bool)
@@ -192,11 +291,13 @@ public struct WorkoutEditorFeature: Sendable {
             case stageMovedUp(WorkoutSectionKind, Stage.ID)
             case stageMovedDown(WorkoutSectionKind, Stage.ID)
             case stageNameChanged(WorkoutSectionKind, Stage.ID, String)
-            case stageDurationChanged(WorkoutSectionKind, Stage.ID, Duration)
+            /// The duration's MM:SS text as typed; the draft takes its duration at once.
+            case stageDurationTextChanged(WorkoutSectionKind, Stage.ID, String)
             case stageIntensityTapped(WorkoutSectionKind, Stage.ID)
-            case stageDurationTapped(Stage.ID)
             case backButtonTapped
             case saveButtonTapped
+            /// A tap on the dimmed Save, which asks why it is dimmed.
+            case saveBlockedTapped
             case editButtonTapped
             case startButtonTapped
         }
@@ -206,6 +307,7 @@ public struct WorkoutEditorFeature: Sendable {
             case saveFailed
             case saveSucceeded(Workout)
             case editingEnded
+            case settled(generation: Int)
         }
 
         @CasePathable
@@ -217,13 +319,19 @@ public struct WorkoutEditorFeature: Sendable {
         }
     }
 
+    private enum CancelID: Hashable, Sendable {
+        case settle
+    }
+
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutEditor")
 
     /// The pencil and a save switch the screen with the short curve of a collection view's batch update, as the
     /// original screen did; a spring's long settle would drag the rows after it.
     static let phaseChangeAnimation: Animation = .easeInOut(duration: 0.3)
 
+    @Dependency(\.continuousClock) private var clock
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.saveTip) private var saveTip
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutStorage) private var workoutStorage
 
@@ -237,7 +345,7 @@ public struct WorkoutEditorFeature: Sendable {
                 case let .internal(action):
                     reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
-                    discardChanges(state)
+                    discardChanges(&state)
                 case .delegate, .destination:
                     .none
             }
@@ -252,14 +360,25 @@ public struct WorkoutEditorFeature: Sendable {
         // The read-only screen draws no editing controls; a late action from the editor it replaced changes nothing.
         switch state.phase {
             case .viewing:
-                guard [.backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
+                guard [.layoutChanged, .backButtonTapped, .editButtonTapped, .startButtonTapped].contains(action) else { return .none }
             case .new, .editing:
                 guard action != .editButtonTapped, action != .startButtonTapped else { return .none }
         }
 
         switch action {
+            case .layoutChanged:
+                return settle(&state)
             case let .nameChanged(name):
-                state.draft.name = name
+                state.draft.name = WorkoutLimits.limitedName(name, previous: state.draft.name)
+            case .nameFieldLeft:
+                // A save trims names anyway; trimming the one just left shows it before Back or Save is judged.
+                state.draft.name = state.draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            case let .stageNameFieldLeft(id):
+                guard let section = WorkoutSectionKind.allCases.first(where: { section in
+                    state.draft[section].contains { $0.id == id }
+                }) else { return .none }
+
+                updateStage(id, in: section, of: &state) { $0.name = $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
             case let .trainingRoundsChanged(rounds):
                 let range = State.trainingRoundsRange
                 state.draft.trainingRounds = min(max(rounds, range.lowerBound), range.upperBound)
@@ -274,9 +393,6 @@ public struct WorkoutEditorFeature: Sendable {
             case let .stageDeleteButtonTapped(section, id):
                 guard let index = state.draft[section].firstIndex(where: { $0.id == id }) else { return .none }
 
-                if state.expandedStageID == id {
-                    state.expandedStageID = nil
-                }
                 state.draft[section].remove(at: index)
             case let .stagesMoved(section, source, destination):
                 // Offsets come from the rows as they were drawn; stale ones would trap in `move`, so they are ignored.
@@ -293,23 +409,27 @@ public struct WorkoutEditorFeature: Sendable {
 
                 state.draft[section].swapAt(index, index + 1)
             case let .stageNameChanged(section, id, name):
-                updateStage(id, in: section, of: &state) { $0.name = name }
-            case let .stageDurationChanged(section, id, duration):
-                updateStage(id, in: section, of: &state) { $0.duration = min(max(duration, .zero), WorkoutLimits.maxStageDuration) }
+                updateStage(id, in: section, of: &state) { $0.name = WorkoutLimits.limitedName(name, previous: $0.name) }
+            case let .stageDurationTextChanged(section, id, text):
+                updateStage(id, in: section, of: &state) { $0.duration = StageDurationText.duration(from: text) }
             case let .stageIntensityTapped(section, id):
                 updateStage(id, in: section, of: &state) { $0.intensity = $0.intensity == .work ? .rest : .work }
-            case let .stageDurationTapped(id):
-                state.expandedStageID = state.expandedStageID == id ? nil : id
             case .backButtonTapped:
-                guard state.hasChanges else { return .run { [dismiss] _ in await dismiss() } }
+                guard state.hasChanges else { return leave(&state) }
 
                 state.destination = .discardConfirmation(.discardChanges)
             case .saveButtonTapped:
                 return save(&state)
+            case .saveBlockedTapped:
+                guard let blocker = state.saveBlocker else { return .none }
+
+                // At once, in the state: the tip must not show when the alert closes, whenever TipKit takes the write.
+                state.saveTipSuppressed = true
+                state.destination = .saveBlockedAlert(.saveBlocked(blocker))
+                return .run { [saveTip] _ in await saveTip.markExplained() }
             case .editButtonTapped:
                 state.original = State.editable(state.workout)
                 state.draft = state.original
-                state.expandedStageID = nil
                 state.phase = .editing
                 state.isStarting = false
             case .startButtonTapped:
@@ -339,21 +459,55 @@ public struct WorkoutEditorFeature: Sendable {
             case .editingEnded:
                 endEditing(&state)
                 return .none
+            case let .settled(generation):
+                guard generation == state.settleGeneration else { return .none }
+
+                state.hasSettled = true
+                return .none
         }
+    }
+
+    /// Waits for the screen to stand still before the tip may show; every layout change starts over, and a wait it
+    /// replaced may still deliver late, so the generation must match.
+    private func settle(_ state: inout State) -> Effect<Action> {
+        state.hasSettled = false
+        state.settleGeneration += 1
+        let generation = state.settleGeneration
+        return .run { [clock] send in
+            do {
+                try await clock.sleep(for: State.tipSettleDelay)
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("The tip's settle clock failed: \(String(reflecting: error), privacy: .public)")
+                return
+            }
+            await send(.internal(.settled(generation: generation)))
+        }
+        .cancellable(id: CancelID.settle, cancelInFlight: true)
     }
 
     private func endEditing(_ state: inout State) {
         state.original = State.editable(state.workout)
         state.draft = state.original
-        state.expandedStageID = nil
         state.phase = .viewing
     }
 
-    private func discardChanges(_ state: State) -> Effect<Action> {
+    private func discardChanges(_ state: inout State) -> Effect<Action> {
         // A save in flight must finish; dismissing would cancel it.
         guard !state.isSaving else { return .none }
 
-        return .run { [dismiss] _ in await dismiss() }
+        return leave(&state)
+    }
+
+    /// Closes the screen. It slides out for a moment, so the tip must not show on it, and a wait still running must
+    /// not bring it back.
+    private func leave(_ state: inout State) -> Effect<Action> {
+        state.hasSettled = false
+        return .merge(
+            .cancel(id: CancelID.settle),
+            .run { [dismiss] _ in await dismiss() }
+        )
     }
 
     private func save(_ state: inout State) -> Effect<Action> {
@@ -433,6 +587,14 @@ extension AlertState where Action == Never {
             TextState("editor.saveFailed.title", bundle: .module)
         } message: {
             TextState("editor.saveFailed.message", bundle: .module)
+        }
+    }
+
+    static func saveBlocked(_ blocker: WorkoutEditorFeature.State.SaveBlocker) -> Self {
+        AlertState {
+            TextState("editor.saveBlocked.title", bundle: .module)
+        } message: {
+            TextState(blocker.messageKey, bundle: .module)
         }
     }
 }

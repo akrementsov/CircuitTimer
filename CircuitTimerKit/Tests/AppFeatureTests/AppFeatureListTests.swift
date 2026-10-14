@@ -61,7 +61,12 @@ struct AppFeatureListTests {
         let store = makeStore(loaded([first]))
 
         await store.send(.view(.addButtonTapped)) {
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(
+                newWorkoutID: UUID(0),
+                warmUpStageID: UUID(1),
+                trainingStageID: UUID(2),
+                coolDownStageID: UUID(3)
+            ))
         }
         await store.send(.path(.popFrom(id: 0))) { $0.path = StackState() }
         await store.send(.view(.workoutTapped(first.id))) {
@@ -407,7 +412,12 @@ struct AppFeatureListTests {
         await store.send(.internal(.mutationFinished(.applied))) {
             $0.pendingMutations = []
             $0.deferredScreen = nil
-            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1)))
+            $0.path[id: 0] = .editor(WorkoutEditorFeature.State(
+                newWorkoutID: UUID(0),
+                warmUpStageID: UUID(1),
+                trainingStageID: UUID(2),
+                coolDownStageID: UUID(3)
+            ))
         }
     }
 

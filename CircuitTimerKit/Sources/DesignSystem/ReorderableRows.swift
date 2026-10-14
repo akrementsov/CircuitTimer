@@ -324,7 +324,7 @@ private struct ReorderDrag<ID: Hashable>: Equatable {
 /// loses to the row's buttons, and on iOS 17 the swipe's drag inside the row takes the touch from a lifted row. The
 /// press starts only where `accepts` takes the point, and a scroll that moves first makes it fail, as on any scroll
 /// view. Points are in the global space, which doesn't move when the screen scrolls under a resting finger.
-private struct ScrollViewLongPress: UIViewRepresentable {
+struct ScrollViewLongPress: UIViewRepresentable {
     let isEnabled: Bool
     let pressDuration: Double
     let accepts: (CGPoint) -> Bool
@@ -379,7 +379,9 @@ private struct ScrollViewLongPress: UIViewRepresentable {
         }
 
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            parent.accepts(touch.location(in: nil))
+            // TextKit's selection gestures own touches in the numeric field, including its internal text views.
+            // A row lift starts earlier than selection and disables the field, interrupting the cursor drag.
+            touch.view?.isInsideNumericField != true && parent.accepts(touch.location(in: nil))
         }
 
         /// Alongside the row's buttons, which on iOS 26 hold the touch from its start; a lifted row's buttons are

@@ -2,21 +2,23 @@ import ComposableArchitecture
 import DesignSystem
 import Foundation
 import SwiftUI
+import TipKit
 import WorkoutDomain
 import WorkoutStorage
 
-/// A text field of the editor. Every `TextField` here is bound to one case through `.focused`:
-/// leaving or saving waits until the focused field has committed its text, and an unbound field
-/// would be read before its last edit arrives. The field's row carries it as its scroll `id` too.
+/// The editor's selected input: name fields use SwiftUI focus, and native duration fields report editing callbacks.
+/// Leaving or saving waits until the selected field commits its text. A row carries its name's case as its scroll `id`.
 enum EditorField: Hashable {
     case name
     case stageName(Stage.ID)
+    case stageDuration(Stage.ID)
 }
 
 @ViewAction(for: WorkoutEditorFeature.self)
 public struct WorkoutEditorView: View {
     @Bindable public var store: StoreOf<WorkoutEditorFeature>
-    @FocusState private var focusedField: EditorField?
+    @FocusState private var focusedNameField: EditorField?
+    @State private var focusedDurationID: Stage.ID?
     @State private var actionAfterFocusLoss: WorkoutEditorFeature.Action.View?
     @State private var rowInteraction = RowInteraction<Stage.ID>()
 
@@ -32,6 +34,9 @@ public struct WorkoutEditorView: View {
                 .onChange(of: focusedField) { scrollToFocusedField(proxy) }
                 .onChange(of: rowInteraction.visibleRect) { scrollToFocusedField(proxy) }
         }
+        // As in the original app, a tap anywhere that takes no input lets the keyboard go: the number pad has no key
+        // of its own for it. Fields and buttons take their taps first.
+        .onTapGesture { focusedField = nil }
         // A style, not a view, under the keyboard too: its rounded top corners would show the black window.
         .background(.surface(.screen))
         .bottomActionPanel { actionPanel }
@@ -45,19 +50,40 @@ public struct WorkoutEditorView: View {
         // Hiding the system back button also turns off the back gestures, so leaving goes only through Back.
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
-        .onChange(of: focusedField) { _, field in focusChanged(to: field) }
+        .onChange(of: focusedField) { oldField, newField in focusChanged(from: oldField, to: newField) }
+        .onChange(of: focusedNameField) { _, field in
+            if field != nil { focusedDurationID = nil }
+        }
         .onChange(of: store.draft) { rowInteraction.closeSwipe() }
-        .onChange(of: store.expandedStageID) { rowInteraction.closeSwipe() }
+        // A phase change moves the cells like a push moves the screen; the tip waits for both to end.
+        .task(id: store.phase) { send(.layoutChanged) }
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
+        .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
     }
 
+    // Native fields stay outside FocusState. UIKit ends the previous name's focus when one begins editing;
+    // clearing that FocusState afterwards would resign the newly selected numeric field.
+    private var focusedField: EditorField? {
+        get { focusedDurationID.map(EditorField.stageDuration) ?? focusedNameField }
+        nonmutating set {
+            if case let .stageDuration(id) = newValue {
+                focusedDurationID = id
+            } else {
+                focusedDurationID = nil
+                if focusedNameField != newValue { focusedNameField = newValue }
+            }
+        }
+    }
+
     private var content: some View {
-        VStack(spacing: .zero) {
+        // Once for all three cards: it compares the whole draft with the original.
+        let unsavableStageIDs = store.state.unsavableStageIDs
+        return VStack(spacing: .zero) {
             nameRow
             totalTimeRow
             VStack(spacing: .token(spacing: .m)) {
-                stagesCard(.warmUp)
+                stagesCard(.warmUp, unsavableStageIDs: unsavableStageIDs)
                 if store.state.showsPause(after: .warmUp) {
                     PauseCard(
                         isOn: $store.draft.pauseAfterWarmUp.sending(\.view.pauseAfterWarmUpChanged),
@@ -66,7 +92,7 @@ public struct WorkoutEditorView: View {
                     )
                     .transition(PlaqueReveal())
                 }
-                stagesCard(.training)
+                stagesCard(.training, unsavableStageIDs: unsavableStageIDs)
                 if store.state.showsPause(after: .training) {
                     PauseCard(
                         isOn: $store.draft.pauseAfterTraining.sending(\.view.pauseAfterTrainingChanged),
@@ -75,7 +101,7 @@ public struct WorkoutEditorView: View {
                     )
                     .transition(PlaqueReveal())
                 }
-                stagesCard(.coolDown)
+                stagesCard(.coolDown, unsavableStageIDs: unsavableStageIDs)
             }
         }
         .padding(.horizontal, .token(spacing: .l))
@@ -86,12 +112,19 @@ public struct WorkoutEditorView: View {
         if store.isEditable {
             BottomActionPanel(
                 title: Text("editor.saveWorkout", bundle: .module),
-                hint: store.showsSaveHint ? Text("editor.saveHint", bundle: .module) : nil,
                 isBusy: store.isSaving,
                 busyLabel: Text("editor.saving", bundle: .module),
                 isEnabled: store.canSave,
                 action: { send(afterClearingFocus: .saveButtonTapped) }
             )
+            // A disabled button takes no taps; while Save is dimmed for a reason, a tap on it asks why instead.
+            .gesture(
+                TapGesture().onEnded { send(afterClearingFocus: .saveBlockedTapped) },
+                including: store.saveBlocker != nil ? .all : .subviews
+            )
+            // VoiceOver's double tap never reaches a disabled button; the reason is read with it instead.
+            .accessibilityHint(store.saveBlocker.map { Text($0.messageKey, bundle: .module) } ?? Text(verbatim: ""))
+            .overlay { saveTipAnchor }
         } else {
             BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
                 send(.startButtonTapped)
@@ -99,15 +132,30 @@ public struct WorkoutEditorView: View {
         }
     }
 
+    /// The tip shows once, by TipKit's count, and only when it can point at a still Save: not while typing, under
+    /// an alert, or before the screen has settled. Before iOS 26 a tip cannot be hidden by a binding, so the anchor
+    /// itself comes and goes.
+    @ViewBuilder
+    private var saveTipAnchor: some View {
+        // A request waiting for the focus to clear is about to leave or explain; the tip must not slip in before it.
+        if store.showsSaveTip, let blocker = store.saveBlocker, focusedField == nil, actionAfterFocusLoss == nil {
+            // After the tip: its anchor takes taps of its own, and the dimmed Save's tap must reach the panel under it.
+            Spacer(minLength: .zero)
+                .popoverTip(SaveWorkoutTip(blocker: blocker), arrowEdge: .bottom)
+                .allowsHitTesting(false)
+        }
+    }
+
     private var nameRow: some View {
         let isEditable = store.isEditable
-        return TextField(
-            text: $store.draft.name.sending(\.view.nameChanged),
-            prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary))
+        return LimitedNameField(
+            name: store.draft.name,
+            prompt: Text("editor.name.placeholder", bundle: .module).foregroundStyle(.text(.secondary)),
+            label: Text("editor.name", bundle: .module)
         ) {
-            Text("editor.name", bundle: .module)
+            send(.nameChanged($0))
         }
-        .focused($focusedField, equals: .name)
+        .focused($focusedNameField, equals: .name)
         .font(.token(.fieldTitle))
         .foregroundStyle(.text(.primary))
         .disabled(!isEditable)
@@ -188,14 +236,14 @@ public struct WorkoutEditorView: View {
     }
 
     @ViewBuilder
-    private func stagesCard(_ section: WorkoutSectionKind) -> some View {
+    private func stagesCard(_ section: WorkoutSectionKind, unsavableStageIDs: Set<Stage.ID>) -> some View {
         if store.state.showsSection(section) {
-            stagesCardContent(section)
+            stagesCardContent(section, unsavableStageIDs: unsavableStageIDs)
                 .transition(PlaqueReveal())
         }
     }
 
-    private func stagesCardContent(_ section: WorkoutSectionKind) -> some View {
+    private func stagesCardContent(_ section: WorkoutSectionKind, unsavableStageIDs: Set<Stage.ID>) -> some View {
         let stages = store.state.shownStages(in: section)
         let isEditable = store.isEditable
         return EditorCard {
@@ -225,10 +273,10 @@ public struct WorkoutEditorView: View {
                 items: stages,
                 spacing: .zero,
                 isEnabled: store.state.canReorderStages(in: section) && focusedField == nil && rowInteraction.swipedID == nil,
-                canLift: { $0.id != store.expandedStageID },
+                canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
-                row: { stageRow($0, in: section, stages: stages) }
+                row: { stageRow($0, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
             )
 
             addStageButton(section)
@@ -243,18 +291,18 @@ public struct WorkoutEditorView: View {
 
     /// Rows read only the stages captured by the card: a row that reads the store observes the stages on its own
     /// and is redrawn apart from the card while a drag settles, showing the wrong stage.
-    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage]) -> some View {
+    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage], isUnsavable: Bool) -> some View {
         let isEditable = store.isEditable
         let offersActions = isEditable && focusedField == nil
         return StageRow(
             stage: stage,
             isEditable: isEditable,
-            isExpanded: store.expandedStageID == stage.id,
-            name: stageNameBinding(stage, in: section),
-            focus: $focusedField,
+            onNameChange: { send(.stageNameChanged(section, stage.id, $0)) },
+            focus: $focusedNameField,
+            durationFocus: $focusedDurationID,
+            durationHint: Self.durationHint(for: stage, isUnsavable: isUnsavable),
             onIntensityTap: { send(.stageIntensityTapped(section, stage.id)) },
-            onDurationTap: { send(.stageDurationTapped(stage.id), animation: WorkoutEditorFeature.phaseChangeAnimation) },
-            onDurationChange: { send(.stageDurationChanged(section, stage.id, $0)) }
+            onDurationTextChange: { send(.stageDurationTextChanged(section, stage.id, $0)) }
         )
         .swipePlaques(
             isOpen: rowInteraction.swipeBinding(for: stage.id),
@@ -342,7 +390,11 @@ public struct WorkoutEditorView: View {
     private func scrollToFocusedField(_ proxy: ScrollViewProxy) {
         guard let focusedField else { return }
 
-        withAnimation { proxy.scrollTo(focusedField) }
+        let rowID = switch focusedField {
+            case let .stageDuration(id): EditorField.stageName(id)
+            case .name, .stageName: focusedField
+        }
+        withAnimation { proxy.scrollTo(rowID) }
     }
 
     /// On iOS 26 a tap anywhere in a row with a text field focuses the field, as a system list row does there.
@@ -382,7 +434,17 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    private func focusChanged(to field: EditorField?) {
+    private func focusChanged(from oldField: EditorField?, to field: EditorField?) {
+        // Before the pending Back or Save, so a name left with spaces around it is no change to ask about.
+        switch oldField {
+            case .name: send(.nameFieldLeft)
+            case let .stageName(id): send(.stageNameFieldLeft(id))
+            case .stageDuration, nil: break
+        }
+        // The keyboard slides away, and the panel with it.
+        if field == nil {
+            send(.layoutChanged)
+        }
         guard let action = actionAfterFocusLoss else { return }
 
         actionAfterFocusLoss = nil
@@ -392,11 +454,16 @@ public struct WorkoutEditorView: View {
         }
     }
 
-    private func stageNameBinding(_ stage: Stage, in section: WorkoutSectionKind) -> Binding<String> {
-        Binding(
-            get: { stage.name },
-            set: { send(.stageNameChanged(section, stage.id, $0)) }
-        )
+    /// What VoiceOver adds to a stage's duration: a changed stage that keeps Save dimmed says so, and one that would
+    /// not play says that a save drops it.
+    private static func durationHint(for stage: Stage, isUnsavable: Bool) -> Text? {
+        if isUnsavable {
+            Text("editor.stage.duration.unsavableHint", bundle: .module)
+        } else if !WorkoutLimits.isPlayable(stage) {
+            Text("editor.stage.skipped", bundle: .module)
+        } else {
+            nil
+        }
     }
 }
 
@@ -434,7 +501,14 @@ public struct WorkoutEditorView: View {
 #Preview("New") {
     NavigationStack {
         WorkoutEditorView(
-            store: Store(initialState: WorkoutEditorFeature.State(newWorkoutID: UUID(0), firstStageID: UUID(1))) {
+            store: Store(
+                initialState: WorkoutEditorFeature.State(
+                    newWorkoutID: UUID(0),
+                    warmUpStageID: UUID(1),
+                    trainingStageID: UUID(2),
+                    coolDownStageID: UUID(3)
+                )
+            ) {
                 WorkoutEditorFeature()
             }
         )

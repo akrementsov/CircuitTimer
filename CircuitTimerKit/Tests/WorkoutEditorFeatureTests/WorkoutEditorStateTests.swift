@@ -6,16 +6,61 @@ import WorkoutDomain
 
 @Suite
 struct WorkoutEditorStateTests {
+    @Test
+    func test_hasChanges_whitespaceAndUntouchedStarter_doesNotRequireSaving() {
+        var state = editingState()
+        state.draft.name = "  Workout  "
+        state.draft.warmUp[0].name = "  Stage 10  "
+        state.draft.training.insert(Stage(id: UUID(fixture: 99), name: "", duration: .zero, intensity: .work), at: 0)
+
+        #expect(!state.hasChanges)
+        #expect(state.canSave)
+        #expect(state.saveBlocker == nil)
+    }
+
+    @Test
+    func test_canSave_editedStageBecomesZero_blocksUntilStageDeleted() {
+        var state = editingState()
+        state.draft.training[0].duration = .zero
+
+        #expect(state.isDraftComplete)
+        #expect(state.unsavableStageIDs == [UUID(fixture: 20)])
+        #expect(!state.canSave)
+        #expect(state.saveBlocker == .unsavableStage)
+
+        state.draft.training.removeFirst()
+
+        #expect(state.hasChanges)
+        #expect(state.canSave)
+        #expect(state.saveBlocker == nil)
+    }
+
+    @Test
+    func test_canSave_storedZeroStage_blocksOnlyWhenThatStageChanges() {
+        var workout = makeWorkout()
+        workout.warmUp[0].duration = .zero
+        var state = editingState(workout)
+        state.draft.name = "Renamed"
+
+        #expect(state.canSave)
+        #expect(state.unsavableStageIDs.isEmpty)
+
+        state.draft.warmUp[0].name = "Changed empty stage"
+
+        #expect(!state.canSave)
+        #expect(state.unsavableStageIDs == [UUID(fixture: 10)])
+    }
+
     struct FlagsCase: CustomTestStringConvertible, Sendable {
         let testDescription: String
         let state: WorkoutEditorFeature.State
         let isDraftComplete: Bool
         let canSave: Bool
-        let showsSaveHint: Bool
+        let saveBlocker: WorkoutEditorFeature.State.SaveBlocker?
     }
 
     static let flagsCases: [FlagsCase] = {
-        let untouchedNew = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+        let untouchedNew = newDraftState()
         let untouched = editingState(makeWorkout())
         var changed = untouched
         changed.draft.name = "Changed"
@@ -40,61 +85,63 @@ struct WorkoutEditorStateTests {
                 state: untouchedNew,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .incomplete
             ),
             FlagsCase(
                 testDescription: "saved workout untouched",
                 state: untouched,
                 isDraftComplete: true,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "complete and changed",
                 state: changed,
                 isDraftComplete: true,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "blank name",
                 state: blankName,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .incomplete
             ),
             FlagsCase(
                 testDescription: "nothing to play",
                 state: nothingToPlay,
                 isDraftComplete: false,
                 canSave: false,
-                showsSaveHint: true
+                saveBlocker: .unsavableStage
             ),
             FlagsCase(
                 testDescription: "stored without a name, untouched",
                 state: untouchedNameless,
                 isDraftComplete: false,
                 canSave: true,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
             FlagsCase(
                 testDescription: "saving",
                 state: saving,
                 isDraftComplete: true,
                 canSave: false,
-                showsSaveHint: false
+                saveBlocker: nil
             ),
         ]
     }()
 
     @Test
-    func test_initNew_givesOneWorkStageInTraining() {
-        let state = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+    func test_initNew_givesAnEmptyWorkStageInEverySection() {
+        let state = newDraftState()
 
         #expect(state.phase == .new)
         #expect(state.draft == Workout(
             id: UUID(fixture: 1),
-            training: [Stage(id: UUID(fixture: 2), name: "", duration: .seconds(30), intensity: .work)]
+            warmUp: [Stage(id: UUID(fixture: 2), name: "", duration: .zero, intensity: .work)],
+            training: [Stage(id: UUID(fixture: 3), name: "", duration: .zero, intensity: .work)],
+            coolDown: [Stage(id: UUID(fixture: 4), name: "", duration: .zero, intensity: .work)]
         ))
         #expect(state.original == state.draft)
     }
@@ -116,7 +163,7 @@ struct WorkoutEditorStateTests {
     func test_flags_followDraftAndSaving(flags: FlagsCase) {
         #expect(flags.state.isDraftComplete == flags.isDraftComplete)
         #expect(flags.state.canSave == flags.canSave)
-        #expect(flags.state.showsSaveHint == flags.showsSaveHint)
+        #expect(flags.state.saveBlocker == flags.saveBlocker)
     }
 
     @Test(arguments: [
@@ -137,14 +184,14 @@ struct WorkoutEditorStateTests {
         let editing = editingState(makeWorkout())
         var saving = editing
         saving.isSaving = true
-        var new = WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))
+        var new = newDraftState()
 
         #expect(editing.canReorderStages(in: .training))
         #expect(!editing.canReorderStages(in: .warmUp))
         #expect(!saving.canReorderStages(in: .training))
         #expect(!WorkoutEditorFeature.State(viewing: makeWorkout()).canReorderStages(in: .training))
         #expect(!new.canReorderStages(in: .training))
-        new.draft.training.append(makeStage(3))
+        new.draft.training.append(makeStage(5))
         #expect(new.canReorderStages(in: .training))
     }
 
@@ -222,6 +269,6 @@ struct WorkoutEditorStateTests {
         #expect(!starting.canStart)
         #expect(!WorkoutEditorFeature.State(viewing: silent).canStart)
         #expect(!editingState(makeWorkout()).canStart)
-        #expect(!WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)).canStart)
+        #expect(!newDraftState().canStart)
     }
 }

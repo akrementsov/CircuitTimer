@@ -97,70 +97,6 @@
         }
       }
     },
-    "editor.duration.minutes %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld min"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld мин"
-          }
-        }
-      }
-    },
-    "editor.duration.minutesLabel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Minutes"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Минуты"
-          }
-        }
-      }
-    },
-    "editor.duration.seconds %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld s"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld с"
-          }
-        }
-      }
-    },
-    "editor.duration.secondsLabel" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seconds"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Секунды"
-          }
-        }
-      }
-    },
     "editor.edit" : {
       "localizations" : {
         "en" : {
@@ -357,6 +293,38 @@
         }
       }
     },
+    "editor.saveBlocked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't save yet"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пока нельзя сохранить"
+          }
+        }
+      }
+    },
+    "editor.saveBlocked.zeroStages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a time for the 00:00 stages you edited, or delete them."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Задайте время этапам 00:00, которые вы изменили, или удалите их."
+          }
+        }
+      }
+    },
     "editor.saveFailed.message" : {
       "localizations" : {
         "en" : {
@@ -513,6 +481,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Длительность"
+          }
+        }
+      }
+    },
+    "editor.stage.duration.unsavableHint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set a time for this stage or delete it to save the workout."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы сохранить тренировку, задайте этапу время или удалите его."
           }
         }
       }

@@ -6,6 +6,40 @@ import Testing
 @Suite
 struct WorkoutLimitsTests {
     @Test(arguments: [
+        NameEdit(previous: "Morning", input: String(repeating: "a", count: 31), expected: "Morning"),
+        NameEdit(
+            previous: String(repeating: "a", count: 30),
+            input: String(repeating: "a", count: 31),
+            expected: String(repeating: "a", count: 30)
+        ),
+        NameEdit(previous: "Morning", input: String(repeating: "👨‍👩‍👧", count: 30), expected: String(repeating: "👨‍👩‍👧", count: 30)),
+        NameEdit(
+            previous: String(repeating: "a", count: 40),
+            input: String(repeating: "b", count: 39),
+            expected: String(repeating: "b", count: 39)
+        ),
+        NameEdit(
+            previous: String(repeating: "a", count: 40),
+            input: String(repeating: "b", count: 40),
+            expected: String(repeating: "a", count: 40)
+        ),
+        NameEdit(
+            previous: String(repeating: "a", count: 40),
+            input: String(repeating: "b", count: 41),
+            expected: String(repeating: "a", count: 40)
+        ),
+    ])
+    func test_limitedName_pasteAndLegacyEdits_rejectsWholeOrAcceptsShortening(edit: NameEdit) {
+        #expect(WorkoutLimits.limitedName(edit.input, previous: edit.previous) == edit.expected)
+    }
+
+    struct NameEdit: Sendable {
+        let previous: String
+        let input: String
+        let expected: String
+    }
+
+    @Test(arguments: [
         (Duration.zero, nil),
         (.seconds(-1), nil),
         (.microseconds(999), nil),

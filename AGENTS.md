@@ -25,7 +25,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 ## Module map
 
-One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` only composes `AppFeature`.
+One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` only composes `AppFeature` and configures TipKit at launch.
 
 | Module | Depends on | Owns |
 |---|---|---|
@@ -33,7 +33,7 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `WorkoutDomain` | Foundation, CryptoKit | Workout model, `WorkoutLimits`, `WorkoutSchedule` and its fingerprint, `WorkoutRun`, `TimeMath` |
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record file |
-| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole |
+| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
 | `WorkoutTimerFeature` | `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; its own stack with the stage list |
 | `TimerPreferences` | Sharing | The Sound, Vibration, Speak names and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
 | `SettingsFeature` | `DesignSystem`, `TimerPreferences`, ComposableArchitecture | The Settings tab: signal toggles, its navigation stack, About with the app version, the legal pages |
@@ -107,6 +107,7 @@ public struct SomeFeature: Sendable {
 - A pushed screen with no state or effects of its own is a `@ReducerCaseIgnored` `Path` case that carries its data; its view sends the stack owner's actions (see `SettingsFeature`).
 - The workout editor is the `editor` case of `AppFeature.Path` on the Workouts stack. It hides the system back button, which also turns off the edge and content back gestures on iOS 17 and 26, so it leaves only through `backButtonTapped`; a Workouts tab re-tap sends it the same action, but only while it is read-only.
 - The editor has phases: `new`, `viewing` (a saved workout, read-only) and `editing` (after the pencil). `workout` is the workout exactly as stored and is what plays; `original` is the base of the draft, with the rounds lifted into the editor's range. A save returns to `viewing`. Start sends `startRequested` with `workout`; `AppFeature` presents the timer only into an empty destination and empties the Workouts stack once the cover has appeared.
+- The editor's Save flags read the comparable draft (names trimmed), so spaces around a name are no change; a changed stage that would not play keeps Save dimmed, and `saveBlocker` says why. A stage duration's typed text and its last accepted text live in `StageDurationField`, which sends each accepted edit synchronously from `NumericTextField`'s native edit callback, so Back and Save never miss the last digit; focus never reaches the reducer. The field's tokenizer treats each character as a word boundary, keeping taps between digits in place, and `StageDurationText` maps the caret through the MM:SS mask. Native duration fields use a view-local selected stage ID; only SwiftUI name fields register with `FocusState`, so each input has one responder owner. TipKit has three points: the app configures it, the view shows `SaveWorkoutTip`, and the reducer invalidates it through `SaveTipClient` after a tap on the dimmed Save, hiding it at once with `saveTipSuppressed`. The view sends `layoutChanged` from `.task(id: phase)` and when the keyboard goes; the reducer clears `hasSettled` and sets it again after `tipSettleDelay` on `continuousClock`, by generation, so the tip never points at Save while the screen moves. Tests that send `layoutChanged` use a `TestClock`. Leaving a name field sends `nameFieldLeft` or `stageNameFieldLeft`, and the reducer trims the name before a pending Back or Save arrives.
 - The workout timer is the `timer` case of `AppFeature.Destination`, a full-screen cover. Like the editor it closes itself with `dismiss()`, the accepted exception to talking up only through `delegate` actions. Every close path first ends the screen's `TimerSessionClient` session and `CueClient` owner, so a clock loop that starts after the teardown returns before it sleeps. The container never replaces or nils a presented timer; if anything else dismisses the cover, it ends both owners afterwards, which drops the keep-awake vote and stops cue output.
 - The timer owns its own stack, `WorkoutTimerStack`; the stage list is a `@ReducerCaseIgnored` case of `WorkoutTimerFeature.Path` that carries a `WorkoutOutline`. Opening it pauses a running stage or drops a 3-2-1, and leaving it keeps the run paused.
 - Long-running or replaceable effects get a `CancelID`; reloads use `cancelInFlight: true`.
@@ -141,6 +142,8 @@ public struct SomeFeature: Sendable {
 Anything that edits a workout applies `WorkoutLimits.normalizedStages(_:)` and `normalizedTrainingRounds(_:)`, and UI limits match `WorkoutLimits`. Otherwise the user would see stages that never reach the schedule.
 
 A stage name may be empty; anything that displays a stage shows its intensity name instead. Storage keeps the empty name, so the fallback follows the current language.
+
+New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:previous:)`: at most `maxNameLength` characters, an edit past it rejected whole. A longer name stored before the limit shows in full. While it remains over the limit, any edit is accepted only if it reduces the character count, including a replacement with unrelated shorter text; an edit of the same length or longer is rejected whole.
 
 ## Identifiers
 

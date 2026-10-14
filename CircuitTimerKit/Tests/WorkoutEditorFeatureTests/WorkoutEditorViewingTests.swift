@@ -21,7 +21,7 @@ struct WorkoutEditorViewingTests {
     }
 
     @Test
-    func test_viewActions_viewing_ignoreEverythingButBackEditAndStart() async {
+    func test_viewActions_viewing_ignoreEverythingButBackEditStartAndLayout() async {
         // Storage and dismissal are left unimplemented: a write or a dismissal fails the test.
         let store = makeStore(WorkoutEditorFeature.State(viewing: makeWorkout()))
         let stage = UUID(fixture: 20)
@@ -37,10 +37,12 @@ struct WorkoutEditorViewingTests {
             .stageMovedUp(.training, UUID(fixture: 21)),
             .stageMovedDown(.training, UUID(fixture: 20)),
             .stageNameChanged(.training, stage, "Other"),
-            .stageDurationChanged(.training, stage, .seconds(1)),
+            .stageDurationTextChanged(.training, stage, "1"),
             .stageIntensityTapped(.training, stage),
-            .stageDurationTapped(stage),
+            .nameFieldLeft,
+            .stageNameFieldLeft(stage),
             .saveButtonTapped,
+            .saveBlockedTapped,
         ]
 
         for action in actions {
@@ -54,13 +56,11 @@ struct WorkoutEditorViewingTests {
         workout.trainingRounds = 0
         var state = WorkoutEditorFeature.State(viewing: workout)
         state.draft.name = "Stale"
-        state.expandedStageID = UUID(fixture: 10)
         state.isStarting = true
         let store = makeStore(state)
 
         await store.send(.view(.editButtonTapped)) {
             $0.draft = $0.original
-            $0.expandedStageID = nil
             $0.isStarting = false
             $0.phase = .editing
         }
@@ -69,7 +69,7 @@ struct WorkoutEditorViewingTests {
     }
 
     @Test(arguments: [
-        WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2)),
+        newDraftState(),
         editingState(makeWorkout()),
     ])
     func test_editAndStart_newOrEditing_changeNothing(state: WorkoutEditorFeature.State) async {
@@ -137,7 +137,7 @@ struct WorkoutEditorViewingTests {
     @Test
     func test_save_newWorkoutFailsThenRetrySucceeds_turnsReadOnlyWithStart() async {
         let calls = LockIsolated(0)
-        let store = makeStore(WorkoutEditorFeature.State(newWorkoutID: UUID(fixture: 1), firstStageID: UUID(fixture: 2))) {
+        let store = makeStore(newDraftState()) {
             $0.workoutStorage.save = { _ in
                 calls.withValue { $0 += 1 }
                 if calls.value == 1 {
@@ -146,6 +146,9 @@ struct WorkoutEditorViewingTests {
             }
         }
         await store.send(.view(.nameChanged("  Morning  "))) { $0.draft.name = "  Morning  " }
+        await store.send(.view(.stageDurationTextChanged(.training, UUID(fixture: 3), "00:30"))) {
+            $0.draft.training[0].duration = .seconds(30)
+        }
 
         await store.send(.view(.saveButtonTapped)) { $0.isSaving = true }
         await store.receive(\.internal.saveFailed) {
@@ -167,6 +170,8 @@ struct WorkoutEditorViewingTests {
         }
         await store.receive(\.delegate.saved, saved)
 
+        #expect(saved.warmUp.isEmpty)
+        #expect(saved.coolDown.isEmpty)
         #expect(store.state.canStart)
         #expect(calls.value == 2)
     }
