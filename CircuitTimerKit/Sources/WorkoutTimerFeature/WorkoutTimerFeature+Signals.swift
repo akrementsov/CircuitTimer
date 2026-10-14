@@ -6,7 +6,7 @@ extension WorkoutTimerFeature {
     func signal(_ state: inout State) -> Effect<Action> {
         let enabled = state.isSoundOn || state.isVibrationOn || state.isSpeechOn
         guard enabled, state.isSceneActive, state.path.isEmpty, state.destination == nil else {
-            guard state.signals.last != nil else { return .none }
+            guard state.signals.last != nil || state.isPreparingCountdown else { return .none }
 
             state.signals.last = nil
             state.haptic = nil
@@ -17,6 +17,7 @@ extension WorkoutTimerFeature {
                 .run { [cues] _ in await cues.suspend(id, revision) }
             )
         }
+        guard !state.isPreparingCountdown else { return .none }
         if !state.isVibrationOn { state.haptic = nil }
         guard let event = state.signals.update(SignalMoment(state)) else { return .none }
 

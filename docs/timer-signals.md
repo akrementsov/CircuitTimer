@@ -10,6 +10,8 @@ Settings stores Sound, Vibration, Speak stage names and Keep screen on separatel
 | Last three seconds of a timed stage | Countdown beep | Light impact | None |
 | Workout finishes | C6–E6–G6 | Success | None |
 
+Before a start/resume countdown, the timer prepares its first beep and briefly shows a readiness indicator. Only then does it show 3 and start the three-second countdown. The monotonic origin is captured in the reducer, so delayed effect launch does not shift its deadlines. Countdown and stage loops request zero sleep tolerance to avoid system wake-up coalescing. Cancelling preparation releases the audio session; preparation errors appear as signal failures and do not hold the timer.
+
 Signals run while the timer is visible and the app is active. Control Center stops them, although the workout keeps going. Opening the stage list or the close alert also stops them. A new cue cuts the preceding cue; closing the timer ends its output immediately. Returning or restoring a running workout never replays skipped signals. A restored paused stage is announced on resume.
 
 The audio session plays through the silent switch and ducks other audio. After the last output ends it releases the session after 1.5 seconds, keeping music ducked between countdown beeps. Leaving the active scene or closing releases it immediately. With VoiceOver on, stage names use a low-priority accessibility announcement instead of synthesizer speech; delivery can be delayed by other announcements.

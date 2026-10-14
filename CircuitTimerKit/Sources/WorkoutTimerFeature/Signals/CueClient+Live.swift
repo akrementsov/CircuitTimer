@@ -7,6 +7,14 @@ extension CueClient {
         let engine = CueEngine()
         engine.queue.async { engine.observeSystem() }
         return Self(
+            prepare: { owner, revision in
+                try Task.checkCancellation()
+                guard await MainActor.run(body: { UIApplication.shared.applicationState == .active }) else { return CueResult() }
+
+                let result = await engine.perform { $0.prepare(owner: owner, revision: revision) }
+                try Task.checkCancellation()
+                return result
+            },
             play: { try await play($0, engine: engine) },
             suspend: { owner, revision in await engine.perform { $0.suspend(owner: owner, through: revision) } },
             end: { owner in await engine.perform { $0.end(owner: owner) } }
@@ -15,9 +23,12 @@ extension CueClient {
 
     private static func play(_ burst: CueBurst, engine: CueEngine) async throws -> CueResult {
         try Task.checkCancellation()
-        guard await MainActor.run(body: { UIApplication.shared.applicationState == .active }) else { return CueResult() }
+        let accessibility = await MainActor.run {
+            (isActive: UIApplication.shared.applicationState == .active, voiceOver: UIAccessibility.isVoiceOverRunning)
+        }
+        guard accessibility.isActive else { return CueResult() }
 
-        let voiceOver = await MainActor.run { UIAccessibility.isVoiceOverRunning }
+        let voiceOver = accessibility.voiceOver
         let text = burst.announcement?.text
         var voice: AVSpeechSynthesisVoice?
         var result = CueResult()

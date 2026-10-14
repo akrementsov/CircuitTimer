@@ -12,7 +12,7 @@ struct CueEngineTests {
         let engine = CueEngine(session: CueAudioSession(
             activate: { calls.withValue { $0.append(true) } },
             deactivate: { calls.withValue { $0.append(false) } }
-        ))
+        ), idleScheduler: DispatchQueue.test.eraseToAnyScheduler())
         await engine.perform { $0.suspend(owner: timerID, through: 1) }
         #expect(await engine.perform { $0.start(owner: timerID, revision: 1) } == .rejected)
         #expect(calls.value.isEmpty)
@@ -22,7 +22,10 @@ struct CueEngineTests {
 
     @Test
     func test_start_closedOwner_rejectsLateBurst() async {
-        let engine = CueEngine(session: CueAudioSession(activate: {}, deactivate: {}))
+        let engine = CueEngine(
+            session: CueAudioSession(activate: {}, deactivate: {}),
+            idleScheduler: DispatchQueue.test.eraseToAnyScheduler()
+        )
         await engine.perform { $0.end(owner: timerID) }
         let result = await engine.perform { $0.start(owner: timerID, revision: 1) }
         #expect(result == .rejected)
@@ -34,7 +37,7 @@ struct CueEngineTests {
         let engine = CueEngine(session: CueAudioSession(
             activate: { calls.withValue { $0.append(true) } },
             deactivate: { calls.withValue { $0.append(false) } }
-        ))
+        ), idleScheduler: DispatchQueue.test.eraseToAnyScheduler())
         _ = await engine.perform { $0.start(owner: timerID, revision: 2) }
         await engine.perform { $0.suspend(owner: timerID, through: 1) }
         #expect(calls.value == [true])
@@ -73,7 +76,7 @@ struct CueEngineTests {
         let engine = CueEngine(session: CueAudioSession(
             activate: { calls.withValue { $0.append(true) } },
             deactivate: { calls.withValue { $0.append(false) } }
-        ))
+        ), idleScheduler: DispatchQueue.test.eraseToAnyScheduler())
         #expect(await engine.perform { $0.preempt(owner: timerID, revision: 1) })
         #expect(calls.value.isEmpty)
         #expect(await engine.perform { $0.preempt(owner: timerID, revision: 1) } == false)
@@ -85,7 +88,7 @@ struct CueEngineTests {
         let engine = CueEngine(session: CueAudioSession(
             activate: { calls.withValue { $0.append(true) } },
             deactivate: { calls.withValue { $0.append(false) } }
-        ))
+        ), idleScheduler: DispatchQueue.test.eraseToAnyScheduler())
         _ = await engine.perform { $0.start(owner: timerID, revision: 1) }
         await engine.perform { $0.handle(.interruptionBegan) }
         await engine.perform { $0.end(owner: timerID) }
@@ -94,7 +97,10 @@ struct CueEngineTests {
 
     @Test
     func test_start_inactiveScene_rejectsUntilActive() async {
-        let engine = CueEngine(session: CueAudioSession(activate: {}, deactivate: {}))
+        let engine = CueEngine(
+            session: CueAudioSession(activate: {}, deactivate: {}),
+            idleScheduler: DispatchQueue.test.eraseToAnyScheduler()
+        )
         await engine.perform { $0.handle(.resignedActive) }
         #expect(await engine.perform { $0.start(owner: timerID, revision: 1) } == .rejected)
         await engine.perform { $0.handle(.becameActive) }

@@ -157,6 +157,51 @@ struct TimerLoopTests {
     }
 
     @Test
+    func test_loops_secondBoundaries_doNotPermitWakeupCoalescing() async throws {
+        let ended = LockIsolated(false)
+        let clock = LateClock(lateness: .zero)
+        let send = Send<Action> { _ in ended.setValue(true) }
+        var run = WorkoutRun(schedule: Schedules.workRest)
+        run.start(at: origin)
+        try await WorkoutTimerFeature.tickLoop(
+            clock: clock,
+            date: DateGenerator { origin },
+            session: Self.session(ended: ended),
+            owner: timerID,
+            run: run,
+            generation: 1,
+            send: send
+        )
+        ended.setValue(false)
+        try await WorkoutTimerFeature.countdownLoop(
+            clock: clock,
+            session: Self.session(ended: ended),
+            owner: timerID,
+            remaining: 3,
+            generation: 1,
+            send: send
+        )
+        #expect(clock.tolerances.value == [.zero, .zero])
+    }
+
+    @Test
+    func test_countdownLoop_delayedEffect_usesTheSelectedStart() async throws {
+        let clock = LateClock(lateness: .zero)
+        let start = MonotonicInstant(now: clock)
+        clock.state.withValue { $0.now = $0.now.advanced(by: .milliseconds(500)) }
+        try await WorkoutTimerFeature.countdownLoop(
+            clock: clock,
+            session: Self.session(ended: LockIsolated(false)),
+            owner: timerID,
+            remaining: 3,
+            generation: 4,
+            send: Send { _ in },
+            startingAt: start
+        )
+        #expect(clock.state.value.deadlines.map(\.offset) == [.seconds(1), .seconds(2), .seconds(3)])
+    }
+
+    @Test
     func test_countdownLoop_lateWakes_keepEveryDeadlineOnTheFirstReading() async throws {
         let clock = LateClock(lateness: .milliseconds(500))
         let sent = LockIsolated<[Action]>([])

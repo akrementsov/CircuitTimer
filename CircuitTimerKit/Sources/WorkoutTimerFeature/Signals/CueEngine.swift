@@ -22,7 +22,7 @@ final class CueEngine: @unchecked Sendable {
 
     struct Output {
         let id: Int
-        var player: AVAudioPlayer?
+        var player: (any CuePlayer)?
         var synthesizer: AVSpeechSynthesizer?
         let delegate: AnyObject
         let waiter: OutputWaiter
@@ -30,6 +30,7 @@ final class CueEngine: @unchecked Sendable {
 
     let queue = DispatchQueue(label: "CircuitTimer.Cues", qos: .userInitiated)
     private let session: CueAudioSession
+    private let makePlayer: @Sendable (Data) throws -> any CuePlayer
     private let idleScheduler: AnySchedulerOf<DispatchQueue>
     var observerTokens: [NSObjectProtocol] = []
     private var owner: UUID?
@@ -43,12 +44,18 @@ final class CueEngine: @unchecked Sendable {
     private var output: Output?
     private var nextOutputID = 0
     private var toneData: [CueTone: Data] = [:]
+    private var preparedPlayers: [CueTone: any CuePlayer] = [:]
     private var loggedMissingTones: Set<CueTone> = []
     private var cachedVoice: Result<AVSpeechSynthesisVoice, CueError>?
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "Cues")
 
-    init(session: CueAudioSession = .live, idleScheduler: AnySchedulerOf<DispatchQueue>? = nil) {
+    init(
+        session: CueAudioSession = .live,
+        idleScheduler: AnySchedulerOf<DispatchQueue>? = nil,
+        makePlayer: @escaping @Sendable (Data) throws -> any CuePlayer = { try AVAudioPlayer(data: $0) }
+    ) {
+        self.makePlayer = makePlayer
         self.session = session
         self.idleScheduler = idleScheduler ?? queue.eraseToAnyScheduler()
     }
@@ -77,6 +84,7 @@ final class CueEngine: @unchecked Sendable {
         if self.owner == owner {
             guard revision > max(latest, limit) else { return false }
         } else {
+            clearPreparedPlayers()
             self.owner = owner
             latest = 0
             limit = suspendedThrough[owner] ?? 0
@@ -87,10 +95,45 @@ final class CueEngine: @unchecked Sendable {
         return true
     }
 
+    func prepare(owner: UUID, revision: Int) -> CueResult {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard sceneActive, !tombstones.contains(owner), revision > (suspendedThrough[owner] ?? 0) else { return CueResult() }
+        if self.owner != owner {
+            stopOutput()
+            clearPreparedPlayers()
+            self.owner = owner
+            latest = 0
+            limit = suspendedThrough[owner] ?? 0
+        }
+        guard revision > max(latest, limit) else { return CueResult() }
+        latest = revision
+        stopOutput()
+        idleToken += 1
+        switch activate() {
+            case .admitted:
+                switch preparedPlayer(for: .countdown) {
+                    case let .success(player):
+                        preparedPlayers[.countdown] = player
+                        scheduleIdle()
+                        return CueResult()
+                    case let .failure(error):
+                        deactivate()
+                        return CueResult(failures: [error])
+                }
+            case let .failed(error): return CueResult(failures: [error])
+            case .rejected, .skipped: return CueResult()
+        }
+    }
+
     func start(owner: UUID, revision: Int) -> StartResult {
         dispatchPrecondition(condition: .onQueue(queue))
         guard admit(owner: owner, revision: revision) else { return .rejected }
         defer { if sessionActive { scheduleIdle() } }
+        return activate()
+    }
+
+    private func activate() -> StartResult {
+        dispatchPrecondition(condition: .onQueue(queue))
         guard !sessionActive else { return .admitted }
 
         do {
@@ -123,26 +166,49 @@ final class CueEngine: @unchecked Sendable {
     func startTone(_ tone: CueTone, owner: UUID, revision: Int) -> OutputStart {
         dispatchPrecondition(condition: .onQueue(queue))
         guard canOutput(owner: owner, revision: revision) else { return .stopped }
-        guard let data = data(for: tone) else { return .failed(.toneMissing) }
-
-        do {
-            let player = try AVAudioPlayer(data: data)
-            let waiter = OutputWaiter()
-            nextOutputID += 1
-            let delegate = ToneDelegate(waiter: waiter, outputID: nextOutputID, engine: self)
-            player.delegate = delegate
-            player.prepareToPlay()
-            guard player.play() else {
-                Self.logger.error("Cue player did not start")
-                return .failed(.playerFailed)
-            }
-            output = Output(id: nextOutputID, player: player, delegate: delegate, waiter: waiter)
-            idleToken += 1
-            return .playing(waiter)
-        } catch {
-            Self.logger.error("Creating cue player failed: \(String(reflecting: error), privacy: .public)")
+        let player: any CuePlayer
+        switch preparedPlayer(for: tone) {
+            case let .success(prepared): player = prepared
+            case let .failure(error): return .failed(error)
+        }
+        let waiter = OutputWaiter()
+        nextOutputID += 1
+        let delegate = ToneDelegate(waiter: waiter, outputID: nextOutputID, engine: self)
+        player.delegate = delegate
+        guard player.play() else {
+            player.stop()
+            Self.logger.error("Cue player did not start")
             return .failed(.playerFailed)
         }
+        output = Output(id: nextOutputID, player: player, delegate: delegate, waiter: waiter)
+        idleToken += 1
+        return .playing(waiter)
+    }
+
+    private func preparedPlayer(for tone: CueTone) -> Result<any CuePlayer, CueError> {
+        dispatchPrecondition(condition: .onQueue(queue))
+        // A prepared player is consumed once; a delayed callback can never target a later playback of that player.
+        if let player = preparedPlayers.removeValue(forKey: tone) { return .success(player) }
+        guard let data = data(for: tone) else { return .failure(.toneMissing) }
+
+        do {
+            let player = try makePlayer(data)
+            guard player.prepareToPlay() else {
+                player.stop()
+                Self.logger.error("Cue player preparation failed")
+                return .failure(.playerFailed)
+            }
+            return .success(player)
+        } catch {
+            Self.logger.error("Creating cue player failed: \(String(reflecting: error), privacy: .public)")
+            return .failure(.playerFailed)
+        }
+    }
+
+    private func clearPreparedPlayers() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        for player in preparedPlayers.values { player.stop() }
+        preparedPlayers.removeAll()
     }
 
     private func data(for tone: CueTone) -> Data? {
@@ -239,12 +305,15 @@ final class CueEngine: @unchecked Sendable {
                 cachedVoice = nil
             case .interruptionBegan:
                 stopOutput()
+                clearPreparedPlayers()
                 sessionActive = false
                 idleToken += 1
                 Self.logger.info("Cue audio was interrupted")
             case .interruptionEnded:
                 Self.logger.info("Cue audio interruption ended")
             case let .routeChanged(reason):
+                // Our category notification may arrive after preparation without changing the output route.
+                if reason != Int(AVAudioSession.RouteChangeReason.categoryChange.rawValue) { clearPreparedPlayers() }
                 Self.logger.info("Cue audio route changed: \(reason)")
             case .mediaServicesReset:
                 output?.waiter.finish(.stopped)
@@ -252,6 +321,7 @@ final class CueEngine: @unchecked Sendable {
                 sessionActive = false
                 idleToken += 1
                 toneData.removeAll()
+                preparedPlayers.removeAll()
                 cachedVoice = nil
                 Self.logger.error("Audio media services reset; cue caches were dropped")
             case .voicesChanged:
@@ -271,6 +341,7 @@ final class CueEngine: @unchecked Sendable {
 
     private func deactivate() {
         dispatchPrecondition(condition: .onQueue(queue))
+        clearPreparedPlayers()
         idleToken += 1
         do {
             try session.deactivate()

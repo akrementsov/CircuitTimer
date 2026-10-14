@@ -181,6 +181,7 @@ struct AppFeatureTimerTests {
         }
         await store.send(.destination(.presented(.timer(.view(.closeButtonTapped))))) {
             $0.$destination[case: \.timer]?.countdown = nil
+            $0.$destination[case: \.timer]?.isPreparingCountdown = false
             $0.$destination[case: \.timer]?.clockGeneration = 2
             $0.$destination[case: \.timer]?.requestedAwake = false
             $0.$destination[case: \.timer]?.awakeRevision = 2

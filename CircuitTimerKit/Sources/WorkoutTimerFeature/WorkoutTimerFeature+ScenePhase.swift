@@ -25,6 +25,7 @@ extension WorkoutTimerFeature {
                 return syncClock(&state, at: now)
             case .active:
                 guard state.isInBackground else {
+                    if state.isPreparingCountdown, state.clockGeneration > 0 { return syncClock(&state, at: now) }
                     // Settle before the cue baseline: a stage crossed under Control Center is never replayed.
                     return advance(&state, at: now) ? syncClock(&state, at: now) : .none
                 }
@@ -34,7 +35,7 @@ extension WorkoutTimerFeature {
                 _ = advance(&state, at: now)
                 return syncClock(&state, at: now)
             case .inactive:
-                return .none
+                return state.isPreparingCountdown && state.clockGeneration > 0 ? syncClock(&state, at: now) : .none
             @unknown default:
                 return .none
         }

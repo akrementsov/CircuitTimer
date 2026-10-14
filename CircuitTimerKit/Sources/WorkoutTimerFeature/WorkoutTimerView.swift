@@ -151,6 +151,9 @@ private enum PreviewTimer {
         state.run.tick(at: now)
         state.snapshot = state.run.snapshot(at: now)
         state.countdown = countdown
+        state.isPreparingCountdown = false
+        // Fixed preview stores receive no scene events from the timer container.
+        state.isSceneActive = true
         state.hasClockFailed = hasClockFailed
         state.hasRecordFailed = hasRecordFailed
         state.cueFailures = cueFailures
@@ -173,6 +176,7 @@ private enum PreviewTimer {
                 } withDependencies: {
                     $0.date = .constant(now)
                     $0.continuousClock = TestClock()
+                    $0.cues = .previewValue
                 }
             )
         }

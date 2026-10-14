@@ -8,25 +8,21 @@ import Testing
 @MainActor
 struct TimerSignalTests {
     @Test
-    func test_scenePhaseChanged_initialActive_beepsThreeOnce() async {
+    func test_scenePhaseChanged_beforeTimerTask_doesNotBeepBeforePreparation() async {
         let timer = TimerHarness(.fresh(), signals: true)
         let bursts = LockIsolated<[CueBurst]>([])
         timer.store.dependencies.cues.play = { burst in
             bursts.withValue { $0.append(burst) }
             return CueResult(outputs: .tone)
         }
-        let baseline = SignalMoment(timer.store.state)
         await timer.store.send(.view(.scenePhaseChanged(.active))) {
             $0.isSceneActive = true
-            $0.signals.last = baseline
-            $0.signals.cueRevision = 1
-            $0.haptic = HapticCue(kind: .countdown, revision: 1)
         }
         await timer.store.finish()
-        #expect(bursts.value == [CueBurst(owner: timerID, revision: 1, tone: .countdown)])
+        #expect(bursts.value.isEmpty)
         await timer.store.send(.view(.scenePhaseChanged(.active)))
         await timer.store.finish()
-        #expect(bursts.value.count == 1)
+        #expect(bursts.value.isEmpty)
     }
 
     @Test
@@ -136,7 +132,64 @@ struct TimerSignalTests {
     }
 
     @Test
-    func test_closeConfirmation_stayRestartingCountdown_signalsThreeImmediately() async {
+    func test_hiddenTimer_runningWithSignals_suspendsTheCurrentRevision() async {
+        for showsStages in [false, true] {
+            var state = WorkoutTimerFeature.State.fixture(.running, elapsed: 1)
+            state.isSceneActive = true
+            state.signals.last = SignalMoment(state)
+            state.signals.announcedStageIndex = 0
+            state.signals.cueRevision = 4
+            state.haptic = HapticCue(kind: .stageStart, revision: 4)
+            let timer = TimerHarness(state, signals: true)
+            let suspends = LockIsolated<[Int]>([])
+            timer.store.dependencies.cues.suspend = { owner, revision in
+                #expect(owner == timerID)
+                suspends.withValue { $0.append(revision) }
+            }
+            let action: WorkoutTimerFeature.Action.View = showsStages ? .stagesButtonTapped : .closeButtonTapped
+            await timer.send(.view(action), saving: true) {
+                $0.run.pause(at: origin)
+                $0.settle(at: origin)
+                $0.clockGeneration = 2
+                $0.clockAnchor = nil
+                $0.requestedAwake = false
+                $0.awakeRevision = 2
+                $0.signals.last = nil
+                $0.haptic = nil
+                if showsStages {
+                    $0.path[id: 0] = .stageList($0.outline)
+                } else {
+                    $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
+                }
+            }
+            await timer.store.finish()
+            #expect(suspends.value == [4])
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func test_closeTimer_confirmedOrFinished_endsCuesBeforeDismissing(finished: Bool) async {
+        var state = WorkoutTimerFeature.State.fixture(finished ? .finished : .paused)
+        state.recordSync = .stored(nil)
+        if !finished { state.destination = .closeConfirmation(.closeConfirmation(restart: nil)) }
+        let timer = TimerHarness(state, signals: true)
+        let order = LockIsolated<[String]>([])
+        timer.store.dependencies.cues.end = { owner in
+            #expect(owner == timerID)
+            order.withValue { $0.append("end") }
+        }
+        timer.store.dependencies.dismiss = DismissEffect { order.withValue { $0.append("dismiss") } }
+        if finished {
+            await timer.store.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
+        } else {
+            await timer.store.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
+        }
+        await timer.store.finish()
+        #expect(order.value == ["end", "dismiss"])
+    }
+
+    @Test
+    func test_closeConfirmation_stayRestartingCountdown_signalsThreeAfterPreparation() async {
         var state = WorkoutTimerFeature.State.fixture(.idle)
         state.isSceneActive = true
         state.recordSync = .stored(nil)
@@ -149,11 +202,16 @@ struct TimerSignalTests {
             $0.clockGeneration = 2
             $0.requestedAwake = true
             $0.awakeRevision = 3
-            $0.signals.last = SignalMoment($0)
+            $0.isPreparingCountdown = true
             $0.signals.cueRevision = 1
-            $0.haptic = HapticCue(kind: .countdown, revision: 1)
         }
-        await timer.store.receive(.internal(.cueFinished(revision: 1, CueResult(failures: [.playerFailed])))) {
+        await timer.store.receive(.internal(.countdownPrepared(generation: 2, CueResult()))) {
+            $0.isPreparingCountdown = false
+            $0.signals.last = SignalMoment($0)
+            $0.signals.cueRevision = 2
+            $0.haptic = HapticCue(kind: .countdown, revision: 2)
+        }
+        await timer.store.receive(.internal(.cueFinished(revision: 2, CueResult(failures: [.playerFailed])))) {
             $0.cueFailures = [.tone]
         }
         await timer.cancelClockLoop()

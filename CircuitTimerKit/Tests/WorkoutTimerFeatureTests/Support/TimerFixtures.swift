@@ -74,6 +74,7 @@ extension WorkoutTimerFeature.State {
         var state = fresh(schedule)
         state.countdown = nil
         state.clockGeneration = 1
+        state.isPreparingCountdown = false
         switch phase {
             case .startCountdown:
                 state.countdown = WorkoutTimerFeature.Countdown(.start)
@@ -178,6 +179,7 @@ struct LateClock: Clock {
 
     let lateness: Duration
     let state = LockIsolated((now: Instant(offset: .zero), deadlines: [Instant]()))
+    let tolerances = LockIsolated<[Duration?]>([])
 
     var now: Instant {
         state.value.now
@@ -189,6 +191,7 @@ struct LateClock: Clock {
 
     func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         try Task.checkCancellation()
+        tolerances.withValue { $0.append(tolerance) }
         state.withValue {
             $0.deadlines.append(deadline)
             $0.now = deadline.advanced(by: lateness)
@@ -214,7 +217,9 @@ final class TimerHarness {
     let store: TestStoreOf<WorkoutTimerFeature>
 
     init(_ state: WorkoutTimerFeature.State, signals: Bool = false) {
+        var state = state
         if !signals {
+            state.isPreparingCountdown = false
             state.$isSoundOn = SharedReader(value: false)
             state.$isVibrationOn = SharedReader(value: false)
             state.$isSpeechOn = SharedReader(value: false)

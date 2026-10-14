@@ -43,13 +43,15 @@ public struct CueResult: Equatable, Sendable {
 
 @DependencyClient
 public struct CueClient: Sendable {
+    /// Reserves a revision and prepares the first beep without playing; later output uses a newer revision.
+    public var prepare: @Sendable (_ owner: UUID, _ revision: Int) async throws -> CueResult
     public var play: @Sendable (CueBurst) async throws -> CueResult
     public var suspend: @Sendable (_ owner: UUID, _ through: Int) async -> Void
     public var end: @Sendable (_ owner: UUID) async -> Void
 }
 
 extension CueClient: DependencyKey {
-    public static let previewValue = Self(play: { _ in CueResult() }, suspend: { _, _ in }, end: { _ in })
+    public static let previewValue = Self(prepare: { _, _ in CueResult() }, play: { _ in CueResult() }, suspend: { _, _ in }, end: { _ in })
     public static let testValue = Self()
 }
 
