@@ -14,6 +14,11 @@ import WorkoutStorage
 @Suite
 struct AppFeatureTimerTests {
     private struct WriteFailure: Error {}
+    private enum TeardownCall: Equatable, Sendable {
+        case session(UUID)
+        case cues(UUID)
+        case notifications(UUID)
+    }
 
     private let first = makeWorkout(1)
     private let second = makeWorkout(2)
@@ -203,17 +208,25 @@ struct AppFeatureTimerTests {
         #expect(calls.value.suffix(2) == [.end(id), .end(id)])
     }
 
-    @Test
-    func test_destinationDismiss_presentedTimer_endsSessionOnce() async {
-        let ends = LockIsolated<[UUID]>([])
-        let store = makeStore(loaded([first])) {
-            $0.timerSession.end = { owner in ends.withValue { $0.append(owner) } }
+    @Test(arguments: [false, true])
+    func test_destinationDismiss_timerEndsSessionCuesAndNotificationsInOrder(coverUp: Bool) async {
+        let owner = UUID(fixture: 7)
+        var state = loaded([first])
+        state.destination = .timer(Self.timer(owner, for: first))
+        state.isTimerCoverUp = coverUp
+        let calls = LockIsolated<[TeardownCall]>([])
+        let store = makeStore(state) {
+            $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
+            $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
+            $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
         }
 
-        await start(first, in: store)
-        await closeTimer(store)
-
-        #expect(ends.value == [UUID(0)])
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            if coverUp { $0.isTimerCoverUp = false }
+        }
+        await store.finish()
+        #expect(calls.value == [.session(owner), .cues(owner), .notifications(owner)])
     }
 
     @Test
