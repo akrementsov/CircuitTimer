@@ -53,9 +53,15 @@ public struct AppFeature: Sendable {
         case open(Workout.ID)
     }
 
-    public enum RootTab: Hashable, Sendable {
+    /// In the tab bar's order.
+    public enum RootTab: CaseIterable, Hashable, Sendable {
         case workouts
         case settings
+    }
+
+    public enum TabStep: Equatable, Sendable {
+        case next
+        case previous
     }
 
     @ObservableState
@@ -103,6 +109,7 @@ public struct AppFeature: Sendable {
         public enum View: Equatable, Sendable {
             case task
             case tabSelected(RootTab)
+            case tabSwiped(TabStep)
             case retryButtonTapped
             case addButtonTapped
             case workoutTapped(Workout.ID)
@@ -203,9 +210,17 @@ public struct AppFeature: Sendable {
                     }
                 }
 
-                state.selectedTab = tab
-                // Leaving the list drops its pending screen request, so it does not open when the user comes back.
-                state.deferredScreen = nil
+                select(tab, &state)
+                return .none
+            case let .tabSwiped(step):
+                let tabs = RootTab.allCases
+                guard let index = tabs.firstIndex(of: state.selectedTab) else { return .none }
+
+                let neighbor = step == .next ? index + 1 : index - 1
+                // Past the first or the last tab a swipe turns nowhere.
+                guard tabs.indices.contains(neighbor) else { return .none }
+
+                select(tabs[neighbor], &state)
                 return .none
             case .retryButtonTapped:
                 return loadWorkouts(&state)
@@ -343,6 +358,12 @@ public struct AppFeature: Sendable {
                 }
                 return .none
         }
+    }
+
+    private func select(_ tab: RootTab, _ state: inout State) {
+        state.selectedTab = tab
+        // Leaving the list drops its pending screen request, so it does not open when the user comes back.
+        state.deferredScreen = nil
     }
 
     /// Opens the screen now, or once pending writes and reloads are done so it never shows a stale workout.

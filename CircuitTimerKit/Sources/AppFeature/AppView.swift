@@ -19,6 +19,7 @@ public struct AppView: View {
         // No tint or bar background here: the selected tab takes the accent color, the bar stays the system one.
         TabView(selection: $store.selectedTab.sending(\.view.tabSelected)) {
             workoutsTab
+                .onPageSwipe { send(.tabSwiped(.next)) } backward: { send(.tabSwiped(.previous)) }
                 .tabItem {
                     Label {
                         Text("tabs.workouts", bundle: .module)
@@ -28,6 +29,7 @@ public struct AppView: View {
                 }
                 .tag(AppFeature.RootTab.workouts)
             SettingsView(store: store.scope(\.settings, action: \.settings))
+                .onPageSwipe { send(.tabSwiped(.next)) } backward: { send(.tabSwiped(.previous)) }
                 .tabItem {
                     Label {
                         Text("tabs.settings", bundle: .module)
