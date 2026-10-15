@@ -176,4 +176,51 @@ struct AppFeatureTabTests {
             $0.workouts = .loaded([renamed])
         }
     }
+
+    @Test
+    func test_tabSwiped_nextFromWorkouts_selectsSettingsDropsDeferredScreenKeepsSettingsPath() async {
+        var state = loaded([first, second])
+        state.pendingMutations = [.delete(UUID(fixture: 99))]
+        state.deferredScreen = .create
+        let store = makeStore(state) {
+            $0.appVersion.shortVersion = { "1.2" }
+        }
+        await store.send(.settings(.view(.aboutTapped))) {
+            $0.settings.path[id: 0] = .about(version: "1.2")
+        }
+
+        await store.send(.view(.tabSwiped(.next))) {
+            $0.selectedTab = .settings
+            $0.deferredScreen = nil
+        }
+    }
+
+    @Test
+    func test_tabSwiped_previousFromSettingsWithPushedScreen_selectsWorkoutsKeepsSettingsPath() async {
+        var state = loaded([first])
+        state.selectedTab = .settings
+        let store = makeStore(state) {
+            $0.appVersion.shortVersion = { "1.2" }
+        }
+        await store.send(.settings(.view(.aboutTapped))) {
+            $0.settings.path[id: 0] = .about(version: "1.2")
+        }
+
+        // The UI sends no swipe over a pushed screen; the reducer still never takes one for a re-tap.
+        await store.send(.view(.tabSwiped(.previous))) { $0.selectedTab = .workouts }
+    }
+
+    @Test(arguments: [
+        (AppFeature.RootTab.workouts, AppFeature.TabStep.previous),
+        (.settings, .next),
+    ])
+    func test_tabSwiped_pastEitherEnd_changesNothing(tab: AppFeature.RootTab, step: AppFeature.TabStep) async {
+        var state = loaded([first, second])
+        state.selectedTab = tab
+        state.pendingMutations = [.delete(UUID(fixture: 99))]
+        state.deferredScreen = .create
+        let store = makeStore(state)
+
+        await store.send(.view(.tabSwiped(step)))
+    }
 }
