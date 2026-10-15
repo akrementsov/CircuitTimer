@@ -298,10 +298,6 @@ struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
     let onEnded: (CGFloat) -> Void
     let onCancelled: () -> Void
 
-    /// How far the row would travel after the finger lifts: the share of a second the velocity carries it, as
-    /// SwiftUI's predicted translation roughly does.
-    private static let projection: CGFloat = 0.25
-
     func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
         Coordinator()
     }
@@ -322,7 +318,8 @@ struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
             case .began, .changed:
                 onChanged(CGSize(width: translation.x, height: translation.y))
             case .ended:
-                onEnded(translation.x + recognizer.velocity(in: recognizer.view).x * Self.projection)
+                let velocity = recognizer.velocity(in: recognizer.view)
+                onEnded(PanProjection.predictedEnd(translation: translation.x, velocity: velocity.x))
             case .cancelled, .failed:
                 onCancelled()
             default:
