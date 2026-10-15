@@ -7,10 +7,18 @@ import Testing
 struct CallbackBridgeTests {
     @Test
     func test_wait_cancelled_throwsCancellationError() async throws {
-        let bridge = CallbackBridge<Int>()
-        let task = Task { try await bridge.wait(timeout: .seconds(2), clock: TestClock<Duration>()) }
-        task.cancel()
-        await #expect(throws: CancellationError.self) { try await task.value }
+        try await withMainSerialExecutor {
+            let clock = TestClock<Duration>()
+            let bridge = CallbackBridge<Int>()
+            let task = Task { try await bridge.wait(timeout: .seconds(2), clock: clock) }
+            await #expect(throws: (any Error).self) { try await clock.checkSuspension() }
+            task.cancel()
+            await #expect(throws: CancellationError.self) { try await task.value }
+            try await clock.checkSuspension()
+            await clock.advance(by: .seconds(2))
+            bridge.resolve(.success(1))
+            await #expect(throws: CancellationError.self) { try await task.value }
+        }
     }
 
     @Test

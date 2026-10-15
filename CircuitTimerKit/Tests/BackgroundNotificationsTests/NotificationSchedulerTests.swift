@@ -2,7 +2,6 @@
 
 import Dependencies
 import Foundation
-import os
 import Testing
 
 struct NotificationSchedulerTests: Sendable {
@@ -81,6 +80,7 @@ struct NotificationSchedulerTests: Sendable {
         let report = try await operation.value
         #expect(report.superseded)
         #expect(fake.removed.contains(oldID))
+        #expect(fake.removedDelivered.contains(oldID))
         let afterEnd = try await scheduler.sync(
             owner,
             revision: 2,
@@ -109,12 +109,12 @@ struct NotificationSchedulerTests: Sendable {
         #expect(fake.removed.isEmpty)
     }
 
-    @Test
-    func test_sync_expiredEvent_doesNotMoveItIntoTheFuture() async throws {
+    @Test(arguments: [-1.0, 0.0])
+    func test_sync_expiredEvent_doesNotMoveItIntoTheFuture(interval: TimeInterval) async throws {
         let fake = NotificationFake()
         let scheduler = NotificationScheduler(transport: fake.transport)
         let report = try await scheduler.sync(
-            owner, revision: 1, plan: [notification(after: -1)], now: { now }, clock: TestClock<Duration>()
+            owner, revision: 1, plan: [notification(after: interval)], now: { now }, clock: TestClock<Duration>()
         )
         #expect(fake.added.isEmpty)
         #expect(report.expired == 1)
@@ -153,10 +153,12 @@ struct NotificationSchedulerTests: Sendable {
         await clock.advance(by: .milliseconds(500))
         #expect(try await retry.value == false)
         #expect(fake.pendingReads == 1)
+        #expect(fake.deliveredReads == 1)
         await clock.advance(by: .seconds(29))
         let renewed = Task { try await scheduler.removeOrphans(clock: clock) }
         await fake.waitForPending(count: 2)
         #expect(fake.pendingReads == 2)
+        #expect(fake.deliveredReads == 2)
         fake.completePending()
         #expect(try await renewed.value)
     }
@@ -278,132 +280,5 @@ struct NotificationSchedulerTests: Sendable {
 
     private func notification(after seconds: TimeInterval) -> ScheduledNotification {
         ScheduledNotification(key: "stage-1", fireDate: now.addingTimeInterval(seconds), title: "Workout", body: "Work", isAudible: true)
-    }
-}
-
-private final class NotificationFake: Sendable {
-    private struct State {
-        var added: [String] = []
-        var pending: Set<String> = []
-        var removed: [String] = []
-        var recordsPending = true
-        var holdsAdd = false
-        var holdsPending = false
-        var pendingReads = 0
-        var pendingWaitCount = 1
-        var holdsSettings = false
-        var settingsReads = 0
-        var settingsWaitCount = 1
-        var settingsWaiter: AsyncStream<Void>.Continuation?
-        var addFailure: NotificationFailure?
-        var addCallbacks: [@Sendable (Result<Void, NotificationFailure>) -> Void] = []
-        var pendingCallbacks: [@Sendable ([String]) -> Void] = []
-        var addWaiter: AsyncStream<Void>.Continuation?
-        var pendingWaiter: AsyncStream<Void>.Continuation?
-    }
-    private let state = OSAllocatedUnfairLock(initialState: State())
-    var added: [String] { state.withLock { $0.added } }
-    var removed: [String] { state.withLock { $0.removed } }
-    var settingsReads: Int { state.withLock { $0.settingsReads } }
-    var holdsSettings: Bool {
-        get { state.withLock { $0.holdsSettings } }
-        set { state.withLock { $0.holdsSettings = newValue } }
-    }
-    var pendingReads: Int { state.withLock { $0.pendingReads } }
-    var addFailure: NotificationFailure? {
-        get { state.withLock { $0.addFailure } }
-        set { state.withLock { $0.addFailure = newValue } }
-    }
-    var recordsPending: Bool {
-        get { state.withLock { $0.recordsPending } }
-        set { state.withLock { $0.recordsPending = newValue } }
-    }
-    var holdsAdd: Bool {
-        get { state.withLock { $0.holdsAdd } }
-        set { state.withLock { $0.holdsAdd = newValue } }
-    }
-    var holdsPending: Bool {
-        get { state.withLock { $0.holdsPending } }
-        set { state.withLock { $0.holdsPending = newValue } }
-    }
-    var transport: NotificationTransport {
-        NotificationTransport(
-            settings: { [self] callback in
-                let held = state.withLock { state in
-                    state.settingsReads += 1
-                    if state.settingsReads >= state.settingsWaitCount { state.settingsWaiter?.yield(()) }
-                    return state.holdsSettings
-                }
-                if !held { callback(.authorized) }
-            },
-            authorize: { $0(.success(())) },
-            add: { [self] id, _, _, _, callback in
-                let (held, failure) = state.withLock { state in
-                    state.added.append(id)
-                    if state.recordsPending && state.addFailure == nil { state.pending.insert(id) }
-                    state.addWaiter?.yield(())
-                    if state.holdsAdd { state.addCallbacks.append(callback) }
-                    return (state.holdsAdd, state.addFailure)
-                }
-                if !held {
-                    if let failure { callback(.failure(failure)) } else { callback(.success(())) }
-                }
-            },
-            pending: { [self] callback in
-                let result = state.withLock { state -> [String]? in
-                    state.pendingReads += 1
-                    if state.pendingReads >= state.pendingWaitCount { state.pendingWaiter?.yield(()) }
-                    if state.holdsPending { state.pendingCallbacks.append(callback); return nil }
-                    return Array(state.pending)
-                }
-                if let result { callback(result) }
-            },
-            delivered: { $0([]) },
-            removePending: { [self] ids in state.withLock { $0.removed += ids; $0.pending.subtract(ids) } },
-            removeDelivered: { _ in }
-        )
-    }
-    func completeAdds() {
-        let callbacks = state.withLock { state in
-            let callbacks = state.addCallbacks
-            state.addCallbacks = []
-            return callbacks
-        }
-        for callback in callbacks { callback(.success(())) }
-    }
-    func completePending() {
-        let (callbacks, ids) = state.withLock { state in
-            let callbacks = state.pendingCallbacks
-            state.pendingCallbacks = []
-            state.holdsPending = false
-            return (callbacks, Array(state.pending))
-        }
-        for callback in callbacks { callback(ids) }
-    }
-    func waitForAdd() async {
-        let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        state.withLock { state in
-            state.addWaiter = pair.continuation
-            if !state.added.isEmpty { pair.continuation.yield(()) }
-        }
-        for await _ in pair.stream { break }
-    }
-    func waitForSettings(count: Int) async {
-        let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        state.withLock { state in
-            state.settingsWaiter = pair.continuation
-            state.settingsWaitCount = count
-            if state.settingsReads >= count { pair.continuation.yield(()) }
-        }
-        for await _ in pair.stream { break }
-    }
-    func waitForPending(count: Int = 1) async {
-        let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        state.withLock { state in
-            state.pendingWaiter = pair.continuation
-            state.pendingWaitCount = count
-            if state.pendingReads >= count { pair.continuation.yield(()) }
-        }
-        for await _ in pair.stream { break }
     }
 }
