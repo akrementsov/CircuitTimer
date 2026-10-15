@@ -45,7 +45,7 @@ enum PageSwipeDecision {
 
 /// A zero-size view that puts a UIKit pan on its tab's view, which holds the navigation bar with its title and the whole
 /// screen: a SwiftUI gesture on the root's content never reaches the bar.
-private struct PageSwipeProbe: UIViewRepresentable {
+struct PageSwipeProbe: UIViewRepresentable {
     let forward: @MainActor () -> Void
     let backward: @MainActor () -> Void
 
@@ -67,7 +67,7 @@ private struct PageSwipeProbe: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: PageSwipeProbe
-        private let recognizer = UIPanGestureRecognizer()
+        let recognizer = UIPanGestureRecognizer()
         /// The tab's own controller, a child of the tab bar controller.
         private weak var tab: UIViewController?
 
@@ -96,7 +96,7 @@ private struct PageSwipeProbe: UIViewRepresentable {
 
         /// The tab's stack root, while it is on top and nothing moves: a swipe never leaves a pushed screen or one being
         /// pushed or popped.
-        private var restingRoot: UIViewController? {
+        var restingRoot: UIViewController? {
             guard
                 let navigation = tab.flatMap(Self.navigationController(in:)),
                 let root = navigation.viewControllers.first,
@@ -140,7 +140,10 @@ private struct PageSwipeProbe: UIViewRepresentable {
             return abs(velocity.x) > abs(velocity.y)
         }
 
-        /// A row under the finger swipes or lifts first; the page turns only when neither takes the touch.
+        /// A row under the finger swipes or lifts first; the page turns only when neither takes the touch. Before iOS 18
+        /// the row's swipe is a SwiftUI drag with no recognizer of its own to wait for: SwiftUI's recognizer holds this
+        /// pan while that drag can still begin and fails it when the drag does, though the pan asks to begin 2 pt into a
+        /// fine-step drag. A row's button alone holds nothing. Measured on iOS 17.5.
         func gestureRecognizer(
             _ recognizer: UIGestureRecognizer,
             shouldRequireFailureOf other: UIGestureRecognizer
@@ -154,14 +157,14 @@ private struct PageSwipeProbe: UIViewRepresentable {
             return false
         }
 
-        private static func tabController(of view: UIView) -> UIViewController? {
+        static func tabController(of view: UIView) -> UIViewController? {
             let nearest = sequence(first: view as UIResponder, next: \.next).lazy.compactMap { $0 as? UIViewController }.first
             guard let nearest else { return nil }
 
             return sequence(first: nearest, next: \.parent).first { $0.parent is UITabBarController }
         }
 
-        private static func navigationController(in controller: UIViewController) -> UINavigationController? {
+        static func navigationController(in controller: UIViewController) -> UINavigationController? {
             if let navigation = controller as? UINavigationController {
                 return navigation
             }

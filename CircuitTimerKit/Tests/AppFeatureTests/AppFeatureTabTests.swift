@@ -180,6 +180,7 @@ struct AppFeatureTabTests {
     @Test
     func test_tabSwiped_nextFromWorkouts_selectsSettingsDropsDeferredScreenKeepsSettingsPath() async {
         var state = loaded([first, second])
+        // A pending write keeps the requested screen deferred, so the swipe can drop it.
         state.pendingMutations = [.delete(UUID(fixture: 99))]
         state.deferredScreen = .create
         let store = makeStore(state) {
