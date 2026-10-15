@@ -30,6 +30,7 @@ struct WorkoutListView: View {
                     onMove: { send(.workoutsMoved(IndexSet(integer: $0), $1)) },
                     row: { row($0, isOpen: swipedID == $0.id, isLifting: isLifting) }
                 )
+                NotificationCleanupNotice(store: store)
                 HiddenRecordsNotice(recordCount: hiddenRecordCount)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

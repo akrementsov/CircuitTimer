@@ -2,6 +2,7 @@
 @testable import WorkoutTimerFeature
 
 import BackgroundExecution
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import WorkoutDomain
@@ -15,13 +16,17 @@ func loaded(_ workouts: [Workout]) -> AppFeature.State {
 @MainActor
 func makeStore(
     _ state: AppFeature.State,
+    notificationsEnabled: Bool = false,
     dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<AppFeature> {
+    state.settings.$isBackgroundNotificationsOn.withLock { $0 = notificationsEnabled }
     let revisions = LockIsolated(0)
     return TestStore(initialState: state) {
         AppFeature()
     } withDependencies: {
         $0.cues = .previewValue
+        $0.backgroundNotifications.removeOrphans = { true }
+        $0.backgroundNotifications.end = { _ in }
         $0.uuid = .incrementing
         $0.continuousClock = TestClock<Duration>()
         $0.backgroundTask = BackgroundTaskClient(begin: { _ in .invalid }, end: { _ in })

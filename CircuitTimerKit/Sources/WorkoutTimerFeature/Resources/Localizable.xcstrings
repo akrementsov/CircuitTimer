@@ -437,6 +437,166 @@
         }
       }
     },
+    "timer.notifications.alertsOff" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification alerts are off in iOS Settings. Background stage changes may not appear."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показ уведомлений выключен в настройках iOS. Смена этапов в фоне может не отобразиться."
+          }
+        }
+      }
+    },
+    "timer.notifications.coverage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Background alerts cover the next 32 stage changes or finish, up to a manual pause. Sound follows Sound in Settings. iOS controls delivery and sound; open CircuitTimer to extend coverage."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В фоне уведомления охватывают ближайшие 32 смены этапа или завершение, до ручной паузы. Звук следует настройке «Звук». Показом и звуком управляет iOS; открывайте CircuitTimer для следующих уведомлений."
+          }
+        }
+      }
+    },
+    "timer.notifications.denied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are denied. Enable them in Settings → CircuitTimer → Notifications."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомления запрещены. Включите их: Настройки → CircuitTimer → Уведомления."
+          }
+        }
+      }
+    },
+    "timer.notifications.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some background notifications could not be confirmed. CircuitTimer will retry while open."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не все фоновые уведомления удалось подтвердить. CircuitTimer повторит попытку, пока приложение открыто."
+          }
+        }
+      }
+    },
+    "timer.notifications.finished" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workout finished."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка завершена."
+          }
+        }
+      }
+    },
+    "timer.notifications.notAsked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification permission will be requested the next time you start a workout. You can also enable notifications in iOS Settings."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer запросит разрешение при следующем запуске тренировки. Также можно включить уведомления в настройках iOS."
+          }
+        }
+      }
+    },
+    "timer.notifications.off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Background notifications are off. Enable them in CircuitTimer Settings."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фоновые уведомления выключены. Включите их в настройках CircuitTimer."
+          }
+        }
+      }
+    },
+    "timer.notifications.reopen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open CircuitTimer to keep receiving stage notifications."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте CircuitTimer, чтобы получать уведомления о следующих этапах."
+          }
+        }
+      }
+    },
+    "timer.notifications.stage %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting: %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начинается: %@"
+          }
+        }
+      }
+    },
+    "timer.notifications.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification access is unknown. Background alerts may be unavailable."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось проверить доступ к уведомлениям. Фоновые уведомления могут не прийти."
+          }
+        }
+      }
+    },
     "timer.record.failed" : {
       "localizations" : {
         "en" : {

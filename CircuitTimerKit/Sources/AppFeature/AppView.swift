@@ -9,6 +9,7 @@ import WorkoutTimerFeature
 
 @ViewAction(for: AppFeature.self)
 public struct AppView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable public var store: StoreOf<AppFeature>
 
     public init(store: StoreOf<AppFeature>) {
@@ -39,9 +40,11 @@ public struct AppView: View {
         }
         .tabBarOnlyOnRoots()
         .task { send(.task) }
+        .onChange(of: scenePhase, initial: true) { _, phase in send(.scenePhaseChanged(phase)) }
         // Presented over the tab bar, so the write-failure alert shows on either tab.
         .alert($store.scope(\.$destination, action: \.destination).alert)
         .alert($store.scope(\.$destination, action: \.destination).resumeRun)
+        .alert($store.scope(\.$destination, action: \.destination).permissionStalled)
         // Full screen over the tab bar, with no swipe to dismiss: the timer closes only through its own X.
         .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
             WorkoutTimerStack(store: timerStore)
@@ -92,6 +95,7 @@ public struct AppView: View {
                         .font(.token(.body))
                         .foregroundStyle(.text(.secondary))
                     HiddenRecordsNotice(recordCount: store.hiddenRecordCount)
+                    NotificationCleanupNotice(store: store, alignment: .center)
                 }
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, .token(spacing: .l))

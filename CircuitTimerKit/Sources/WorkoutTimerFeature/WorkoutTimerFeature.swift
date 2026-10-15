@@ -1,4 +1,5 @@
 import BackgroundExecution
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import os
@@ -80,6 +81,8 @@ public struct WorkoutTimerFeature: Sendable {
         @SharedReader(.soundSignals) var isSoundOn = true
         @SharedReader(.vibrationSignals) var isVibrationOn = true
         @SharedReader(.spokenStageNames) var isSpeechOn = true
+        @SharedReader(.backgroundNotifications) var isBackgroundNotificationsOn = true
+        var notifications = NotificationState()
         var signals = SignalTrack()
         var isSceneActive = false
         var haptic: HapticCue?
@@ -135,6 +138,7 @@ public struct WorkoutTimerFeature: Sendable {
             case nextButtonTapped
             case stagesButtonTapped
             case scenePhaseChanged(ScenePhase)
+            case notificationPreferencesChanged
         }
 
         @CasePathable
@@ -146,12 +150,15 @@ public struct WorkoutTimerFeature: Sendable {
             case clockFailed(generation: Int)
             case cueFinished(revision: Int, CueResult)
             case recordWritten(revision: Int, succeeded: Bool)
+            case notificationAccessLoaded(generation: Int, NotificationAccess?)
+            case notificationsSynced(revision: Int, report: NotificationSyncReport?)
         }
     }
 
     enum CancelID: Hashable, Sendable {
         case clock(generation: Int)
         case cues
+        case notificationAccess
     }
 
     /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
@@ -159,11 +166,13 @@ public struct WorkoutTimerFeature: Sendable {
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WorkoutTimer")
 
+    @Dependency(\.backgroundNotifications) var backgroundNotifications
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.cues) var cues
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.preferredLocales) var preferredLocales
     @Dependency(\.timerSession) var timerSession
     @Dependency(\.workoutRunRecord) var workoutRunRecord
 
@@ -192,7 +201,7 @@ public struct WorkoutTimerFeature: Sendable {
             // Presentation and stack reducers settle visibility before cues compare the screen's moment.
             if case .destination(.presented(.closeConfirmation(.finish))) = action { return .none }
             if case .view(.closeButtonTapped) = action, state.snapshot.status == .finished { return .none }
-            return .merge(signal(&state), syncScreenAwake(&state))
+            return .merge(signal(&state), syncScreenAwake(&state), syncNotifications(&state, after: action, at: date()))
         }
     }
 
@@ -202,7 +211,8 @@ public struct WorkoutTimerFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         // The close alert relies on a stopped clock; a control that slips under it would restart the clock or
         // replace the alert. Leaving and coming back still count: the clock is stopped, and the run is saved.
-        if action != .task, !action.is(\.scenePhaseChanged), state.destination != nil { return .none }
+        if action != .task, !action.is(\.scenePhaseChanged), action != .notificationPreferencesChanged,
+           state.destination != nil { return .none }
 
         let now = date()
         switch action {
@@ -211,6 +221,8 @@ public struct WorkoutTimerFeature: Sendable {
                 guard state.clockGeneration == 0 else { return .none }
 
                 return syncClock(&state, at: now)
+            case .notificationPreferencesChanged:
+                return .none
             case .closeButtonTapped:
                 return close(&state, at: now)
             case .playPauseButtonTapped:
@@ -226,6 +238,13 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
+            case let .notificationAccessLoaded(generation, access):
+                guard generation == state.notifications.accessGeneration, state.isBackgroundNotificationsOn else { return .none }
+                state.notifications.access = access
+                return .none
+            case let .notificationsSynced(revision, report):
+                notificationsSynced(revision: revision, report: report, &state)
+                return .none
             case let .cueFinished(revision, result):
                 cueFinished(revision: revision, result: result, &state)
                 return .none
@@ -401,12 +420,15 @@ public struct WorkoutTimerFeature: Sendable {
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the closed workout run")
+        let id = state.id
+        let notifications = backgroundNotifications
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        return .merge(.cancel(id: CancelID.cues), .run { [timerSession, cues, dismiss, workoutRunRecord, backgroundTask, id = state.id] _ in
+        let close = Effect<Action>.run { [timerSession, cues, notifications, dismiss, workoutRunRecord, backgroundTask] _ in
             await timerSession.end(owner: id)
             await cues.end(id)
+            await notifications.end(id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that, so a cancellation is no failure.
@@ -419,7 +441,8 @@ public struct WorkoutTimerFeature: Sendable {
                 Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
             }
             await backgroundTask.end(token)
-        })
+        }
+        return .merge(.cancel(id: CancelID.cues), close)
     }
 
     /// Handles a clock jump, commits the progress made by `now` and returns whether the clock must follow:

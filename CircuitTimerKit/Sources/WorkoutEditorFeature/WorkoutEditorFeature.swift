@@ -206,6 +206,11 @@ public struct WorkoutEditorFeature: Sendable {
             phase == .viewing && workout.isPlayable && !isStarting
         }
 
+        /// Releases Start when its container cancels a pending permission decision.
+        public mutating func cancelStart() {
+            isStarting = false
+        }
+
         /// The same cells serve both phases: read-only they show what the stored workout plays, and the pencil
         /// turns them into the draft's controls, as the original app did.
         public var isEditable: Bool {
@@ -435,10 +440,8 @@ public struct WorkoutEditorFeature: Sendable {
             case .startButtonTapped:
                 guard state.canStart else { return .none }
 
-                // The container presents the timer and then empties the stack under it, so this screen goes away.
-                // It refuses only an unplayable workout, which `canStart` excludes, or something already presented:
-                // an alert is modal, so Start cannot be tapped under it, and a timer comes only from this flag's
-                // first tap. The flag only blocks Start; Back keeps working.
+                // Permission may delay presentation. The container releases Start if that intent is cancelled;
+                // the flag blocks another Start while Back and editing remain available.
                 state.isStarting = true
                 return .send(.delegate(.startRequested(state.workout)))
         }

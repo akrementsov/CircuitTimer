@@ -1,4 +1,5 @@
 import AppFeature
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import os
@@ -14,6 +15,8 @@ struct CircuitTimerApp: App {
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "App")
 
     init() {
+        @Dependency(\.backgroundNotifications) var notifications
+        notifications.installForegroundSuppression()
         // Once per launch, before any tip shows. Without it tips stay hidden; what they explain is said elsewhere too.
         do {
             try Tips.configure([.datastoreLocation(.applicationDefault), .displayFrequency(.immediate)])

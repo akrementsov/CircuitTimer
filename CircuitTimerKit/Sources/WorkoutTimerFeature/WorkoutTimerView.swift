@@ -44,20 +44,24 @@ public struct WorkoutTimerView: View {
                 .frame(height: 98 * unit)
                 .padding(.horizontal, .token(spacing: .xxxl))
                 .padding(.top, .token(spacing: .xxl))
-                if store.showsAudioFailure {
-                    signalFootnote("timer.signals.failed")
+                ScrollView {
+                    VStack(spacing: .zero) {
+                        if store.showsAudioFailure {
+                            signalFootnote("timer.signals.failed")
+                        }
+                        if store.showsVoiceFailure, !voiceOverEnabled {
+                            signalFootnote("timer.signals.noVoice")
+                        }
+                        if store.hasRecordFailed {
+                            signalFootnote("timer.record.failed")
+                        }
+                        if let key = store.notificationFootnote {
+                            signalFootnote(LocalizedStringKey(key))
+                        }
+                    }
                 }
-                if store.showsVoiceFailure, !voiceOverEnabled {
-                    signalFootnote("timer.signals.noVoice")
-                }
-                if store.hasRecordFailed {
-                    Text("timer.record.failed", bundle: .module)
-                        .font(.token(.footnote))
-                        .foregroundStyle(.text(.secondary))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, .token(spacing: .l))
-                        .padding(.top, .token(spacing: .m))
-                }
+                .scrollIndicators(.hidden)
+                .frame(maxHeight: .infinity)
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }

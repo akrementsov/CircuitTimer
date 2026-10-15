@@ -2,6 +2,7 @@
 @testable import WorkoutDomain
 @testable import WorkoutTimerFeature
 
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
@@ -218,6 +219,7 @@ final class TimerHarness {
 
     init(_ state: WorkoutTimerFeature.State, signals: Bool = false) {
         var state = state
+        state.$isBackgroundNotificationsOn = SharedReader(value: false)
         if !signals {
             state.isPreparingCountdown = false
             state.$isSoundOn = SharedReader(value: false)
@@ -247,6 +249,7 @@ final class TimerHarness {
         store = TestStore(initialState: state) {
             WorkoutTimerFeature()
         } withDependencies: {
+            $0.backgroundNotifications.end = { _ in }
             $0.cues = .previewValue
             $0.workoutRunRecord = WorkoutRunRecordClient(
                 nextRevision: { revisions.withValue { $0 += 1; return $0 } },
