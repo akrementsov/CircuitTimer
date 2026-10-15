@@ -22,6 +22,13 @@ public struct WorkoutTimerStack: View {
         }
         // The back button is white, like the legacy bar.
         .tint(.text(.primary))
+        // Shared app-storage values can change outside this view; keep the live queue in sync.
+        .onChange(of: store.isBackgroundNotificationsOn) { _, _ in
+            send(.notificationPreferencesChanged)
+        }
+        .onChange(of: store.isSoundOn) { _, _ in
+            send(.notificationPreferencesChanged)
+        }
         // Here rather than on the timer view, which leaves the screen while the stage list is open. The initial phase
         // counts too: the app may leave before the cover has rendered.
         .onChange(of: scenePhase, initial: true) { _, phase in

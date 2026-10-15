@@ -1,6 +1,7 @@
 @testable import AppFeature
 @testable import WorkoutTimerFeature
 
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
@@ -45,9 +46,13 @@ struct AppFeatureRunRestoreTests {
         let wall = now.addingTimeInterval(4)
         let restored = try WorkoutRun(schedule: WorkoutSchedule(workout: workout), restoring: saved.record, at: wall)
         let ends = LockIsolated<[UUID]>([])
-        let store = offered(saved) {
+        let accesses = LockIsolated(0)
+        let requests = LockIsolated(0)
+        let store = offered(saved, notificationsEnabled: true) {
             $0.date = .constant(wall)
             $0.timerSession.end = { id in ends.withValue { $0.append(id) } }
+            $0.backgroundNotifications.access = { accesses.withValue { $0 += 1 }; return .authorized }
+            $0.backgroundNotifications.requestAuthorization = { requests.withValue { $0 += 1 }; return .authorized }
         }
 
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
@@ -63,6 +68,11 @@ struct AppFeatureRunRestoreTests {
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(4))
         #expect(store.state.destination?[case: \.timer]?.countdown == nil)
+        #expect(store.state.destination?[case: \.timer]?.id == UUID(0))
+        #expect(store.state.destination?[case: \.timer]?.run.schedule == WorkoutSchedule(workout: workout))
+        #expect(store.state.startIntent == nil)
+        #expect(accesses.value == 0)
+        #expect(requests.value == 0)
         await store.send(.view(.timerCoverAppeared)) {
             $0.isTimerCoverUp = true
             $0.runRestore = .resolved
@@ -73,6 +83,22 @@ struct AppFeatureRunRestoreTests {
         }
         await store.finish()
         #expect(ends.value == [UUID(0)])
+    }
+
+    @Test
+    func test_cleanup_stalled_preservesOfferedResumeAlertAndRun() async throws {
+        let saved = try stored(.paused)
+        let store = offered(saved)
+        await store.send(.internal(.notificationCleanupFinished(false))) {
+            $0.isNotificationCleanupStalled = true
+        }
+        #expect(store.state.runRestore == .offered(saved))
+        #expect(store.state.destination == .resumeRun(.resumeRun(workoutName: workout.name)))
+        #expect(store.state.startIntent == nil)
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            $0.runRestore = .resolved
+        }
     }
 
     @Test
@@ -340,12 +366,13 @@ struct AppFeatureRunRestoreTests {
 
     private func offered(
         _ saved: StoredRunRecord,
+        notificationsEnabled: Bool = false,
         dependencies: (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<AppFeature> {
         var state = loaded([workout])
         state.runRestore = .offered(saved)
         state.destination = .resumeRun(.resumeRun(workoutName: workout.name))
-        return makeStore(state, dependencies: dependencies)
+        return makeStore(state, notificationsEnabled: notificationsEnabled, dependencies: dependencies)
     }
 
     private struct SaveFailure: Error {}

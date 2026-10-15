@@ -81,6 +81,150 @@
         }
       }
     },
+    "settings.notifications.alertsOff" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification alerts are off. Enable them in iOS Settings to see stage changes in the background."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показ уведомлений выключен. Включите его в настройках iOS, чтобы видеть смену этапов в фоне."
+          }
+        }
+      }
+    },
+    "settings.notifications.coverage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows workout and stage names on the Lock Screen. Sound follows Sound above. Covers the next 32 transitions, up to a manual pause; reopen CircuitTimer to extend coverage. iOS controls delivery and sound."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывает названия тренировки и этапов на экране блокировки. Звук следует переключателю выше. Охватывает ближайшие 32 перехода, до ручной паузы; открывайте CircuitTimer для следующих уведомлений. Показом и звуком управляет iOS."
+          }
+        }
+      }
+    },
+    "settings.notifications.denied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are denied. Enable them in iOS Settings."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомления запрещены. Включите их в настройках iOS."
+          }
+        }
+      }
+    },
+    "settings.notifications.notAsked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer asks for notification permission before the first workout starts."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer запросит разрешение на уведомления перед первым запуском тренировки."
+          }
+        }
+      }
+    },
+    "settings.notifications.off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Background notifications are off. Turning this on does not request permission."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фоновые уведомления выключены. Включение не запрашивает разрешение."
+          }
+        }
+      }
+    },
+    "settings.notifications.openFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not open Settings. Try again, or go to Settings → CircuitTimer → Notifications."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось открыть настройки. Повторите попытку или перейдите: Настройки → CircuitTimer → Уведомления."
+          }
+        }
+      }
+    },
+    "settings.notifications.openSettings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open iOS Settings"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Открыть настройки iOS"
+          }
+        }
+      }
+    },
+    "settings.notifications.toggle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Background notifications"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фоновые уведомления"
+          }
+        }
+      }
+    },
+    "settings.notifications.unknown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification access is unknown. Reopen this screen or check iOS Settings."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ к уведомлениям неизвестен. Откройте этот экран снова или проверьте настройки iOS."
+          }
+        }
+      }
+    },
     "settings.screen.keepOn" : {
       "localizations" : {
         "en" : {

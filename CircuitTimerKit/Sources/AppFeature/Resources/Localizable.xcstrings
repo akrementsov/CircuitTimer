@@ -277,6 +277,102 @@
         }
       }
     },
+    "workouts.notifications.cleanupRetry" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try again"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторить"
+          }
+        }
+      }
+    },
+    "workouts.notifications.cleanupStalled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications from an earlier session may still arrive: iOS hasn't answered the cleanup. Wait 30 seconds before trying again, or reopen the app later."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уведомления из прошлого запуска ещё могут прийти: iOS не ответила на очистку. Подождите 30 секунд перед повторной попыткой или откройте приложение позже."
+          }
+        }
+      }
+    },
+    "workouts.permissionStalled.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can start now. Background notifications begin once iOS reports permission."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Можно начать сейчас. Уведомления в фоне заработают, когда iOS сообщит о разрешении."
+          }
+        }
+      }
+    },
+    "workouts.permissionStalled.startNow" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start now"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать сейчас"
+          }
+        }
+      }
+    },
+    "workouts.permissionStalled.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification permission hasn't answered yet"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешение на уведомления пока без ответа"
+          }
+        }
+      }
+    },
+    "workouts.permissionStalled.wait" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wait"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подождать"
+          }
+        }
+      }
+    },
     "workouts.restoreFailed.message" : {
       "localizations" : {
         "en" : {

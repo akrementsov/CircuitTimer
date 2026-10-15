@@ -1,8 +1,11 @@
 import BackgroundExecution
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import os
 import SettingsFeature
+import SwiftUI
+import TimerPreferences
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutStorage
@@ -18,12 +21,15 @@ public struct AppFeature: Sendable {
         case alert(AlertState<Never>)
         @ReducerCaseIgnored
         case resumeRun(AlertState<ResumeRunChoice>)
+        @ReducerCaseIgnored
+        case permissionStalled(AlertState<PermissionStallChoice>)
         case timer(WorkoutTimerFeature)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case alert(Never)
             case resumeRun(ResumeRunChoice)
+            case permissionStalled(PermissionStallChoice)
             case timer(WorkoutTimerFeature.Action)
         }
     }
@@ -83,6 +89,12 @@ public struct AppFeature: Sendable {
         var runRestore = RunRestore.idle
         /// Set once the timer's cover is on screen; a dismissal before that comes from the alert it replaced.
         var isTimerCoverUp = false
+        @SharedReader(.backgroundNotifications) var isBackgroundNotificationsOn = true
+        var notificationAccess: NotificationAccess?
+        var startIntent: StartIntent?
+        var notificationPermissionGeneration = 0
+        var isSceneActive = true
+        var isNotificationCleanupStalled = false
 
         public init() {}
 
@@ -119,6 +131,8 @@ public struct AppFeature: Sendable {
             case workoutMovedUp(Workout.ID)
             case workoutMovedDown(Workout.ID)
             case timerCoverAppeared
+            case scenePhaseChanged(ScenePhase)
+            case notificationCleanupRetryTapped
         }
 
         @CasePathable
@@ -134,6 +148,12 @@ public struct AppFeature: Sendable {
             case resumeRunConfirmed
             case runFinishFailed
             case timerPresentationFailed
+            case notificationCleanupFinished(Bool)
+            case notificationAccessQueried(generation: Int, NotificationAccess?)
+            case notificationPermissionAnswered(generation: Int, NotificationAccess?)
+            case notificationPermissionStalled(generation: Int)
+            case startIntentConfirmed(generation: Int)
+            case notificationPermissionWait
         }
     }
 
@@ -141,10 +161,14 @@ public struct AppFeature: Sendable {
         case load
         case readRunRecord
         case readRunRecordTimeout
+        case notificationPermission
+        case notificationPermissionStall
+        case notificationCleanup
     }
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
 
+    @Dependency(\.backgroundNotifications) var backgroundNotifications
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.continuousClock) var clock
     @Dependency(\.cues) private var cues
@@ -172,6 +196,8 @@ public struct AppFeature: Sendable {
                     startWorkout(workout, &state)
                 case let .destination(.presented(.resumeRun(choice))):
                     resumeRunChosen(choice, &state)
+                case let .destination(.presented(.permissionStalled(choice))):
+                    permissionStallChosen(choice, &state)
                 case .destination(.dismiss):
                     destinationDismissed(&state)
                 case .destination, .path, .settings:
@@ -180,6 +206,13 @@ public struct AppFeature: Sendable {
         }
         .ifLet(\.$destination, action: \.destination)
         .forEach(\.path, action: \.path)
+        Reduce { state, _ in
+            guard let intent = state.startIntent else { return .none }
+            guard isCurrentStartIntent(intent, state),
+                  state.destination == nil || state.destination?.is(\.permissionStalled) == true
+            else { return cancelStartIntent(&state) }
+            return .none
+        }
     }
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
@@ -189,7 +222,7 @@ public struct AppFeature: Sendable {
 
                 // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
-                return readRunRecord(&state)
+                return .merge(readRunRecord(&state), cleanupNotifications())
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -271,6 +304,10 @@ public struct AppFeature: Sendable {
 
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
+            case let .scenePhaseChanged(phase):
+                return notificationSceneChanged(phase, &state)
+            case .notificationCleanupRetryTapped:
+                return cleanupNotifications(reportSuccess: true)
             case .timerCoverAppeared:
                 if case .presenting = state.runRestore { state.runRestore = .resolved }
                 state.isTimerCoverUp = true
@@ -282,6 +319,21 @@ public struct AppFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
+            case let .notificationCleanupFinished(cleaned):
+                state.isNotificationCleanupStalled = !cleaned
+                return .none
+            case let .notificationAccessQueried(generation, access):
+                return notificationAccessQueried(access, generation: generation, &state)
+            case let .notificationPermissionAnswered(generation, access):
+                return notificationPermissionAnswered(access, generation: generation, &state)
+            case let .notificationPermissionStalled(generation):
+                guard state.startIntent?.generation == generation, state.destination == nil else { return .none }
+                state.destination = .permissionStalled(.permissionStalled)
+                return .none
+            case let .startIntentConfirmed(generation):
+                return confirmStartIntent(generation, &state)
+            case .notificationPermissionWait:
+                return waitForNotificationPermission(state)
             case let .workoutsLoaded(stored):
                 state.isReloading = false
                 // A write made on the shown list during the reload may be missing from what was read: read again once
@@ -415,13 +467,12 @@ public struct AppFeature: Sendable {
             Self.logger.error("Refused to start a workout with nothing to play")
             return .none
         }
-        state.destination = .timer(timerState(for: workout))
-        return .none
+        return prepareNotificationPermission(workout, &state)
     }
 
     // A timer's state is built only here and in `restoredTimerState`, so both get the same identifiers and title.
 
-    private func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
+    func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
         WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
@@ -492,9 +543,10 @@ public struct AppFeature: Sendable {
                 // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
-                let end = Effect<Action>.run { [timerSession, cues, id = timer.id] _ in
+                let end = Effect<Action>.run { [timerSession, cues, backgroundNotifications, id = timer.id] _ in
                     await timerSession.end(owner: id)
                     await cues.end(id)
+                    await backgroundNotifications.end(id)
                 }
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")
@@ -511,6 +563,8 @@ public struct AppFeature: Sendable {
                 // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
                 state.runRestore = .resolved
                 return .none
+            case .permissionStalled:
+                return .send(.internal(.notificationPermissionWait))
             case .alert, nil:
                 return .none
         }

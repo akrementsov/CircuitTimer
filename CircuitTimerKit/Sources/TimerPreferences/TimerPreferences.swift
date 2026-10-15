@@ -18,6 +18,11 @@ extension SharedReaderKey where Self == AppStorageKey<Bool>.Default {
         Self[.appStorage("signalSpokenStageNames"), default: true]
     }
 
+    /// Whether stage changes and the workout finish appear as background notifications.
+    public static var backgroundNotifications: Self {
+        Self[.appStorage("signalBackgroundNotifications"), default: true]
+    }
+
     /// Whether a running timer prevents automatic screen lock.
     public static var keepScreenOn: Self {
         Self[.appStorage("timerKeepScreenOn"), default: true]

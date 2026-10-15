@@ -8,6 +8,27 @@ import TimerPreferences
 @MainActor
 struct TimerPreferencesTests {
     @Test
+    func test_backgroundNotifications_defaultOn_persistsIndependently() async {
+        let defaults = UserDefaults.inMemory
+        let store = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            TestStore(initialState: SettingsFeature.State()) { SettingsFeature() }
+        }
+        #expect(store.state.isBackgroundNotificationsOn)
+        await store.send(.view(.backgroundNotificationsToggled(false))) {
+            $0.$isBackgroundNotificationsOn.withLock { $0 = false }
+            $0.notificationAccessGeneration = 1
+        }
+        let reloaded = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: { SettingsFeature.State() }
+        #expect(!reloaded.isBackgroundNotificationsOn)
+        #expect(reloaded.isSoundOn && reloaded.isVibrationOn && reloaded.isSpeechOn && reloaded.isKeepScreenOn)
+        #expect(defaults.object(forKey: "signalBackgroundNotifications") as? Bool == false)
+    }
+
+    @Test
     func test_keepScreenOnToggled_disabled_persistsWithoutChangingSignals() async {
         let defaults = UserDefaults.inMemory
         let store = withDependencies {

@@ -178,7 +178,7 @@ extension WorkoutTimerFeature.State {
     }
 
     /// A blank name reads as the stage's intensity in the current language; storage keeps it blank.
-    private static func displayName(_ stage: ScheduledStage) -> String {
+    static func displayName(_ stage: ScheduledStage) -> String {
         if let name = stage.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
             return name
         }
