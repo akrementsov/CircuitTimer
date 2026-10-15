@@ -51,6 +51,7 @@ public struct ScheduledNotification: Equatable, Sendable {
 public struct NotificationSyncReport: Equatable, Sendable {
     public var superseded: Bool
     public var canDeliver: Bool
+    public var access: NotificationAccess?
     public var confirmedFuture: Int
     public var expired: Int
     public var failed: Int
@@ -66,10 +67,12 @@ public struct NotificationSyncReport: Equatable, Sendable {
         failed: Int = 0,
         missing: Int = 0,
         imminentUnconfirmed: Int = 0,
-        isVerified: Bool = true
+        isVerified: Bool = true,
+        access: NotificationAccess? = nil
     ) {
         self.superseded = superseded
-        self.canDeliver = canDeliver
+        self.canDeliver = access?.canDeliver ?? canDeliver
+        self.access = access
         self.confirmedFuture = confirmedFuture
         self.expired = expired
         self.failed = failed

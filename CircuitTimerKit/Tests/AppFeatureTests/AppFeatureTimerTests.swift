@@ -2,6 +2,7 @@
 @testable import WorkoutEditorFeature
 @testable import WorkoutTimerFeature
 
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
@@ -227,6 +228,34 @@ struct AppFeatureTimerTests {
         }
         await store.finish()
         #expect(calls.value == [.session(owner), .cues(owner), .notifications(owner)])
+    }
+
+    @Test
+    func test_start_notificationsAuthorized_coverAppearsThenClosesAndEndsSameOwner() async {
+        let defaults = UserDefaults.inMemory
+        defaults.set(true, forKey: "signalBackgroundNotifications")
+        let calls = LockIsolated<[TeardownCall]>([])
+        let (store, timer) = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            var state = loaded([first])
+            state.notificationAccess = .authorized
+            return (
+                makeStore(state, notificationsEnabled: true) {
+                    $0.defaultAppStorage = defaults
+                    $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
+                    $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
+                    $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
+                },
+                Self.timer(UUID(0), for: first)
+            )
+        }
+        #expect(store.state.isBackgroundNotificationsOn)
+        await start(first, in: store, timer: timer)
+        #expect(store.state.isTimerCoverUp)
+        #expect(store.state.path.isEmpty)
+        await closeTimer(store)
+        #expect(calls.value == [.session(UUID(0)), .cues(UUID(0)), .notifications(UUID(0))])
     }
 
     @Test

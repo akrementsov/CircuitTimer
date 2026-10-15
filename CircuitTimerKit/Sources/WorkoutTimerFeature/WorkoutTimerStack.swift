@@ -22,6 +22,7 @@ public struct WorkoutTimerStack: View {
         }
         // The back button is white, like the legacy bar.
         .tint(.text(.primary))
+        // Shared app-storage values can change outside this view; keep the live queue in sync.
         .onChange(of: store.isBackgroundNotificationsOn) { _, _ in
             send(.notificationPreferencesChanged)
         }

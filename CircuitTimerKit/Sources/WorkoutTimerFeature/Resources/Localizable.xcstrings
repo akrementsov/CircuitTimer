@@ -453,22 +453,6 @@
         }
       }
     },
-    "timer.notifications.coverage" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Background alerts cover the next 32 stage changes or finish, up to a manual pause. Sound follows Sound in Settings. iOS controls delivery and sound; open CircuitTimer to extend coverage."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "В фоне уведомления охватывают ближайшие 32 смены этапа или завершение, до ручной паузы. Звук следует настройке «Звук». Показом и звуком управляет iOS; открывайте CircuitTimer для следующих уведомлений."
-          }
-        }
-      }
-    },
     "timer.notifications.denied" : {
       "localizations" : {
         "en" : {
@@ -529,22 +513,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CircuitTimer запросит разрешение при следующем запуске тренировки. Также можно включить уведомления в настройках iOS."
-          }
-        }
-      }
-    },
-    "timer.notifications.off" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Background notifications are off. Enable them in CircuitTimer Settings."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Фоновые уведомления выключены. Включите их в настройках CircuitTimer."
           }
         }
       }

@@ -100,11 +100,17 @@ extension WorkoutTimerFeature {
     func notificationsSynced(revision: Int, report: NotificationSyncReport?, _ state: inout State) {
         guard revision == state.notifications.revision, report?.superseded != true else { return }
 
+        if state.isBackgroundNotificationsOn, state.notifications.access == nil, let access = report?.access {
+            state.notifications.access = access
+            // The scheduler recovered the missing status; an earlier read must not erase it on timeout.
+            state.notifications.accessGeneration += 1
+        }
         let clean = report?.isClean == true
-        state.notifications.needsRetry = !clean
-        if !clean {
+        let failed = report?.canDeliver != false && !clean
+        state.notifications.needsRetry = failed
+        if failed {
             state.notifications.hasSchedulingFailed = true
-        } else if state.notifications.projection?.events.isEmpty == false {
+        } else if clean, state.notifications.projection?.events.isEmpty == false {
             // Removing requests proves cleanup, but cannot prove that future scheduling recovered.
             state.notifications.hasSchedulingFailed = false
         }
@@ -157,12 +163,12 @@ extension WorkoutTimerFeature.State {
 
     /// Permission status takes priority only within this notification footnote.
     var notificationFootnote: String? {
-        guard isBackgroundNotificationsOn else { return "timer.notifications.off" }
+        guard isBackgroundNotificationsOn else { return nil }
         guard let access = notifications.access else { return "timer.notifications.unknown" }
         if access.authorization == .notDetermined { return "timer.notifications.notAsked" }
         if access.authorization == .denied { return "timer.notifications.denied" }
         if !access.showsAlerts { return "timer.notifications.alertsOff" }
         if notifications.hasSchedulingFailed { return "timer.notifications.failed" }
-        return "timer.notifications.coverage"
+        return nil
     }
 }

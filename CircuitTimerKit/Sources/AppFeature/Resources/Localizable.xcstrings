@@ -298,13 +298,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Notifications from an earlier session may still arrive: iOS hasn't answered the cleanup. Try again or reopen the app later."
+            "value" : "Notifications from an earlier session may still arrive: iOS hasn't answered the cleanup. Wait 30 seconds before trying again, or reopen the app later."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Уведомления из прошлого запуска ещё могут прийти: iOS не ответила на очистку. Повторите или откройте приложение позже."
+            "value" : "Уведомления из прошлого запуска ещё могут прийти: iOS не ответила на очистку. Подождите 30 секунд перед повторной попыткой или откройте приложение позже."
           }
         }
       }

@@ -29,6 +29,7 @@ final class NotificationScheduler: Sendable {
     }
     struct State: Sendable {
         var owners: [UUID: Owner] = [:]
+        // Keep tombstones for this process: a delayed effect can attempt admission even after callbacks finish.
         var ended: Set<UUID> = []
         var serial = 0
         var sweep: OrphanSweep?
@@ -119,7 +120,8 @@ final class NotificationScheduler: Sendable {
                 canDeliver: access.canDeliver,
                 expired: expired,
                 failed: prepared.failures,
-                isVerified: verified
+                isVerified: verified,
+                access: access
             )
         )
     }

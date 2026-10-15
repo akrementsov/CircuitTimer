@@ -291,7 +291,7 @@ struct TimerNotificationTests {
         await store.send(.internal(.notificationAccessLoaded(generation: 1, denied)))
         #expect(store.state.notifications.access == .authorized)
         #expect(store.state.notifications.access?.canDeliver == true)
-        #expect(store.state.notificationFootnote == "timer.notifications.coverage")
+        #expect(store.state.notificationFootnote == nil)
     }
 
     @Test
@@ -299,7 +299,7 @@ struct TimerNotificationTests {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.hasSchedulingFailed = true
-        #expect(state.notificationFootnote == "timer.notifications.off")
+        #expect(state.notificationFootnote == nil)
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         #expect(state.notificationFootnote == "timer.notifications.unknown")
         state.notifications.access = NotificationAccess(authorization: .notDetermined, showsAlerts: false, playsSound: false)
@@ -311,7 +311,64 @@ struct TimerNotificationTests {
         state.notifications.access = .authorized
         #expect(state.notificationFootnote == "timer.notifications.failed")
         state.notifications.hasSchedulingFailed = false
-        #expect(state.notificationFootnote == "timer.notifications.coverage")
+        #expect(state.notificationFootnote == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func test_notificationsSynced_unknownAccessLearnsBlockedStatusWithoutRetry(alertsDisabled: Bool) async {
+        let clock = TestClock<Duration>()
+        let access = NotificationAccess(
+            authorization: alertsDisabled ? .authorized : .denied,
+            showsAlerts: false,
+            playsSound: false
+        )
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        state.$isBackgroundNotificationsOn = SharedReader(value: true)
+        state.notifications.accessGeneration = 1
+        state.notifications.revision = 1
+        state.notifications.needsRetry = true
+        state.notifications.lastAttempt = MonotonicInstant(now: clock)
+        state.notifications.projection = state.notificationProjection(at: origin, language: "en")
+        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.date = .constant(origin)
+            $0.continuousClock = clock
+            $0.preferredLocales = [Locale(identifier: "en")]
+        }
+        let report = NotificationSyncReport(access: access)
+        await store.send(.internal(.notificationsSynced(revision: 1, report: report))) {
+            $0.notifications.access = access
+            $0.notifications.accessGeneration = 2
+            $0.notifications.needsRetry = false
+        }
+        #expect(store.state.notificationFootnote == (alertsDisabled ? "timer.notifications.alertsOff" : "timer.notifications.denied"))
+        await store.send(.internal(.notificationAccessLoaded(generation: 1, nil)))
+        await clock.advance(by: .seconds(10))
+        await store.send(.internal(.cueFinished(revision: 0, CueResult())))
+        await store.finish()
+        #expect(!store.state.notifications.hasSchedulingFailed)
+        #expect(store.state.notifications.revision == 1)
+    }
+
+    @Test
+    func test_notificationsSynced_blockedWithoutAccess_doesNotInventPermissionStatus() {
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        state.$isBackgroundNotificationsOn = SharedReader(value: true)
+        state.notifications.revision = 1
+        WorkoutTimerFeature().notificationsSynced(revision: 1, report: NotificationSyncReport(canDeliver: false), &state)
+        #expect(state.notifications.access == nil)
+        #expect(!state.notifications.needsRetry)
+        #expect(!state.notifications.hasSchedulingFailed)
+    }
+
+    @Test
+    func test_notificationsSynced_accessSnapshot_doesNotReplaceKnownPermission() {
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        state.$isBackgroundNotificationsOn = SharedReader(value: true)
+        state.notifications.access = .authorized
+        state.notifications.revision = 1
+        let denied = NotificationAccess(authorization: .denied, showsAlerts: false, playsSound: false)
+        WorkoutTimerFeature().notificationsSynced(revision: 1, report: NotificationSyncReport(access: denied), &state)
+        #expect(state.notifications.access == .authorized)
     }
 
     @Test

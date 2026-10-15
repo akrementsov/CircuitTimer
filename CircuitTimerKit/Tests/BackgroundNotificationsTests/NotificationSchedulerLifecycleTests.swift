@@ -54,6 +54,7 @@ struct NotificationSchedulerLifecycleTests: Sendable {
         fake.access = NotificationAccess(authorization: .denied, showsAlerts: false, playsSound: false)
         let report = try await scheduler.sync(owner, revision: 2, plan: [notification()], now: { now }, clock: TestClock<Duration>())
         #expect(!report.canDeliver)
+        #expect(report.access == fake.access)
         #expect(!report.isClean)
         #expect(report.confirmedFuture == 0)
         #expect(fake.added.count == 1)
