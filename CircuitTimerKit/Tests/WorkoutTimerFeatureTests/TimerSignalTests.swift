@@ -169,15 +169,23 @@ struct TimerSignalTests {
     }
 
     @Test(arguments: [false, true])
-    func test_closeTimer_confirmedOrFinished_endsCuesBeforeDismissing(finished: Bool) async {
+    func test_closeTimer_confirmedOrFinished_endsOwnersBeforeDismissing(finished: Bool) async {
         var state = WorkoutTimerFeature.State.fixture(finished ? .finished : .paused)
         state.recordSync = .stored(nil)
         if !finished { state.destination = .closeConfirmation(.closeConfirmation(restart: nil)) }
         let timer = TimerHarness(state, signals: true)
         let order = LockIsolated<[String]>([])
+        timer.store.dependencies.timerSession.end = { owner in
+            #expect(owner == timerID)
+            order.withValue { $0.append("session") }
+        }
         timer.store.dependencies.cues.end = { owner in
             #expect(owner == timerID)
-            order.withValue { $0.append("end") }
+            order.withValue { $0.append("cues") }
+        }
+        timer.store.dependencies.backgroundNotifications.end = { owner in
+            #expect(owner == timerID)
+            order.withValue { $0.append("notifications") }
         }
         timer.store.dependencies.dismiss = DismissEffect { order.withValue { $0.append("dismiss") } }
         if finished {
@@ -186,7 +194,7 @@ struct TimerSignalTests {
             await timer.store.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
         }
         await timer.store.finish()
-        #expect(order.value == ["end", "dismiss"])
+        #expect(order.value == ["session", "cues", "notifications", "dismiss"])
     }
 
     @Test

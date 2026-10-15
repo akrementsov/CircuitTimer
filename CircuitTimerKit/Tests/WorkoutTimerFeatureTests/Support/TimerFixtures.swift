@@ -217,9 +217,9 @@ final class TimerHarness {
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
-    init(_ state: WorkoutTimerFeature.State, signals: Bool = false) {
+    init(_ state: WorkoutTimerFeature.State, signals: Bool = false, notifications: Bool = false) {
         var state = state
-        state.$isBackgroundNotificationsOn = SharedReader(value: false)
+        state.$isBackgroundNotificationsOn = SharedReader(value: notifications)
         if !signals {
             state.isPreparingCountdown = false
             state.$isSoundOn = SharedReader(value: false)
@@ -250,6 +250,10 @@ final class TimerHarness {
             WorkoutTimerFeature()
         } withDependencies: {
             $0.backgroundNotifications.end = { _ in }
+            $0.backgroundNotifications.sync = { _, _, _ in NotificationSyncReport() }
+            $0.backgroundNotifications.access = { .authorized }
+            $0.backgroundNotifications.removeDelivered = { _ in }
+            $0.preferredLocales = [Locale(identifier: "en")]
             $0.cues = .previewValue
             $0.workoutRunRecord = WorkoutRunRecordClient(
                 nextRevision: { revisions.withValue { $0 += 1; return $0 } },
