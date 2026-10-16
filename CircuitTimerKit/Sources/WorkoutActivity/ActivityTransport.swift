@@ -60,12 +60,18 @@ struct ActivityTransport: Sendable {
                 }
             },
             update: { id, state in
-                guard let activity = activity(id, in: requested) else { return }
+                guard let activity = activity(id, in: requested) else {
+                    Logger.liveActivity.debug("No live activity \(id, privacy: .public) to update")
+                    return
+                }
 
                 await activity.update(content(state))
             },
             end: { id, state, dismissal in
-                guard let activity = activity(id, in: requested) else { return }
+                guard let activity = activity(id, in: requested) else {
+                    Logger.liveActivity.debug("No live activity \(id, privacy: .public) to end")
+                    return
+                }
 
                 await activity.end(state.map(content), dismissalPolicy: dismissal == .immediate ? .immediate : .default)
                 // A standard end leaves the final content on the Lock Screen; a later immediate end still removes it.

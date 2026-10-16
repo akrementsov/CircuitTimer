@@ -44,9 +44,10 @@ struct ActivityClockText: View {
     private static let twoDigitMinutes: TimeInterval = 600
 
     /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and `WorkoutLimits` keeps a stage
-    /// under 100 minutes, so the minutes never take three digits.
+    /// under 100 minutes, so the minutes never take three digits. Whole seconds decide: a boundary may move by a
+    /// millisecond, and a ten-minute stage must still get room for both digits.
     private static func template(for range: ClosedRange<Date>) -> String {
-        range.upperBound.timeIntervalSince(range.lowerBound) >= twoDigitMinutes ? "22:22" : "2:22"
+        range.upperBound.timeIntervalSince(range.lowerBound).rounded() >= twoDigitMinutes ? "22:22" : "2:22"
     }
 
     private func glyph(_ name: String) -> some View {

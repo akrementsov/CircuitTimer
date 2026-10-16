@@ -4,7 +4,6 @@ import os
 /// Applies each owner's syncs and ends one at a time, newest revision first, on a loop that a
 /// cancelled caller does not stop: a timer that closes still has its activity removed.
 actor LiveActivityCoordinator {
-    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "LiveActivity")
     static let endTimeout: Duration = .milliseconds(500)
     /// An activity iOS has not listed by then is ended and requested again on a later sync.
     static let visibilityTimeout: Duration = .seconds(10)
@@ -98,7 +97,7 @@ actor LiveActivityCoordinator {
 
         // A cancelled caller stops waiting too, which is no slow end.
         if await !signal.wait(timeout: Self.endTimeout, clock: clock), !Task.isCancelled {
-            Self.logger.notice("Ending a live activity took over \(Self.endTimeout, privacy: .public); it ends in the background")
+            Logger.liveActivity.notice("Ending a live activity took over \(Self.endTimeout, privacy: .public); it ends in the background")
         }
     }
 
@@ -270,6 +269,8 @@ actor LiveActivityCoordinator {
         guard let owner = owners[id] else { return }
 
         owners[id]?.endSignals = []
+        // Only the tombstone matters from now on; the content it showed is let go.
+        owners[id]?.applied = nil
         if let activityID = owner.activityID {
             owners[id]?.activityID = nil
             await transport.end(activityID, nil, .immediate)
@@ -301,9 +302,9 @@ actor LiveActivityCoordinator {
     /// Logs a kind of failure as an error once per owner; repeats only reach the debug log.
     private func log(_ id: UUID, _ failure: Failure, _ message: String) {
         if owners[id]?.loggedFailures.insert(failure).inserted == true {
-            Self.logger.error("\(message, privacy: .public)")
+            Logger.liveActivity.error("\(message, privacy: .public)")
         } else {
-            Self.logger.debug("\(message, privacy: .public)")
+            Logger.liveActivity.debug("\(message, privacy: .public)")
         }
     }
 }
