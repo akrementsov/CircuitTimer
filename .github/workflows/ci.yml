@@ -51,12 +51,22 @@ jobs:
         run: |
           xcodebuild -version
           xcodebuild -version | grep '^Xcode 27\.1' > /dev/null || { ls -d /Applications/Xcode*; exit 1; }
-          xcrun simctl list devices available
+
+      # Before the runtime download, so a lockfile mismatch fails in seconds.
+      - name: Check lockfiles
+        run: make check-resolved
 
       # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5. Installing the runtime
       # also creates its default devices, iPhone 17 among them, so a device of our own would be a duplicate.
       - name: Install the iOS 26.5 simulator
-        run: xcodebuild -downloadPlatform iOS -buildVersion 26.5
+        run: |
+          for attempt in 1 2 3; do
+            xcodebuild -downloadPlatform iOS -buildVersion 26.5 && break
+            [ "$attempt" -lt 3 ] || exit 1
+            echo "::warning::The runtime download failed (attempt $attempt); retrying"
+            sleep 30
+          done
+          xcrun simctl list devices 'iOS 26.5'
 
       - name: Cache keys
         id: keys
@@ -78,9 +88,6 @@ jobs:
           restore-keys: |
             xcode27.1-dd-${{ steps.keys.outputs.resolved }}-
             xcode27.1-dd-
-
-      - name: Check lockfiles
-        run: make check-resolved
 
       - name: Test the package
         id: test
