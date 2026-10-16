@@ -66,6 +66,7 @@ archive:
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
 
 # Signs the archive with a cloud-managed distribution certificate and uploads it to App Store Connect.
+# The upload writes nothing to EXPORT_PATH; testflight.yml inspects a separate export instead.
 upload:
 	@test -n "$(ASC_KEY_PATH)" -a -n "$(ASC_KEY_ID)" -a -n "$(ASC_ISSUER_ID)" \
 		|| { echo "upload: ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID are required" >&2; exit 1; }
