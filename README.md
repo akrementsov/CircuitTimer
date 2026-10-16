@@ -19,7 +19,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 All code lives in one local Swift package, `CircuitTimerKit`. The Xcode project is a thin shell that launches `AppFeature`, configures TipKit and installs the injected notification presentation delegate before the UI starts.
 
-The app and the planned widget extension are thin targets over the package's modules, which form four layers; a module imports only from the layers below it:
+The app and its widget extension are thin targets over the package's modules, which form four layers; a module imports only from the layers below it:
 
 ```mermaid
 flowchart TD
@@ -43,6 +43,7 @@ flowchart TD
         TimerPreferences
         BackgroundExecution
         BackgroundNotifications
+        WorkoutActivity
     end
 
     subgraph Domain
@@ -60,26 +61,28 @@ flowchart TD
     SettingsFeature --> TimerPreferences
     SettingsFeature --> BackgroundNotifications
     WorkoutTimerFeature --> BackgroundNotifications
+    WorkoutTimerFeature --> WorkoutActivity
     WorkoutStorage --> WorkoutDomain
+    WorkoutActivity --> WorkoutDomain
 
-    Widget["Widget extension (planned)"] -.-> WorkoutActivity["WorkoutActivity (planned)"]
-    Widget -.-> DesignSystem
-    WorkoutActivity -.-> WorkoutDomain
+    Widgets["CircuitTimerWidgets extension"] --> WorkoutActivity
+    Widgets --> DesignSystem
 ```
 
-Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. `Package.swift` is the exact list. The planned `WorkoutActivity` (CT-4) joins Core; the widget extension is a thin target like the app.
+Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. `Package.swift` is the exact list.
 
 | Module | Layer | Responsibility |
 |---|---|---|
 | `AppFeature` | App | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. Before the first Start it requests notification permission. At launch it offers to continue or finish a saved run while separately cleaning notifications left by the previous process. |
 | `WorkoutEditorFeature` | Features | The workout screen in the original app's cards: a saved workout opens read-only with Start workout at the bottom; the pencil edits a draft that the bottom Save workout button saves, back to read-only, or Back discards; a new workout starts with an empty stage in every section; stage durations typed as MM:SS on the number pad, and a dimmed Save that explains itself; stage editing within `WorkoutLimits`. |
-| `WorkoutTimerFeature` | Features | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It schedules stage-start and finish notifications for the background, in a bounded rolling window. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. |
+| `WorkoutTimerFeature` | Features | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It schedules stage-start and finish notifications for the background, in a bounded rolling window. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. It shows the run on the Lock Screen and in the Dynamic Island as a Live Activity, with a footnote when iOS refuses one. |
 | `SettingsFeature` | Features | The Settings tab with persistent Sound, Vibration and Speak stage names, Background notifications and Keep screen on switches; notification permission status and a route to iOS Settings; its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `DesignSystem` | Core | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows, the caption plate and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll; the tab bar kept to the stacks' roots. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | Core | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. `WorkoutRunRecordClient`, the saved run as one JSON file. |
 | `TimerPreferences` | Core | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles as `@Shared(.appStorage)` keys, shared by Settings and the timer. |
 | `BackgroundExecution` | Core | `BackgroundTaskClient`: a background-task assertion around the run record writes of the timer and `AppFeature`. |
 | `BackgroundNotifications` | Core | Injected local notification client, owner-scoped scheduling and cleanup, permission access, foreground suppression. |
+| `WorkoutActivity` | Core | The Live Activity: a compact state of the run within iOS's 4 KB limit, what the Lock Screen and the Dynamic Island show for it, and `LiveActivityClient`, whose coordinator starts, updates and ends one activity per timer. The `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. |
 | `WorkoutDomain` | Domain | Workout model, normalization limits, the linear schedule and its fingerprint, and the `WorkoutRun` timer engine. Foundation and CryptoKit only, so the widget can use it. |
 
 Features never import each other, Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
@@ -145,7 +148,9 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-3-3** — background and restore
   - [x] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
   - [x] **CT-3-5** — cues in the background through local notifications
-- [ ] **CT-4** — Live Activity and Dynamic Island
+- [ ] **CT-4** — Live Activity and Dynamic Island, in slices:
+  - [x] **CT-4-1** — the running workout on the Lock Screen and in the Dynamic Island, and signing checks of both bundles on TestFlight
+  - [ ] **CT-4-2** — pause and resume from the Live Activity
 - [ ] **CT-5** — iCloud sync
 - [ ] **CT-6** — in-app purchase with StoreKit 2
 - [ ] **CT-7** — App Store release
