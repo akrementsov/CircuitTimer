@@ -27,14 +27,15 @@ struct LockScreenView: View {
                 .font(.token(.stageName))
                 .textCase(.uppercase)
                 .lineLimit(2)
-                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            // The clock never gives way: a long name wraps or truncates instead.
             ActivityClockText(display.clock, style: .lockScreenClock, glyphSide: .token(size: .activityGlyph))
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .layoutPriority(1)
         }
         .foregroundStyle(display.tone.ink)
         .padding(.vertical, .token(spacing: .s))
         .padding(.horizontal, .token(spacing: .l))
-        .frame(maxWidth: .infinity, minHeight: .token(size: .activityStageCard))
+        .frame(maxWidth: .infinity, minHeight: .token(size: .activityStageCard), alignment: .leading)
         .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
     }
 
@@ -48,10 +49,10 @@ struct LockScreenView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(.text(.primary))
                 .lineLimit(1)
-                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
             ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .marker))
                 .foregroundStyle(.text(.secondary))
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .layoutPriority(1)
         }
         .padding(.horizontal, .token(spacing: .xxs))
     }

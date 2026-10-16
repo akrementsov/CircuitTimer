@@ -17,10 +17,17 @@ struct ActivityClockText: View {
     var body: some View {
         switch clock {
             case let .counting(range):
-                // A counting text takes all the width it is offered; trailing alignment keeps the digits at the edge.
-                Text(timerInterval: range, countsDown: true, showsHours: false)
+                // A counting text has no width of its own: it takes all it is offered, and a fixed size breaks the
+                // layout. A hidden template of the longest reading gives it one.
+                Text(verbatim: Self.template(for: range))
+                    .hidden()
+                    .overlay(alignment: .trailing) {
+                        Text(timerInterval: range, countsDown: true, showsHours: false)
+                            .multilineTextAlignment(.trailing)
+                            // A rounding overflow shrinks the digits a little instead of truncating them.
+                            .minimumScaleFactor(0.9)
+                    }
                     .font(.token(style))
-                    .multilineTextAlignment(.trailing)
             case let .fixed(duration):
                 Text(verbatim: duration.clockText(.timerRemaining))
                     .font(.token(style))
@@ -31,6 +38,11 @@ struct ActivityClockText: View {
             case .none:
                 EmptyView()
         }
+    }
+
+    /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and stages never reach an hour.
+    private static func template(for range: ClosedRange<Date>) -> String {
+        range.upperBound.timeIntervalSince(range.lowerBound) >= 600 ? "22:22" : "2:22"
     }
 
     private func glyph(_ name: String) -> some View {

@@ -9,41 +9,31 @@ enum IslandViews {
     @MainActor
     static func dynamicIsland(_ display: WorkoutActivityDisplay) -> DynamicIsland {
         DynamicIsland {
-            DynamicIslandExpandedRegion(.leading) {
-                VStack(alignment: .leading, spacing: .token(spacing: .xxs)) {
-                    Text("activity.now")
-                        .font(.token(.label))
-                        .foregroundStyle(.text(.secondary))
-                    Text(display.headline)
-                        .font(.token(.expandedStageName))
-                        .textCase(.uppercase)
-                        .foregroundStyle(display.tone.accent)
-                        .lineLimit(1)
-                }
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            DynamicIslandExpandedRegion(.trailing) {
-                ActivityClockText(display.islandClock, style: .expandedClock, glyphSide: .token(size: .activityGlyph))
-                    .foregroundStyle(display.tone.accent)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-            }
+            // One full-width region: the leading and trailing ones beside the camera are too narrow for a stage name.
             DynamicIslandExpandedRegion(.bottom) {
-                if let next = display.next {
-                    HStack(alignment: .firstTextBaseline, spacing: .token(spacing: .xs)) {
-                        Text("activity.next")
-                            .font(.token(.label))
-                            .foregroundStyle(.text(.secondary))
-                        Text(next.label)
-                            .font(.token(.nextName))
-                            .textCase(.uppercase)
-                            .foregroundStyle(next.tone.accent)
-                            .lineLimit(1)
+                VStack(spacing: .token(spacing: .xs)) {
+                    HStack(alignment: .bottom, spacing: .token(spacing: .m)) {
+                        VStack(alignment: .leading, spacing: .token(spacing: .xxs)) {
+                            Text("activity.now")
+                                .font(.token(.label))
+                                .foregroundStyle(.text(.secondary))
+                            Text(display.headline)
+                                .font(.token(.expandedStageName))
+                                .textCase(.uppercase)
+                                .foregroundStyle(display.tone.accent)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        ActivityClockText(display.islandClock, style: .expandedClock, glyphSide: .token(size: .activityGlyph))
+                            .foregroundStyle(display.tone.accent)
                             .layoutPriority(1)
-                        ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .marker))
-                            .foregroundStyle(.text(.secondary))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    if let next = display.next {
+                        nextRow(next)
                     }
                 }
+                // The bottom corners of the island are round; the content stays inside them.
+                .padding(.horizontal, .token(spacing: .xs))
             }
         } compactLeading: {
             Text(display.headline)
@@ -61,5 +51,23 @@ enum IslandViews {
                 .frame(width: .token(size: .activityMinimalClock))
         }
         .keylineTint(display.tone.accent)
+    }
+
+    @MainActor
+    private static func nextRow(_ next: WorkoutActivityDisplay.Next) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: .token(spacing: .xs)) {
+            Text("activity.next")
+                .font(.token(.label))
+                .foregroundStyle(.text(.secondary))
+            Text(next.label)
+                .font(.token(.nextName))
+                .textCase(.uppercase)
+                .foregroundStyle(next.tone.accent)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .marker))
+                .foregroundStyle(.text(.secondary))
+                .layoutPriority(1)
+        }
     }
 }
