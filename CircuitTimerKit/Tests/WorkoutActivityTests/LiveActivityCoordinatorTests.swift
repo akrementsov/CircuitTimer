@@ -291,12 +291,12 @@ struct LiveActivityCoordinatorTests {
         await gate.entered.next()
         let second = Task { await sync(.held(3), revision: 3) }
         let third = Task { await sync(.held(4), revision: 4) }
-        await Task.megaYield()
+        // In either arrival order the second returns only once the third is queued.
+        #expect(await second.value == nil)
 
         gate.open()
 
         #expect(await first.value == nil)
-        #expect(await second.value == nil)
         #expect(await third.value == nil)
         #expect(fake.calls.value == [.request(.held(1)), .update("activity-1", .held(2)), .update("activity-1", .held(4))])
     }
@@ -308,16 +308,18 @@ struct LiveActivityCoordinatorTests {
         fake.updateGate.setValue(gate)
         let inFlight = Task { await sync(.held(2), revision: 2) }
         await gate.entered.next()
-        let queued = Task { await sync(.held(3), revision: 3) }
-        await Task.megaYield()
+        let superseded = Task { await sync(.held(3), revision: 3) }
+        let queued = Task { await sync(.held(4), revision: 4) }
+        // In either arrival order the superseded sync returns only once the newer one is queued.
+        #expect(await superseded.value == nil)
         let ending = Task { await end() }
-        await Task.megaYield()
+        // With the update held, only the end can drop the queued sync.
+        #expect(await queued.value == nil)
 
         gate.open()
         await ending.value
 
         #expect(await inFlight.value == nil)
-        #expect(await queued.value == nil)
         #expect(fake.calls.value == [.request(.held(1)), .update("activity-1", .held(2)), .end("activity-1", nil, .immediate)])
     }
 
