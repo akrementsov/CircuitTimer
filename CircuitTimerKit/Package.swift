@@ -118,7 +118,11 @@ let package = Package(
         ),
         .target(
             name: "WorkoutActivity",
-            dependencies: ["WorkoutDomain"],
+            dependencies: [
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .target(
