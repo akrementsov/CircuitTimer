@@ -30,7 +30,7 @@ jobs:
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep '^Xcode 27\.1' > /dev/null || { ls -d /Applications/Xcode*; exit 1; }
 
       - name: Install SwiftLint
         run: |
@@ -50,14 +50,13 @@ jobs:
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep '^Xcode 27\.1' > /dev/null || { ls -d /Applications/Xcode*; exit 1; }
           xcrun simctl list devices available
 
-      # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5.
+      # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5. Installing the runtime
+      # also creates its default devices, iPhone 17 among them, so a device of our own would be a duplicate.
       - name: Install the iOS 26.5 simulator
-        run: |
-          xcodebuild -downloadPlatform iOS -buildVersion 26.5
-          xcrun simctl create "iPhone 17" "iPhone 17" com.apple.CoreSimulator.SimRuntime.iOS-26-5
+        run: xcodebuild -downloadPlatform iOS -buildVersion 26.5
 
       - name: Cache keys
         id: keys

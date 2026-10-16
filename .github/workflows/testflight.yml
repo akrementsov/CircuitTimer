@@ -28,7 +28,7 @@ jobs:
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep '^Xcode 27\.1' > /dev/null || { ls -d /Applications/Xcode*; exit 1; }
 
       - name: Require a commit of main that passed CI
         env:
