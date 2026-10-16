@@ -74,25 +74,36 @@ jobs:
             xcode26.5-dd-${{ steps.keys.outputs.resolved }}-
             xcode26.5-dd-
 
-      - name: Check lockfiles, test package, build app
-        run: make check-resolved test build-app
+      - name: Check lockfiles
+        run: make check-resolved
+
+      - name: Test the package
+        id: test
+        run: make test
 
       - name: Show test failures
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         run: |
-          [ -d .build/TestResults.xcresult ] || { echo "No test results: the run failed before testing"; exit 0; }
+          set -o pipefail
+          [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
           xcrun xcresulttool get test-results summary --path .build/TestResults.xcresult \
-            | jq -r '.testFailures[]? | "::error title=\(.targetName)/\(.testIdentifierString)::"
-                + (.failureText | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))'
+            | jq -r 'def escape: gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A");
+                .testFailures[]?
+                | "::error title=" + ("\(.targetName)/\(.testIdentifierString)" | escape | gsub(":"; "%3A") | gsub(","; "%2C"))
+                + "::" + (.failureText | escape)'
 
+      # The wildcard keeps the bundle's own folder in the artifact, so it opens in Xcode as downloaded.
       - name: Keep the test results
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: .build/TestResults.xcresult
+          path: .build/*.xcresult
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Build the app
+        run: make build-app
 
       # Pull requests only restore caches, so their revisions do not evict the main branch caches.
       - name: Save package sources
