@@ -58,7 +58,7 @@ Layering:
 | Command | What it does |
 |---|---|
 | `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary) |
-| `make test` | Builds and tests the package with warnings as errors |
+| `make test` | Builds and tests the package with warnings as errors; failure messages go to `.build/TestResults.xcresult`, which a failed CI run prints and keeps as an artifact |
 | `make build-app` | Builds the app for the simulator without signing |
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
 | `make resolve` | Re-resolves both lockfiles |
