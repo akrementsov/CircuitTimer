@@ -28,12 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # SwiftLint's image carries the Swift runtime and SourceKit. Its static Linux binary refuses SourceKit and
-      # only warns while it skips the rules that need it, our custom rules among them, so a skip fails the step.
+      # SwiftLint's image carries the Swift runtime and SourceKit, and its entrypoint is `swiftlint`. Its static
+      # Linux binary refuses SourceKit and only warns while it skips the rules that need it, our custom rules among
+      # them, so a skip fails the step.
       - name: Lint
         run: |
           set -o pipefail
-          make lint SWIFTLINT="docker run --rm -v $PWD:$PWD -w $PWD $SWIFTLINT_IMAGE swiftlint" 2>&1 \
+          make lint SWIFTLINT="docker run --rm -v $PWD:$PWD -w $PWD $SWIFTLINT_IMAGE" 2>&1 \
             | tee "$RUNNER_TEMP/lint.log"
           if grep -q 'Skipping enabled rule' "$RUNNER_TEMP/lint.log"; then
             echo "::error::SwiftLint skipped rules; see the log above"
