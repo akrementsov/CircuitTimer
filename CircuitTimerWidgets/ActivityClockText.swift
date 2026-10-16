@@ -40,9 +40,13 @@ struct ActivityClockText: View {
         }
     }
 
-    /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and stages never reach an hour.
+    /// Ten minutes, from which the minutes take two digits.
+    private static let twoDigitMinutes: TimeInterval = 600
+
+    /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and `WorkoutLimits` keeps a stage
+    /// under 100 minutes, so the minutes never take three digits.
     private static func template(for range: ClosedRange<Date>) -> String {
-        range.upperBound.timeIntervalSince(range.lowerBound) >= 600 ? "22:22" : "2:22"
+        range.upperBound.timeIntervalSince(range.lowerBound) >= twoDigitMinutes ? "22:22" : "2:22"
     }
 
     private func glyph(_ name: String) -> some View {
@@ -50,15 +54,5 @@ struct ActivityClockText: View {
             .resizable()
             .scaledToFit()
             .frame(width: glyphSide, height: glyphSide)
-    }
-}
-
-extension WorkoutActivityDisplay {
-    /// The Dynamic Island shows a held stage's time where the Lock Screen shows the pause glyph.
-    var islandClock: Clock {
-        if case .pauseGlyph = clock, let next, case .fixed = next.clock {
-            return next.clock
-        }
-        return clock
     }
 }

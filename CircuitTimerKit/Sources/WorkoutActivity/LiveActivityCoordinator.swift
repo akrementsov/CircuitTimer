@@ -30,6 +30,13 @@ actor LiveActivityCoordinator {
         case end
     }
 
+    /// Each is logged as an error once per owner.
+    private enum Failure: Hashable {
+        case request
+        case size
+        case visibility
+    }
+
     private struct Owner {
         var acceptedRevision = Int.min
         var request: Request?
@@ -43,12 +50,12 @@ actor LiveActivityCoordinator {
         var isGone = false
         /// A failure that a retry cannot fix; the owner stops trying.
         var isBroken = false
-        /// Set while a requested activity has never been listed.
-        var isVisibilityOverdue: (@Sendable () -> Bool)?
+        /// Set while a requested activity has never been listed; true once it is overdue.
+        var visibilityDeadlinePassed: (@Sendable () -> Bool)?
         var isFailing = false
         var reportedFailing = false
         var noticeSerial = 0
-        var loggedFailures: Set<String> = []
+        var loggedFailures: Set<Failure> = []
     }
 
     private let transport: ActivityTransport
@@ -89,8 +96,9 @@ actor LiveActivityCoordinator {
         owners[id] = owner
         startDraining(id, clock: clock)
 
-        if await !signal.wait(timeout: Self.endTimeout, clock: clock) {
-            Self.logger.notice("Ending a live activity took over 500 ms; it ends in the background")
+        // A cancelled caller stops waiting too, which is no slow end.
+        if await !signal.wait(timeout: Self.endTimeout, clock: clock), !Task.isCancelled {
+            Self.logger.notice("Ending a live activity took over \(Self.endTimeout, privacy: .public); it ends in the background")
         }
     }
 
@@ -144,18 +152,21 @@ actor LiveActivityCoordinator {
         guard let owner = owners[id], !owner.isEnding else { return .superseded }
         guard !owner.isBroken else { return .failed }
         guard !owner.isGone else { return .unavailable }
+        // The run is over and its activity ended with its final content, which stays until `end(owner)`
+        // removes it; iOS lists it as ended meanwhile, which is not a removal by the user.
+        guard owner.applied?.phase != .finished else { return .shown }
         guard let activityID = owner.activityID else { return start(id, request, clock: clock) }
 
         switch transport.presence(activityID) {
             case .alive:
                 owners[id]?.wasSeen = true
-                owners[id]?.isVisibilityOverdue = nil
+                owners[id]?.visibilityDeadlinePassed = nil
             case .gone:
                 return markGone(id)
             case nil:
                 // Once listed, missing means removed; never listed in time means it failed to show.
                 if owner.wasSeen { return markGone(id) }
-                if owner.isVisibilityOverdue?() == true { return await dropInvisible(id, activityID) }
+                if owner.visibilityDeadlinePassed?() == true { return await dropInvisible(id, activityID) }
         }
         if request.content != owner.applied {
             guard fits(id, request) else { return await breakDown(id) }
@@ -190,10 +201,10 @@ actor LiveActivityCoordinator {
                     return .deferred
                 case let .permanent(reason):
                     owners[id]?.isBroken = true
-                    log(id, kind: "request", "Starting a live activity failed for good: \(reason)")
+                    log(id, .request, "Starting a live activity failed for good: \(reason)")
                     return .failed
                 case let .transient(reason):
-                    log(id, kind: "request", "Starting a live activity failed: \(reason)")
+                    log(id, .request, "Starting a live activity failed: \(reason)")
                     return .failed
             }
         }
@@ -203,7 +214,7 @@ actor LiveActivityCoordinator {
             owners[id]?.wasSeen = true
             return .shown
         }
-        owners[id]?.isVisibilityOverdue = Self.deadline(after: Self.visibilityTimeout, on: clock)
+        owners[id]?.visibilityDeadlinePassed = Self.deadline(after: Self.visibilityTimeout, on: clock)
         return .deferred
     }
 
@@ -211,12 +222,12 @@ actor LiveActivityCoordinator {
         do {
             let size = try request.attributes.encodedSize(with: request.content)
             guard size <= WorkoutActivityAttributes.encodedSizeLimit else {
-                log(id, kind: "size", "A live activity takes \(size) bytes, over the limit")
+                log(id, .size, "A live activity takes \(size) bytes, over the limit")
                 return false
             }
             return true
         } catch {
-            log(id, kind: "size", "Encoding a live activity failed: \(String(reflecting: error))")
+            log(id, .size, "Encoding a live activity failed: \(String(reflecting: error))")
             return false
         }
     }
@@ -239,10 +250,10 @@ actor LiveActivityCoordinator {
 
     /// Ends the first request before a later sync asks for another, so two never show.
     private func dropInvisible(_ id: UUID, _ activityID: String) async -> Outcome {
-        log(id, kind: "visibility", "A live activity did not appear within 10 s; it is requested again")
+        log(id, .visibility, "A live activity did not appear within \(Self.visibilityTimeout); it is requested again")
         owners[id]?.activityID = nil
         owners[id]?.applied = nil
-        owners[id]?.isVisibilityOverdue = nil
+        owners[id]?.visibilityDeadlinePassed = nil
         await transport.end(activityID, nil, .immediate)
         return .failed
     }
@@ -262,8 +273,6 @@ actor LiveActivityCoordinator {
         }
         owner.endSignals.forEach { $0.complete() }
     }
-
-    // MARK: - The warning
 
     private func settle(_ id: UUID, _ outcome: Outcome) -> LiveActivityNotice? {
         record(id, outcome)
@@ -287,8 +296,8 @@ actor LiveActivityCoordinator {
     }
 
     /// Logs a kind of failure as an error once per owner; repeats only reach the debug log.
-    private func log(_ id: UUID, kind: String, _ message: String) {
-        if owners[id]?.loggedFailures.insert(kind).inserted == true {
+    private func log(_ id: UUID, _ failure: Failure, _ message: String) {
+        if owners[id]?.loggedFailures.insert(failure).inserted == true {
             Self.logger.error("\(message, privacy: .public)")
         } else {
             Self.logger.debug("\(message, privacy: .public)")

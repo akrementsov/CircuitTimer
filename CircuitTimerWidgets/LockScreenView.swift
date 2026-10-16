@@ -24,7 +24,7 @@ struct LockScreenView: View {
     private var card: some View {
         HStack(spacing: .token(spacing: .m)) {
             Text(display.headline)
-                .font(.token(.stageName))
+                .font(.token(.lockScreenStageName))
                 .textCase(.uppercase)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,7 +50,7 @@ struct LockScreenView: View {
                 .foregroundStyle(.text(.primary))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .marker))
+            ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .activitySmallGlyph))
                 .foregroundStyle(.text(.secondary))
                 .layoutPriority(1)
         }

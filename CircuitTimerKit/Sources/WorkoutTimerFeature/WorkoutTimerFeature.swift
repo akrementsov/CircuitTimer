@@ -448,7 +448,7 @@ public struct WorkoutTimerFeature: Sendable {
             await timerSession.end(owner: id)
             await cues.end(id)
             await notifications.end(id)
-            // Waits at most 500 ms; the activity goes in the background after that.
+            // The client bounds the wait; the activity goes in the background after that.
             await activity.end(id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the

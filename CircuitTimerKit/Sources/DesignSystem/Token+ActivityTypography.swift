@@ -16,7 +16,7 @@ extension DesignSystem.Token {
         /// The clock of the minimal Dynamic Island.
         case minimalClock
         /// The current stage on the Lock Screen card.
-        case stageName
+        case lockScreenStageName
         /// The current stage in the expanded Dynamic Island.
         case expandedStageName
         /// The current stage in the compact Dynamic Island.
@@ -42,7 +42,7 @@ extension Font {
                 StageClockText.Face.current.font(size: 22)
             case .minimalClock:
                 StageClockText.Face.current.font(size: 17)
-            case .stageName:
+            case .lockScreenStageName:
                 .system(size: 22, weight: .heavy)
             case .expandedStageName:
                 .system(size: 20, weight: .heavy)

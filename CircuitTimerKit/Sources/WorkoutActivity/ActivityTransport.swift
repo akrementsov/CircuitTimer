@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import os
 
 /// Why iOS refused to start an activity, sorted by what the coordinator does about it.
 enum ActivityRequestFailure: Error, Equatable {
@@ -26,7 +27,8 @@ enum ActivityDismissal: Equatable {
 }
 
 /// ActivityKit behind Sendable closures. `Activity` is not `Sendable`, so only its identifier
-/// leaves a closure, and each call looks the activity up again.
+/// leaves a closure, and each call looks the activity up again: first among the activities this
+/// process requested, because iOS may list a new one a moment after `request` returns.
 struct ActivityTransport: Sendable {
     var isEnabled: @Sendable () -> Bool
     var request: @Sendable (WorkoutActivityAttributes, WorkoutActivityAttributes.ContentState) throws(ActivityRequestFailure) -> String
@@ -40,7 +42,9 @@ struct ActivityTransport: Sendable {
         isEnabled: { ActivityAuthorizationInfo().areActivitiesEnabled },
         request: { attributes, state throws(ActivityRequestFailure) in
             do {
-                return try Activity.request(attributes: attributes, content: content(state), pushType: nil).id
+                let activity = try Activity.request(attributes: attributes, content: content(state), pushType: nil)
+                requested.withLockUnchecked { $0[activity.id] = activity }
+                return activity.id
             } catch let error as ActivityAuthorizationError {
                 throw ActivityRequestFailure(error)
             } catch {
@@ -56,17 +60,25 @@ struct ActivityTransport: Sendable {
             guard let activity = activity(id) else { return }
 
             await activity.end(state.map(content), dismissalPolicy: dismissal == .immediate ? .immediate : .default)
+            // A standard end leaves the final content on the Lock Screen; a later immediate end still removes it.
+            if dismissal == .immediate {
+                requested.withLockUnchecked { _ = $0.removeValue(forKey: id) }
+            }
         },
         presence: { id in
-            activity(id).map { ActivityPresence($0.activityState) }
+            Activity<WorkoutActivityAttributes>.activities.first { $0.id == id }.map { ActivityPresence($0.activityState) }
         },
         allIDs: {
             Activity<WorkoutActivityAttributes>.activities.map(\.id)
         }
     )
 
+    /// Requested by this process and not ended yet. `Activity` is not `Sendable`; the lock only
+    /// stores and hands out references, and ActivityKit synchronizes the activities themselves.
+    private static let requested = OSAllocatedUnfairLock<[String: Activity<WorkoutActivityAttributes>]>(uncheckedState: [:])
+
     private static func activity(_ id: String) -> Activity<WorkoutActivityAttributes>? {
-        Activity<WorkoutActivityAttributes>.activities.first { $0.id == id }
+        requested.withLockUnchecked { $0[id] } ?? Activity<WorkoutActivityAttributes>.activities.first { $0.id == id }
     }
 
     private static func content(

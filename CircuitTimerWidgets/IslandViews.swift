@@ -42,11 +42,11 @@ enum IslandViews {
                 .foregroundStyle(display.tone.accent)
                 .lineLimit(1)
         } compactTrailing: {
-            ActivityClockText(display.islandClock, style: .compactClock, glyphSide: .token(size: .marker))
+            ActivityClockText(display.islandClock, style: .compactClock, glyphSide: .token(size: .activitySmallGlyph))
                 .foregroundStyle(display.tone.accent)
                 .frame(width: .token(size: .activityCompactClock), alignment: .trailing)
         } minimal: {
-            ActivityClockText(display.islandClock, style: .minimalClock, glyphSide: .token(size: .marker))
+            ActivityClockText(display.islandClock, style: .minimalClock, glyphSide: .token(size: .activitySmallGlyph))
                 .foregroundStyle(display.tone.accent)
                 .frame(width: .token(size: .activityMinimalClock))
         }
@@ -65,7 +65,7 @@ enum IslandViews {
                 .foregroundStyle(next.tone.accent)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .marker))
+            ActivityClockText(next.clock, style: .nextClock, glyphSide: .token(size: .activitySmallGlyph))
                 .foregroundStyle(.text(.secondary))
                 .layoutPriority(1)
         }

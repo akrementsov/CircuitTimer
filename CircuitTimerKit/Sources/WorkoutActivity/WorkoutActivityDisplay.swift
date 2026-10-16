@@ -14,7 +14,7 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
     public enum Tone: Hashable, Sendable {
         case work
         case rest
-        /// Pauses, the start and the end, like the timer screen's pause card.
+        /// Pauses and the end, like the timer screen's pause card. The start takes `rest`, like its 3-2-1.
         case dark
     }
 
@@ -49,6 +49,9 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
     public let tone: Tone
     public let headline: Label
     public let clock: Clock
+    /// The Dynamic Island has no room for the pause glyph's meaning, so a stage the user paused shows its time
+    /// left there; everything else shows `clock`.
+    public let islandClock: Clock
     /// `nil` once the workout is over.
     public let next: Next?
 
@@ -92,7 +95,14 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
                     next: next
                 )
             case let .paused(held):
-                self.init(title: title, tone: .dark, headline: .pause, clock: .pauseGlyph, next: Self.next(held))
+                self.init(
+                    title: title,
+                    tone: .dark,
+                    headline: .pause,
+                    clock: .pauseGlyph,
+                    islandClock: .fixed(.milliseconds(held.remainingMilliseconds)),
+                    next: Self.next(held)
+                )
             case let .awaitingUser(upcoming):
                 let next = upcoming.map(Self.next) ?? Next(label: .finished, tone: .dark, clock: .none)
                 self.init(title: title, tone: .dark, headline: .pause, clock: .pauseGlyph, next: next)
@@ -101,11 +111,12 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
         }
     }
 
-    private init(title: Title, tone: Tone, headline: Label, clock: Clock, next: Next?) {
+    private init(title: Title, tone: Tone, headline: Label, clock: Clock, islandClock: Clock? = nil, next: Next?) {
         self.title = title
         self.tone = tone
         self.headline = headline
         self.clock = clock
+        self.islandClock = islandClock ?? clock
         self.next = next
     }
 

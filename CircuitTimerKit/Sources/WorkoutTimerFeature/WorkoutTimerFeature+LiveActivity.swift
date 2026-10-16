@@ -27,3 +27,10 @@ extension WorkoutTimerFeature {
         state.liveActivityNotice = notice
     }
 }
+
+extension WorkoutTimerFeature.State {
+    /// Whether the screen warns that the Lock Screen cannot show the workout.
+    var isLiveActivityFailing: Bool {
+        liveActivityNotice?.isFailing == true
+    }
+}

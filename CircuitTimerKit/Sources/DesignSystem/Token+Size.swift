@@ -17,6 +17,8 @@ extension DesignSystem.Token {
         case activityStageCard = 84
         /// Side of the pause and finish glyphs on the Lock Screen card.
         case activityGlyph = 34
+        /// Side of the pause and finish glyphs in the compact and minimal Dynamic Island and the next stage's row.
+        case activitySmallGlyph = 16
         /// Width of the clock in the compact Dynamic Island; a counting clock takes all the width it is offered.
         case activityCompactClock = 44
         /// Width of the clock in the minimal Dynamic Island.

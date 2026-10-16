@@ -14,7 +14,7 @@ extension Duration {
         case timerRemaining
     }
 
-    /// ASCII digits and colons in every region; fractions round down, except for `remaining`.
+    /// ASCII digits and colons in every region; fractions round down, except for `remaining` and `timerRemaining`.
     public func clockText(_ style: ClockTextStyle) -> String {
         switch style {
             case .hoursMinutesSeconds:

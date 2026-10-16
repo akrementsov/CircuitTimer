@@ -28,9 +28,10 @@ final class CompletionSignal: Sendable {
             group.addTask {
                 do {
                     try await clock.sleep(for: timeout)
-                } catch {
-                    // Only cancellation interrupts the sleep; the caller stops waiting either way.
+                } catch is CancellationError {
                     return false
+                } catch {
+                    LiveActivityCoordinator.logger.error("Waiting for an end failed: \(String(reflecting: error), privacy: .public)")
                 }
                 return false
             }

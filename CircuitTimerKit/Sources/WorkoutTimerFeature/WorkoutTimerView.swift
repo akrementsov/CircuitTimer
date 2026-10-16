@@ -56,7 +56,7 @@ public struct WorkoutTimerView: View {
                         if store.hasRecordFailed {
                             signalFootnote("timer.record.failed")
                         }
-                        if store.liveActivityNotice?.isFailing == true {
+                        if store.isLiveActivityFailing {
                             signalFootnote("timer.liveActivity.failed")
                         }
                         if let key = store.notificationFootnote {

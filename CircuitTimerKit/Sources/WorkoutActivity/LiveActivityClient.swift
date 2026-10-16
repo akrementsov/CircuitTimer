@@ -28,8 +28,8 @@ public struct LiveActivityClient: Sendable {
         _ attributes: WorkoutActivityAttributes,
         _ content: WorkoutActivityAttributes.ContentState
     ) async -> LiveActivityNotice? = { _, _, _, _ in nil }
-    /// Removes the owner's activity at once and refuses its later syncs. Waits at most 500 ms;
-    /// the removal finishes in the background after that.
+    /// Removes the owner's activity at once and refuses its later syncs. Waits a bounded time
+    /// (`LiveActivityCoordinator.endTimeout`); the removal finishes in the background after that.
     public var end: @Sendable (_ owner: UUID) async -> Void
     /// Removes the activities of earlier processes.
     public var endOrphans: @Sendable () async -> Void

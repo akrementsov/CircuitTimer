@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct CircuitTimerWidgets: WidgetBundle {
+struct CircuitTimerWidgetsBundle: WidgetBundle {
     var body: some Widget {
         WorkoutActivityWidget()
     }
