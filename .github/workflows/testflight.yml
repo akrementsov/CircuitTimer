@@ -15,11 +15,11 @@ permissions:
   actions: read
 
 env:
-  DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
 
 jobs:
   upload:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,7 +28,7 @@ jobs:
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
 
       - name: Require a commit of main that passed CI
         env:
@@ -49,7 +49,7 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .build/SourcePackages
-          key: xcode26.5-spm-${{ steps.keys.outputs.resolved }}
+          key: xcode27.1-spm-${{ steps.keys.outputs.resolved }}
 
       # The build number is the UTC start time, so a re-run of an older run still gets a higher number.
       - name: Archive

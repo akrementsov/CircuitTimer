@@ -13,7 +13,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 - [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect
 - Swift Testing
 - SwiftLint, GitHub Actions
-- Xcode 26.5
+- Xcode 27.1; tests run on the iOS 26.5 simulator
 
 ## Architecture
 

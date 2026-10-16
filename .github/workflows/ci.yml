@@ -16,21 +16,21 @@ permissions:
 env:
   # Pinned explicitly: concurrency diagnostics and the resolved package graph depend on the
   # Xcode version, and the runner image's default Xcode changes over time.
-  DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
   DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=26.5
   SWIFTLINT_VERSION: 0.65.1
   SWIFTLINT_SHA256: c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0
 
 jobs:
   lint:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
 
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
 
       - name: Install SwiftLint
         run: |
@@ -43,15 +43,21 @@ jobs:
         run: make lint SWIFTLINT="$RUNNER_TEMP/swiftlint/swiftlint"
 
   build-test:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
 
       - name: Verify Xcode
         run: |
           xcodebuild -version
-          xcodebuild -version | grep -q '^Xcode 26\.5' || { ls -d /Applications/Xcode*; exit 1; }
+          xcodebuild -version | grep -q '^Xcode 27\.1' || { ls -d /Applications/Xcode*; exit 1; }
           xcrun simctl list devices available
+
+      # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5.
+      - name: Install the iOS 26.5 simulator
+        run: |
+          xcodebuild -downloadPlatform iOS -buildVersion 26.5
+          xcrun simctl create "iPhone 17" "iPhone 17" com.apple.CoreSimulator.SimRuntime.iOS-26-5
 
       - name: Cache keys
         id: keys
@@ -63,16 +69,16 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .build/SourcePackages
-          key: xcode26.5-spm-${{ steps.keys.outputs.resolved }}
+          key: xcode27.1-spm-${{ steps.keys.outputs.resolved }}
 
       - name: Restore DerivedData
         uses: actions/cache/restore@v6
         with:
           path: .build/DerivedData
-          key: xcode26.5-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
+          key: xcode27.1-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
           restore-keys: |
-            xcode26.5-dd-${{ steps.keys.outputs.resolved }}-
-            xcode26.5-dd-
+            xcode27.1-dd-${{ steps.keys.outputs.resolved }}-
+            xcode27.1-dd-
 
       - name: Check lockfiles
         run: make check-resolved
@@ -118,4 +124,4 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .build/DerivedData
-          key: xcode26.5-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
+          key: xcode27.1-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
