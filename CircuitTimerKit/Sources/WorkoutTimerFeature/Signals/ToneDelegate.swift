@@ -1,7 +1,8 @@
 import AVFAudio
 import Foundation
 
-final class ToneDelegate: NSObject, AVAudioPlayerDelegate, Sendable {
+// The iOS 27 SDK puts AVAudioPlayerDelegate on the main actor, but `CueEngine` creates this on its own queue.
+nonisolated final class ToneDelegate: NSObject, AVAudioPlayerDelegate, Sendable {
     let waiter: OutputWaiter
     let outputID: Int
     let engine: CueEngine
