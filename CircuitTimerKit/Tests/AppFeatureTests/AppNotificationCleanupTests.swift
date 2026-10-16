@@ -113,6 +113,34 @@ struct AppNotificationCleanupTests {
         #expect(store.state.isNotificationCleanupStalled == false)
     }
 
+    @Test
+    func test_launch_endsLiveActivityOrphansOnceWithoutDelayingTheRestore() async {
+        let orphanCleanups = LockIsolated(0)
+        let release = AsyncStream<Void>.makeStream()
+        let store = makeStore(AppFeature.State()) {
+            $0.workoutRunRecord.load = { nil }
+            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: []) }
+            $0.backgroundNotifications.removeOrphans = { true }
+            $0.liveActivity.endOrphans = {
+                orphanCleanups.withValue { $0 += 1 }
+                for await _ in release.stream {}
+            }
+        }
+
+        await store.send(.view(.task)) {
+            $0.workouts = .loading
+            $0.runRestore = .reading
+        }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
+        await store.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([]) }
+        await store.send(.view(.task))
+        #expect(orphanCleanups.value == 1)
+
+        release.continuation.finish()
+        await store.finish()
+        #expect(orphanCleanups.value == 1)
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func test_cleanup_retryCancelsOlderRequestAndReportsOnlyNewestResult() async {
         let calls = LockIsolated(0)

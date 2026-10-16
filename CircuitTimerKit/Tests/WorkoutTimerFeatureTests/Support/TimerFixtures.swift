@@ -128,6 +128,7 @@ extension WorkoutTimerFeature.State {
 enum TimerCall: Equatable, Sendable {
     case requestAwake(owner: UUID, awake: Bool, revision: Int)
     case end(owner: UUID)
+    case endLiveActivity(owner: UUID)
     case dismiss
 
     static func awake(_ awake: Bool, _ revision: Int) -> Self {

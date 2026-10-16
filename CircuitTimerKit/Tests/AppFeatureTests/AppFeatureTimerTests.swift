@@ -19,6 +19,7 @@ struct AppFeatureTimerTests {
         case session(UUID)
         case cues(UUID)
         case notifications(UUID)
+        case liveActivity(UUID)
     }
 
     private let first = makeWorkout(1)
@@ -211,7 +212,7 @@ struct AppFeatureTimerTests {
     }
 
     @Test(arguments: [false, true])
-    func test_destinationDismiss_timerEndsSessionCuesAndNotificationsInOrder(coverUp: Bool) async {
+    func test_destinationDismiss_timerEndsSessionCuesNotificationsAndActivityInOrder(coverUp: Bool) async {
         let owner = UUID(fixture: 7)
         var state = loaded([first])
         state.destination = .timer(Self.timer(owner, for: first))
@@ -221,6 +222,7 @@ struct AppFeatureTimerTests {
             $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
             $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
             $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
+            $0.liveActivity.end = { id in calls.withValue { $0.append(.liveActivity(id)) } }
         }
 
         await store.send(.destination(.dismiss)) {
@@ -228,7 +230,7 @@ struct AppFeatureTimerTests {
             if coverUp { $0.isTimerCoverUp = false }
         }
         await store.finish()
-        #expect(calls.value == [.session(owner), .cues(owner), .notifications(owner)])
+        #expect(calls.value == [.session(owner), .cues(owner), .notifications(owner), .liveActivity(owner)])
     }
 
     @Test
