@@ -77,6 +77,23 @@ jobs:
       - name: Check lockfiles, test package, build app
         run: make check-resolved test build-app
 
+      - name: Show test failures
+        if: failure()
+        run: |
+          [ -d .build/TestResults.xcresult ] || { echo "No test results: the run failed before testing"; exit 0; }
+          xcrun xcresulttool get test-results summary --path .build/TestResults.xcresult \
+            | jq -r '.testFailures[]? | "::error title=\(.targetName)/\(.testIdentifierString)::"
+                + (.failureText | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A"))'
+
+      - name: Keep the test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: .build/TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 14
+
       # Pull requests only restore caches, so their revisions do not evict the main branch caches.
       - name: Save package sources
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.spm-cache.outputs.cache-hit != 'true'
