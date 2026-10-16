@@ -38,6 +38,25 @@ struct TimeMathTests {
         #expect(now.elapsed(since: start) == expected)
     }
 
+    private static let flooredDates: [(Date, Int64)] = [
+        (Date(millisecondsSince1970: 1_700_000_000_123), 1_700_000_000_123),
+        (Date(timeIntervalSince1970: 1_700_000_000.1239), 1_700_000_000_123),
+        // Within the 1 µs tolerance a hair below the boundary counts as the boundary.
+        (Date(timeIntervalSince1970: 1_700_000_000.1239995), 1_700_000_000_124),
+        (Date(timeIntervalSince1970: -1.5), -1_500),
+        (Date(timeIntervalSince1970: 2e10), 10_000_000_000_000),
+        (Date(timeIntervalSince1970: -2e10), -10_000_000_000_000),
+        (Date(timeIntervalSince1970: .infinity), 0),
+    ]
+
+    @Test(arguments: flooredDates)
+    func test_dateFlooredToMilliseconds_truncatesWithToleranceAndSaturates(date: Date, expected: Int64) {
+        let floored = date.flooredToMilliseconds()
+
+        #expect(floored.millisecondsSince1970 == expected)
+        #expect(floored.flooredToMilliseconds() == floored)
+    }
+
     @Test
     func test_addingThenElapsed_currentEpoch_roundTripsWholeMilliseconds() {
         var generator = SeededGenerator(seed: 0x7173)

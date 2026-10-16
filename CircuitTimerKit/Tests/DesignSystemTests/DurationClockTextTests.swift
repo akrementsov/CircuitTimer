@@ -56,4 +56,18 @@ struct DurationClockTextTests {
     func test_clockText_remaining_roundsFractionsUp(duration: Duration, expected: String) {
         #expect(duration.clockText(.remaining) == expected)
     }
+
+    @Test(arguments: [
+        (Duration.zero, "0:00"),
+        (.seconds(5), "0:05"),
+        (.seconds(75), "1:15"),
+        (.seconds(600), "10:00"),
+        (.seconds(3_600), "60:00"),
+        (.seconds(5_999), "99:59"),
+        (.milliseconds(1), "0:01"),
+        (.milliseconds(59_001), "1:00"),
+    ])
+    func test_clockText_timerRemaining_dropsLeadingZeroAndRoundsUp(duration: Duration, expected: String) {
+        #expect(duration.clockText(.timerRemaining) == expected)
+    }
 }
