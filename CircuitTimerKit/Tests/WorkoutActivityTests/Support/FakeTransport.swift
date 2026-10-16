@@ -13,6 +13,8 @@ final class FakeTransport: Sendable {
     }
 
     let calls = LockIsolated<[Call]>([])
+    /// The attributes of each request, in order.
+    let requestedAttributes = LockIsolated<[Attributes]>([])
     let isEnabled = LockIsolated(true)
     /// Consumed one per request before any succeeds.
     let requestFailures = LockIsolated<[ActivityRequestFailure]>([])
@@ -27,8 +29,9 @@ final class FakeTransport: Sendable {
     var transport: ActivityTransport {
         ActivityTransport(
             isEnabled: { self.isEnabled.value },
-            request: { _, state throws(ActivityRequestFailure) in
+            request: { attributes, state throws(ActivityRequestFailure) in
                 self.calls.withValue { $0.append(.request(state)) }
+                self.requestedAttributes.withValue { $0.append(attributes) }
                 let failure = self.requestFailures.withValue { $0.isEmpty ? nil : $0.removeFirst() }
                 if let failure { throw failure }
 

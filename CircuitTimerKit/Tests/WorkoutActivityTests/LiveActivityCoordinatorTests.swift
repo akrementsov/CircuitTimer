@@ -38,6 +38,7 @@ struct LiveActivityCoordinatorTests {
 
         #expect(notice == nil)
         #expect(fake.calls.value == [.request(.held(1))])
+        #expect(fake.requestedAttributes.value == [Self.attributes])
     }
 
     @Test

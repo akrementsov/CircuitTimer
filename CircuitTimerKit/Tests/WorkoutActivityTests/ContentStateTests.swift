@@ -104,6 +104,10 @@ struct ContentStateTests {
         run.pause(at: moment(3))
         #expect(Content(run: run, at: moment(4)).staleDate == nil)
         #expect(Content.finished.staleDate == nil)
+
+        var waiting = makeRun(makePausedWorkout())
+        waiting.start(at: origin)
+        #expect(Content(run: waiting, at: moment(16)).staleDate == nil)
     }
 
     @Test

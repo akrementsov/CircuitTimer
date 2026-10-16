@@ -116,14 +116,21 @@ struct AppNotificationCleanupTests {
     @Test
     func test_launch_endsLiveActivityOrphansOnceWithoutDelayingTheRestore() async {
         let orphanCleanups = LockIsolated(0)
-        let release = AsyncStream<Void>.makeStream()
+        let notificationCleanups = LockIsolated(0)
+        let releaseNotifications = AsyncStream<Void>.makeStream()
+        let releaseActivities = AsyncStream<Void>.makeStream()
         let store = makeStore(AppFeature.State()) {
             $0.workoutRunRecord.load = { nil }
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: []) }
-            $0.backgroundNotifications.removeOrphans = { true }
+            // Both cleanups stay in flight together: neither waits for the other or for the restore.
+            $0.backgroundNotifications.removeOrphans = {
+                notificationCleanups.withValue { $0 += 1 }
+                for await _ in releaseNotifications.stream {}
+                return true
+            }
             $0.liveActivity.endOrphans = {
                 orphanCleanups.withValue { $0 += 1 }
-                for await _ in release.stream {}
+                for await _ in releaseActivities.stream {}
             }
         }
 
@@ -135,8 +142,10 @@ struct AppNotificationCleanupTests {
         await store.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([]) }
         await store.send(.view(.task))
         #expect(orphanCleanups.value == 1)
+        #expect(notificationCleanups.value == 1)
 
-        release.continuation.finish()
+        releaseNotifications.continuation.finish()
+        releaseActivities.continuation.finish()
         await store.finish()
         #expect(orphanCleanups.value == 1)
     }
