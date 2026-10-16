@@ -3,6 +3,8 @@ import os
 
 /// Lets a caller wait a bounded time for work that keeps running after the wait gives up.
 final class CompletionSignal: Sendable {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "LiveActivity")
+
     private let pair = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private let completed = OSAllocatedUnfairLock(initialState: false)
 
@@ -31,7 +33,7 @@ final class CompletionSignal: Sendable {
                 } catch is CancellationError {
                     return false
                 } catch {
-                    LiveActivityCoordinator.logger.error("Waiting for an end failed: \(String(reflecting: error), privacy: .public)")
+                    Self.logger.error("A completion wait failed: \(String(reflecting: error), privacy: .public)")
                 }
                 return false
             }

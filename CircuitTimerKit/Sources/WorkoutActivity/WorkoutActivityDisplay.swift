@@ -49,8 +49,8 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
     public let tone: Tone
     public let headline: Label
     public let clock: Clock
-    /// The Dynamic Island has no room for the pause glyph's meaning, so a stage the user paused shows its time
-    /// left there; everything else shows `clock`.
+    /// What the Dynamic Island's clock shows. It has no row for a paused stage's time left, which the Lock Screen
+    /// shows under the pause glyph, so a stage the user paused shows that time instead; everything else is `clock`.
     public let islandClock: Clock
     /// `nil` once the workout is over.
     public let next: Next?

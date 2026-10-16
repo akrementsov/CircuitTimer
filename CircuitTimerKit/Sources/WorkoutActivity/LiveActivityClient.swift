@@ -37,7 +37,7 @@ public struct LiveActivityClient: Sendable {
 
 extension LiveActivityClient: DependencyKey {
     public static let liveValue: Self = {
-        let coordinator = LiveActivityCoordinator(transport: .live)
+        let coordinator = LiveActivityCoordinator(transport: .live())
         let revision = LockIsolated(0)
         return Self(
             nextRevision: {

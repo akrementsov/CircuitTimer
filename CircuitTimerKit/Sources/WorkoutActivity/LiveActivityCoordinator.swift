@@ -244,7 +244,10 @@ actor LiveActivityCoordinator {
 
     private func markGone(_ id: UUID) -> Outcome {
         owners[id]?.isGone = true
-        owners[id]?.activityID = nil
+        if let activityID = owners[id]?.activityID {
+            owners[id]?.activityID = nil
+            transport.forget(activityID)
+        }
         return .unavailable
     }
 
