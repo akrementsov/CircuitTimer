@@ -195,7 +195,8 @@ struct TimerDisplayTests {
         (.seconds(59 * 60 + 1), 1, 0),
         (.seconds(60 * 60), 1, 0),
         (.seconds(61 * 60), 1, 1),
-        (.seconds(100 * 3_600 + 30 * 60) + .milliseconds(1), 100, 31),
+        // 100 h 30 min and 1 ms; one literal, since arithmetic here makes the @Test expansion too slow to type-check.
+        (.milliseconds(361_800_001), 100, 31),
     ])
     func test_totalLeft_remaining_roundsUpToWholeMinutes(remaining: Duration, hours: Int, minutes: Int) {
         var state = State.fixture(.running)
