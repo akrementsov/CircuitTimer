@@ -10,6 +10,8 @@ extension Duration {
         case adaptive
         /// `minutesSeconds` with fractions rounded up, so time left reads `00:00` only once none is left.
         case remaining
+        /// `1:15`, as a counting `Text(timerInterval:)` without hours draws it; fractions rounded up like `remaining`.
+        case timerRemaining
     }
 
     /// ASCII digits and colons in every region; fractions round down, except for `remaining`.
@@ -23,6 +25,8 @@ extension Duration {
                 clockText(self < .seconds(3_600) ? .minutesSeconds : .hoursMinutesSeconds)
             case .remaining:
                 posixFormatted(.minuteSecond(padMinuteToLength: 2, roundFractionalSeconds: .up))
+            case .timerRemaining:
+                posixFormatted(.minuteSecond(padMinuteToLength: 1, roundFractionalSeconds: .up))
         }
     }
 

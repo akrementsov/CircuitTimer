@@ -40,6 +40,8 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
 
     public struct Next: Hashable, Sendable {
         public let label: Label
+        /// The colour the stage will take; the Dynamic Island draws its name in it.
+        public let tone: Tone
         public let clock: Clock
     }
 
@@ -65,10 +67,10 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
                             tone: Self.tone(stage),
                             headline: Self.label(stage),
                             clock: Self.counting(from: running.stageEnd, to: end),
-                            next: Next(label: .openApp, clock: .none)
+                            next: Next(label: .openApp, tone: .dark, clock: .none)
                         )
                     case .manualPause:
-                        let next = Next(label: .openApp, clock: .none)
+                        let next = Next(label: .openApp, tone: .dark, clock: .none)
                         self.init(title: title, tone: .dark, headline: .pause, clock: .pauseGlyph, next: next)
                     case .finish:
                         self.init(title: title, tone: .dark, headline: .finished, clock: .finishedGlyph, next: nil)
@@ -76,11 +78,11 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
             case let .running(running):
                 let next = switch running.next {
                     case let .stage(stage, end):
-                        Next(label: Self.label(stage), clock: Self.counting(from: running.stageEnd, to: end))
+                        Next(label: Self.label(stage), tone: Self.tone(stage), clock: Self.counting(from: running.stageEnd, to: end))
                     case .manualPause:
-                        Next(label: .pause, clock: .none)
+                        Next(label: .pause, tone: .dark, clock: .none)
                     case .finish:
-                        Next(label: .finished, clock: .none)
+                        Next(label: .finished, tone: .dark, clock: .none)
                 }
                 self.init(
                     title: title,
@@ -92,7 +94,7 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
             case let .paused(held):
                 self.init(title: title, tone: .dark, headline: .pause, clock: .pauseGlyph, next: Self.next(held))
             case let .awaitingUser(upcoming):
-                let next = upcoming.map(Self.next) ?? Next(label: .finished, clock: .none)
+                let next = upcoming.map(Self.next) ?? Next(label: .finished, tone: .dark, clock: .none)
                 self.init(title: title, tone: .dark, headline: .pause, clock: .pauseGlyph, next: next)
             case .finished:
                 self.init(title: title, tone: .dark, headline: .finished, clock: .finishedGlyph, next: nil)
@@ -108,7 +110,7 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
     }
 
     private static func next(_ held: WorkoutActivityAttributes.HeldStage) -> Next {
-        Next(label: label(held.stage), clock: .fixed(.milliseconds(held.remainingMilliseconds)))
+        Next(label: label(held.stage), tone: tone(held.stage), clock: .fixed(.milliseconds(held.remainingMilliseconds)))
     }
 
     private static func tone(_ stage: WorkoutActivityAttributes.Stage) -> Tone {
