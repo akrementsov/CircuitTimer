@@ -20,8 +20,9 @@ env:
 jobs:
   upload:
     runs-on: xcode-27
-    # A backstop above the step timeouts below added together; GitHub's default is six hours.
-    timeout-minutes: 90
+    # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
+    # the step timeouts below added together, so a slow run is not cancelled before they report.
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v7
         with:
@@ -48,6 +49,7 @@ jobs:
           echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore package sources
+        timeout-minutes: 10
         uses: actions/cache/restore@v6
         with:
           path: .build/SourcePackages
