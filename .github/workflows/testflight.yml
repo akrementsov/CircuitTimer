@@ -20,6 +20,9 @@ env:
 jobs:
   upload:
     runs-on: xcode-27
+    # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
+    # the step timeouts below added together, so a slow run is not cancelled before they report.
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v7
         with:
@@ -46,6 +49,7 @@ jobs:
           echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore package sources
+        timeout-minutes: 10
         uses: actions/cache/restore@v6
         with:
           path: .build/SourcePackages
@@ -53,6 +57,7 @@ jobs:
 
       # The build number is the UTC start time, so a re-run of an older run still gets a higher number.
       - name: Archive
+        timeout-minutes: 40
         run: |
           build_number=$(date -u +%y%m%d.%H%M%S)
           echo "Build number: $build_number"
@@ -91,6 +96,7 @@ jobs:
       # signature stops the run before anything is uploaded. The upload signs again with the same cloud identity
       # and automatic profiles, so this is strong evidence about the uploaded build, not a proof.
       - name: Export a signed IPA to inspect
+        timeout-minutes: 15
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -109,6 +115,7 @@ jobs:
             "$TEAM" "$APP_ID" "$WIDGETS_ID"
 
       - name: Upload to TestFlight
+        timeout-minutes: 20
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -116,6 +123,7 @@ jobs:
 
       - name: Keep the export reports
         if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:
           name: export-reports
