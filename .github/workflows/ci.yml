@@ -18,9 +18,7 @@ env:
   # Xcode version, and the runner image's default Xcode changes over time.
   DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
   DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=26.5
-  SWIFTLINT_VERSION: 0.65.1
-  # Of swiftlint_linux_amd64.zip.
-  SWIFTLINT_SHA256: caeed6f4a679c35539ffaf124f6c4ab4a8416917f7d8796279dc52b74026059d
+  SWIFTLINT_IMAGE: ghcr.io/realm/swiftlint:0.65.1@sha256:f47e083201e47a136cda5ae847595bfe00226c444ca226fa74fa5dc648a9b057
 
 jobs:
   # Linux, so lint does not take one of the five macOS jobs a Free plan runs at a time.
@@ -30,22 +28,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install SwiftLint
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/swiftlint.zip" \
-            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/swiftlint_linux_amd64.zip"
-          echo "${SWIFTLINT_SHA256}  $RUNNER_TEMP/swiftlint.zip" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
-
-      # The static binary needs no Swift runtime; SourceKit, which the custom rules' match_kinds use, comes
-      # from the image's Swift toolchain.
+      # SwiftLint's image carries the Swift runtime and SourceKit. Its static Linux binary refuses SourceKit and
+      # only warns while it skips the rules that need it, our custom rules among them, so a skip fails the step.
       - name: Lint
         run: |
-          toolchain=$(dirname "$(dirname "$(readlink -f "$(command -v swift)")")")
-          export LINUX_SOURCEKIT_LIB_PATH="$toolchain/lib"
-          test -f "$LINUX_SOURCEKIT_LIB_PATH/libsourcekitdInProc.so" \
-            || { echo "::error::No SourceKit in $LINUX_SOURCEKIT_LIB_PATH"; exit 1; }
-          make lint SWIFTLINT="$RUNNER_TEMP/swiftlint/swiftlint-static"
+          set -o pipefail
+          make lint SWIFTLINT="docker run --rm -v $PWD:$PWD -w $PWD $SWIFTLINT_IMAGE swiftlint" 2>&1 \
+            | tee "$RUNNER_TEMP/lint.log"
+          if grep -q 'Skipping enabled rule' "$RUNNER_TEMP/lint.log"; then
+            echo "::error::SwiftLint skipped rules; see the log above"
+            exit 1
+          fi
 
   build-test:
     runs-on: xcode-27
