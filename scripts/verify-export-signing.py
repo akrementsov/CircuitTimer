@@ -6,8 +6,6 @@ only in what the export produced. Run with `python3 -I`; it uses the standard li
 
   verify-export-signing.py archive <CircuitTimer.xcarchive>
       The app declares Live Activities and embeds the widget extension. Exit 0 or 1.
-  verify-export-signing.py summary <DistributionSummary.plist> <team> <app id> <widgets id>
-      Exit 0 when both bundles are signed as expected, 1 on a mismatch, 2 when the summary does not say.
   verify-export-signing.py ipa <CircuitTimer.ipa> <team> <app id> <widgets id>
       Reads the signatures and profiles of an exported IPA. Exit 0 or 1.
 """
@@ -37,44 +35,6 @@ def check_entitlements(name, entitlements, team, bundle_id):
         raise Mismatch(f"{name}: team identifier is {entitlements.get('com.apple.developer.team-identifier')!r}, not {team!r}")
     if entitlements.get("get-task-allow") is True:
         raise Mismatch(f"{name}: get-task-allow is set, so this is a development signature")
-
-
-def entries_named(node, names):
-    """Every dictionary in the summary whose `name` is one of `names`, at any depth."""
-    if isinstance(node, dict):
-        if node.get("name") in names:
-            yield node
-        for value in node.values():
-            yield from entries_named(value, names)
-    elif isinstance(node, list):
-        for value in node:
-            yield from entries_named(value, names)
-
-
-def verify_summary(path, team, app_id, widgets_id):
-    try:
-        with open(path, "rb") as file:
-            summary = plistlib.load(file)
-    except FileNotFoundError:
-        print(f"{path} does not exist")
-        return 2
-    expected = {APP: app_id, WIDGETS: widgets_id}
-    found = {}
-    for entry in entries_named(summary, expected.keys()):
-        found.setdefault(entry["name"], entry)
-    missing = sorted(set(expected) - set(found))
-    if missing:
-        print(f"The summary does not list {', '.join(missing)}")
-        return 2
-    for name, entry in found.items():
-        if "entitlements" not in entry:
-            print(f"{name}: the summary shows no entitlements")
-            return 2
-        check_entitlements(name, entry["entitlements"], team, expected[name])
-        if not entry.get("profile"):
-            raise Mismatch(f"{name}: the summary shows no provisioning profile")
-        print(f"{name}: signed for {entry['entitlements']['application-identifier']}")
-    return 0
 
 
 def run_plist(name, command):
@@ -126,8 +86,6 @@ def main(arguments):
     try:
         if len(arguments) == 2 and arguments[0] == "archive":
             return verify_archive(arguments[1])
-        if len(arguments) == 5 and arguments[0] == "summary":
-            return verify_summary(*arguments[1:])
         if len(arguments) == 5 and arguments[0] == "ipa":
             return verify_ipa(*arguments[1:])
     except Mismatch as mismatch:
