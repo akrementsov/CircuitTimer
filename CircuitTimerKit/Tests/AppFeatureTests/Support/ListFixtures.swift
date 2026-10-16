@@ -5,6 +5,7 @@ import BackgroundExecution
 import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
+import WorkoutActivity
 import WorkoutDomain
 
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
@@ -24,6 +25,7 @@ func makeStore(
     return TestStore(initialState: state) {
         AppFeature()
     } withDependencies: {
+        $0.liveActivity = .previewValue
         $0.cues = .previewValue
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }

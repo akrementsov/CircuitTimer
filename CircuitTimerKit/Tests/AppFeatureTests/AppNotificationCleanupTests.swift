@@ -113,6 +113,49 @@ struct AppNotificationCleanupTests {
         #expect(store.state.isNotificationCleanupStalled == false)
     }
 
+    @Test
+    func test_launch_runsBothOrphanCleanupsOnceInParallelWithoutDelayingTheRestore() async {
+        let orphanCleanups = LockIsolated(0)
+        let notificationCleanups = LockIsolated(0)
+        let started = AsyncStream<Void>.makeStream()
+        let releaseNotifications = AsyncStream<Void>.makeStream()
+        let releaseActivities = AsyncStream<Void>.makeStream()
+        let store = makeStore(AppFeature.State()) {
+            $0.workoutRunRecord.load = { nil }
+            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: []) }
+            // Both cleanups stay in flight together: neither waits for the other or for the restore.
+            $0.backgroundNotifications.removeOrphans = {
+                notificationCleanups.withValue { $0 += 1 }
+                started.continuation.yield()
+                for await _ in releaseNotifications.stream {}
+                return true
+            }
+            $0.liveActivity.endOrphans = {
+                orphanCleanups.withValue { $0 += 1 }
+                started.continuation.yield()
+                for await _ in releaseActivities.stream {}
+            }
+        }
+
+        await store.send(.view(.task)) {
+            $0.workouts = .loading
+            $0.runRestore = .reading
+        }
+        await store.receive(.internal(.runRecordLoaded(nil))) { $0.runRestore = .resolved }
+        await store.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([]) }
+        await store.send(.view(.task))
+        var arrivals = started.stream.makeAsyncIterator()
+        _ = await arrivals.next()
+        _ = await arrivals.next()
+        #expect(orphanCleanups.value == 1)
+        #expect(notificationCleanups.value == 1)
+
+        releaseNotifications.continuation.finish()
+        releaseActivities.continuation.finish()
+        await store.finish()
+        #expect(orphanCleanups.value == 1)
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func test_cleanup_retryCancelsOlderRequestAndReportsOnlyNewestResult() async {
         let calls = LockIsolated(0)

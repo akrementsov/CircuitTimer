@@ -437,6 +437,22 @@
         }
       }
     },
+    "timer.liveActivity.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't show the workout on the Lock Screen."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось показать тренировку на экране блокировки."
+          }
+        }
+      }
+    },
     "timer.notifications.alertsOff" : {
       "localizations" : {
         "en" : {

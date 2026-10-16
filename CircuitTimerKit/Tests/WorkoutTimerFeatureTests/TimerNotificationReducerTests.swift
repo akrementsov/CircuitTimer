@@ -4,6 +4,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WorkoutActivity
 import WorkoutDomain
 
 @MainActor
@@ -18,6 +19,7 @@ struct TimerNotificationReducerTests {
         let removed = LockIsolated<[UUID]>([])
         let syncGate = AsyncStream<Void>.makeStream()
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -58,6 +60,7 @@ struct TimerNotificationReducerTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         let calls = LockIsolated(0)
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.backgroundNotifications.access = {
                 calls.withValue { $0 += 1 }
@@ -83,6 +86,7 @@ struct TimerNotificationReducerTests {
         state.$isSoundOn = SharedReader(value: false)
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -116,6 +120,7 @@ struct TimerNotificationReducerTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -156,6 +161,7 @@ struct TimerNotificationReducerTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = DateGenerator { wall.value }
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -195,6 +201,7 @@ struct TimerNotificationReducerTests {
         let cancelled = AsyncStream<Void>.makeStream()
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "ru")]
@@ -239,6 +246,7 @@ struct TimerNotificationReducerTests {
         let state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
         }
         await store.send(.view(.notificationPreferencesChanged))
@@ -253,6 +261,7 @@ struct TimerNotificationReducerTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -423,6 +432,7 @@ struct TimerNotificationReducerTests {
         let reads = LockIsolated(0)
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]

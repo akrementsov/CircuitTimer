@@ -5,6 +5,7 @@ import Foundation
 import os
 import SwiftUI
 import TimerPreferences
+import WorkoutActivity
 import WorkoutDomain
 import WorkoutStorage
 
@@ -56,6 +57,8 @@ public struct WorkoutTimerFeature: Sendable {
         public let id: UUID
         public let workoutID: Workout.ID
         public let title: String
+        /// The workout's name as stored; the Live Activity decides how a blank one reads.
+        public let workoutName: String
         var run: WorkoutRun
         public internal(set) var snapshot: WorkoutRun.Snapshot
         /// `.start` with 3 s at init, unless the schedule is empty.
@@ -75,6 +78,8 @@ public struct WorkoutTimerFeature: Sendable {
         var recordSync = RecordSync.unknown
         /// Set while the newest record write failed: a relaunch may bring back no run, or an earlier state of one.
         public internal(set) var hasRecordFailed = false
+        /// Whether the Lock Screen cannot show the workout; the newest serial wins.
+        public internal(set) var liveActivityNotice: LiveActivityNotice?
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @SharedReader(.keepScreenOn) var isKeepScreenOn = true
@@ -90,10 +95,11 @@ public struct WorkoutTimerFeature: Sendable {
         @Presents public var destination: Destination.State?
         public internal(set) var path = StackState<Path.State>()
 
-        public init(id: UUID, workoutID: Workout.ID, title: String, schedule: WorkoutSchedule) {
+        public init(id: UUID, workoutID: Workout.ID, title: String, workoutName: String, schedule: WorkoutSchedule) {
             self.id = id
             self.workoutID = workoutID
             self.title = title
+            self.workoutName = workoutName
             // `@ObservableState` makes stored properties computed, so `self.run` can't be read before every property is set.
             let run = WorkoutRun(schedule: schedule)
             self.run = run
@@ -106,10 +112,11 @@ public struct WorkoutTimerFeature: Sendable {
         /// A saved run brought back after the process was gone; `run` is already settled at `now`.
         ///
         /// No countdown: the user saw the run going before, so it continues as it was, running or paused.
-        public init(id: UUID, workoutID: Workout.ID, title: String, restoring run: WorkoutRun, at now: Date) {
+        public init(id: UUID, workoutID: Workout.ID, title: String, workoutName: String, restoring run: WorkoutRun, at now: Date) {
             self.id = id
             self.workoutID = workoutID
             self.title = title
+            self.workoutName = workoutName
             var run = run
             // Already settled at `now`; the tick keeps the rule that a snapshot follows a tick.
             run.tick(at: now)
@@ -152,6 +159,7 @@ public struct WorkoutTimerFeature: Sendable {
             case recordWritten(revision: Int, succeeded: Bool)
             case notificationAccessLoaded(generation: Int, NotificationAccess?)
             case notificationsSynced(revision: Int, report: NotificationSyncReport?)
+            case liveActivityNoticeChanged(LiveActivityNotice)
         }
     }
 
@@ -172,6 +180,7 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.date) private var date
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.preferredLocales) var preferredLocales
     @Dependency(\.timerSession) var timerSession
     @Dependency(\.workoutRunRecord) var workoutRunRecord
@@ -201,7 +210,13 @@ public struct WorkoutTimerFeature: Sendable {
             // Presentation and stack reducers settle visibility before cues compare the screen's moment.
             if case .destination(.presented(.closeConfirmation(.finish))) = action { return .none }
             if case .view(.closeButtonTapped) = action, state.snapshot.status == .finished { return .none }
-            return .merge(signal(&state), syncScreenAwake(&state), syncNotifications(&state, after: action, at: date()))
+            let now = date()
+            return .merge(
+                signal(&state),
+                syncScreenAwake(&state),
+                syncNotifications(&state, after: action, at: now),
+                syncLiveActivity(state, after: action, at: now)
+            )
         }
     }
 
@@ -244,6 +259,9 @@ public struct WorkoutTimerFeature: Sendable {
                 return .none
             case let .notificationsSynced(revision, report):
                 notificationsSynced(revision: revision, report: report, &state)
+                return .none
+            case let .liveActivityNoticeChanged(notice):
+                liveActivityNoticeChanged(notice, &state)
                 return .none
             case let .cueFinished(revision, result):
                 cueFinished(revision: revision, result: result, &state)
@@ -422,13 +440,16 @@ public struct WorkoutTimerFeature: Sendable {
         let token = backgroundTask.begin("Clear the closed workout run")
         let id = state.id
         let notifications = backgroundNotifications
+        let activity = liveActivity
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        let close = Effect<Action>.run { [timerSession, cues, notifications, dismiss, workoutRunRecord, backgroundTask] _ in
+        let close = Effect<Action>.run { [timerSession, cues, notifications, activity, dismiss, workoutRunRecord, backgroundTask] _ in
             await timerSession.end(owner: id)
             await cues.end(id)
             await notifications.end(id)
+            // The client bounds the wait; the activity goes in the background after that.
+            await activity.end(id)
             await dismiss()
             // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
             // write does not stop for that, so a cancellation is no failure.

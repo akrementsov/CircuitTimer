@@ -62,6 +62,7 @@ struct AppFeatureRunRestoreTests {
                 id: UUID(0),
                 workoutID: workout.id,
                 title: workout.name,
+                workoutName: workout.name,
                 restoring: restored,
                 at: wall
             ))
@@ -117,6 +118,7 @@ struct AppFeatureRunRestoreTests {
                 id: UUID(0),
                 workoutID: workout.id,
                 title: workout.name,
+                workoutName: workout.name,
                 restoring: restored,
                 at: wall
             ))
@@ -255,7 +257,7 @@ struct AppFeatureRunRestoreTests {
             await store.receive(.internal(.resumeRunConfirmed)) {
                 $0.runRestore = .presenting(saved)
                 $0.destination = .timer(WorkoutTimerFeature.State(
-                    id: UUID(attempt), workoutID: workout.id, title: workout.name, restoring: run, at: date
+                    id: UUID(attempt), workoutID: workout.id, title: workout.name, workoutName: workout.name, restoring: run, at: date
                 ))
             }
             #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(phase == .running ? elapsed : 3))
@@ -301,7 +303,7 @@ struct AppFeatureRunRestoreTests {
         await store.receive(.internal(.resumeRunConfirmed)) {
             $0.runRestore = .presenting(saved)
             $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0), workoutID: workout.id, title: workout.name, restoring: run, at: now
+                id: UUID(0), workoutID: workout.id, title: workout.name, workoutName: workout.name, restoring: run, at: now
             ))
         }
         await store.send(.destination(.dismiss)) {

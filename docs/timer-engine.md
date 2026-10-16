@@ -59,6 +59,10 @@ The row is the phase *after* settling.
 | `awaitingUser` | the pause | following | 0 / 0 | stored | — |
 | `finished` | — | — | 0 / 0 | total / 0 | — |
 
+## Outlook
+
+`outlook(at:)` settles a copy at `now` and returns `nil` unless it is running. Otherwise it gives the dates a Live Activity needs to count on its own while the app sleeps: the running stage's start and end, and the end of the stage after it — `nil` when that stage is a manual pause or the workout ends. Every date is floored to whole milliseconds since 1970, so the outlook stays equal while ticks re-anchor the run.
+
 ## Time
 
 - `TimeMath` is the only place converting between `Date` and `Duration`.

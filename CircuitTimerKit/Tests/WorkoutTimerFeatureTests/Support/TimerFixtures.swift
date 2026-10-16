@@ -6,6 +6,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WorkoutActivity
 import WorkoutStorage
 
 /// A fixed date of the current epoch, so `Date` arithmetic has production precision.
@@ -64,7 +65,7 @@ enum TimerPhase: CaseIterable, Sendable {
 
 extension WorkoutTimerFeature.State {
     static func fresh(_ schedule: WorkoutSchedule = Schedules.workRest) -> Self {
-        Self(id: timerID, workoutID: timerWorkoutID, title: "Workout", schedule: schedule)
+        Self(id: timerID, workoutID: timerWorkoutID, title: "Workout", workoutName: "Workout", schedule: schedule)
     }
 
     /// The state the reducer leaves at `origin` in `phase` after the clock's first sync, without the loop itself.
@@ -127,6 +128,7 @@ extension WorkoutTimerFeature.State {
 enum TimerCall: Equatable, Sendable {
     case requestAwake(owner: UUID, awake: Bool, revision: Int)
     case end(owner: UUID)
+    case endLiveActivity(owner: UUID)
     case dismiss
 
     static func awake(_ awake: Bool, _ revision: Int) -> Self {
@@ -249,6 +251,7 @@ final class TimerHarness {
         store = TestStore(initialState: state) {
             WorkoutTimerFeature()
         } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.backgroundNotifications.end = { _ in }
             $0.backgroundNotifications.sync = { _, _, _ in NotificationSyncReport() }
             $0.backgroundNotifications.access = { .authorized }

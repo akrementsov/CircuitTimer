@@ -65,4 +65,9 @@ extension Date {
     init(millisecondsSince1970 milliseconds: Int64) {
         self.init(timeIntervalSince1970: TimeInterval(milliseconds) / 1_000)
     }
+
+    /// The same date truncated to whole milliseconds since 1970, with the 1 µs tolerance above.
+    func flooredToMilliseconds() -> Date {
+        Date(millisecondsSince1970: millisecondsSince1970)
+    }
 }
