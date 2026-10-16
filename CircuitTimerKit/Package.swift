@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
+        .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
         .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
@@ -113,6 +114,11 @@ let package = Package(
             dependencies: [
                 .product(name: "Sharing", package: "swift-sharing"),
             ],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "WorkoutActivity",
+            dependencies: ["WorkoutDomain"],
             swiftSettings: strictSettings
         ),
         .target(
