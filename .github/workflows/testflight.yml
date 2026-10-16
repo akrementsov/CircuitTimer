@@ -89,28 +89,9 @@ jobs:
           printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
           make upload ASC_KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
 
-      # The archive is unsigned, so only the export shows whether both bundles kept their App Store signature.
-      # Exit 2 means the summary does not say; a separate signed export is then inspected instead.
-      - name: Read the distribution summary
-        id: summary
-        env:
-          TEAM: ${{ steps.archive.outputs.team }}
-          APP_ID: ${{ steps.archive.outputs.app }}
-          WIDGETS_ID: ${{ steps.archive.outputs.widgets }}
-        run: |
-          set +e
-          python3 -I scripts/verify-export-signing.py summary .build/Export/DistributionSummary.plist \
-            "$TEAM" "$APP_ID" "$WIDGETS_ID"
-          status=$?
-          set -e
-          case $status in
-            0) echo "verified=true" >> "$GITHUB_OUTPUT" ;;
-            2) echo "verified=false" >> "$GITHUB_OUTPUT"; ls -la .build/Export ;;
-            *) exit 1 ;;
-          esac
-
+      # The archive is unsigned, so only an export shows whether both bundles kept their App Store signature.
+      # An upload leaves no exported files behind, so a second export to a folder is inspected instead.
       - name: Export a signed IPA to inspect
-        if: steps.summary.outputs.verified == 'false'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -134,9 +115,8 @@ jobs:
         with:
           name: export-reports
           path: |
-            .build/Export/DistributionSummary.plist
-            .build/Export/Packaging.log
             .build/ExportInspect/DistributionSummary.plist
+            .build/ExportInspect/Packaging.log
           if-no-files-found: ignore
           retention-days: 14
 
