@@ -57,7 +57,7 @@ Layering:
 
 | Command | What it does |
 |---|---|
-| `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary) |
+| `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary or command line, such as CI's `docker run`) |
 | `make test` | Builds and tests the package with warnings as errors; failure messages go to `.build/TestResults.xcresult`, which a failed CI run prints and keeps as an artifact |
 | `make build-app` | Builds the app for the simulator without signing |
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
@@ -67,7 +67,7 @@ Layering:
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
-`SWIFTLINT` must be an absolute path or a command on `PATH`: `verify-clean` runs inside a temporary clone.
+`SWIFTLINT` must be an absolute path or a command on `PATH`, optionally with arguments: `verify-clean` runs inside a temporary clone.
 
 ## Delivery
 

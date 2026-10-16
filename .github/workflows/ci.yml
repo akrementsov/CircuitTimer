@@ -18,6 +18,7 @@ env:
   # Xcode version, and the runner image's default Xcode changes over time.
   DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
   DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
+  # After bumping it, push one violation of a custom rule and see lint fail: the image can lint nothing quietly.
   SWIFTLINT_IMAGE: ghcr.io/realm/swiftlint:0.65.1@sha256:f47e083201e47a136cda5ae847595bfe00226c444ca226fa74fa5dc648a9b057
 
 jobs:
@@ -54,7 +55,7 @@ jobs:
           xcodebuild -version
           xcodebuild -version | grep '^Xcode 27\.1' > /dev/null || { ls -d /Applications/Xcode*; exit 1; }
 
-      # Before the runtime download, so a lockfile mismatch fails in seconds.
+      # Before the caches and the tests, so a lockfile mismatch fails in seconds.
       - name: Check lockfiles
         run: make check-resolved
 
@@ -91,6 +92,8 @@ jobs:
       - name: Show the slowest tests
         if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
         timeout-minutes: 5
+        # Diagnostics only: a changed result-bundle format must not fail a run whose tests passed.
+        continue-on-error: true
         run: |
           set -o pipefail
           [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
