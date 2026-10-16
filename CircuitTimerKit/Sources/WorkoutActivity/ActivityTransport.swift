@@ -100,7 +100,7 @@ struct ActivityTransport: Sendable {
     }
 }
 
-private extension ActivityRequestFailure {
+extension ActivityRequestFailure {
     init(_ error: ActivityAuthorizationError) {
         switch error {
             case .denied:
@@ -115,7 +115,7 @@ private extension ActivityRequestFailure {
     }
 }
 
-private extension ActivityPresence {
+extension ActivityPresence {
     init(_ state: ActivityState) {
         switch state {
             case .ended, .dismissed:

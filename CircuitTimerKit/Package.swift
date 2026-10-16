@@ -199,6 +199,15 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WorkoutActivityTests",
+            dependencies: [
+                "WorkoutActivity",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WorkoutDomainTests",
             dependencies: ["WorkoutDomain"],
             swiftSettings: strictSettings
