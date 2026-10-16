@@ -37,8 +37,3 @@ struct AboutView: View {
 
     private static let missingVersion = "—"
 }
-
-// Temporary: checks that Linux lint catches custom rules; reverted in the next commit.
-private func lintProbe() {
-    print(Color.red)
-}
