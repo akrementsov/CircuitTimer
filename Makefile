@@ -1,5 +1,5 @@
 SWIFTLINT ?= swiftlint
-DESTINATION ?= platform=iOS Simulator,name=iPhone 17,OS=26.5
+DESTINATION ?= platform=iOS Simulator,name=iPhone 17,OS=27.0
 BUILD_DESTINATION := generic/platform=iOS Simulator
 HOST_ARCH := $(shell uname -m)
 SOURCE_PACKAGES ?= $(CURDIR)/.build/SourcePackages

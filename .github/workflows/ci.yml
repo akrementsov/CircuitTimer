@@ -17,7 +17,7 @@ env:
   # Pinned explicitly: concurrency diagnostics and the resolved package graph depend on the
   # Xcode version, and the runner image's default Xcode changes over time.
   DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
-  DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=26.5
+  DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
   SWIFTLINT_IMAGE: ghcr.io/realm/swiftlint:0.65.1@sha256:f47e083201e47a136cda5ae847595bfe00226c444ca226fa74fa5dc648a9b057
 
 jobs:
@@ -58,19 +58,6 @@ jobs:
       - name: Check lockfiles
         run: make check-resolved
 
-      # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5. Installing the runtime
-      # also creates its default devices, iPhone 17 among them, so a device of our own would be a duplicate.
-      - name: Install the iOS 26.5 simulator
-        timeout-minutes: 15
-        run: |
-          for attempt in 1 2 3; do
-            xcodebuild -downloadPlatform iOS -buildVersion 26.5 && break
-            [ "$attempt" -lt 3 ] || exit 1
-            echo "::warning::The runtime download failed (attempt $attempt); retrying"
-            sleep 30
-          done
-          xcrun simctl list devices 'iOS 26.5'
-
       - name: Cache keys
         id: keys
         run: |
@@ -99,6 +86,22 @@ jobs:
         id: test
         timeout-minutes: 25
         run: make test
+
+      # Tests that wait in real time add up on the runner's few cores; the step summary names the slowest.
+      - name: Show the slowest tests
+        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
+          {
+            echo '| Seconds | Test |'
+            echo '|---:|---|'
+            xcrun xcresulttool get test-results tests --path .build/TestResults.xcresult \
+              | jq -r '[.. | objects | select(.nodeType == "Test Case" and .durationInSeconds != null)]
+                  | sort_by(-.durationInSeconds) | .[:20][]
+                  | "| \(.durationInSeconds * 10 | round / 10) | `\(.nodeIdentifier)` |"'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Show test failures
         if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled') }}
