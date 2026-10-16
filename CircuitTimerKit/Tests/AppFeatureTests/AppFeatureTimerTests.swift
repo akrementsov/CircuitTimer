@@ -72,6 +72,7 @@ struct AppFeatureTimerTests {
                 id: UUID(0),
                 workoutID: untitled.id,
                 title: "Untitled workout",
+                workoutName: untitled.name,
                 schedule: WorkoutSchedule(workout: untitled)
             )
         )
@@ -310,6 +311,7 @@ struct AppFeatureTimerTests {
             id: id,
             workoutID: workout.id,
             title: workout.name,
+            workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
     }

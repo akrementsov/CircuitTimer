@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Foundation
 import SwiftUI
+import WorkoutActivity
 import WorkoutDomain
 
 /// The full-screen timer, laid out after the original app.
@@ -54,6 +55,9 @@ public struct WorkoutTimerView: View {
                         }
                         if store.hasRecordFailed {
                             signalFootnote("timer.record.failed")
+                        }
+                        if store.liveActivityNotice?.isFailing == true {
+                            signalFootnote("timer.liveActivity.failed")
                         }
                         if let key = store.notificationFootnote {
                             signalFootnote(LocalizedStringKey(key))
@@ -142,6 +146,7 @@ private enum PreviewTimer {
         countdown: WorkoutTimerFeature.Countdown? = nil,
         hasClockFailed: Bool = false,
         hasRecordFailed: Bool = false,
+        isLiveActivityFailing: Bool = false,
         cueFailures: Set<CueFailure> = [],
         play: (inout WorkoutRun) -> Void = { $0.start(at: PreviewTimer.start) }
     ) -> WorkoutTimerFeature.State {
@@ -149,6 +154,7 @@ private enum PreviewTimer {
             id: UUID(0),
             workoutID: workout.id,
             title: workout.name,
+            workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
         play(&state.run)
@@ -160,6 +166,7 @@ private enum PreviewTimer {
         state.isSceneActive = true
         state.hasClockFailed = hasClockFailed
         state.hasRecordFailed = hasRecordFailed
+        state.liveActivityNotice = isLiveActivityFailing ? LiveActivityNotice(serial: 1, isFailing: true) : nil
         state.cueFailures = cueFailures
         return state
     }
@@ -242,6 +249,10 @@ private enum PreviewTimer {
 
 #Preview("Save failed") {
     PreviewTimer.view(PreviewTimer.state(hasRecordFailed: true))
+}
+
+#Preview("Lock Screen failed") {
+    PreviewTimer.view(PreviewTimer.state(isLiveActivityFailing: true))
 }
 
 #Preview("Audio signals failed") {

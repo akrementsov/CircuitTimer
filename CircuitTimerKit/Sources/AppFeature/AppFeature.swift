@@ -6,6 +6,7 @@ import os
 import SettingsFeature
 import SwiftUI
 import TimerPreferences
+import WorkoutActivity
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutStorage
@@ -173,6 +174,7 @@ public struct AppFeature: Sendable {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
+    @Dependency(\.liveActivity) private var liveActivity
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutRunRecord) var workoutRunRecord
@@ -222,7 +224,7 @@ public struct AppFeature: Sendable {
 
                 // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
-                return .merge(readRunRecord(&state), cleanupNotifications())
+                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans())
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -477,13 +479,28 @@ public struct AppFeature: Sendable {
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
+            workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
     }
 
     /// A timer over a saved run already settled at `now`.
     func restoredTimerState(for workout: Workout, run: WorkoutRun, at now: Date) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(id: uuid(), workoutID: workout.id, title: workout.displayName, restoring: run, at: now)
+        WorkoutTimerFeature.State(
+            id: uuid(),
+            workoutID: workout.id,
+            title: workout.displayName,
+            workoutName: workout.name,
+            restoring: run,
+            at: now
+        )
+    }
+
+    /// Activities of an earlier process show a run this launch has not continued; a continued run starts its own.
+    private func endLiveActivityOrphans() -> Effect<Action> {
+        .run { [liveActivity] _ in
+            await liveActivity.endOrphans()
+        }
     }
 
     private func reorder(_ workouts: IdentifiedArrayOf<Workout>, _ state: inout State) -> Effect<Action> {
@@ -543,10 +560,11 @@ public struct AppFeature: Sendable {
                 // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
-                let end = Effect<Action>.run { [timerSession, cues, backgroundNotifications, id = timer.id] _ in
+                let end = Effect<Action>.run { [timerSession, cues, backgroundNotifications, liveActivity, id = timer.id] _ in
                     await timerSession.end(owner: id)
                     await cues.end(id)
                     await backgroundNotifications.end(id)
+                    await liveActivity.end(id)
                 }
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")

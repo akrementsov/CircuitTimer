@@ -4,6 +4,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WorkoutActivity
 import WorkoutDomain
 
 @MainActor
@@ -100,6 +101,7 @@ struct TimerNotificationTests {
         state.notifications.revision = 1
         state.notifications.needsRetry = true
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -117,6 +119,7 @@ struct TimerNotificationTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -132,6 +135,7 @@ struct TimerNotificationTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -155,6 +159,7 @@ struct TimerNotificationTests {
         state.notifications.lastAttempt = MonotonicInstant(now: clock)
         let calls = LockIsolated(0)
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
             $0.continuousClock = clock
@@ -189,6 +194,7 @@ struct TimerNotificationTests {
         let previousLanguage = language == "ru" ? "en" : "ru"
         state.notifications.projection = state.notificationProjection(at: origin, language: previousLanguage)
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = language == "ru" ? [Locale(identifier: "ru")] : []
@@ -211,6 +217,7 @@ struct TimerNotificationTests {
         state.notifications.revision = 2
         state.notifications.hasSchedulingFailed = true
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -223,6 +230,7 @@ struct TimerNotificationTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.revision = 1
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: nil))) {
@@ -239,6 +247,7 @@ struct TimerNotificationTests {
         state.notifications.hasSchedulingFailed = true
         state.notifications.needsRetry = true
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport(superseded: true))))
@@ -254,6 +263,7 @@ struct TimerNotificationTests {
         state.notifications.accessGeneration = 1
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -269,6 +279,7 @@ struct TimerNotificationTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.accessGeneration = 2
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -284,6 +295,7 @@ struct TimerNotificationTests {
         state.notifications.accessGeneration = 2
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.preferredLocales = [Locale(identifier: "en")]
         }
@@ -330,6 +342,7 @@ struct TimerNotificationTests {
         state.notifications.lastAttempt = MonotonicInstant(now: clock)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
             $0.preferredLocales = [Locale(identifier: "en")]
@@ -377,6 +390,7 @@ struct TimerNotificationTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         let calls = LockIsolated(0)
         let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+            $0.liveActivity = .previewValue
             $0.date = .constant(origin)
             $0.cues = .previewValue
             $0.backgroundNotifications.sync = { _, _, _ in

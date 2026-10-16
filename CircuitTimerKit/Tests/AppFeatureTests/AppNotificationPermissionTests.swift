@@ -542,6 +542,7 @@ private extension AppFeature.State {
             id: UUID(0),
             workoutID: workout.id,
             title: workout.name,
+            workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
     }
