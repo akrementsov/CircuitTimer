@@ -24,6 +24,7 @@ env:
 jobs:
   lint:
     runs-on: xcode-27
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -44,8 +45,9 @@ jobs:
 
   build-test:
     runs-on: xcode-27
-    # A backstop for a hang outside the tests; GitHub's default is six hours.
-    timeout-minutes: 45
+    # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
+    # the step timeouts below added together, so a slow run is not cancelled before they report.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -61,6 +63,7 @@ jobs:
       # The xcode-27 image ships only iOS 27 simulators; the tests run on iOS 26.5. Installing the runtime
       # also creates its default devices, iPhone 17 among them, so a device of our own would be a duplicate.
       - name: Install the iOS 26.5 simulator
+        timeout-minutes: 15
         run: |
           for attempt in 1 2 3; do
             xcodebuild -downloadPlatform iOS -buildVersion 26.5 && break
@@ -91,15 +94,17 @@ jobs:
             xcode27.1-dd-${{ steps.keys.outputs.resolved }}-
             xcode27.1-dd-
 
-      # The tests take 5–10 minutes on this runner, so a hang ends here and the steps below still report what the
-      # result bundle holds; they run whether the timeout leaves the step failed or cancelled.
+      # The tests take 5–10 minutes on this runner, so a hang ends here, and the steps below report what the
+      # result bundle holds whether the step timeout leaves it failed or cancelled. A cancelled run (by hand,
+      # superseded or past the job timeout) skips them.
       - name: Test the package
         id: test
         timeout-minutes: 25
         run: make test
 
       - name: Show test failures
-        if: always() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled')
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled') }}
+        timeout-minutes: 5
         run: |
           set -o pipefail
           [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
@@ -111,7 +116,8 @@ jobs:
 
       # The wildcard keeps the bundle's own folder in the artifact, so it opens in Xcode as downloaded.
       - name: Keep the test results
-        if: always() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled')
+        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled') }}
+        timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:
           name: test-results
