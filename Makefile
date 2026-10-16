@@ -7,6 +7,7 @@ DERIVED_DATA ?= $(CURDIR)/.build/DerivedData
 ARCHIVE_PATH ?= $(CURDIR)/.build/CircuitTimer.xcarchive
 EXPORT_PATH ?= $(CURDIR)/.build/Export
 TEST_RESULTS ?= $(CURDIR)/.build/TestResults.xcresult
+TEST_FLAGS ?=
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -53,7 +54,7 @@ test:
 	rm -rf "$(TEST_RESULTS)"
 	cd CircuitTimerKit && $(STRICT) xcodebuild test -scheme CircuitTimerKit-Package \
 		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/Package" -resultBundlePath "$(TEST_RESULTS)" $(XCODEBUILD_FLAGS)
+		-derivedDataPath "$(DERIVED_DATA)/Package" -resultBundlePath "$(TEST_RESULTS)" $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
