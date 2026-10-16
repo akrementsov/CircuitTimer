@@ -105,6 +105,7 @@ struct ContentStateTests {
         #expect(Content(run: run, at: moment(4)).staleDate == nil)
         #expect(Content.finished.staleDate == nil)
 
+        // Past the 15 s of timed stages, the run waits at the manual pause.
         var waiting = makeRun(makePausedWorkout())
         waiting.start(at: origin)
         #expect(Content(run: waiting, at: moment(16)).staleDate == nil)
