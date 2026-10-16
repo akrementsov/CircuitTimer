@@ -38,7 +38,7 @@ struct ActivityTransport: Sendable {
     var request: @Sendable (WorkoutActivityAttributes, WorkoutActivityAttributes.ContentState) throws(ActivityRequestFailure) -> String
     var update: @Sendable (String, WorkoutActivityAttributes.ContentState) async -> Void
     var end: @Sendable (String, WorkoutActivityAttributes.ContentState?, ActivityDismissal) async -> Void
-    /// Drops an activity the user removed, which no call reaches again.
+    /// Drops an activity that went while it showed, removed by the user or ended by iOS; no later call reaches it.
     var forget: @Sendable (String) -> Void
     /// `nil` while iOS does not list the activity.
     var presence: @Sendable (String) -> ActivityPresence?
