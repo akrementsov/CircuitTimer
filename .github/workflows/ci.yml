@@ -46,7 +46,7 @@ jobs:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 75
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@v7
 
@@ -102,6 +102,20 @@ jobs:
         timeout-minutes: 35
         run: make test TEST_FLAGS='-collect-test-diagnostics never'
 
+      # Built even when a package test failed, so the UI tests still report.
+      - name: Build the app
+        id: build-app
+        if: ${{ !cancelled() }}
+        timeout-minutes: 20
+        run: make build-app
+
+      # About 4 minutes for the tests and 10 for a cold build of the app with its UI tests. A failing UI test runs
+      # once more and is reported as flaky if it then passes; a hung runner gets one more run as above.
+      - name: Test the UI
+        if: ${{ !cancelled() && steps.build-app.outcome == 'success' }}
+        timeout-minutes: 25
+        run: make test-ui
+
       # Every result bundle: its failed tests, tests that passed only on a retry, and the slowest tests, which add up
       # on the runner's few cores. Diagnostics only: a changed result-bundle format must not fail a run whose tests
       # passed.
@@ -122,9 +136,6 @@ jobs:
           path: .build/TestResults/
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: Build the app
-        run: make build-app
 
       # Pull requests only restore caches, so their revisions do not evict the main branch caches.
       - name: Save package sources
