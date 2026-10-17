@@ -55,6 +55,14 @@ expect_in "$work/summary" '### Slowest tests in UI.xcresult'
 expect_in "$work/summary" '| 0.2 | `ProbeUITests/test_50%, then 100%()` |'
 expect_in "$work/summary" '### Slowest tests in Package.xcresult'
 
+describe "CI, special characters in the target"
+target=$(bundle Target)
+jq '(.. | objects | select(.nodeType == "UI test bundle") | .name) = "UITests: 100%, iPhone"' \
+	"$fixtures/ui-failed-and-retried.json" > "$target/tests.json"
+run env GITHUB_ACTIONS=true "$report" "$target"
+expect_status 0
+expect_in "$work/out" '::warning title=UITests%3A 100%25%2C iPhone/ProbeUITests/test_probe_passesOnRetry()::Passed only on a retry.'
+
 describe "terminal"
 run "$report" "$ui"
 expect_status 0

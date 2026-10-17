@@ -104,11 +104,17 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 		if (inpreview && /static[[:space:]]/ && !/previewValue/) {
 			inpreview = 0
 		}
+		preview = $0
 		if (/static[[:space:]]+(let|var)[[:space:]]+previewValue/) {
 			haspreview = 1
 			inpreview = 1
+			# Only the preview value counts, from its name to the next declaration on the line.
+			preview = substr($0, index($0, "previewValue") + length("previewValue"))
+			if (match(preview, /static[[:space:]]/)) {
+				preview = substr(preview, 1, RSTART - 1)
+			}
 		}
-		if (inpreview && /liveValue/) {
+		if (inpreview && preview ~ /liveValue/) {
 			print FILENAME ":" FNR ": previewValue reads liveValue"
 		}
 		depth += braces($0, "[{]") - braces($0, "[}]")

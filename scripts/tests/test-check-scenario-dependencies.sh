@@ -139,6 +139,15 @@ failing one-line-key-without-preview "$kit/Case.swift" "Case.swift:1: a Dependen
 enum OneLineKey: DependencyKey { static let liveValue = 1 }
 EOF
 
+failing one-line-preview-reads-live "$kit/Case.swift" "Case.swift:1: previewValue reads liveValue" <<'EOF'
+enum OneLineMirrorKey: DependencyKey { static let liveValue = 1; static let previewValue = liveValue }
+EOF
+
+passing one-line-key-with-preview "$kit/Case.swift" <<'EOF'
+enum OneLineKey: DependencyKey { static let liveValue = 1; static let previewValue = 2 }
+enum ReversedKey: DependencyKey { static let previewValue = 2; static let liveValue = 1 }
+EOF
+
 passing attributed-key-with-preview "$kit/Case.swift" <<'EOF'
 @available(iOS 17, *) public struct AttributedKey: DependencyKey {
     public static let liveValue = 1
