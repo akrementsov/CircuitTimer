@@ -143,6 +143,18 @@ failing one-line-preview-reads-live "$kit/Case.swift" "Case.swift:1: previewValu
 enum OneLineMirrorKey: DependencyKey { static let liveValue = 1; static let previewValue = liveValue }
 EOF
 
+failing preview-named-in-live-value "$kit/Case.swift" "Case.swift:1: previewValue reads liveValue" <<'EOF'
+enum ArgumentKey: DependencyKey { static let liveValue = make(previewValue: false); static let previewValue = liveValue }
+EOF
+
+passing preview-ended-on-its-line "$kit/Case.swift" <<'EOF'
+enum SplitKey: DependencyKey {
+    static let previewValue = 2; static let liveValue = make(
+        liveValue: true
+    )
+}
+EOF
+
 passing one-line-key-with-preview "$kit/Case.swift" <<'EOF'
 enum OneLineKey: DependencyKey { static let liveValue = 1; static let previewValue = 2 }
 enum ReversedKey: DependencyKey { static let previewValue = 2; static let liveValue = 1 }

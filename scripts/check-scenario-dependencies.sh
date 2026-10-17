@@ -104,18 +104,23 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 		if (inpreview && /static[[:space:]]/ && !/previewValue/) {
 			inpreview = 0
 		}
-		preview = $0
-		if (/static[[:space:]]+(let|var)[[:space:]]+previewValue/) {
+		previewtext = $0
+		previewends = 0
+		if (match($0, /static[[:space:]]+(let|var)[[:space:]]+previewValue/)) {
 			haspreview = 1
 			inpreview = 1
-			# Only the preview value counts, from its name to the next declaration on the line.
-			preview = substr($0, index($0, "previewValue") + length("previewValue"))
-			if (match(preview, /static[[:space:]]/)) {
-				preview = substr(preview, 1, RSTART - 1)
+			# Only the preview value counts: from its declaration to the next one on the line, which ends it.
+			previewtext = substr($0, RSTART + RLENGTH)
+			if (match(previewtext, /static[[:space:]]/)) {
+				previewtext = substr(previewtext, 1, RSTART - 1)
+				previewends = 1
 			}
 		}
-		if (inpreview && preview ~ /liveValue/) {
+		if (inpreview && previewtext ~ /liveValue/) {
 			print FILENAME ":" FNR ": previewValue reads liveValue"
+		}
+		if (previewends) {
+			inpreview = 0
 		}
 		depth += braces($0, "[{]") - braces($0, "[}]")
 		# A body may open and close on one line.

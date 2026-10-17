@@ -2,7 +2,7 @@
 # Tests scripts/report-test-results.sh against xcresulttool's JSON. The fixtures are its output for real bundles: a UI
 # test that failed twice and one that passed on its retry, a failed parameterized package test, and passed package
 # tests. By hand they got special characters in a test name and a message, and an `Arguments → Repetition →
-# Test Case Run` chain, which no real bundle had yet.
+# Test Case Run` chain, which no real bundle had yet; special characters in a target's name are put in by the test.
 . "$(dirname "$0")/lib.sh"
 
 fixtures="$root/scripts/tests/fixtures/report"
