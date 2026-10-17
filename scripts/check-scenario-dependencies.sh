@@ -112,7 +112,8 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 			print FILENAME ":" FNR ": previewValue reads liveValue"
 		}
 		depth += braces($0, "[{]") - braces($0, "[}]")
-		if (depth > 0) {
+		# A body may open and close on one line.
+		if (depth > 0 || /[{]/) {
 			opened = 1
 		}
 		if (opened && depth <= 0) {
@@ -153,7 +154,8 @@ clients=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 			print name
 		}
 		depth += braces($0, "[{]") - braces($0, "[}]")
-		if (depth > 0) {
+		# A body may open and close on one line.
+		if (depth > 0 || /[{]/) {
 			opened = 1
 		}
 		if (opened && depth <= 0) {
