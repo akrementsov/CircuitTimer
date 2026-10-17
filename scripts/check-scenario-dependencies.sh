@@ -89,6 +89,9 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 			continue
 		return t ~ /^[[:space:]]*((@[A-Za-z_][A-Za-z0-9_]*(\([^)]*\))?|[a-z]+)[[:space:]]+)*(extension|struct|enum|class|actor)[[:space:]][^{]*[:,][[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/
 	}
+	BEGIN {
+		previewdecl = "static[[:space:]]+(let|var)[[:space:]]+previewValue"
+	}
 	FNR == 1 {
 		inkey = 0
 	}
@@ -101,12 +104,12 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 		start = FNR
 	}
 	inkey {
-		if (inpreview && /static[[:space:]]/ && !/static[[:space:]]+(let|var)[[:space:]]+previewValue/) {
+		if (inpreview && /static[[:space:]]/ && $0 !~ previewdecl) {
 			inpreview = 0
 		}
 		previewtext = $0
 		previewends = 0
-		if (match($0, /static[[:space:]]+(let|var)[[:space:]]+previewValue/)) {
+		if (match($0, previewdecl)) {
 			haspreview = 1
 			inpreview = 1
 			# Only the preview value counts: from its declaration to the next one on the line, which ends it.
