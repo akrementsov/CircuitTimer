@@ -32,11 +32,19 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint check-resolved resolve build-package test build-app test-ui archive check-release-app upload ci verify-clean
+.PHONY: lint test-scripts check-resolved resolve build-package test build-app test-ui archive check-release-app upload ci \
+	verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
 	scripts/check-scenario-dependencies.sh
+
+# Tests of the scripts and of the make targets around xcodebuild, with fixtures and stand-ins for xcodebuild and xcrun,
+# so CI's Linux lint job runs them too; a test that lints uses SWIFTLINT.
+test-scripts:
+	@set -u; failed=0; \
+	for test in scripts/tests/test-*.sh; do SWIFTLINT="$(SWIFTLINT)" "$$test" || failed=1; done; \
+	exit $$failed
 
 # The local package inside the app project keeps its own lockfile, so both must pin the same versions.
 check-resolved:
@@ -124,7 +132,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint check-resolved test build-app test-ui
+ci: lint test-scripts check-resolved test build-app test-ui
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

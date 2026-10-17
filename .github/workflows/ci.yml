@@ -42,6 +42,10 @@ jobs:
             exit 1
           fi
 
+      # Here the scripts' tests run with GNU tools and mawk, and the tests that lint use the same image.
+      - name: Test the scripts
+        run: make test-scripts SWIFTLINT="docker run --rm -v $PWD:$PWD -w $PWD $SWIFTLINT_IMAGE"
+
   build-test:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above

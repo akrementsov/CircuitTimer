@@ -1,0 +1,107 @@
+{
+  "devices": [
+    {
+      "architecture": "arm64",
+      "deviceId": "00000000-0000-0000-0000-000000000000",
+      "deviceName": "iPhone 17",
+      "modelName": "iPhone 17",
+      "osBuildNumber": "24A434",
+      "osVersion": "27.0",
+      "platform": "iOS Simulator"
+    }
+  ],
+  "testNodes": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "duration": "0,0031s",
+                  "durationInSeconds": 0.0030558109283447266,
+                  "name": "test_save_existingID_replacesInPlace()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_existingID_replacesInPlace()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_existingID_replacesInPlace()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,0061s",
+                  "durationInSeconds": 0.0060918331146240234,
+                  "name": "test_save_concurrentNewWorkouts_keepsEveryOne()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_concurrentNewWorkouts_keepsEveryOne()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_concurrentNewWorkouts_keepsEveryOne()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,0031s",
+                  "durationInSeconds": 0.0030701160430908203,
+                  "name": "test_save_oneStorage_leavesAnotherUnchanged()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_oneStorage_leavesAnotherUnchanged()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_oneStorage_leavesAnotherUnchanged()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,000034s",
+                  "durationInSeconds": 0.00003409385681152344,
+                  "name": "test_fetchAll_givenWorkouts_keepsTheirOrder()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_fetchAll_givenWorkouts_keepsTheirOrder()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_fetchAll_givenWorkouts_keepsTheirOrder()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,000034s",
+                  "durationInSeconds": 0.00003409385681152344,
+                  "name": "test_save_emptyList_storesFirstWorkout()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_emptyList_storesFirstWorkout()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_emptyList_storesFirstWorkout()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,000097s",
+                  "durationInSeconds": 0.00009679794311523438,
+                  "name": "test_save_newID_appends()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_newID_appends()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_newID_appends()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                },
+                {
+                  "duration": "0,00089s",
+                  "durationInSeconds": 0.0008862018585205078,
+                  "name": "test_save_concurrentVersionsOfOneWorkout_keepsOne()",
+                  "nodeIdentifier": "ScenarioStorageTests/test_save_concurrentVersionsOfOneWorkout_keepsOne()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests/test_save_concurrentVersionsOfOneWorkout_keepsOne()",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                }
+              ],
+              "name": "ScenarioStorageTests",
+              "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ScenarioStorageTests",
+              "nodeType": "Test Suite",
+              "result": "Passed"
+            }
+          ],
+          "name": "AppScenariosTests",
+          "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests",
+          "nodeType": "Unit test bundle",
+          "result": "Failed"
+        }
+      ],
+      "name": "CircuitTimerKit-Package",
+      "nodeType": "Test Plan",
+      "result": "Failed"
+    }
+  ],
+  "testPlanConfigurations": [
+    {
+      "configurationId": "1",
+      "configurationName": "Test Scheme Action"
+    }
+  ]
+}

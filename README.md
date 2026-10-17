@@ -119,6 +119,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | Command | What it does |
 |---|---|
 | `make lint` | SwiftLint in strict mode and the scenario dependency check |
+| `make test-scripts` | Tests of the scripts and of the make targets around xcodebuild |
 | `make test` | Builds and tests the package with warnings as errors |
 | `make build-app` | Builds the app for the simulator |
 | `make test-ui` | Builds the app and runs its UI tests on `DESTINATION` |
