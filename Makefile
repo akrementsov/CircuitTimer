@@ -9,6 +9,10 @@ EXPORT_PATH ?= $(CURDIR)/.build/Export
 # One result bundle and log per test run; scripts/report-test-results.sh reads them all.
 TEST_RESULTS ?= $(CURDIR)/.build/TestResults
 TEST_FLAGS ?=
+# UI test runs keep apart by destination: `iPhone 17 #2` on 27.0 runs as `iPhone-17-2-27.0`.
+UI_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
+# Parallel workers clone the simulator, so more than one is allowed only on CI.
+UI_TEST_WORKERS ?= 1
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -24,7 +28,7 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint check-resolved resolve build-package test build-app archive check-release-app upload ci verify-clean
+.PHONY: lint check-resolved resolve build-package test build-app test-ui archive check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -63,6 +67,27 @@ build-app:
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
 
+# Each destination has its own result bundle, log and DerivedData, so runs on different simulators can overlap; the
+# package checkouts are shared and only read. A failing test gets one more run, and one that passes only then is
+# reported as flaky. Parallel workers stay off unless UI_TEST_WORKERS says otherwise, which xcodebuild needs to hear
+# either way: its flag overrides the scheme. Diagnostics are never collected: the simulator can keep xcodebuild
+# waiting ten minutes for them after the tests, and the result bundle keeps its screen recordings without them.
+test-ui:
+	@set -eu; \
+	w='$(UI_TEST_WORKERS)'; \
+	case "$$w" in [1-9]|[1-9][0-9]) ;; *) echo "test-ui: UI_TEST_WORKERS must be a number from 1 to 99, not '$$w'" >&2; exit 2 ;; esac; \
+	if [ "$$w" -gt 1 ] && [ "$${CI:-}" != true ]; then \
+		echo "test-ui: parallel workers clone simulators, which only CI may do (see AGENTS.md)" >&2; exit 2; \
+	fi; \
+	if [ "$$w" -eq 1 ]; then par="-parallel-testing-enabled NO"; \
+	else par="-parallel-testing-enabled YES -parallel-testing-worker-count $$w"; fi; \
+	scripts/run-tests.sh "$(TEST_RESULTS)/UITests-$(UI_RUN).xcresult" \
+		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
+		-derivedDataPath "$(DERIVED_DATA)/UITests-$(UI_RUN)" $$par \
+		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
+		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 \
+		CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+
 # Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
@@ -94,7 +119,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint check-resolved test build-app
+ci: lint check-resolved test build-app test-ui
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

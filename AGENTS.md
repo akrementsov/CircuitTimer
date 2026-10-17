@@ -25,7 +25,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 ## Module map
 
-One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` composes `AppFeature`, configures TipKit and calls the injected `BackgroundNotificationClient.installForegroundSuppression` at launch. In Debug it builds the store from a UI test scenario of `AppScenarios` when the launch asks for one. The app imports `BackgroundNotifications`; TCA reexports Dependencies for the hook. The widget extension `CircuitTimerWidgets` draws the Live Activity from `WorkoutActivity` and `DesignSystem` only; lint covers it like the package.
+One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` composes `AppFeature`, configures TipKit and calls the injected `BackgroundNotificationClient.installForegroundSuppression` at launch. In Debug it builds the store from a UI test scenario of `AppScenarios` when the launch asks for one. The UI test target `CircuitTimerUITests` in the same project links only `UITestContract`. The app imports `BackgroundNotifications`; TCA reexports Dependencies for the hook. The widget extension `CircuitTimerWidgets` draws the Live Activity from `WorkoutActivity` and `DesignSystem` only; lint covers it like the package.
 
 | Module | Depends on | Owns |
 |---|---|---|
@@ -65,7 +65,8 @@ Layering:
 | `make build-app` | Builds the app for the simulator without signing |
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
 | `make resolve` | Re-resolves both lockfiles |
-| `make ci` | `lint`, `check-resolved`, `test`, `build-app` |
+| `make test-ui` | Builds the app and runs its UI tests on `DESTINATION`; the result bundle and log go to `.build/TestResults/UITests-<run>.{xcresult,log}` and DerivedData to `.build/DerivedData/UITests-<run>`, where `UI_RUN` (`iPhone-17-2-27.0` for `iPhone 17 #2` on 27.0) comes from `DESTINATION`. `UI_TEST_WORKERS` (1 by default) sets Xcode's parallel workers |
+| `make ci` | `lint`, `check-resolved`, `test`, `build-app`, `test-ui` |
 | `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
 | `make check-release-app` | Fails if a file of the archived app names a UI test scenario's key, module or fixture |
@@ -86,6 +87,8 @@ Layering:
 - CI pins Xcode 27.1 on the `xcode-27` runner image, still a GitHub preview. Tests run on the iOS 27.0 simulator that the image ships. CI boots the simulator before the tests, and `scripts/run-tests.sh` runs them once more when the test runner hangs before connecting and the result bundle holds no test, which the preview image's simulator sometimes does; a failing package test is not retried. `scripts/report-test-results.sh` reports every bundle in `.build/TestResults/`: failures as annotations, tests that passed only on a retry as warnings, and the 20 slowest tests in the step summary. A failed run, or one with a flaky test, keeps the bundles and logs as an artifact. The `lint` job runs on Ubuntu in SwiftLint's own Docker image, which has the SourceKit our custom rules need, so it takes none of the plan's five concurrent macOS jobs. After switching Xcode run `make resolve` and `make check-resolved`, then commit **both** `Package.resolved` files: newer Swift tools pick different package manifests and resolve a different graph.
 - Warnings are errors everywhere we control them. The app target sets `SWIFT_TREAT_WARNINGS_AS_ERRORS`. The package turns on `.treatAllWarnings(as: .error)` only when `CIRCUITTIMER_STRICT_WARNINGS=1`, which `make test` and `make build-package` set: when the app builds the package as a dependency, Xcode passes `-suppress-warnings`, and the two flags conflict. Strict and non-strict builds use separate DerivedData because the evaluated manifest is cached there.
 - Locally, tests and screen checks use only four simulators: `iPhone 17` (`DESTINATION`), `iPhone 17 #2` and `iPhone 17 #3` on iOS 27.0, and `iPhone 15` on iOS 17.5 for checks on the oldest supported iOS. One job runs on a device at a time; a parallel job takes a free one, for example `make test DESTINATION='platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'`, or waits. Create no other simulators; if one of the four is missing, recreate exactly it.
+- Parallel UI test workers (`UI_TEST_WORKERS` above 1) make Xcode clone the simulator, so `make test-ui` allows them only with `CI=true`. Locally, UI tests run in parallel only on different allowed simulators, each `make test-ui` with its own `DESTINATION`, and only after one run on each has finished alone: the first run resolves the shared package checkouts, which later runs only read.
+- A failing UI test runs once more (`-retry-tests-on-failure -test-iterations 2`); one that passes only then is reported as flaky and keeps its result bundle as an artifact. Package tests get no retry. A UI test that runs past 120 s fails.
 - The launch screen lives in `Configs/Info.plist`, which Xcode merges with the generated `INFOPLIST_KEY_*` keys. The file is not a member of any target: Copy Bundle Resources would conflict with the generated plist.
 
 ## TCA
@@ -190,6 +193,8 @@ Log with `os.Logger` and move the UI to an explicit state. Do not log expected o
 - Name tests `test_method_state_expected`.
 - Declare a test target only together with a committed source file: SwiftPM rejects a declared target whose directory is missing on a clean checkout. Test targets use the same `strictSettings`.
 - `WorkoutRun` keeps `position` and `cursor` readable through `@testable import` so tests can check its invariants.
+- UI tests are the exception: XCTest, because Swift Testing does not run UI tests. A test is a `@MainActor final class <Area>UITests: XCTestCase` with a synchronous `setUp`, if any, and methods named `test_<start>_<action>_<expected>`. It starts with `let app = launch(.<scenario>)` and drives the app through Screens (`CircuitTimerUITests/Screens/`), which wait for the app and report failures at the test's line. Lint rejects `sleep`, waits outside `Screens/` and `Support/`, and `XCUIApplication()` outside `Support/Launch.swift`.
+- UI tests share no state and depend on no order: each launches its own app into its scenario. Scenario data lives in the app's process; TipKit's datastore on the simulator is the one thing tests share, so a test that needs tips passes `-com.apple.TipKit.ResetDatastore 1`.
 
 ## Imports
 
