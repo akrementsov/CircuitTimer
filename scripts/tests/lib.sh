@@ -4,8 +4,16 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 test_name=$(basename "$0" .sh)
-work=$(mktemp -d "${TMPDIR:-/tmp}/$test_name.XXXXXX")
-trap 'rm -rf "$work"' EXIT
+# Inside the repository when SwiftLint must see the files: CI runs it in Docker, which mounts only the repository.
+if [ "${SCRATCH_IN_REPO:-}" = 1 ]; then
+	scratch_parent="$root/.test-scripts"
+	mkdir -p "$scratch_parent"
+	trap 'rm -rf "$work"; rmdir "$scratch_parent" 2>/dev/null || true' EXIT
+else
+	scratch_parent=${TMPDIR:-/tmp}
+	trap 'rm -rf "$work"' EXIT
+fi
+work=$(mktemp -d "$scratch_parent/$test_name.XXXXXX")
 # The scripts under test would write into the real CI step's annotations, outputs and summary, and a nested make
 # would take the calling make's variables.
 unset GITHUB_ACTIONS GITHUB_OUTPUT GITHUB_STEP_SUMMARY CI MAKEFLAGS MFLAGS MAKELEVEL

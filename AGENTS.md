@@ -61,7 +61,7 @@ Layering:
 | Command | What it does |
 |---|---|
 | `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary or command line, such as CI's `docker run`), then `scripts/check-scenario-dependencies.sh` |
-| `make test-scripts` | Runs `scripts/tests/test-*.sh`: the scripts and the make targets around xcodebuild against fixtures and stand-ins for xcodebuild and xcrun |
+| `make test-scripts` | Runs `scripts/tests/test-*.sh`: the scripts and the make targets around xcodebuild against fixtures and stand-ins for xcodebuild and xcrun, and the custom lint rules against Swift fixtures linted with `SWIFTLINT` |
 | `make test` | Builds and tests the package with warnings as errors through `scripts/run-tests.sh`; the result bundle and log go to `.build/TestResults/Package.{xcresult,log}`, and a failed local run prints its failures |
 | `make build-app` | Builds the app for the simulator without signing |
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |

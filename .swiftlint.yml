@@ -161,7 +161,7 @@ custom_rules:
 
   ui_test_waits_in_screens:
     name: Wait outside a Screen
-    regex: 'waitForExistence|waitForNonExistence|\.wait\(for:|XCTWaiter|XCTNSPredicateExpectation'
+    regex: 'waitForExistence|waitForNonExistence|\bwait\(for:|waitForExpectations|\bexpectation\(|\bfulfillment\(of:|XCTWaiter|XCTNSPredicateExpectation'
     included: '/CircuitTimerUITests/'
     excluded: '/CircuitTimerUITests/(Screens|Support)/'
     match_kinds:
@@ -171,11 +171,13 @@ custom_rules:
 
   ui_test_launch_only:
     name: App created outside launch
-    regex: '\bXCUIApplication\('
+    regex: '\bXCUIApplication(\.init)?\(|\bXCUIApplication\s*=\s*\.init\('
     included: '/CircuitTimerUITests/'
     excluded: '/CircuitTimerUITests/Support/Launch\.swift'
     match_kinds:
       - identifier
+      - keyword
+      - typeidentifier
     message: Start the app with launch(_:), which selects a scenario; any other launch runs on live data.
     severity: error
 
