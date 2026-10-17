@@ -1,3 +1,4 @@
+// The UI test target: the app's identifiers and its Swift settings, so the tests build as strictly as the app.
 #include "App.xcconfig"
 
 PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_ID).uitests
@@ -7,7 +8,6 @@ GENERATE_INFOPLIST_FILE = YES
 CODE_SIGN_STYLE = Automatic
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
 SWIFT_VERSION = 6.0
-SWIFT_STRICT_CONCURRENCY = complete
 SWIFT_APPROACHABLE_CONCURRENCY = NO
 SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated
 SWIFT_TREAT_WARNINGS_AS_ERRORS = YES

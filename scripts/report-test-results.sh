@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Usage: report-test-results.sh BUNDLE...
 # Reports each result bundle: an error annotation per failed test with its messages, a warning per test that
-# passed only on a retry, and the 20 slowest tests, also into the step summary on CI. Writes `flaky=` and
+# passed only on a retry, and the 20 slowest tests, also into the step summary on CI. Outside GitHub Actions the
+# failures and flaky tests print as plain text. Writes `flaky=` and
 # `upload=` to $GITHUB_OUTPUT when it is set; `upload=true` asks CI to keep the bundles. Diagnostics only: it fails
 # no run by itself.
 set -euo pipefail
@@ -32,9 +33,14 @@ JQ_TESTS='
 			(.children // [])[] | cases($target)
 		end;
 	def annotation(kind; prefix):
-		[.test | msgs("")] as $messages
-		| "::\(kind) title=" + ("\(.target)/\(.test.nodeIdentifier)" | property) + "::"
-		+ (prefix + (if $messages == [] then "no failure message" else $messages | join("\n") end) | escape);
+		"\(.target)/\(.test.nodeIdentifier)" as $title
+		| [.test | msgs("")] as $messages
+		| (prefix + (if $messages == [] then "no failure message" else $messages | join("\n") end)) as $text
+		| if $ci then
+			"::\(kind) title=" + ($title | property) + "::" + ($text | escape)
+		else
+			"\(kind | ascii_upcase): \($title)\n" + ($text | split("\n") | map("    " + .) | join("\n"))
+		end;
 	[.testNodes[] | cases("")] as $cases
 	| ($cases[] | select(.test.result == "Failed") | annotation("error"; "")),
 	($cases[]
@@ -56,6 +62,11 @@ summary() {
 	fi
 }
 
+# Annotations for GitHub Actions, plain text for a terminal.
+ci=false
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+	ci=true
+fi
 flaky=false
 upload=false
 for bundle in "$@"; do
@@ -69,7 +80,7 @@ for bundle in "$@"; do
 		upload=true
 		continue
 	fi
-	if ! annotations=$(jq -r "$JQ_TESTS" <<< "$tests"); then
+	if ! annotations=$(jq -r --argjson ci "$ci" "$JQ_TESTS" <<< "$tests"); then
 		echo "::warning::$name: the result bundle has an unexpected format"
 		upload=true
 		continue
@@ -77,9 +88,10 @@ for bundle in "$@"; do
 	if [ -n "$annotations" ]; then
 		echo "$annotations"
 		upload=true
-		if grep -q '^::warning' <<< "$annotations"; then
+		retried=$(grep -cE '^(::warning|WARNING:)' <<< "$annotations" || true)
+		if [ "$retried" -gt 0 ]; then
 			flaky=true
-			echo "- $name: $(grep -c '^::warning' <<< "$annotations") test(s) passed only on a retry" | summary
+			echo "- $name: $retried test(s) passed only on a retry" | summary
 		fi
 	fi
 	{

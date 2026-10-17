@@ -14,6 +14,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.iOS(.v17)],
     products: [
+        .library(name: "UITestContract", targets: ["UITestContract"]),
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
@@ -26,7 +27,6 @@ let package = Package(
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
         .library(name: "AppScenarios", targets: ["AppScenarios"]),
-        .library(name: "UITestContract", targets: ["UITestContract"]),
     ],
     dependencies: [
         .package(
@@ -57,6 +57,23 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "AppFeatureTests",
+            dependencies: [
+                "TimerPreferences",
+                "BackgroundNotifications",
+                "BackgroundExecution",
+                "AppFeature",
+                "SettingsFeature",
+                "WorkoutActivity",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                "WorkoutTimerFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         // Debug-only: every file is under `#if DEBUG`, so Release links an empty module.
         .target(
             name: "AppScenarios",
@@ -72,23 +89,6 @@ let package = Package(
                 "WorkoutTimerFeature",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "Sharing", package: "swift-sharing"),
-            ],
-            swiftSettings: strictSettings
-        ),
-        .testTarget(
-            name: "AppFeatureTests",
-            dependencies: [
-                "TimerPreferences",
-                "BackgroundNotifications",
-                "BackgroundExecution",
-                "AppFeature",
-                "SettingsFeature",
-                "WorkoutActivity",
-                "WorkoutDomain",
-                "WorkoutStorage",
-                "WorkoutTimerFeature",
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
         ),

@@ -15,7 +15,7 @@ shift
 case "$bundle" in
 	*.xcresult) ;;
 	*)
-		echo "run-tests.sh: $bundle must end in .xcresult" >&2
+		echo "run-tests: $bundle must end in .xcresult" >&2
 		exit 2
 		;;
 esac
@@ -30,11 +30,20 @@ bundle_ran_tests() {
 			| jq -e '(.totalTestCount // 0) > 0' >/dev/null
 }
 
+# Runs the command once into the bundle, appending its output to the log; returns the command's status.
+run_once() {
+	if "$@" -resultBundlePath "$bundle" 2>&1 | tee -a "$log"; then
+		return 0
+	else
+		return $?
+	fi
+}
+
 mkdir -p "$(dirname "$bundle")"
 # xcodebuild refuses an existing result bundle.
 rm -rf "$bundle" "$log"
 
-if "$@" -resultBundlePath "$bundle" 2>&1 | tee -a "$log"; then
+if run_once "$@"; then
 	status=0
 else
 	status=$?
@@ -46,7 +55,7 @@ else
 		fi
 		echo "=== retry after hung runner ===" >> "$log"
 		rm -rf "$bundle"
-		if "$@" -resultBundlePath "$bundle" 2>&1 | tee -a "$log"; then
+		if run_once "$@"; then
 			status=0
 		else
 			status=$?

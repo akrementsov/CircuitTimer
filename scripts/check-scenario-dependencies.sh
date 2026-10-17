@@ -9,7 +9,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 # Keys the library answers by itself in every context, without reaching the outside world.
 LIBRARY_DEFAULTS="context dismiss preferredLocales"
-PREPARE="CircuitTimerKit/Sources/AppScenarios"
+SCENARIOS_DIR="CircuitTimerKit/Sources/AppScenarios"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/check-scenario-dependencies.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
@@ -64,8 +64,8 @@ kit="$tmp/CircuitTimerKit/Sources"
 app="$tmp/CircuitTimer"
 strip_comments "$root/CircuitTimerKit/Sources" "$kit"
 strip_comments "$root/CircuitTimer" "$app"
-scenarios="$kit/AppScenarios"
-mv "$scenarios" "$tmp/AppScenarios"
+# Out of the package copy, so the checks below read only the code a scenario replaces.
+mv "$kit/AppScenarios" "$tmp/AppScenarios"
 scenarios="$tmp/AppScenarios"
 
 is_set_in_prepare() {
@@ -74,7 +74,7 @@ is_set_in_prepare() {
 
 # (a) A key's preview value must exist and must not be its live value: swift-dependencies falls back to the live
 # value when a key declares no preview value.
-keys=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
+key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 	function braces(s, ch,   t) {
 		t = s
 		return gsub(ch, "", t)
@@ -82,7 +82,7 @@ keys=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 	FNR == 1 {
 		inkey = 0
 	}
-	!inkey && /:[[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/ {
+	!inkey && /^[[:space:]]*([a-z]+[[:space:]]+)*(extension|struct|enum|class|actor)[[:space:]][^{]*[:,][[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/ {
 		inkey = 1
 		depth = 0
 		opened = 0
@@ -113,11 +113,11 @@ keys=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 		}
 	}
 ' {} +)
-if [ -n "$keys" ]; then
+if [ -n "$key_problems" ]; then
 	while IFS= read -r problem; do
 		fail "$problem; give it a preview value that is not live"
 	done <<EOF
-$keys
+$key_problems
 EOF
 fi
 
@@ -126,6 +126,9 @@ clients=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 	function braces(s, ch,   t) {
 		t = s
 		return gsub(ch, "", t)
+	}
+	FNR == 1 {
+		inext = 0
 	}
 	!inext && /extension[[:space:]]+DependencyValues([[:space:]]|[{]|$)/ {
 		inext = 1
@@ -150,19 +153,19 @@ clients=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 ' {} + | sort -u)
 for name in $clients; do
 	if ! is_set_in_prepare "$name"; then
-		fail "DependencyValues.$name is not set in $PREPARE; give scenarios a value that is not live"
+		fail "DependencyValues.$name is not set in $SCENARIOS_DIR; give scenarios a value that is not live"
 	fi
 done
 
 # (c) Every key the app or the package reads must be set by `prepare` or be one the library answers by itself.
-used=$(grep -rhoE '@Dependency\(\\\.[A-Za-z_][A-Za-z0-9_.]*\)' "$kit" "$app" \
-	| sed -e 's/^@Dependency(\\\.//' -e 's/[.)].*$//' | sort -u || true)
+used=$(grep -rhoE '@Dependency\(\\(DependencyValues)?\.[A-Za-z_][A-Za-z0-9_.]*\)' "$kit" "$app" \
+	| sed -e 's/^@Dependency(\\\(DependencyValues\)\{0,1\}\.//' -e 's/[.)].*$//' | sort -u || true)
 for name in $used; do
 	case " $LIBRARY_DEFAULTS " in
 		*" $name "*) continue ;;
 	esac
 	if ! is_set_in_prepare "$name"; then
-		fail "@Dependency(\\.$name) is read but not set in $PREPARE; set it there or, if the library answers it without the outside world, add it to LIBRARY_DEFAULTS"
+		fail "@Dependency(\\.$name) is read but not set in $SCENARIOS_DIR; set it there or, if the library answers it without the outside world, add it to LIBRARY_DEFAULTS"
 	fi
 done
 
@@ -179,7 +182,7 @@ fi
 # (e) A storage strategy in use needs its default store replaced, or scenarios share the device's.
 check_strategy() {
 	if grep -rqE "\\.$1\\(" "$kit" "$app" && ! is_set_in_prepare "$2"; then
-		fail ".$1 storage is used but $2 is not set in $PREPARE"
+		fail ".$1 storage is used but $2 is not set in $SCENARIOS_DIR"
 	fi
 }
 check_strategy appStorage defaultAppStorage

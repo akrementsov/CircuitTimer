@@ -57,6 +57,7 @@ jobs:
 
       # Before the caches and the tests, so a lockfile mismatch fails in seconds.
       - name: Check lockfiles
+        id: lockfiles
         run: make check-resolved
 
       - name: Cache keys
@@ -96,22 +97,23 @@ jobs:
           xcrun simctl bootstatus "$udid" -b
 
       # A runner that still hangs before connecting tests nothing, so scripts/run-tests.sh retries it once; a failing
-      # package test gets no retry. Collecting diagnostics would add ten minutes to each hang.
+      # package test gets no retry.
       - name: Test the package
         id: test
         timeout-minutes: 35
-        run: make test TEST_FLAGS='-collect-test-diagnostics never'
+        run: make test
 
-      # Built even when a package test failed, so the UI tests still report.
+      # Built even when a package test failed, so the UI tests still report; never on mismatched lockfiles.
       - name: Build the app
         id: build-app
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
         timeout-minutes: 20
         run: make build-app
 
       # About 4 minutes for the tests and 10 for a cold build of the app with its UI tests. A failing UI test runs
       # once more and is reported as flaky if it then passes; a hung runner gets one more run as above.
       - name: Test the UI
+        id: test-ui
         if: ${{ !cancelled() && steps.build-app.outcome == 'success' }}
         timeout-minutes: 25
         run: make test-ui
@@ -127,8 +129,9 @@ jobs:
         run: scripts/report-test-results.sh .build/TestResults/*.xcresult
 
       # The folder keeps each bundle's own folder in the artifact, so it opens in Xcode as downloaded; the logs go along.
+      # A test step past its timeout may end cancelled rather than failed; its log is kept either way.
       - name: Keep the test results
-        if: ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true') }}
+        if: ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true' || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:

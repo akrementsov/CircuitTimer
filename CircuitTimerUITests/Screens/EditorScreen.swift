@@ -60,7 +60,9 @@ struct EditorScreen: Screen {
     }
 
     func tapBack(file: StaticString = #filePath, line: UInt = #line) -> WorkoutListScreen {
-        backButton.tap()
+        backButton
+            .waitUntilHittable("The Back button", file: file, line: line)
+            .tap()
         return WorkoutListScreen(app, file: file, line: line)
     }
 

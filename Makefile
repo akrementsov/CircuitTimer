@@ -55,12 +55,13 @@ build-package:
 		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS)
 
 # Tests run in English so assertions on localized text do not depend on the machine's language.
-# The output is quiet, so failure messages live only in the result bundle, which run-tests.sh names.
+# The output is quiet, so failure messages live only in the result bundle, which run-tests.sh names. Diagnostics are
+# never collected: the simulator can keep xcodebuild waiting ten minutes for them.
 test:
 	cd CircuitTimerKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/Package.xcresult" \
 		xcodebuild test -scheme CircuitTimerKit-Package \
 		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+		-derivedDataPath "$(DERIVED_DATA)/Package" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
@@ -96,13 +97,17 @@ archive:
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
 
-# UI test scenarios are Debug-only: no file of the archived app may name the scenario key, the module or a fixture.
+# UI test scenarios are Debug-only: no file of the archived app may name one. An optimized build may fold a short
+# string literal into code, so the check also looks for the type and module names, which Swift metadata keeps.
+# Keep it in step with UITestContract's AppScenario.swift.
+RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
+
 check-release-app:
 	@set -eu; \
 	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
 	test -d "$$app" || { echo "check-release-app: no archived app at $$app; run make archive first" >&2; exit 1; }; \
 	found=$$(find "$$app" -type f | while IFS= read -r file; do \
-		if strings -a "$$file" | grep -qE 'CT_APP_SCENARIO|AppScenarios|Leg day'; then echo "$$file"; fi; \
+		if strings -a "$$file" | grep -qE '$(RELEASE_FORBIDDEN)'; then echo "$$file"; fi; \
 	done); \
 	if [ -n "$$found" ]; then \
 		echo "check-release-app: UI test scenarios reached the Release app in:" >&2; echo "$$found" >&2; exit 1; \

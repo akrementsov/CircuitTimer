@@ -15,7 +15,9 @@ struct WorkoutListScreen: Screen {
     }
 
     func tapAdd(file: StaticString = #filePath, line: UInt = #line) -> EditorScreen {
-        addButton.tap()
+        addButton
+            .waitUntilHittable("The workout list's Add button", file: file, line: line)
+            .tap()
         return EditorScreen(app, file: file, line: line)
     }
 
@@ -40,7 +42,7 @@ struct WorkoutListScreen: Screen {
     ) -> Self {
         let workout = row(name, file: file, line: line)
         if let duration {
-            workout.waitForValue(duration, of: "The total time of \"\(name)\"", file: file, line: line)
+            workout.waitUntilValue("The total time of \"\(name)\"", is: duration, file: file, line: line)
         }
         return self
     }

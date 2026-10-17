@@ -18,13 +18,15 @@ struct TimerScreen: Screen {
     /// The current stage as VoiceOver reads it, such as "Get ready, Starting in 3".
     @discardableResult
     func assertCurrentStage(_ spoken: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
-        currentStage.waitForValue(spoken, of: "The current stage", file: file, line: line)
+        currentStage.waitUntilValue("The current stage", is: spoken, file: file, line: line)
         return self
     }
 
     /// Asks to finish the workout: "Finish" leaves the timer, "No" stays.
     func tapClose(file: StaticString = #filePath, line: UInt = #line) -> AlertScreen<Self> {
-        closeButton.tap()
+        closeButton
+            .waitUntilHittable("The timer's Close button", file: file, line: line)
+            .tap()
         return AlertScreen(app, title: "Finish", file: file, line: line)
     }
 }
