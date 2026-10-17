@@ -32,7 +32,7 @@ extension XCUIElement {
     func waitUntilValue(_ description: String, is expected: String, file: StaticString, line: UInt) {
         guard waitUntilExists(description, file: file, line: line).exists else { return }
         if !wait(for: \.stringValue, toEqual: expected, timeout: screenTimeout) {
-            let shown = stringValue ?? "no text"
+            let shown = exists ? stringValue ?? "no text" : "no element"
             XCTFail("\(description) is \"\(shown)\", not \"\(expected)\", after \(Int(screenTimeout)) s", file: file, line: line)
         }
     }

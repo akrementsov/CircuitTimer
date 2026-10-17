@@ -13,9 +13,9 @@ TEST_FLAGS ?=
 UI_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
 # Parallel workers clone the simulator, so more than one is allowed only on CI.
 UI_TEST_WORKERS ?= 1
-# What `check-release-app` looks for: UI test scenarios are Debug-only. An optimized build may fold a short string
-# literal into code, so it also looks for the type and module names, which Swift metadata keeps; `AppScenario` also
-# matches the module `AppScenarios`. Keep it in step with UITestContract's AppScenario.swift.
+# What `check-release-app` looks for. An optimized build may fold a short string literal into code, so the list also
+# names the types, which Swift metadata keeps; `AppScenario` also matches the module `AppScenarios`. Keep it in step
+# with UITestContract's AppScenario.swift.
 RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
 
 XCODEBUILD_FLAGS = -quiet \

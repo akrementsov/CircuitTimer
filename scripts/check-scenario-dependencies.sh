@@ -84,8 +84,9 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 	# generic parameters are dropped first, so a constraint such as `<K: DependencyKey>` is no conformance.
 	function declares_key(s,   t) {
 		t = s
-		while (gsub(/<[^<>]*>/, "", t)) {
-		}
+		# Innermost pairs first, until none is left.
+		while (gsub(/<[^<>]*>/, "", t) > 0)
+			continue
 		return t ~ /^[[:space:]]*((@[A-Za-z_][A-Za-z0-9_]*(\([^)]*\))?|[a-z]+)[[:space:]]+)*(extension|struct|enum|class|actor)[[:space:]][^{]*[:,][[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/
 	}
 	FNR == 1 {
