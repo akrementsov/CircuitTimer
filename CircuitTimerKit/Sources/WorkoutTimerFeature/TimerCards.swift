@@ -1,5 +1,6 @@
 import DesignSystem
 import SwiftUI
+import UITestContract
 
 /// The rough time left in the workout.
 struct TotalCard: View {
@@ -54,6 +55,7 @@ struct CurrentStageCard: View {
         }
         .background(fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
         .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(AccessibilityID.Timer.currentStage)
         .accessibilityLabel(Text("timer.card.current", bundle: .module))
         .accessibilityValue(card.spokenValue)
         .accessibilityAddTraits(.updatesFrequently)

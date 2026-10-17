@@ -142,6 +142,14 @@ custom_rules:
     message: Use a TCA effect instead of an unstructured Task.
     severity: error
 
+  accessibility_identifier_constant:
+    name: Accessibility identifier constant
+    regex: '\.accessibilityIdentifier\((?!\s*AccessibilityID\.)'
+    match_kinds:
+      - identifier
+    message: Take accessibility identifiers from UITestContract's AccessibilityID, which the UI tests share.
+    severity: error
+
   todo_with_ticket:
     name: TODO without ticket
     regex: '\b(TODO|FIXME)\b(?!: \[CT-(([A-Z]+|\d+)-)?\d+\])'

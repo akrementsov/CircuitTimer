@@ -25,6 +25,7 @@ let package = Package(
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
+        .library(name: "UITestContract", targets: ["UITestContract"]),
     ],
     dependencies: [
         .package(
@@ -44,6 +45,7 @@ let package = Package(
                 "BackgroundExecution",
                 "DesignSystem",
                 "SettingsFeature",
+                "UITestContract",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -119,6 +121,10 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .target(
+            name: "UITestContract",
+            swiftSettings: strictSettings
+        ),
+        .target(
             name: "WorkoutActivity",
             dependencies: [
                 "WorkoutDomain",
@@ -135,6 +141,7 @@ let package = Package(
             name: "WorkoutEditorFeature",
             dependencies: [
                 "DesignSystem",
+                "UITestContract",
                 "WorkoutDomain",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -159,6 +166,7 @@ let package = Package(
                 "TimerPreferences",
                 "BackgroundExecution",
                 "DesignSystem",
+                "UITestContract",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutStorage",

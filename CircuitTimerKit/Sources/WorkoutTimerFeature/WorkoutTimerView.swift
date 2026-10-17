@@ -2,6 +2,7 @@ import ComposableArchitecture
 import DesignSystem
 import Foundation
 import SwiftUI
+import UITestContract
 import WorkoutActivity
 import WorkoutDomain
 
@@ -106,6 +107,7 @@ public struct WorkoutTimerView: View {
                 .labelStyle(.iconOnly)
             }
             .tint(.text(.primary))
+            .accessibilityIdentifier(AccessibilityID.Timer.close)
             // Escape from a bar item would otherwise go up to the navigation controller.
             .accessibilityAction(.escape) { send(.closeButtonTapped) }
         }
