@@ -92,6 +92,18 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "AppScenariosTests",
+            dependencies: [
+                "AppScenarios",
+                "UITestContract",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "BackgroundExecution",
             dependencies: [
