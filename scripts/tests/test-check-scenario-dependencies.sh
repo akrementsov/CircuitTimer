@@ -155,6 +155,15 @@ enum SplitKey: DependencyKey {
 }
 EOF
 
+passing live-value-reads-preview "$kit/Case.swift" <<'EOF'
+enum DerivedKey: DependencyKey {
+    static let previewValue = make(
+        seed: 2
+    )
+    static let liveValue = previewValue
+}
+EOF
+
 passing one-line-key-with-preview "$kit/Case.swift" <<'EOF'
 enum OneLineKey: DependencyKey { static let liveValue = 1; static let previewValue = 2 }
 enum ReversedKey: DependencyKey { static let previewValue = 2; static let liveValue = 1 }

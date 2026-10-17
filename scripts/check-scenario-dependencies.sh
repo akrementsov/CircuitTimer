@@ -101,7 +101,7 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 		start = FNR
 	}
 	inkey {
-		if (inpreview && /static[[:space:]]/ && !/previewValue/) {
+		if (inpreview && /static[[:space:]]/ && !/static[[:space:]]+(let|var)[[:space:]]+previewValue/) {
 			inpreview = 0
 		}
 		previewtext = $0
