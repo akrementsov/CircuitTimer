@@ -8,7 +8,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved`; never assume an API exists.
 3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the original app's palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`; the Live Activity keeps the same dark palette whatever the system theme. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together.
    - Fonts ship in `Sources/DesignSystem/Resources/Fonts/` with their license and are registered at runtime from `Bundle.module`; `Font.custom` lives only in `DesignSystem`.
-4. **Dependencies:** reach the outside world through `@Dependency` clients. No singletons, no static mutable state.
+4. **Dependencies:** reach the outside world through `@Dependency` clients, read by key path. No singletons, no static mutable state. A new client, key or storage strategy also gets a value that is not live in `AppScenario.prepare` (see UI tests); `make lint` fails without one. It cannot see our own `SharedKey`s: a new one needs its default store replaced there by hand.
 5. **Navigation:** state-driven — `@Presents` + `@Reducer enum Destination` for modals, `StackState` + `@Reducer enum Path` for pushes. A feature never knows its container; it talks up only through `delegate` actions. A pushed screen that must not close unasked hides the system back button: a SwiftUI pop reaches the reducer as `popFrom`, which removes the element without a veto.
 6. **Every commit passes `make verify-clean`.** A squash-merged pull request may run it at milestones instead; its last commit always passes it.
 
@@ -25,7 +25,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 ## Module map
 
-One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` composes `AppFeature`, configures TipKit and calls the injected `BackgroundNotificationClient.installForegroundSuppression` at launch. The app imports `BackgroundNotifications`; TCA reexports Dependencies for the hook. The widget extension `CircuitTimerWidgets` draws the Live Activity from `WorkoutActivity` and `DesignSystem` only; lint covers it like the package.
+One local package, `CircuitTimerKit`; every module is a library product, so the package scheme builds all of them. The app target in `CircuitTimer.xcodeproj` composes `AppFeature`, configures TipKit and calls the injected `BackgroundNotificationClient.installForegroundSuppression` at launch. In Debug it builds the store from a UI test scenario of `AppScenarios` when the launch asks for one. The app imports `BackgroundNotifications`; TCA reexports Dependencies for the hook. The widget extension `CircuitTimerWidgets` draws the Live Activity from `WorkoutActivity` and `DesignSystem` only; lint covers it like the package.
 
 | Module | Depends on | Owns |
 |---|---|---|
@@ -35,15 +35,18 @@ One local package, `CircuitTimerKit`; every module is a library product, so the 
 | `WorkoutActivity` | `WorkoutDomain`, Dependencies, DependenciesMacros, Foundation, ActivityKit, os | The Live Activity: its attributes and a compact `ContentState` built from a settled run, `WorkoutActivityDisplay` (what the Lock Screen and the Dynamic Island show), `LiveActivityClient` and its coordinator |
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots; the swipe between tabs on a stack's root; the Live Activity's typography |
 | `WorkoutStorage` | `WorkoutDomain`, Dependencies, SwiftData | `WorkoutStorageClient` and its SwiftData store; `WorkoutRunRecordClient` and the run record file |
-| `WorkoutEditorFeature` | `DesignSystem`, `Workout*`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
-| `WorkoutTimerFeature` | `BackgroundNotifications`, `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `WorkoutActivity`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; syncing its Live Activity; its own stack with the stage list |
+| `UITestContract` | — | Accessibility identifiers shared by the app and its UI tests; in Debug also the scenario names, the launch keys and the fixture names the tests read |
+| `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `Workout*`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
+| `WorkoutTimerFeature` | `BackgroundNotifications`, `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `UITestContract`, `WorkoutActivity`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; syncing its Live Activity; its own stack with the stage list |
 | `TimerPreferences` | Sharing | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
 | `SettingsFeature` | `BackgroundNotifications`, `DesignSystem`, `TimerPreferences`, ComposableArchitecture | The Settings tab: signal toggles, its navigation stack, About with the app version, the legal pages |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start, or after a relaunch when the user continues a saved run; composes Settings |
+| `AppScenarios` | `BackgroundExecution`, `BackgroundNotifications`, `SettingsFeature`, `UITestContract`, `Workout*`, Dependencies, Sharing | Debug only: each UI test scenario's dependencies, none of them live, and its workouts |
 
 Layering:
 
 - `*Feature` → `DesignSystem`, `Workout*`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`. A feature never imports another feature; composition happens in `AppFeature`.
+- Features import `UITestContract` only for accessibility identifiers. `AppScenarios` is all under `#if DEBUG`, so Release links it empty; only the app imports it, in Debug, and it imports features only for their clients.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `BackgroundNotifications` imports no feature, TCA or workout module; the app, Settings and timer use only its dependency client.
 - `AppFeature` reads `TimerPreferences` to gate the first Start permission request.
@@ -57,7 +60,7 @@ Layering:
 
 | Command | What it does |
 |---|---|
-| `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary or command line, such as CI's `docker run`) |
+| `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary or command line, such as CI's `docker run`), then `scripts/check-scenario-dependencies.sh` |
 | `make test` | Builds and tests the package with warnings as errors; failure messages go to `.build/TestResults.xcresult`, which a failed CI run prints and keeps as an artifact |
 | `make build-app` | Builds the app for the simulator without signing |
 | `make check-resolved` | Fails if the package and project lockfiles pin different versions |
@@ -65,6 +68,7 @@ Layering:
 | `make ci` | `lint`, `check-resolved`, `test`, `build-app` |
 | `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
+| `make check-release-app` | Fails if a file of the archived app names a UI test scenario's key, module or fixture |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
 `SWIFTLINT` must be an absolute path or a command on `PATH`, optionally with arguments: `verify-clean` runs inside a temporary clone.
@@ -72,7 +76,7 @@ Layering:
 ## Delivery
 
 - A tag `v<MARKETING_VERSION>` (or `v<MARKETING_VERSION>-<suffix>` for another build of the same version) on a commit of `main` whose CI passed runs `testflight.yml`, which archives and uploads to TestFlight. The build number is the UTC start time, `YYMMDD.HHMMSS`.
-- The archive is unsigned: an App Store Connect API key signs only at export, with a cloud-managed distribution certificate, so the key needs the Admin role. `testflight.yml` checks the archive for `NSSupportsLiveActivities` and the extension, then confirms that the app and `CircuitTimerWidgets.appex` carry App Store signatures of the team in a separate signed IPA export, because the upload leaves no exported files to read (`scripts/verify-export-signing.py`, run with `python3 -I`). These checks run before the upload, so a wrong signature or a failed check stops the run with nothing uploaded and the reports kept as a run artifact; re-running it archives and uploads under a new build number. The upload signs again on its own, so a passing check is strong evidence about the uploaded build, not a proof. CT-5 extends the check with its entitlements.
+- The archive is unsigned: an App Store Connect API key signs only at export, with a cloud-managed distribution certificate, so the key needs the Admin role. `testflight.yml` checks the archive for `NSSupportsLiveActivities`, the extension and, with `make check-release-app`, the absence of UI test scenarios, then confirms that the app and `CircuitTimerWidgets.appex` carry App Store signatures of the team in a separate signed IPA export, because the upload leaves no exported files to read (`scripts/verify-export-signing.py`, run with `python3 -I`). These checks run before the upload, so a wrong signature or a failed check stops the run with nothing uploaded and the reports kept as a run artifact; re-running it archives and uploads under a new build number. The upload signs again on its own, so a passing check is strong evidence about the uploaded build, not a proof. CT-5 extends the check with its entitlements.
 - `Configs/App.xcconfig` holds the bundle IDs (`APP_BUNDLE_ID`, `WIDGETS_BUNDLE_ID`), `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` for both targets: App Store Connect flags an extension whose version differs from the app's.
 - `ExportOptions.plist` repeats the team ID from `App.xcconfig`; change both together.
 - `claude-review.yml` reviews a pull request from this repository with `claude -p` through the pinned superpowers plugin (its `requesting-code-review` skill) when it is opened, reopened or marked ready for review, and again on the `claude-review` label, which the run removes; every review is a new comment that names the reviewed commit; the prompt is `.github/claude-review.md`. It needs the `ANTHROPIC_API_KEY` secret from the Console organization that receives the Max plan's monthly API credits. It is not a required check.
@@ -151,6 +155,14 @@ Anything that edits a workout applies `WorkoutLimits.normalizedStages(_:)` and `
 A stage name may be empty; anything that displays a stage shows its intensity name instead. Storage keeps the empty name, so the fallback follows the current language.
 
 New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:previous:)`: at most `maxNameLength` characters, an edit past it rejected whole. A longer name stored before the limit shows in full, also in the Live Activity, which never cuts a name by length; an activity over the 4 KB limit ends and the timer shows its footnote. While it remains over the limit, any edit is accepted only if it reduces the character count, including a replacement with unrelated shorter text; an edit of the same length or longer is rejected whole.
+
+## UI tests
+
+- Accessibility identifiers come from `UITestContract`'s `AccessibilityID`, named `<screen>.<element>`; lint rejects any other argument of `.accessibilityIdentifier`. An element repeated in a list is named by its section and position, never by user data. Text the user typed and system elements are found by their text.
+- A scenario is a case of `AppScenario` that the launch selects with `CT_APP_SCENARIO`. In Debug, `CircuitTimerApp.makeStore` builds the store with `AppScenario.prepare`, which sets every client and key the app reads to a value that is not live. It stops the app on an unknown name, and outside the `preview` dependency context (`SWIFT_DEPENDENCIES_CONTEXT=preview`): `init` reads its clients from the process's context, not from the store. Release has no scenarios; `make check-release-app` checks the archive.
+- Time stands still in a scenario: `continuousClock` is a `TestClock` that nothing advances, `date` is constant and `uuid` counts up, so a started timer stays on its first countdown digit. The timer's logic is tested with `TestStore` and `TestClock`, not through the UI.
+- A scenario's workouts live in the process's memory (`WorkoutStorageClient.scenario`), whose insert, delete and reorder stop the app until a scenario needs them. Preferences go to `UserDefaults.inMemory`, a new suite at every launch.
+- TipKit keeps its configured datastore on the device; the UI tests hide tips with the `-com.apple.TipKit.HideAllTips 1` launch argument.
 
 ## Identifiers
 

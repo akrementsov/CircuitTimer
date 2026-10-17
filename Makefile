@@ -23,10 +23,11 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint check-resolved resolve build-package test build-app archive upload ci verify-clean
+.PHONY: lint check-resolved resolve build-package test build-app archive check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
+	scripts/check-scenario-dependencies.sh
 
 # The local package inside the app project keeps its own lockfile, so both must pin the same versions.
 check-resolved:
@@ -68,6 +69,19 @@ archive:
 		-destination 'generic/platform=iOS' -archivePath "$(ARCHIVE_PATH)" \
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
+
+# UI test scenarios are Debug-only: no file of the archived app may name the scenario key, the module or a fixture.
+check-release-app:
+	@set -eu; \
+	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
+	test -d "$$app" || { echo "check-release-app: no archived app at $$app; run make archive first" >&2; exit 1; }; \
+	found=$$(find "$$app" -type f | while IFS= read -r file; do \
+		if strings -a "$$file" | grep -qE 'CT_APP_SCENARIO|AppScenarios|Leg day'; then echo "$$file"; fi; \
+	done); \
+	if [ -n "$$found" ]; then \
+		echo "check-release-app: UI test scenarios reached the Release app in:" >&2; echo "$$found" >&2; exit 1; \
+	fi; \
+	echo "check-release-app: OK"
 
 # Signs the archive with a cloud-managed distribution certificate and uploads it to App Store Connect.
 # The upload writes nothing to EXPORT_PATH; testflight.yml inspects a separate export instead.

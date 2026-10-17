@@ -25,6 +25,7 @@ let package = Package(
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
+        .library(name: "AppScenarios", targets: ["AppScenarios"]),
         .library(name: "UITestContract", targets: ["UITestContract"]),
     ],
     dependencies: [
@@ -54,6 +55,24 @@ let package = Package(
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        // Debug-only: every file is under `#if DEBUG`, so Release links an empty module.
+        .target(
+            name: "AppScenarios",
+            dependencies: [
+                "BackgroundExecution",
+                "BackgroundNotifications",
+                "SettingsFeature",
+                "UITestContract",
+                "WorkoutActivity",
+                "WorkoutDomain",
+                "WorkoutEditorFeature",
+                "WorkoutStorage",
+                "WorkoutTimerFeature",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
