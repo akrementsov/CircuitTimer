@@ -2,9 +2,8 @@
 # Usage: report-test-results.sh BUNDLE...
 # Reports each result bundle: an error annotation per failed test with its messages, a warning per test that
 # passed only on a retry, and the 20 slowest tests, also into the step summary on CI. Outside GitHub Actions the
-# failures and flaky tests print as plain text. Writes `flaky=` and
-# `upload=` to $GITHUB_OUTPUT when it is set; `upload=true` asks CI to keep the bundles. Diagnostics only: it fails
-# no run by itself.
+# failures and flaky tests print as plain text. Writes `flaky=` and `upload=` to $GITHUB_OUTPUT when it is set;
+# `upload=true` asks CI to keep the bundles. Diagnostics only: it fails no run by itself.
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
@@ -67,6 +66,15 @@ ci=false
 if [ -n "${GITHUB_ACTIONS:-}" ]; then
 	ci=true
 fi
+
+warn() {
+	if [ "$ci" = true ]; then
+		echo "::warning::$1"
+	else
+		echo "WARNING: $1"
+	fi
+}
+
 flaky=false
 upload=false
 for bundle in "$@"; do
@@ -76,12 +84,12 @@ for bundle in "$@"; do
 		continue
 	fi
 	if ! tests=$(xcrun xcresulttool get test-results tests --path "$bundle"); then
-		echo "::warning::$name: xcresulttool could not read the result bundle"
+		warn "$name: xcresulttool could not read the result bundle"
 		upload=true
 		continue
 	fi
 	if ! annotations=$(jq -r --argjson ci "$ci" "$JQ_TESTS" <<< "$tests"); then
-		echo "::warning::$name: the result bundle has an unexpected format"
+		warn "$name: the result bundle has an unexpected format"
 		upload=true
 		continue
 	fi

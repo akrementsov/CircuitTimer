@@ -28,9 +28,11 @@ extension XCUIElement {
         }
     }
 
+    /// Reading the value of an element that is not there yet fails the test, so it waits for the element first.
     func waitUntilValue(_ description: String, is expected: String, file: StaticString, line: UInt) {
+        guard waitUntilExists(description, file: file, line: line).exists else { return }
         if !wait(for: \.stringValue, toEqual: expected, timeout: screenTimeout) {
-            let shown = exists ? stringValue ?? "no text" : "no element"
+            let shown = stringValue ?? "no text"
             XCTFail("\(description) is \"\(shown)\", not \"\(expected)\", after \(Int(screenTimeout)) s", file: file, line: line)
         }
     }

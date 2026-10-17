@@ -32,11 +32,7 @@ bundle_ran_tests() {
 
 # Runs the command once into the bundle, appending its output to the log; returns the command's status.
 run_once() {
-	if "$@" -resultBundlePath "$bundle" 2>&1 | tee -a "$log"; then
-		return 0
-	else
-		return $?
-	fi
+	"$@" -resultBundlePath "$bundle" 2>&1 | tee -a "$log"
 }
 
 mkdir -p "$(dirname "$bundle")"

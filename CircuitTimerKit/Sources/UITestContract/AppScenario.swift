@@ -14,7 +14,7 @@ public enum ScenarioLaunch {
 }
 
 /// User data the scenarios put on screen, which the tests find by its text. `make check-release-app` fails a Release
-/// archive that names it or a type of this file; keep its list in step.
+/// archive that names it or a type of this file; keep the Makefile's `RELEASE_FORBIDDEN` in step.
 public enum ScenarioFixture {
     public static let workoutName = "Leg day"
 }

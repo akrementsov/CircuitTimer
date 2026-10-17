@@ -2,7 +2,8 @@
 # Fails when a UI test scenario could reach the outside world: a client whose preview value is its live one, a
 # client or key that `AppScenario.prepare` does not set, a dependency looked up by type, or a storage strategy whose
 # default store `prepare` does not replace. It reads the code with comments removed, but not string literals, and
-# knows nothing about our own `SharedKey`s or keys only a library reads.
+# knows nothing about our own `SharedKey`s or keys only a library reads. A key's declaration, up to its
+# `DependencyKey` conformance, must fit on one line.
 # Runs with bash 3.2 and with BSD, GNU or mawk awk, so on a Mac and on CI's Linux lint job alike.
 set -euo pipefail
 
@@ -79,10 +80,18 @@ key_problems=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec a
 		t = s
 		return gsub(ch, "", t)
 	}
+	# A declaration that conforms to `DependencyKey` or `TestDependencyKey`, behind any attributes and modifiers;
+	# generic parameters are dropped first, so a constraint such as `<K: DependencyKey>` is no conformance.
+	function declares_key(s,   t) {
+		t = s
+		while (gsub(/<[^<>]*>/, "", t)) {
+		}
+		return t ~ /^[[:space:]]*((@[A-Za-z_][A-Za-z0-9_]*(\([^)]*\))?|[a-z]+)[[:space:]]+)*(extension|struct|enum|class|actor)[[:space:]][^{]*[:,][[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/
+	}
 	FNR == 1 {
 		inkey = 0
 	}
-	!inkey && /^[[:space:]]*([a-z]+[[:space:]]+)*(extension|struct|enum|class|actor)[[:space:]][^{]*[:,][[:space:]]*(Test)?DependencyKey([[:space:]]|[{,]|$)/ {
+	!inkey && declares_key($0) {
 		inkey = 1
 		depth = 0
 		opened = 0

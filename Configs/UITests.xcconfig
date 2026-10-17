@@ -1,4 +1,4 @@
-// The UI test target: the app's identifiers and its Swift settings, so the tests build as strictly as the app.
+// The UI test target: the app's identifiers from App.xcconfig, and Swift settings as strict as the app's.
 #include "App.xcconfig"
 
 PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_ID).uitests

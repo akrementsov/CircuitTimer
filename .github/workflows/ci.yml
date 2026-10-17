@@ -131,7 +131,9 @@ jobs:
       # The folder keeps each bundle's own folder in the artifact, so it opens in Xcode as downloaded; the logs go along.
       # A test step past its timeout may end cancelled rather than failed; its log is kept either way.
       - name: Keep the test results
-        if: ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true' || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
+        if: >-
+          ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true'
+          || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:

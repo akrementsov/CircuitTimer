@@ -13,6 +13,10 @@ TEST_FLAGS ?=
 UI_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
 # Parallel workers clone the simulator, so more than one is allowed only on CI.
 UI_TEST_WORKERS ?= 1
+# What `check-release-app` looks for: UI test scenarios are Debug-only. An optimized build may fold a short string
+# literal into code, so it also looks for the type and module names, which Swift metadata keeps; `AppScenario` also
+# matches the module `AppScenarios`. Keep it in step with UITestContract's AppScenario.swift.
+RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -97,11 +101,7 @@ archive:
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
 
-# UI test scenarios are Debug-only: no file of the archived app may name one. An optimized build may fold a short
-# string literal into code, so the check also looks for the type and module names, which Swift metadata keeps.
-# Keep it in step with UITestContract's AppScenario.swift.
-RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
-
+# UI test scenarios are Debug-only: no file of the archived app may name one.
 check-release-app:
 	@set -eu; \
 	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
