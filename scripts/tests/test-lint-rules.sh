@@ -113,10 +113,13 @@ done | sort)
 
 describe "custom rules"
 cd "$root"
+# The repository's configuration excludes the scratch folder, so `make lint` never reads these files. A copy next to
+# them, where that exclusion names a folder that does not exist, lints them by the same rules.
+cp .swiftlint.yml "$work/swiftlint.yml"
 # SWIFTLINT may be a command line with arguments, such as CI's `docker run`. Violations go to stdout and progress to
 # stderr; Docker can interleave the two mid-line, so they are read apart.
 set +e
-$swiftlint lint --strict $files > "$work/violations" 2> "$work/progress"
+$swiftlint lint --strict --config "$work/swiftlint.yml" $files > "$work/violations" 2> "$work/progress"
 set -e
 actual=$(sed -nE "s/^(.*):([0-9]+):[0-9]+: (error|warning): .* \\(($rules)\\)\$/\\1:\\2 \\4/p" "$work/violations" | sort)
 expect_equal "$actual" "$expected"

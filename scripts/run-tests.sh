@@ -61,7 +61,7 @@ fi
 
 if [ "$status" -ne 0 ]; then
 	if [ -z "${GITHUB_ACTIONS:-}" ]; then
-		"$here/report-test-results.sh" "$bundle" || true
+		"$here/report-test-results.sh" "$bundle" || echo "run-tests: could not report $bundle" >&2
 	fi
 	echo "Tests failed; result bundle $bundle, log $log" >&2
 fi

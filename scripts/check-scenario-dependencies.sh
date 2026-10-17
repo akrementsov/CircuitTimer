@@ -68,9 +68,35 @@ strip_comments "$root/CircuitTimer" "$app"
 # Out of the package copy, so the checks below read only the code a scenario replaces.
 mv "$kit/AppScenarios" "$tmp/AppScenarios"
 scenarios="$tmp/AppScenarios"
+# Only the body of `prepare` sets a scenario's dependencies: an assignment anywhere else in the module sets none.
+find "$scenarios" -name '*.swift' -exec awk '
+	function braces(s, ch,   t) {
+		t = s
+		return gsub(ch, "", t)
+	}
+	FNR == 1 {
+		inprepare = 0
+	}
+	!inprepare && /func[[:space:]]+prepare[[:space:]]*\(/ {
+		inprepare = 1
+		depth = 0
+		opened = 0
+	}
+	inprepare {
+		print
+		depth += braces($0, "[{]") - braces($0, "[}]")
+		# A body may open and close on one line.
+		if (depth > 0 || /[{]/) {
+			opened = 1
+		}
+		if (opened && depth <= 0) {
+			inprepare = 0
+		}
+	}
+' {} + > "$tmp/prepare.swift"
 
 is_set_in_prepare() {
-	grep -rqE "\\.$1[[:space:]]*=[^=]" "$scenarios"
+	grep -qE "\\.$1[[:space:]]*=[^=]" "$tmp/prepare.swift"
 }
 
 # (a) A key's preview value must exist and must not be its live value: swift-dependencies falls back to the live
@@ -179,7 +205,7 @@ clients=$(cd "$tmp" && find CircuitTimerKit/Sources -name '*.swift' -exec awk '
 ' {} + | sort -u)
 for name in $clients; do
 	if ! is_set_in_prepare "$name"; then
-		fail "DependencyValues.$name is not set in $SCENARIOS_DIR; give scenarios a value that is not live"
+		fail "DependencyValues.$name is not set by prepare in $SCENARIOS_DIR; give scenarios a value that is not live"
 	fi
 done
 
@@ -191,7 +217,7 @@ for name in $used; do
 		*" $name "*) continue ;;
 	esac
 	if ! is_set_in_prepare "$name"; then
-		fail "@Dependency(\\.$name) is read but not set in $SCENARIOS_DIR; set it there or, if the library answers it without the outside world, add it to LIBRARY_DEFAULTS"
+		fail "@Dependency(\\.$name) is read but not set by prepare in $SCENARIOS_DIR; set it there or, if the library answers it without the outside world, add it to LIBRARY_DEFAULTS"
 	fi
 done
 
@@ -208,7 +234,7 @@ fi
 # (e) A storage strategy in use needs its default store replaced, or scenarios share the device's.
 check_strategy() {
 	if grep -rqE "\\.$1\\(" "$kit" "$app" && ! is_set_in_prepare "$2"; then
-		fail ".$1 storage is used but $2 is not set in $SCENARIOS_DIR"
+		fail ".$1 storage is used but $2 is not set by prepare in $SCENARIOS_DIR"
 	fi
 }
 check_strategy appStorage defaultAppStorage

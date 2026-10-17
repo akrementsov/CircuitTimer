@@ -4,6 +4,8 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 test_name=$(basename "$0" .sh)
+# Set before the traps, which still run when mktemp fails.
+work=""
 # Inside the repository when SwiftLint must see the files: CI runs it in Docker, which mounts only the repository.
 if [ "${SCRATCH_IN_REPO:-}" = 1 ]; then
 	scratch_parent="$root/.test-scripts"

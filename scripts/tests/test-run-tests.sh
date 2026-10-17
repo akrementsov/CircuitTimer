@@ -102,6 +102,17 @@ expect_in "$work/out" "Tests failed; result bundle $dir/results/Run.xcresult, lo
 expect_exists "$dir/results/Run.xcresult"
 expect_in "$dir/results/Run.log" "** TEST FAILED **"
 
+# The report is found next to run-tests.sh, so a copy of it gets a report that fails.
+describe "failing test, failing report"
+dir="$work/failing-report"
+mkdir -p "$dir/scripts" "$dir/results"
+cp "$root/scripts/run-tests.sh" "$dir/scripts/"
+printf '#!/usr/bin/env bash\nexit 3\n' > "$dir/scripts/report-test-results.sh"
+chmod +x "$dir/scripts/report-test-results.sh"
+run env FAKE_DIR="$dir" FAKE_PLAN=fail "$dir/scripts/run-tests.sh" "$dir/results/Run.xcresult" fake-xcodebuild test
+expect_status 65
+expect_in "$work/out" "run-tests: could not report $dir/results/Run.xcresult"
+
 describe "usage"
 dir="$work/usage"
 mkdir -p "$dir"

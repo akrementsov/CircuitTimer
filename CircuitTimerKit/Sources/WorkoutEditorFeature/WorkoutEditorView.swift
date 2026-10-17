@@ -281,7 +281,7 @@ public struct WorkoutEditorView: View {
                 canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
-                row: { stageRow($0, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
+                row: { stageRow($0, at: $1, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
             )
 
             addStageButton(section)
@@ -296,14 +296,19 @@ public struct WorkoutEditorView: View {
 
     /// Rows read only the stages captured by the card: a row that reads the store observes the stages on its own
     /// and is redrawn apart from the card while a drag settles, showing the wrong stage.
-    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage], isUnsavable: Bool) -> some View {
+    private func stageRow(
+        _ stage: Stage,
+        at index: Int,
+        in section: WorkoutSectionKind,
+        stages: [Stage],
+        isUnsavable: Bool
+    ) -> some View {
         let isEditable = store.isEditable
         let offersActions = isEditable && focusedField == nil
         return StageRow(
             stage: stage,
             section: StageSection(section),
-            // A row always comes from `stages`; the fallback names no field a test looks for.
-            index: stages.firstIndex { $0.id == stage.id } ?? stages.count,
+            index: index,
             isEditable: isEditable,
             onNameChange: { send(.stageNameChanged(section, stage.id, $0)) },
             focus: $focusedNameField,

@@ -95,13 +95,34 @@ enum MirrorKey: DependencyKey {
 }
 EOF
 
-failing client-not-set "$kit/Case.swift" "DependencyValues.unset is not set in CircuitTimerKit/Sources/AppScenarios" <<'EOF'
+failing client-not-set "$kit/Case.swift" "DependencyValues.unset is not set by prepare in CircuitTimerKit/Sources/AppScenarios" <<'EOF'
 extension DependencyValues {
     public var unset: Int {
         get { 0 }
         set {}
     }
 }
+EOF
+
+# Set only outside `prepare`: the client and the reads of it both fail.
+describe "set outside prepare"
+check set-outside-prepare CircuitTimerKit/Sources/AppScenarios/Prepare.swift <<'EOF'
+func prepare(_ dependencies: inout DependencyValues) {
+    dependencies.date = .constant(Date(timeIntervalSinceReferenceDate: 0))
+    dependencies.defaultAppStorage = .inMemory
+}
+
+func helper(_ dependencies: inout DependencyValues) {
+    dependencies.probe = .previewValue
+}
+EOF
+expect_status 1
+expect_in "$work/out" "DependencyValues.probe is not set by prepare"
+expect_in "$work/out" "@Dependency(\\.probe) is read but not set by prepare"
+expect_in "$work/out" "check-scenario-dependencies: 2 problem(s)"
+
+passing one-line-prepare CircuitTimerKit/Sources/AppScenarios/Prepare.swift <<'EOF'
+func prepare(_ d: inout DependencyValues) { d.probe = .previewValue; d.date = .constant(.distantPast); d.defaultAppStorage = .inMemory }
 EOF
 
 failing app-reads-unset-key CircuitTimer/Case.swift "@Dependency(\\.unsetKey) is read but not set" <<'EOF'

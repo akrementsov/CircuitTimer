@@ -80,7 +80,8 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     /// A tap on a row's free space, outside its own controls.
     let onRowTap: ((Item) -> Void)?
     let onMove: (_ from: Int, _ offset: Int) -> Void
-    let row: (Item) -> Row
+    /// The row of an item at its place in `items`.
+    let row: (_ item: Item, _ index: Int) -> Row
 
     /// Rows' places in the scroll content, which don't move while it scrolls.
     @State private var frames: [Item.ID: CGRect] = [:]
@@ -103,7 +104,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         canLift: @escaping (Item) -> Bool,
         onRowTap: ((Item) -> Void)?,
         onMove: @escaping (_ from: Int, _ offset: Int) -> Void,
-        @ViewBuilder row: @escaping (Item) -> Row
+        @ViewBuilder row: @escaping (_ item: Item, _ index: Int) -> Row
     ) {
         self.items = items
         self.spacing = spacing
@@ -115,19 +116,18 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     }
 
     public var body: some View {
-        let indices = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($1.id, $0) })
         let canDrag = isEnabled && interaction != nil
         VStack(spacing: spacing) {
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 let isLifted = drag?.id == item.id
-                row(item)
+                row(item, index)
                     // The lifted row's controls let go of the finger, so letting it go over them presses nothing.
                     .disabled(isLifted)
                     .modifier(
                         LiftedRowTracker(
                             isLifted: isLifted,
                             scale: isLifted ? Self.liftScale : 1,
-                            shift: shift(ofRowAt: indices[item.id]),
+                            shift: shift(ofRowAt: index),
                             fingerTravel: isLifted ? drag?.fingerTravel ?? .zero : .zero,
                             offsetRange: isLifted ? drag?.geometry.offsetRange ?? 0...0 : 0...0,
                             onOffsetChange: liftedOffsetChanged
@@ -201,8 +201,8 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         }
     }
 
-    private func shift(ofRowAt index: Int?) -> CGFloat {
-        guard let drag, let index else { return .zero }
+    private func shift(ofRowAt index: Int) -> CGFloat {
+        guard let drag else { return .zero }
 
         return drag.geometry.shift(ofRowAt: index, destination: drag.destination)
     }
