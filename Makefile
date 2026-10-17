@@ -6,7 +6,8 @@ SOURCE_PACKAGES ?= $(CURDIR)/.build/SourcePackages
 DERIVED_DATA ?= $(CURDIR)/.build/DerivedData
 ARCHIVE_PATH ?= $(CURDIR)/.build/CircuitTimer.xcarchive
 EXPORT_PATH ?= $(CURDIR)/.build/Export
-TEST_RESULTS ?= $(CURDIR)/.build/TestResults.xcresult
+# One result bundle and log per test run; scripts/report-test-results.sh reads them all.
+TEST_RESULTS ?= $(CURDIR)/.build/TestResults
 TEST_FLAGS ?=
 
 XCODEBUILD_FLAGS = -quiet \
@@ -50,12 +51,12 @@ build-package:
 		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS)
 
 # Tests run in English so assertions on localized text do not depend on the machine's language.
-# The output is quiet, so failure messages live only in the result bundle; xcodebuild refuses an existing one.
+# The output is quiet, so failure messages live only in the result bundle, which run-tests.sh names.
 test:
-	rm -rf "$(TEST_RESULTS)"
-	cd CircuitTimerKit && $(STRICT) xcodebuild test -scheme CircuitTimerKit-Package \
+	cd CircuitTimerKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/Package.xcresult" \
+		xcodebuild test -scheme CircuitTimerKit-Package \
 		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/Package" -resultBundlePath "$(TEST_RESULTS)" $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
