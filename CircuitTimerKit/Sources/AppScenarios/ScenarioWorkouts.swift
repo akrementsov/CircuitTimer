@@ -13,11 +13,22 @@ extension AppScenario {
                 []
             case .oneWorkout:
                 [.legDay]
+            case .threeWorkouts:
+                [.legDay, .legDayCopy(2), .legDayCopy(3)]
         }
     }
 }
 
 private extension Workout {
+    static func legDayCopy(_ index: Int) -> Self {
+        Workout(
+            id: UUID(0xF2_0000 + index),
+            name: index == 2 ? ScenarioFixture.secondWorkoutName : ScenarioFixture.thirdWorkoutName,
+            training: legDay.training,
+            trainingRounds: legDay.trainingRounds
+        )
+    }
+
     /// Two rounds of 40 seconds of work and 20 of rest: two minutes in all.
     static let legDay = Workout(
         id: UUID(0xF1_0001),
@@ -31,8 +42,8 @@ private extension Workout {
 }
 
 extension WorkoutStorageClient {
-    /// The scenario's workouts in memory. Reading and saving work; the list's insert, delete and reorder stop the
-    /// app until a scenario needs them.
+    /// The scenario's workouts in memory. Reading, saving and reordering work; insert and delete stop the app until
+    /// a scenario needs them.
     static func scenario(_ workouts: [Workout]) -> Self {
         let stored = LockIsolated(workouts)
         return Self(
@@ -48,7 +59,13 @@ extension WorkoutStorageClient {
             },
             insert: { _, _ in fatalError("Scenario storage has no insert yet; implement it with the scenario that needs it") },
             delete: { _ in fatalError("Scenario storage has no delete yet; implement it with the scenario that needs it") },
-            reorder: { _ in fatalError("Scenario storage has no reorder yet; implement it with the scenario that needs it") }
+            reorder: { ids in
+                stored.withValue { workouts in
+                    let byID = Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
+                    workouts = ids.compactMap { byID[$0] }
+                }
+                return .applied
+            }
         )
     }
 }

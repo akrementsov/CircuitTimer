@@ -130,7 +130,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
                             shift: shift(ofRowAt: index),
                             fingerTravel: isLifted ? drag?.fingerTravel ?? .zero : .zero,
                             offsetRange: isLifted ? drag?.geometry.offsetRange ?? 0...0 : 0...0,
-                            onOffsetChange: liftedOffsetChanged
+                            onOffsetChange: { _ in updateDragPosition() }
                         )
                     )
                     .gesture(TapGesture().onEnded { onRowTap?(item) }, including: onRowTap != nil ? .all : .subviews)
@@ -219,7 +219,13 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         let geometry = ReorderGeometry(heights: sizes.map(\.height), from: from, spacing: spacing)
         liftedOffset.value = .zero
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-            drag = ReorderDrag(id: item.id, ids: items.map(\.id), sizes: sizes, geometry: geometry)
+            drag = ReorderDrag(
+                id: item.id,
+                ids: items.map(\.id),
+                sizes: sizes,
+                geometry: geometry,
+                contentMinYAtLift: interaction.geometry.contentFrame.minY
+            )
             interaction.liftedID = item.id
         }
     }
@@ -231,12 +237,16 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
             drag?.fingerYAtLift = fingerY
         }
         drag?.fingerY = fingerY
-        updateVelocity()
+        // Commit the destination in the gesture callback: SwiftUI's geometry/onChange callbacks can arrive after
+        // the finger has already lifted, especially for short stage rows.
+        updateDragPosition()
     }
 
-    private func liftedOffsetChanged(_ offset: CGFloat) {
-        guard let current = drag else { return }
+    private func updateDragPosition() {
+        guard let current = drag, let interaction else { return }
 
+        let scrolled = current.contentMinYAtLift - interaction.geometry.contentFrame.minY
+        let offset = current.geometry.clampedOffset(current.fingerTravel + scrolled)
         liftedOffset.value = offset
         let destination = current.geometry.destination(for: offset)
         if destination != current.destination {
@@ -300,15 +310,17 @@ private struct ReorderDrag<ID: Hashable>: Equatable {
     let ids: [ID]
     let sizes: [CGSize]
     let geometry: ReorderGeometry
+    let contentMinYAtLift: CGFloat
     var destination: Int
     var fingerYAtLift: CGFloat?
     var fingerY: CGFloat?
 
-    init(id: ID, ids: [ID], sizes: [CGSize], geometry: ReorderGeometry) {
+    init(id: ID, ids: [ID], sizes: [CGSize], geometry: ReorderGeometry, contentMinYAtLift: CGFloat) {
         self.id = id
         self.ids = ids
         self.sizes = sizes
         self.geometry = geometry
+        self.contentMinYAtLift = contentMinYAtLift
         destination = geometry.from
     }
 
@@ -370,6 +382,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
                 case .changed:
                     parent.onFingerMove(point)
                 case .ended:
+                    parent.onFingerMove(point)
                     parent.onDrop()
                 case .cancelled, .failed:
                     parent.onCancel()

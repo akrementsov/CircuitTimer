@@ -3,6 +3,7 @@
 public enum AppScenario: String, CaseIterable, Sendable {
     case emptyList
     case oneWorkout
+    case threeWorkouts
 }
 
 /// The launch environment that selects a scenario.
@@ -17,5 +18,7 @@ public enum ScenarioLaunch {
 /// archive that names it or a type of this file; keep the Makefile's `RELEASE_FORBIDDEN` in step.
 public enum ScenarioFixture {
     public static let workoutName = "Leg day"
+    public static let secondWorkoutName = "Leg day 2"
+    public static let thirdWorkoutName = "Leg day 3"
 }
 #endif
