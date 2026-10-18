@@ -3,6 +3,7 @@ import DesignSystem
 import Foundation
 import SettingsFeature
 import SwiftUI
+import UITestContract
 import WorkoutDomain
 import WorkoutEditorFeature
 import WorkoutTimerFeature
@@ -72,6 +73,7 @@ public struct AppView: View {
                                 }
                             }
                             .tint(.brand)
+                            .accessibilityIdentifier(AccessibilityID.WorkoutList.add)
                         }
                     }
                 }
@@ -96,6 +98,7 @@ public struct AppView: View {
                     Text("workouts.empty.title", bundle: .module)
                         .font(.token(.body))
                         .foregroundStyle(.text(.secondary))
+                        .accessibilityIdentifier(AccessibilityID.WorkoutList.empty)
                     HiddenRecordsNotice(recordCount: store.hiddenRecordCount)
                     NotificationCleanupNotice(store: store, alignment: .center)
                 }

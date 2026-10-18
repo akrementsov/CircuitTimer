@@ -156,7 +156,7 @@ private struct FocusHost: View {
     @State private var focus: Stage.ID?
 
     var body: some View {
-        StageDurationField(stage: stage, focus: $focus, hint: nil, onTextChange: { _ in })
+        StageDurationField(stage: stage, section: .training, index: 0, focus: $focus, hint: nil, onTextChange: { _ in })
             .onChange(of: focus) { _, value in probe.focus = value.map(EditorField.stageDuration) }
             .onAppear { probe.clearFocus = { focus = nil } }
     }

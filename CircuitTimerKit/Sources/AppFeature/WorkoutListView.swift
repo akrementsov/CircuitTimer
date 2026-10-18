@@ -28,7 +28,7 @@ struct WorkoutListView: View {
                     canLift: { _ in true },
                     onRowTap: nil,
                     onMove: { send(.workoutsMoved(IndexSet(integer: $0), $1)) },
-                    row: { row($0, isOpen: swipedID == $0.id, isLifting: isLifting) }
+                    row: { workout, _ in row(workout, isOpen: swipedID == workout.id, isLifting: isLifting) }
                 )
                 NotificationCleanupNotice(store: store)
                 HiddenRecordsNotice(recordCount: hiddenRecordCount)

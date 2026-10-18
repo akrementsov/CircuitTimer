@@ -1,0 +1,134 @@
+{
+  "devices": [
+    {
+      "architecture": "arm64",
+      "deviceId": "00000000-0000-0000-0000-000000000000",
+      "deviceName": "iPhone 17",
+      "modelName": "iPhone 17",
+      "osBuildNumber": "24A434",
+      "osVersion": "27.0",
+      "platform": "iOS Simulator"
+    }
+  ],
+  "testNodes": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "name": "failed - Probe failure: 100%, sure\nsecond line",
+                          "nodeType": "Failure Message",
+                          "sourceLocation": {
+                            "filePath": "CircuitTimerUITests/ProbeUITests.swift",
+                            "lineNumber": 8
+                          }
+                        }
+                      ],
+                      "duration": "0,3s",
+                      "durationInSeconds": 0.30320799350738525,
+                      "name": "First Run",
+                      "nodeIdentifier": "1",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_fails",
+                      "nodeType": "Repetition",
+                      "result": "Failed"
+                    },
+                    {
+                      "children": [
+                        {
+                          "name": "failed - Probe failure: 100%, sure\nsecond line",
+                          "nodeType": "Failure Message",
+                          "sourceLocation": {
+                            "filePath": "CircuitTimerUITests/ProbeUITests.swift",
+                            "lineNumber": 8
+                          }
+                        }
+                      ],
+                      "duration": "0,038s",
+                      "durationInSeconds": 0.038017988204956055,
+                      "name": "Retry 1",
+                      "nodeIdentifier": "2",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_fails",
+                      "nodeType": "Repetition",
+                      "result": "Failed"
+                    }
+                  ],
+                  "details": "Failed after 2 retries",
+                  "duration": "0,17s",
+                  "durationInSeconds": 0.17061299085617065,
+                  "name": "test_probe_fails()",
+                  "nodeIdentifier": "ProbeUITests/test_50%, then 100%()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_fails",
+                  "nodeType": "Test Case",
+                  "result": "Failed"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "name": "failed - Probe first attempt fails",
+                          "nodeType": "Failure Message",
+                          "sourceLocation": {
+                            "filePath": "CircuitTimerUITests/ProbeUITests.swift",
+                            "lineNumber": 14
+                          }
+                        }
+                      ],
+                      "duration": "0,1s",
+                      "durationInSeconds": 0.09957408905029297,
+                      "name": "First Run",
+                      "nodeIdentifier": "1",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_passesOnRetry",
+                      "nodeType": "Repetition",
+                      "result": "Failed"
+                    },
+                    {
+                      "duration": "0,036s",
+                      "durationInSeconds": 0.036157965660095215,
+                      "name": "Retry 1",
+                      "nodeIdentifier": "2",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_passesOnRetry",
+                      "nodeType": "Repetition",
+                      "result": "Passed"
+                    }
+                  ],
+                  "details": "⚠️ Passed after 1 retry",
+                  "duration": "0,068s",
+                  "durationInSeconds": 0.06786602735519409,
+                  "name": "test_probe_passesOnRetry()",
+                  "nodeIdentifier": "ProbeUITests/test_probe_passesOnRetry()",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests/test_probe_passesOnRetry",
+                  "nodeType": "Test Case",
+                  "result": "Passed"
+                }
+              ],
+              "name": "ProbeUITests",
+              "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests/ProbeUITests",
+              "nodeType": "Test Suite",
+              "result": "Failed"
+            }
+          ],
+          "name": "CircuitTimerUITests",
+          "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimer/CircuitTimerUITests",
+          "nodeType": "UI test bundle",
+          "result": "Failed"
+        }
+      ],
+      "name": "CircuitTimer",
+      "nodeType": "Test Plan",
+      "result": "Failed"
+    }
+  ],
+  "testPlanConfigurations": [
+    {
+      "configurationId": "1",
+      "configurationName": "Test Scheme Action"
+    }
+  ]
+}

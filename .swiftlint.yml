@@ -2,6 +2,8 @@ excluded:
   - .build
   - CircuitTimerKit/.build
   - DerivedData
+  # Scratch files of scripts/tests, such as the lint rules' fixtures, which break rules on purpose.
+  - .test-scripts
 
 allow_zero_lintable_files: true
 
@@ -140,6 +142,45 @@ custom_rules:
     regex: '\bTask(\.detached)?\s*(\([^)]*\))?\s*\{'
     included: '/Sources/'
     message: Use a TCA effect instead of an unstructured Task.
+    severity: error
+
+  accessibility_identifier_constant:
+    name: Accessibility identifier constant
+    regex: '\.accessibilityIdentifier\((?!\s*AccessibilityID\.)'
+    match_kinds:
+      - identifier
+    message: Take accessibility identifiers from UITestContract's AccessibilityID, which the UI tests share.
+    severity: error
+
+  ui_test_no_sleep:
+    name: Sleep in a UI test
+    regex: '\b(sleep|usleep)\(|Thread\.sleep'
+    included: '/CircuitTimerUITests/'
+    match_kinds:
+      - identifier
+    message: Wait for an element in a Screen instead of sleeping.
+    severity: error
+
+  ui_test_waits_in_screens:
+    name: Wait outside a Screen
+    regex: 'waitForExistence|waitForNonExistence|\bwait\(for:|waitForExpectations|\bexpectation\(|\bfulfillment\(of:|XCTWaiter|XCTNSPredicateExpectation'
+    included: '/CircuitTimerUITests/'
+    excluded: '/CircuitTimerUITests/(Screens|Support)/'
+    match_kinds:
+      - identifier
+    message: Tests only act and check through Screens, which wait for the app themselves.
+    severity: error
+
+  ui_test_launch_only:
+    name: App created outside launch
+    regex: '\bXCUIApplication(\.init)?\(|\bXCUIApplication\s*=\s*\.init\('
+    included: '/CircuitTimerUITests/'
+    excluded: '/CircuitTimerUITests/Support/Launch\.swift'
+    match_kinds:
+      - identifier
+      - keyword
+      - typeidentifier
+    message: Start the app with launch(_:), which selects a scenario; any other launch runs on live data.
     severity: error
 
   todo_with_ticket:

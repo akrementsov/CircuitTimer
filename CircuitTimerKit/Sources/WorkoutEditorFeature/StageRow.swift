@@ -1,12 +1,16 @@
 import DesignSystem
 import Foundation
 import SwiftUI
+import UITestContract
 import WorkoutDomain
 
 /// One stage of the workout screen: intensity marker, name and duration.
 /// Read-only it keeps its layout on the inactive field color and takes no taps, like the original cell.
 struct StageRow: View {
     let stage: Stage
+    /// Where the stage stands on the screen, which names the field for UI tests.
+    let section: StageSection
+    let index: Int
     let isEditable: Bool
     let onNameChange: (String) -> Void
     let focus: FocusState<EditorField?>.Binding
@@ -71,7 +75,14 @@ struct StageRow: View {
     @ViewBuilder
     private var duration: some View {
         if isEditable {
-            StageDurationField(stage: stage, focus: durationFocus, hint: durationHint, onTextChange: onDurationTextChange)
+            StageDurationField(
+                stage: stage,
+                section: section,
+                index: index,
+                focus: durationFocus,
+                hint: durationHint,
+                onTextChange: onDurationTextChange
+            )
                 .transition(.identity)
         } else {
             Text(stage.duration.clockText(.minutesSeconds))

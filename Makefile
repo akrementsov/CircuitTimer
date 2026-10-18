@@ -6,8 +6,21 @@ SOURCE_PACKAGES ?= $(CURDIR)/.build/SourcePackages
 DERIVED_DATA ?= $(CURDIR)/.build/DerivedData
 ARCHIVE_PATH ?= $(CURDIR)/.build/CircuitTimer.xcarchive
 EXPORT_PATH ?= $(CURDIR)/.build/Export
-TEST_RESULTS ?= $(CURDIR)/.build/TestResults.xcresult
+# One result bundle and log per test run; scripts/report-test-results.sh reads them all.
+TEST_RESULTS ?= $(CURDIR)/.build/TestResults
 TEST_FLAGS ?=
+# Test runs keep apart by destination, so runs on different simulators can overlap: `iPhone 17 #2` on 27.0 runs as
+# `iPhone-17-2-27.0`.
+TEST_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
+# Parallel workers clone the simulator, so more than one is allowed only on CI.
+UI_TEST_WORKERS ?= 1
+# What `check-release-app` looks for. An optimized build may fold a short string literal into code, so the list also
+# names the types, which Swift metadata keeps; `AppScenario` also matches the module `AppScenarios`. Keep it in step
+# with UITestContract's AppScenario.swift.
+RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
+# What `build-ui-tests` builds and `test-ui` runs: the same arguments, so the tests find the build done.
+UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
+	-derivedDataPath "$(DERIVED_DATA)/UITests-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -23,10 +36,19 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint check-resolved resolve build-package test build-app archive upload ci verify-clean
+.PHONY: lint test-scripts check-resolved resolve build-package test build-app build-ui-tests test-ui archive \
+	check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
+	scripts/check-scenario-dependencies.sh
+
+# Tests of the scripts and of the make targets around xcodebuild, with fixtures and stand-ins for xcodebuild and xcrun,
+# so CI's Linux lint job runs them too; a test that lints uses SWIFTLINT.
+test-scripts:
+	@set -u; failed=0; \
+	for test in scripts/tests/test-*.sh; do SWIFTLINT="$(SWIFTLINT)" "$$test" || failed=1; done; \
+	exit $$failed
 
 # The local package inside the app project keeps its own lockfile, so both must pin the same versions.
 check-resolved:
@@ -49,17 +71,42 @@ build-package:
 		-derivedDataPath "$(DERIVED_DATA)/Package" $(XCODEBUILD_FLAGS)
 
 # Tests run in English so assertions on localized text do not depend on the machine's language.
-# The output is quiet, so failure messages live only in the result bundle; xcodebuild refuses an existing one.
+# The output is quiet, so failure messages live only in the result bundle, which run-tests.sh names. Diagnostics are
+# never collected: the simulator can keep xcodebuild waiting ten minutes for them. Each destination has its own result
+# bundle, log and DerivedData, as in `test-ui`.
 test:
-	rm -rf "$(TEST_RESULTS)"
-	cd CircuitTimerKit && $(STRICT) xcodebuild test -scheme CircuitTimerKit-Package \
+	cd CircuitTimerKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/Package-$(TEST_RUN).xcresult" \
+		xcodebuild test -scheme CircuitTimerKit-Package \
 		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/Package" -resultBundlePath "$(TEST_RESULTS)" $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+		-derivedDataPath "$(DERIVED_DATA)/Package-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
+
+# The app with its UI tests, as `test-ui` builds them, so CI shows a build error in a step of its own.
+build-ui-tests:
+	xcodebuild build-for-testing $(UI_TEST_BUILD)
+
+# Each destination has its own result bundle, log and DerivedData, so runs on different simulators can overlap; the
+# package checkouts are shared and only read. A failing test gets one more run, and one that passes only then is
+# reported as flaky. Parallel workers stay off unless UI_TEST_WORKERS says otherwise, which xcodebuild needs to hear
+# either way: its flag overrides the scheme. Diagnostics are never collected: the simulator can keep xcodebuild
+# waiting ten minutes for them after the tests, and the result bundle keeps its screen recordings without them.
+test-ui:
+	@set -eu; \
+	w='$(UI_TEST_WORKERS)'; \
+	case "$$w" in [1-9]|[1-9][0-9]) ;; *) echo "test-ui: UI_TEST_WORKERS must be a number from 1 to 99, not '$$w'" >&2; exit 2 ;; esac; \
+	if [ "$$w" -gt 1 ] && [ "$${CI:-}" != true ]; then \
+		echo "test-ui: parallel workers clone simulators, which only CI may do (see AGENTS.md)" >&2; exit 2; \
+	fi; \
+	if [ "$$w" -eq 1 ]; then par="-parallel-testing-enabled NO"; \
+	else par="-parallel-testing-enabled YES -parallel-testing-worker-count $$w"; fi; \
+	scripts/run-tests.sh "$(TEST_RESULTS)/UITests-$(TEST_RUN).xcresult" \
+		xcodebuild test $(UI_TEST_BUILD) $$par \
+		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
+		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)
 
 # Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
 archive:
@@ -68,6 +115,19 @@ archive:
 		-destination 'generic/platform=iOS' -archivePath "$(ARCHIVE_PATH)" \
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
+
+# UI test scenarios are Debug-only: no file of the archived app may name one.
+check-release-app:
+	@set -eu; \
+	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
+	test -d "$$app" || { echo "check-release-app: no archived app at $$app; run make archive first" >&2; exit 1; }; \
+	found=$$(find "$$app" -type f | while IFS= read -r file; do \
+		if strings -a "$$file" | grep -qE '$(RELEASE_FORBIDDEN)'; then echo "$$file"; fi; \
+	done); \
+	if [ -n "$$found" ]; then \
+		echo "check-release-app: UI test scenarios reached the Release app in:" >&2; echo "$$found" >&2; exit 1; \
+	fi; \
+	echo "check-release-app: OK"
 
 # Signs the archive with a cloud-managed distribution certificate and uploads it to App Store Connect.
 # The upload writes nothing to EXPORT_PATH; testflight.yml inspects a separate export instead.
@@ -79,7 +139,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint check-resolved test build-app
+ci: lint test-scripts check-resolved test build-ui-tests test-ui
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

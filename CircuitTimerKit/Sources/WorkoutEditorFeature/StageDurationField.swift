@@ -1,12 +1,16 @@
 import DesignSystem
 import Foundation
 import SwiftUI
+import UITestContract
 import WorkoutDomain
 
 /// A stage's duration typed on the number pad as MM:SS. The typed text lives here, in the view; the reducer gets
 /// each accepted edit as it is typed, so totals follow the typing and Back or Save never miss the last digit.
 struct StageDurationField: View {
     let stage: Stage
+    /// Where the stage stands on the screen, which names the field for UI tests.
+    let section: StageSection
+    let index: Int
     @Binding var focus: Stage.ID?
     let hint: Text?
     let onTextChange: (String) -> Void
@@ -18,8 +22,17 @@ struct StageDurationField: View {
     /// Whether this focus accepted an edit: without one, the field keeps showing the stored duration.
     @State private var didEdit = false
 
-    init(stage: Stage, focus: Binding<Stage.ID?>, hint: Text?, onTextChange: @escaping (String) -> Void) {
+    init(
+        stage: Stage,
+        section: StageSection,
+        index: Int,
+        focus: Binding<Stage.ID?>,
+        hint: Text?,
+        onTextChange: @escaping (String) -> Void
+    ) {
         self.stage = stage
+        self.section = section
+        self.index = index
         _focus = focus
         self.hint = hint
         self.onTextChange = onTextChange
@@ -42,6 +55,7 @@ struct StageDurationField: View {
                     }
                 }
                 .accessibilityLabel(Text("editor.stage.duration", bundle: .module))
+                .accessibilityIdentifier(AccessibilityID.Editor.stageDuration(section, index))
                 // Unconditional, so the field keeps its identity and its focus: VoiceOver edits the typed text and
                 // otherwise hears the stored duration in words.
                 .accessibilityValue(isFocused ? Text(verbatim: text) : Text(spokenDuration))

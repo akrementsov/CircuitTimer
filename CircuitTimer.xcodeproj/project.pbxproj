@@ -12,6 +12,9 @@
 		C7A10000000000000000004C /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 		C7A10000000000000000004D /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004B /* DesignSystem */; };
 		C7A10000000000000000004F /* CircuitTimerWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C7A100000000000000000040 /* CircuitTimerWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C7A100000000000000000052 /* AppScenarios in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000053 /* AppScenarios */; };
+		C7A100000000000000000054 /* UITestContract in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000055 /* UITestContract */; };
+		C7A100000000000000000062 /* UITestContract in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000063 /* UITestContract */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,6 +24,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = C7A100000000000000000043;
 			remoteInfo = CircuitTimerWidgets;
+		};
+		C7A10000000000000000005E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7A100000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C7A100000000000000000008;
+			remoteInfo = CircuitTimer;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -44,6 +54,8 @@
 		C7A100000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C7A100000000000000000040 /* CircuitTimerWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CircuitTimerWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7A100000000000000000041 /* Widgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Widgets-Info.plist"; sourceTree = "<group>"; };
+		C7A100000000000000000056 /* CircuitTimerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CircuitTimerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C7A100000000000000000057 /* UITests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = UITests.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -57,6 +69,11 @@
 			path = CircuitTimerWidgets;
 			sourceTree = "<group>";
 		};
+		C7A100000000000000000058 /* CircuitTimerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CircuitTimerUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +83,8 @@
 			files = (
 				C7A10000000000000000000C /* AppFeature in Frameworks */,
 				C7A100000000000000000030 /* BackgroundNotifications in Frameworks */,
+				C7A100000000000000000052 /* AppScenarios in Frameworks */,
+				C7A100000000000000000054 /* UITestContract in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +97,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C7A10000000000000000005B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C7A100000000000000000062 /* UITestContract in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -87,6 +114,7 @@
 				C7A100000000000000000004 /* Configs */,
 				C7A100000000000000000005 /* CircuitTimer */,
 				C7A100000000000000000042 /* CircuitTimerWidgets */,
+				C7A100000000000000000058 /* CircuitTimerUITests */,
 				C7A100000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -97,6 +125,7 @@
 				C7A100000000000000000007 /* App.xcconfig */,
 				C7A100000000000000000020 /* Info.plist */,
 				C7A100000000000000000041 /* Widgets-Info.plist */,
+				C7A100000000000000000057 /* UITests.xcconfig */,
 			);
 			path = Configs;
 			sourceTree = "<group>";
@@ -106,6 +135,7 @@
 			children = (
 				C7A100000000000000000006 /* CircuitTimer.app */,
 				C7A100000000000000000040 /* CircuitTimerWidgets.appex */,
+				C7A100000000000000000056 /* CircuitTimerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -134,6 +164,8 @@
 			packageProductDependencies = (
 				C7A10000000000000000000E /* AppFeature */,
 				C7A100000000000000000031 /* BackgroundNotifications */,
+				C7A100000000000000000053 /* AppScenarios */,
+				C7A100000000000000000055 /* UITestContract */,
 			);
 			productName = CircuitTimer;
 			productReference = C7A100000000000000000006 /* CircuitTimer.app */;
@@ -163,6 +195,30 @@
 			productReference = C7A100000000000000000040 /* CircuitTimerWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		C7A100000000000000000059 /* CircuitTimerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C7A100000000000000000061 /* Build configuration list for PBXNativeTarget "CircuitTimerUITests" */;
+			buildPhases = (
+				C7A10000000000000000005A /* Sources */,
+				C7A10000000000000000005B /* Frameworks */,
+				C7A10000000000000000005C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C7A10000000000000000005D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C7A100000000000000000058 /* CircuitTimerUITests */,
+			);
+			name = CircuitTimerUITests;
+			packageProductDependencies = (
+				C7A100000000000000000063 /* UITestContract */,
+			);
+			productName = CircuitTimerUITests;
+			productReference = C7A100000000000000000056 /* CircuitTimerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -178,6 +234,10 @@
 					};
 					C7A100000000000000000043 = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					C7A100000000000000000059 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = C7A100000000000000000008;
 					};
 				};
 			};
@@ -201,6 +261,7 @@
 			targets = (
 				C7A100000000000000000008 /* CircuitTimer */,
 				C7A100000000000000000043 /* CircuitTimerWidgets */,
+				C7A100000000000000000059 /* CircuitTimerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -214,6 +275,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C7A100000000000000000046 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7A10000000000000000005C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -237,6 +305,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C7A10000000000000000005A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -244,6 +319,11 @@
 			isa = PBXTargetDependency;
 			target = C7A100000000000000000043 /* CircuitTimerWidgets */;
 			targetProxy = C7A100000000000000000051 /* PBXContainerItemProxy */;
+		};
+		C7A10000000000000000005D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C7A100000000000000000008 /* CircuitTimer */;
+			targetProxy = C7A10000000000000000005E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -404,6 +484,20 @@
 			};
 			name = Release;
 		};
+		C7A10000000000000000005F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C7A100000000000000000057 /* UITests.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		C7A100000000000000000060 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C7A100000000000000000057 /* UITests.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -434,6 +528,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		C7A100000000000000000061 /* Build configuration list for PBXNativeTarget "CircuitTimerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C7A10000000000000000005F /* Debug */,
+				C7A100000000000000000060 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -459,6 +562,18 @@
 		C7A10000000000000000004B /* DesignSystem */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = DesignSystem;
+		};
+		C7A100000000000000000053 /* AppScenarios */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppScenarios;
+		};
+		C7A100000000000000000055 /* UITestContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UITestContract;
+		};
+		C7A100000000000000000063 /* UITestContract */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UITestContract;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

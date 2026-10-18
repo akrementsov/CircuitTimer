@@ -63,6 +63,9 @@ jobs:
           echo "Build number: $build_number"
           make archive BUILD_NUMBER="$build_number"
 
+      - name: Require an archive without UI test scenarios
+        run: make check-release-app
+
       - name: Require the tag to match the version
         run: |
           version=$(plutil -extract CFBundleShortVersionString raw \

@@ -42,11 +42,15 @@ jobs:
             exit 1
           fi
 
+      # Here the scripts' tests run with GNU tools and mawk, and the tests that lint use the same image.
+      - name: Test the scripts
+        run: make test-scripts SWIFTLINT="docker run --rm -v $PWD:$PWD -w $PWD $SWIFTLINT_IMAGE"
+
   build-test:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 75
+    timeout-minutes: 110
     steps:
       - uses: actions/checkout@v7
 
@@ -57,6 +61,7 @@ jobs:
 
       # Before the caches and the tests, so a lockfile mismatch fails in seconds.
       - name: Check lockfiles
+        id: lockfiles
         run: make check-resolved
 
       - name: Cache keys
@@ -95,61 +100,52 @@ jobs:
           [ -n "$udid" ] || { echo "::error::No $name on iOS $os"; xcrun simctl list devices available; exit 1; }
           xcrun simctl bootstatus "$udid" -b
 
-      # A runner that still hangs before connecting tests nothing, so it gets one retry; a failing test gets none.
-      # Collecting diagnostics would add ten minutes to each hang.
+      # A runner that still hangs before connecting tests nothing, so scripts/run-tests.sh retries it once; a failing
+      # package test gets no retry.
       - name: Test the package
         id: test
         timeout-minutes: 35
-        run: |
-          set -o pipefail
-          make test TEST_FLAGS='-collect-test-diagnostics never' 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
-          grep -q 'The test runner hung before establishing connection' "$RUNNER_TEMP/test.log" || exit 1
-          echo "::warning::The test runner hung before connecting; retrying once"
-          make test TEST_FLAGS='-collect-test-diagnostics never'
+        run: make test
 
-      # Tests that wait in real time add up on the runner's few cores; the step summary names the slowest.
-      - name: Show the slowest tests
-        if: ${{ !cancelled() && (steps.test.outcome == 'success' || steps.test.outcome == 'failure') }}
+      # Built even when a package test failed, so the UI tests still report; never on mismatched lockfiles. The app
+      # with its UI tests, into the next step's DerivedData: about 4 minutes cold.
+      - name: Build the app and its UI tests
+        id: build-ui-tests
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 20
+        run: make build-ui-tests
+
+      # About 2 minutes: the step above built everything. A failing UI test runs once more and is reported as flaky
+      # if it then passes; a hung runner gets one more run as above.
+      - name: Test the UI
+        id: test-ui
+        if: ${{ !cancelled() && steps.build-ui-tests.outcome == 'success' }}
+        timeout-minutes: 25
+        run: make test-ui
+
+      # Every result bundle: its failed tests, tests that passed only on a retry, and the slowest tests, which add up
+      # on the runner's few cores. Diagnostics only: a changed result-bundle format must not fail a run whose tests
+      # passed.
+      - name: Report test results
+        id: report
+        if: ${{ !cancelled() }}
         timeout-minutes: 5
-        # Diagnostics only: a changed result-bundle format must not fail a run whose tests passed.
         continue-on-error: true
-        run: |
-          set -o pipefail
-          [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
-          {
-            echo '| Seconds | Test |'
-            echo '|---:|---|'
-            xcrun xcresulttool get test-results tests --path .build/TestResults.xcresult \
-              | jq -r '[.. | objects | select(.nodeType == "Test Case" and .durationInSeconds != null)]
-                  | sort_by(-.durationInSeconds) | .[:20][]
-                  | "| \(.durationInSeconds * 10 | round / 10) | `\(.nodeIdentifier)` |"'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+        run: scripts/report-test-results.sh .build/TestResults/*.xcresult
 
-      - name: Show test failures
-        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled') }}
-        timeout-minutes: 5
-        run: |
-          set -o pipefail
-          [ -d .build/TestResults.xcresult ] || { echo "No test results: the tests did not start"; exit 0; }
-          xcrun xcresulttool get test-results summary --path .build/TestResults.xcresult \
-            | jq -r 'def escape: gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A");
-                .testFailures[]?
-                | "::error title=" + ("\(.targetName)/\(.testIdentifierString)" | escape | gsub(":"; "%3A") | gsub(","; "%2C"))
-                + "::" + (.failureText | escape)'
-
-      # The wildcard keeps the bundle's own folder in the artifact, so it opens in Xcode as downloaded.
+      # The folder keeps each bundle's own folder in the artifact, so it opens in Xcode as downloaded; the logs go along.
+      # A test step past its timeout may end cancelled rather than failed; its log is kept either way.
       - name: Keep the test results
-        if: ${{ !cancelled() && (steps.test.outcome == 'failure' || steps.test.outcome == 'cancelled') }}
+        if: >-
+          ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true'
+          || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: .build/*.xcresult
+          path: .build/TestResults/
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: Build the app
-        run: make build-app
 
       # Pull requests only restore caches, so their revisions do not evict the main branch caches.
       - name: Save package sources
@@ -165,3 +161,23 @@ jobs:
         with:
           path: .build/DerivedData
           key: xcode27.1-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
+
+  # Each push to main saves a DerivedData cache of its own, about 1 GB against the repository's 10 GB, and runs restore
+  # only the newest, so the older ones go before they evict the package sources.
+  prune-caches:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete older DerivedData caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          gh cache list --ref refs/heads/main --sort created_at --order desc --limit 100 --json id,key \
+            --jq '[.[] | select(.key | test("^xcode[0-9.]+-dd-"))] | .[1:][] | .id' \
+            | while read -r id; do gh cache delete "$id"; done

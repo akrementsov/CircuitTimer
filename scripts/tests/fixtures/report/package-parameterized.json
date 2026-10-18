@@ -1,0 +1,120 @@
+{
+  "devices": [
+    {
+      "architecture": "arm64",
+      "deviceId": "00000000-0000-0000-0000-000000000000",
+      "deviceName": "iPhone 17",
+      "modelName": "iPhone 17",
+      "osBuildNumber": "24A434",
+      "osVersion": "27.0",
+      "platform": "iOS Simulator"
+    }
+  ],
+  "testNodes": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "duration": "0,0092s",
+                      "durationInSeconds": 0.009156227111816406,
+                      "name": "1",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ProbeTests/test_probe_parameterized(value:)?args=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+                      "nodeType": "Arguments",
+                      "result": "Passed"
+                    },
+                    {
+                      "children": [
+                        {
+                          "name": "Expectation failed: value == 1\nvalue → 2: Probe: 100% sure, value: 2",
+                          "nodeType": "Failure Message",
+                          "sourceLocation": {
+                            "filePath": "CircuitTimerKit/Tests/AppScenariosTests/ProbeTests.swift",
+                            "lineNumber": 6
+                          }
+                        }
+                      ],
+                      "duration": "0,021s",
+                      "durationInSeconds": 0.020756006240844727,
+                      "name": "2",
+                      "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ProbeTests/test_probe_parameterized(value:)?args=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+                      "nodeType": "Arguments",
+                      "result": "Failed"
+                    }
+                  ],
+                  "duration": "0,015s",
+                  "durationInSeconds": 0.014956116676330566,
+                  "name": "test_probe_parameterized(value:)",
+                  "nodeIdentifier": "ProbeTests/test_probe_parameterized(value:)",
+                  "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ProbeTests/test_probe_parameterized(value:)",
+                  "nodeType": "Test Case",
+                  "result": "Failed"
+                },
+                {
+                  "name": "test_probe_retried(value:)",
+                  "nodeIdentifier": "ProbeTests/test_probe_retried(value:)",
+                  "nodeType": "Test Case",
+                  "durationInSeconds": 0.5,
+                  "result": "Passed",
+                  "children": [
+                    {
+                      "name": "3",
+                      "nodeType": "Arguments",
+                      "result": "Passed",
+                      "children": [
+                        {
+                          "name": "First Run",
+                          "nodeType": "Repetition",
+                          "result": "Failed",
+                          "children": [
+                            {
+                              "name": "iPhone 17",
+                              "nodeType": "Test Case Run",
+                              "result": "Failed",
+                              "children": [
+                                {
+                                  "name": "Expectation failed: value == 4",
+                                  "nodeType": "Failure Message"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "name": "Retry 1",
+                          "nodeType": "Repetition",
+                          "result": "Passed"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "name": "ProbeTests",
+              "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests/ProbeTests",
+              "nodeType": "Test Suite",
+              "result": "Failed"
+            }
+          ],
+          "name": "AppScenariosTests",
+          "nodeIdentifierURL": "test://com.apple.xcode/CircuitTimerKit/AppScenariosTests",
+          "nodeType": "Unit test bundle",
+          "result": "Failed"
+        }
+      ],
+      "name": "CircuitTimerKit-Package",
+      "nodeType": "Test Plan",
+      "result": "Failed"
+    }
+  ],
+  "testPlanConfigurations": [
+    {
+      "configurationId": "1",
+      "configurationName": "Test Scheme Action"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import DesignSystem
 import Foundation
 import SwiftUI
 import TipKit
+import UITestContract
 import WorkoutDomain
 import WorkoutStorage
 
@@ -117,6 +118,7 @@ public struct WorkoutEditorView: View {
                 isEnabled: store.canSave,
                 action: { send(afterClearingFocus: .saveButtonTapped) }
             )
+            .accessibilityIdentifier(AccessibilityID.Editor.save)
             // A disabled button takes no taps; while Save is dimmed for a reason, a tap on it asks why instead.
             .gesture(
                 TapGesture().onEnded { send(afterClearingFocus: .saveBlockedTapped) },
@@ -129,6 +131,7 @@ public struct WorkoutEditorView: View {
             BottomActionPanel(title: Text("editor.startWorkout", bundle: .module), isEnabled: store.canStart) {
                 send(.startButtonTapped)
             }
+            .accessibilityIdentifier(AccessibilityID.Editor.start)
         }
     }
 
@@ -156,6 +159,7 @@ public struct WorkoutEditorView: View {
             send(.nameChanged($0))
         }
         .focused($focusedNameField, equals: .name)
+        .accessibilityIdentifier(AccessibilityID.Editor.name)
         .font(.token(.fieldTitle))
         .foregroundStyle(.text(.primary))
         .disabled(!isEditable)
@@ -215,6 +219,7 @@ public struct WorkoutEditorView: View {
             // Tint, not a foreground style, so the chevron still dims while saving.
             .tint(.text(.primary))
             .disabled(store.isSaving)
+            .accessibilityIdentifier(AccessibilityID.Editor.back)
             // Escape from a bar item would otherwise go up to the navigation controller; on every item it means leave.
             .accessibilityAction(.escape, leave)
         }
@@ -276,7 +281,7 @@ public struct WorkoutEditorView: View {
                 canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
-                row: { stageRow($0, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
+                row: { stageRow($0, at: $1, in: section, stages: stages, isUnsavable: unsavableStageIDs.contains($0.id)) }
             )
 
             addStageButton(section)
@@ -291,11 +296,19 @@ public struct WorkoutEditorView: View {
 
     /// Rows read only the stages captured by the card: a row that reads the store observes the stages on its own
     /// and is redrawn apart from the card while a drag settles, showing the wrong stage.
-    private func stageRow(_ stage: Stage, in section: WorkoutSectionKind, stages: [Stage], isUnsavable: Bool) -> some View {
+    private func stageRow(
+        _ stage: Stage,
+        at index: Int,
+        in section: WorkoutSectionKind,
+        stages: [Stage],
+        isUnsavable: Bool
+    ) -> some View {
         let isEditable = store.isEditable
         let offersActions = isEditable && focusedField == nil
         return StageRow(
             stage: stage,
+            section: StageSection(section),
+            index: index,
             isEditable: isEditable,
             onNameChange: { send(.stageNameChanged(section, stage.id, $0)) },
             focus: $focusedNameField,
@@ -463,6 +476,19 @@ public struct WorkoutEditorView: View {
             Text("editor.stage.skipped", bundle: .module)
         } else {
             nil
+        }
+    }
+}
+
+private extension StageSection {
+    init(_ kind: WorkoutSectionKind) {
+        switch kind {
+            case .warmUp:
+                self = .warmUp
+            case .training:
+                self = .training
+            case .coolDown:
+                self = .coolDown
         }
     }
 }

@@ -38,6 +38,9 @@ playground.xcworkspace
 .build/
 .swiftpm/
 
+# The lint rules' test fixtures, written inside the repository for SwiftLint in Docker
+/.test-scripts/
+
 # Code Injection
 #
 # After new code Injection tools there's a generated folder /iOSInjectionProject

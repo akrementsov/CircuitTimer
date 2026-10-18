@@ -28,7 +28,8 @@ struct TimerButtons: View {
     /// Inset by its border at the top and the bottom of the row, like the original button.
     private func playPauseButton(rowHeight: CGFloat) -> some View {
         let border: CGFloat = .token(size: .buttonBorder)
-        let side = rowHeight - 2 * border
+        // The first layout may offer the row no height; a frame never takes a negative side.
+        let side = max(rowHeight - 2 * border, .zero)
         return Button(action: onPlayPause) {
             Image(systemName: playButton == .pause ? "pause.fill" : "play.fill")
                 .resizable()

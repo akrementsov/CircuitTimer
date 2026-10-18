@@ -11,7 +11,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 - Swift 6 language mode with complete strict concurrency, iOS 17+
 - SwiftUI and [The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) 1.26 with the 2.0 deprecations trait enabled
 - [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect
-- Swift Testing
+- Swift Testing; XCTest for the UI tests
 - SwiftLint, GitHub Actions
 - Xcode 27.1; tests run on the iOS 27.0 simulator
 
@@ -69,7 +69,7 @@ flowchart TD
     Widgets --> DesignSystem
 ```
 
-Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. `Package.swift` is the exact list.
+Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. Also left out are `UITestContract`, which the features and the UI tests share, and the Debug-only `AppScenarios` above the features (see [UI tests](#ui-tests)). `Package.swift` is the exact list.
 
 | Module | Layer | Responsibility |
 |---|---|---|
@@ -84,6 +84,8 @@ Not drawn, to keep the picture readable: `AppFeature`, the composition root, als
 | `BackgroundNotifications` | Core | Injected local notification client, owner-scoped scheduling and cleanup, permission access, foreground suppression. |
 | `WorkoutActivity` | Core | The Live Activity: a compact state of the run within iOS's 4 KB limit, what the Lock Screen and the Dynamic Island show for it, and `LiveActivityClient`, whose coordinator starts, updates and ends one activity per timer. The `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. |
 | `WorkoutDomain` | Domain | Workout model, normalization limits, the linear schedule and its fingerprint, and the `WorkoutRun` timer engine. Foundation and CryptoKit only, so the widget can use it. |
+| `UITestContract` | Core | The accessibility identifiers the app and its UI tests share and, in Debug, the scenario names, launch keys and fixture names the tests read. No dependencies. |
+| `AppScenarios` | App, Debug only | Each UI test scenario: its workouts and a value for every dependency the app reads, none of them live. The app builds its store from one when a UI test asks. |
 
 Features never import each other, Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -116,11 +118,49 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 
 | Command | What it does |
 |---|---|
-| `make lint` | SwiftLint in strict mode |
+| `make lint` | SwiftLint in strict mode and the scenario dependency check |
+| `make test-scripts` | Tests of the scripts, the make targets around xcodebuild and the custom lint rules |
 | `make test` | Builds and tests the package with warnings as errors |
 | `make build-app` | Builds the app for the simulator |
+| `make build-ui-tests` | Builds the app with its UI tests, as `make test-ui` does |
+| `make test-ui` | Builds the app and runs its UI tests on `DESTINATION` |
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
+
+## UI tests
+
+The UI tests in `CircuitTimerUITests` drive the app with XCUITest. Each starts the app in a named scenario, a Debug-only state with its own data and no live dependencies, and works through Screens, one struct per screen, so a test reads as the user's steps:
+
+```swift
+@MainActor
+final class WorkoutTimerUITests: XCTestCase {
+    func test_oneWorkout_startThenFinish_returnsToList() {
+        let app = launch(.oneWorkout)
+
+        WorkoutListScreen(app)
+            .assertHasWorkout(ScenarioFixture.workoutName, duration: "2 minutes")
+            .openWorkout(ScenarioFixture.workoutName)
+            .tapStart()
+            .assertCurrentStage("Get ready, Starting in 3")
+            .tapClose()
+            .tap("No")
+            .assertCurrentStage("Get ready, Starting in 3")
+            .tapClose()
+            .tap("Finish", landingOn: WorkoutListScreen.self)
+            .assertHasWorkout(ScenarioFixture.workoutName)
+    }
+}
+```
+
+### How to add a UI test
+
+1. **Scenario.** Use an existing case of `AppScenario` (`UITestContract`) or add one, with its workouts in `ScenarioWorkouts.swift` and its dependencies in `AppScenario.prepare` (`AppScenarios`). `make lint` fails when a dependency client, key or storage strategy is not set there, as long as a key's declaration keeps `DependencyKey` on its first line; that the value is not live is yours to check.
+2. **Identifiers.** Give the elements the test needs an identifier from `AccessibilityID`, named `<screen>.<element>`; lint rejects any other. Text the user typed, such as a workout's name, and system elements, such as an alert's buttons, are found by their text.
+3. **Screen.** Add actions and checks to the screen's struct in `CircuitTimerUITests/Screens/`, or a new struct that conforms to `Screen`. Queries stay private. Every action and check takes `file: StaticString = #filePath, line: UInt = #line` and passes them to the waits and to the next screen, so a failure points at the test's line. An action returns the screen the user lands on, which waits until it shows. A screen that returns to where it came from is generic, like `AlertScreen<Source>`; behavior several screens share goes into a protocol with a default implementation.
+4. **Test.** In `<Area>UITests.swift`, a `@MainActor final class` with methods named `test_<start>_<action>_<expected>`, starting with `let app = launch(.<scenario>)`. Lint rejects `sleep`, waits in tests and `XCUIApplication()` outside `launch`; keep `setUp`, if any, synchronous.
+5. **Parallel safety.** A test shares nothing with other tests and depends on no order: it launches its own app. Each launch already gets its own in-memory workouts and preferences, no record, notifications or Live Activity, its own clock and identifiers. TipKit's datastore on the simulator is shared; `launch` hides tips, so a test of a tip first adds a launch option that resets the datastore and shows them.
+6. **Run.** `make test-ui` runs on `iPhone 17`; another simulator takes its own result bundle, log and DerivedData, for example `make test-ui DESTINATION='platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'`. Runs on two simulators may overlap only after one run on each has finished alone; each first run is a cold build and its DerivedData takes several GB. `scripts/report-test-results.sh .build/TestResults/*.xcresult` prints failures, flaky tests and the slowest tests. More than one Xcode worker (`UI_TEST_WORKERS`) runs only on CI.
+7. **Time stands still.** A scenario's clock never advances, so a started timer stays on its first countdown digit. The timer's logic is tested in the package with `TestStore` and `TestClock`.
 
 ## Releasing
 
@@ -141,7 +181,10 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
   - [x] **CT-UI-5** — editor layout of the original app
   - [x] **CT-UI-6** — stage durations typed as MM:SS
   - [x] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list; own drag reorder (delivered with CT-3-2)
-- [ ] **CT-QA** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type) and UI smoke tests of the main flows on CI
+- [ ] **CT-QA** — tests through the UI, in slices:
+  - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
+  - [ ] UI smoke tests of the main flows: the workout list, creating and editing, the timer, Settings
+  - [ ] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
   - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button

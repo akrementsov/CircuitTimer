@@ -14,6 +14,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.iOS(.v17)],
     products: [
+        .library(name: "UITestContract", targets: ["UITestContract"]),
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
@@ -25,6 +26,7 @@ let package = Package(
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
+        .library(name: "AppScenarios", targets: ["AppScenarios"]),
     ],
     dependencies: [
         .package(
@@ -44,6 +46,7 @@ let package = Package(
                 "BackgroundExecution",
                 "DesignSystem",
                 "SettingsFeature",
+                "UITestContract",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -68,6 +71,36 @@ let package = Package(
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        // Debug-only: every file is under `#if DEBUG`, so Release links an empty module.
+        .target(
+            name: "AppScenarios",
+            dependencies: [
+                "BackgroundExecution",
+                "BackgroundNotifications",
+                "SettingsFeature",
+                "UITestContract",
+                "WorkoutActivity",
+                "WorkoutDomain",
+                "WorkoutEditorFeature",
+                "WorkoutStorage",
+                "WorkoutTimerFeature",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "AppScenariosTests",
+            dependencies: [
+                "AppScenarios",
+                "UITestContract",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
             ],
             swiftSettings: strictSettings
         ),
@@ -119,6 +152,10 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .target(
+            name: "UITestContract",
+            swiftSettings: strictSettings
+        ),
+        .target(
             name: "WorkoutActivity",
             dependencies: [
                 "WorkoutDomain",
@@ -135,6 +172,7 @@ let package = Package(
             name: "WorkoutEditorFeature",
             dependencies: [
                 "DesignSystem",
+                "UITestContract",
                 "WorkoutDomain",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -159,6 +197,7 @@ let package = Package(
                 "TimerPreferences",
                 "BackgroundExecution",
                 "DesignSystem",
+                "UITestContract",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutStorage",
