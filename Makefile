@@ -33,10 +33,11 @@ XCODEBUILD_FLAGS = -quiet \
 STRICT := CIRCUITTIMER_STRICT_WARNINGS=1
 
 PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
+SNAPSHOT_KIT_RESOLVED := CircuitTimerSnapshotKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint test-scripts check-resolved resolve build-package test build-app build-ui-tests test-ui archive \
+.PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
 	check-release-app upload ci verify-clean
 
 lint:
@@ -50,20 +51,41 @@ test-scripts:
 	for test in scripts/tests/test-*.sh; do SWIFTLINT="$(SWIFTLINT)" "$$test" || failed=1; done; \
 	exit $$failed
 
-# The local package inside the app project keeps its own lockfile, so both must pin the same versions.
+# Shared dependencies agree across the packages; their union is exactly what the project resolves.
 check-resolved:
 	@set -eu; \
 	command -v jq >/dev/null || { echo "check-resolved: jq is required" >&2; exit 1; }; \
-	package=$$(jq -cS '$(PINS)' $(PACKAGE_RESOLVED)); \
+	conflicts=$$(jq -sr '[.[].pins[] | {identity, version: .state.version, revision: .state.revision}] | \
+		group_by(.identity)[] | select((unique | length) > 1) | .[0].identity' \
+		$(PACKAGE_RESOLVED) $(SNAPSHOT_KIT_RESOLVED)); \
+	if [ -n "$$conflicts" ]; then \
+		echo "check-resolved: CircuitTimerKit and CircuitTimerSnapshotKit pin $$conflicts differently; run 'make resolve' and commit all three" >&2; exit 1; \
+	fi; \
+	package=$$(jq -csS '[.[].pins[] | {identity, version: .state.version, revision: .state.revision}] | unique | sort_by(.identity)' \
+		$(PACKAGE_RESOLVED) $(SNAPSHOT_KIT_RESOLVED)); \
 	project=$$(jq -cS '$(PINS)' $(PROJECT_RESOLVED)); \
 	if [ "$$package" != "$$project" ]; then \
-		echo "check-resolved: the two Package.resolved files differ; run 'make resolve' and commit both" >&2; exit 1; \
+		echo "check-resolved: the packages' lockfiles together differ from the project's; run 'make resolve' and commit all three" >&2; exit 1; \
+	fi; \
+	if ! jq -es '([.[0].pins[] | select(.identity == "swift-snapshot-testing")] | length) == 0 and \
+		all(.[1:][]; ([.pins[] | select(.identity == "swift-snapshot-testing")] | length) == 1 and \
+		any(.pins[]; .identity == "swift-snapshot-testing" and .state.version == "1.19.6"))' \
+		$(PACKAGE_RESOLVED) $(SNAPSHOT_KIT_RESOLVED) $(PROJECT_RESOLVED) >/dev/null; then \
+		echo "check-resolved: SnapshotTesting 1.19.6 belongs to CircuitTimerSnapshotKit and the project only; run 'make resolve' and commit all three" >&2; exit 1; \
 	fi
 
 resolve:
 	cd CircuitTimerKit && xcodebuild -resolvePackageDependencies -clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)"
+	cd CircuitTimerSnapshotKit && xcodebuild -resolvePackageDependencies -clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)"
 	xcodebuild -resolvePackageDependencies -project CircuitTimer.xcodeproj -scheme CircuitTimer \
 		-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)"
+	xcodebuild -resolvePackageDependencies -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots \
+		-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)"
+
+build-snapshot-kit:
+	cd CircuitTimerSnapshotKit && $(STRICT) xcodebuild build -scheme CircuitTimerSnapshotKit \
+		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
+		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
 
 build-package:
 	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme CircuitTimerKit-Package \

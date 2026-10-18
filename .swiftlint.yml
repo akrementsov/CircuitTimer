@@ -1,6 +1,7 @@
 excluded:
   - .build
   - CircuitTimerKit/.build
+  - CircuitTimerSnapshotKit/.build
   - DerivedData
   # Scratch files of scripts/tests, such as the lint rules' fixtures, which break rules on purpose.
   - .test-scripts
