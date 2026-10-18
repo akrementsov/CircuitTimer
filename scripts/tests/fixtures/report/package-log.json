@@ -1,0 +1,233 @@
+{
+  "attachments": [],
+  "domainType": "com.apple.dt.unit.cocoaUnitTest",
+  "duration": 20,
+  "messages": [],
+  "result": "succeeded",
+  "startTime": 1792336240,
+  "subsections": [
+    {
+      "attachments": [],
+      "domainType": "Xcode.IDEActivityLogDomainType.LaunchLog",
+      "duration": 12,
+      "messages": [],
+      "result": "succeeded",
+      "startTime": 1792336240,
+      "subsections": [],
+      "title": "Launch actions"
+    },
+    {
+      "attachments": [],
+      "domainType": "com.apple.dt.IDE.LogSection",
+      "duration": 12,
+      "messages": [],
+      "result": "succeeded",
+      "startTime": 1792336240,
+      "subsections": [
+        {
+          "attachments": [],
+          "domainType": "com.apple.dt.IDE.UnitTestLogSection.Worker",
+          "duration": 6,
+          "messages": [],
+          "result": "succeeded",
+          "startTime": 1792336240,
+          "subsections": [
+            {
+              "attachments": [],
+              "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+              "duration": 0.00002,
+              "messages": [],
+              "result": "succeeded",
+              "startTime": 1792336240,
+              "subsections": [],
+              "title": "Writing diagnostic log for test runner launch."
+            },
+            {
+              "attachments": [],
+              "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+              "duration": 0.002,
+              "messages": [],
+              "result": "succeeded",
+              "startTime": 1792336240,
+              "subsections": [],
+              "testDetails": {
+                "suiteName": "All tests",
+                "summary": "",
+                "testsPassedString": "0 tests total, 0 passed",
+                "wasSkipped": false
+              },
+              "title": "Run test suite All tests"
+            },
+            {
+              "attachments": [],
+              "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+              "duration": 4,
+              "messages": [],
+              "result": "succeeded",
+              "startTime": 1792336240,
+              "subsections": [
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 4,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336240,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Slow",
+                    "summary": "",
+                    "testName": "test_waits()",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_waits()"
+                },
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 2,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336240,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Slow",
+                    "summary": "",
+                    "testName": "test_works()",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_works()"
+                },
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 1,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336241,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Slow",
+                    "summary": "",
+                    "testName": "test_param(value:)",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_param(value:)"
+                },
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 2,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336242,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Slow",
+                    "summary": "",
+                    "testName": "test_param(value:)",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_param(value:)"
+                }
+              ],
+              "testDetails": {
+                "suiteName": "Slow",
+                "summary": "",
+                "testsPassedString": "3 tests total, 3 passed",
+                "wasSkipped": false
+              },
+              "title": "Run test suite Slow"
+            },
+            {
+              "attachments": [],
+              "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+              "duration": 0,
+              "messages": [],
+              "result": "succeeded",
+              "startTime": 1792336245,
+              "subsections": [
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 0,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336245,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Fast",
+                    "summary": "",
+                    "testName": "test_instant()",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_instant()"
+                }
+              ],
+              "testDetails": {
+                "suiteName": "Fast",
+                "summary": "",
+                "testsPassedString": "1 tests total, 1 passed",
+                "wasSkipped": false
+              },
+              "title": "Run test suite Fast"
+            }
+          ],
+          "title": "xctest (101)"
+        },
+        {
+          "attachments": [],
+          "domainType": "com.apple.dt.IDE.UnitTestLogSection.Worker",
+          "duration": 1,
+          "messages": [],
+          "result": "succeeded",
+          "startTime": 1792336250,
+          "subsections": [
+            {
+              "attachments": [],
+              "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+              "duration": 1,
+              "messages": [],
+              "result": "succeeded",
+              "startTime": 1792336250,
+              "subsections": [
+                {
+                  "attachments": [],
+                  "domainType": "com.apple.dt.IDE.UnitTestLogSection",
+                  "duration": 1,
+                  "messages": [],
+                  "result": "succeeded",
+                  "startTime": 1792336250,
+                  "subsections": [],
+                  "testDetails": {
+                    "emittedOutput": "",
+                    "suiteName": "Slow",
+                    "summary": "",
+                    "testName": "test_waits()",
+                    "wasSkipped": false
+                  },
+                  "title": "Run test case test_waits()"
+                }
+              ],
+              "testDetails": {
+                "suiteName": "Slow",
+                "summary": "",
+                "testsPassedString": "1 tests total, 1 passed",
+                "wasSkipped": false
+              },
+              "title": "Run test suite Slow"
+            }
+          ],
+          "title": "xctest (102)"
+        }
+      ],
+      "title": "Test Scheme Action"
+    }
+  ],
+  "title": "Test CircuitTimerKit-Package"
+}

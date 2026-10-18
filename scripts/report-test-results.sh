@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Usage: report-test-results.sh BUNDLE...
 # Reports each result bundle: an error annotation per failed test with its messages, a warning per test that
-# passed only on a retry, and the 20 slowest tests, also into the step summary on CI. Outside GitHub Actions the
-# failures and flaky tests print as plain text. Writes `flaky=` and `upload=` to $GITHUB_OUTPUT when it is set;
-# `upload=true` asks CI to keep the bundles. Diagnostics only: it fails no run by itself.
+# passed only on a retry, and the 20 tests with the most own time with how long each waited for the tests running in
+# parallel, also into the step summary on CI. Outside GitHub Actions the failures and flaky tests print as plain text.
+# Writes `flaky=` and `upload=` to $GITHUB_OUTPUT when it is set; `upload=true` asks CI to keep the bundles.
+# Diagnostics only: it fails no run by itself.
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
@@ -47,6 +48,52 @@ JQ_TESTS='
 		| annotation("warning"; "Passed only on a retry. "))
 '
 
+# The 20 tests with the most own time, from the action log, which gives each run of a test (one per argument) its
+# start and duration and puts it under the test process it ran in. Own time is an estimate: every moment of a run is
+# split evenly among the runs going on in its process at that moment. Tests on the main actor take turns on its one
+# thread, so most of their total time is waiting; tests off it share the CPU cores and get more than the estimate.
+JQ_OWN='
+	def runs($process):
+		(if .domainType == "com.apple.dt.IDE.UnitTestLogSection.Worker" then .title else $process end) as $p
+		| (if .testDetails.testName? != null and .startTime != null and .duration != null then
+			{process: $p, test: "\(.testDetails.suiteName)/\(.testDetails.testName)", start: .startTime,
+				end: (.startTime + .duration)}
+		else
+			empty
+		end),
+		((.subsections // [])[] | runs($p));
+	def round2: . * 100 | round / 100;
+	[runs("")] | group_by(.process) | map(
+		# Spans between consecutive starts and ends, each with the number of runs going on; an end sorts before a
+		# start at the same moment.
+		([.[] | [.start, 1], [.end, -1]] | sort
+			| reduce .[] as $event ({at: null, running: 0, spans: []};
+				(if .at != null and $event[0] > .at and .running > 0 then
+					.spans += [{from: .at, to: $event[0], running: .running}]
+				else
+					.
+				end)
+				| .at = $event[0] | .running += $event[1])
+			| .spans) as $spans
+		| map(. as $run
+			| [$spans[] | select(.from >= $run.start and .to <= $run.end)] as $inside
+			| . + {
+				own: ([$inside[] | (.to - .from) / .running] | add // 0),
+				crowd: ([$inside[] | (.to - .from) * .running] | add // 0)
+			})
+	) | add // []
+	| group_by([.process, .test]) | map({
+		test: .[0].test,
+		own: (map(.own) | add),
+		total: ((map(.end) | max) - (map(.start) | min)),
+		atOnce: ((map(.end - .start) | add) as $length
+			| if $length > 0 then (map(.crowd) | add) / $length else 1 end)
+	})
+	| sort_by(-.own) | .[:20][]
+	| "| \(.own | round2) | \(.total - .own | round2) | \(.total | round2) | \(.atOnce | round) | `\(.test)` |"
+'
+
+# Without the log: the 20 longest tests by total time, waiting included.
 JQ_SLOWEST='
 	[.. | objects | select(.nodeType == "Test Case" and .durationInSeconds != null)]
 	| sort_by(-.durationInSeconds) | .[:20][]
@@ -102,14 +149,32 @@ for bundle in "$@"; do
 			echo "- $name: $retried test(s) passed only on a retry" | summary
 		fi
 	fi
-	{
-		echo "### Slowest tests in $name"
-		echo
-		echo '| Seconds | Test |'
-		echo '|---:|---|'
-		jq -r "$JQ_SLOWEST" <<< "$tests" || echo "| | the result bundle has an unexpected format |"
-		echo
-	} | summary
+	if log=$(xcrun xcresulttool get log --path "$bundle" --type action 2> /dev/null) \
+		&& own=$(jq -r "$JQ_OWN" <<< "$log" 2> /dev/null) && [ -n "$own" ]; then
+		{
+			echo "### Slowest tests in $name"
+			echo
+			echo "Tests run in parallel, so a test's total time is mostly waiting for the others in its process." \
+				"Own time is an estimate: each moment of a test is split evenly among the tests running then." \
+				"At once is how many tests ran at a time on average, this one included."
+			echo
+			echo '| Own, s | Waited, s | Total, s | At once | Test |'
+			echo '|---:|---:|---:|---:|---|'
+			echo "$own"
+			echo
+		} | summary
+	else
+		{
+			echo "### Slowest tests in $name"
+			echo
+			echo "The log has no test runs, so each time includes waiting for the tests that ran in parallel."
+			echo
+			echo '| Seconds | Test |'
+			echo '|---:|---|'
+			jq -r "$JQ_SLOWEST" <<< "$tests" || echo "| | the result bundle has an unexpected format |"
+			echo
+		} | summary
+	fi
 done
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
