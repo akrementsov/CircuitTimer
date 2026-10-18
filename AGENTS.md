@@ -199,6 +199,7 @@ Log with `os.Logger` and move the UI to an explicit state. Do not log expected o
 - `WorkoutRun` keeps `position` and `cursor` readable through `@testable import` so tests can check its invariants.
 - UI tests are the exception: a UI test target runs XCTest. A test is a `@MainActor final class <Area>UITests: XCTestCase` with a synchronous `setUp`, if any, and methods named `test_<start>_<action>_<expected>`. It starts with `let app = launch(.<scenario>)` and drives the app through Screens (`CircuitTimerUITests/Screens/`), which wait for the app and report failures at the test's line. Lint rejects `sleep`, waits outside `Screens/` and `Support/`, and `XCUIApplication()` outside `Support/Launch.swift`.
 - UI tests share no state and depend on no order: each launches its own app into its scenario. Scenario data lives in the app's process; TipKit's datastore on the simulator is the one thing tests share; `launch` hides tips, and a test of a tip needs a launch option that resets the datastore and shows them.
+- Only time depends on order: Xcode runs the classes by name, and `AppLaunchUITests` comes first, so the slow first launch on a fresh simulator falls on its short test. Keep it first; a class named before it takes that launch.
 
 ## Imports
 
