@@ -22,6 +22,12 @@ RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|
 UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
 	-derivedDataPath "$(DERIVED_DATA)/UITests-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
+SNAPSHOT_REFERENCE_DESTINATION := platform=iOS Simulator,name=iPhone 17,OS=27.0
+SNAPSHOTS_DIR := CircuitTimerSnapshotTests/__Snapshots__
+SNAPSHOT_LANGUAGES ?= en ru
+SNAPSHOT_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots -destination '$(DESTINATION)' \
+	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
+
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
 	-skipMacroValidation \
@@ -38,7 +44,7 @@ PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swif
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
 .PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
-	check-release-app upload ci verify-clean
+	build-snapshots test-snapshots record-snapshots check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -130,6 +136,80 @@ test-ui:
 		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
 		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)
 
+# Snapshot tests use a fresh process per language and no test selection or Xcode retry: their result must describe
+# the whole reference matrix. The only retry of an image is the capture helper's second mount.
+define validate-snapshot-run
+	case '$(DESTINATION)' in \
+		'platform=iOS Simulator,name=iPhone 17,OS=27.0'|\
+		'platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'|\
+		'platform=iOS Simulator,name=iPhone 17 #3,OS=27.0') ;; \
+		*) echo "snapshots: comparisons require iPhone 17, #2 or #3 on iOS 27.0" >&2; exit 2 ;; \
+	esac; \
+	if [ -z '$(strip $(SNAPSHOT_LANGUAGES))' ]; then \
+		echo "snapshots: SNAPSHOT_LANGUAGES must contain en or ru" >&2; exit 2; \
+	fi; \
+	seen=" "; \
+	for language in $(SNAPSHOT_LANGUAGES); do \
+		case "$$language" in en|ru) ;; *) echo "snapshots: unsupported language '$$language'" >&2; exit 2 ;; esac; \
+		case "$$seen" in *" $$language "*) echo "snapshots: duplicate language '$$language'" >&2; exit 2 ;; esac; \
+		seen="$$seen$$language "; \
+	done; \
+	for flag in $(TEST_FLAGS) $(XCODEBUILD_FLAGS); do \
+		case "$$flag" in \
+			-only-testing*|-skip-testing*|-test-iterations*|-retry-tests-on-failure*|-run-tests-until-failure*) \
+				echo "snapshots: '$$flag' would select or repeat cases; narrow only with SNAPSHOT_LANGUAGES" >&2; exit 2 ;; \
+		esac; \
+	done;
+endef
+
+define run-snapshots
+	set -eu; \
+	$(validate-snapshot-run) \
+	version=$$(xcodebuild -version); \
+	printf '%s\n' "$$version"; \
+	if [ -n "$${GITHUB_STEP_SUMMARY:-}" ]; then printf '%s\n' "$$version" >> "$$GITHUB_STEP_SUMMARY"; fi; \
+	failed=0; english_bundle=""; russian_bundle=""; suffix=""; \
+	if [ '$(1)' = failed ]; then suffix=-record; fi; \
+	for language in $(SNAPSHOT_LANGUAGES); do \
+		case "$$language" in en) region=US ;; ru) region=RU ;; esac; \
+		base="$(abspath $(TEST_RESULTS))/Snapshots-$(TEST_RUN)-$$language$$suffix"; \
+		bundle="$$base.xcresult"; artifacts="$$base-artifacts"; \
+		rm -rf "$$artifacts"; mkdir -p "$$artifacts"; \
+		status=0; \
+		env TEST_RUNNER_SNAPSHOT_TESTING_RECORD='$(1)' TEST_RUNNER_SNAPSHOT_ARTIFACTS="$$artifacts" \
+			scripts/run-tests.sh "$$bundle" xcodebuild test $(SNAPSHOT_TEST_BUILD) \
+			-testLanguage "$$language" -testRegion "$$region" -parallel-testing-enabled NO \
+			-collect-test-diagnostics never $(TEST_FLAGS) || status=$$?; \
+		SNAPSHOTS_DIR="$(SNAPSHOTS_DIR)" scripts/check-snapshot-run.sh '$(1)' "$$language" "$$status" \
+			"$$bundle" "$$artifacts" || failed=1; \
+		case "$$language" in en) english_bundle="$$bundle" ;; ru) russian_bundle="$$bundle" ;; esac; \
+	done; \
+	if [ "$$failed" -eq 0 ] && [ -n "$$english_bundle" ] && [ -n "$$russian_bundle" ]; then \
+		scripts/check-snapshot-run.sh --same-cases "$$english_bundle" "$$russian_bundle" || failed=1; \
+	fi; \
+	[ "$$failed" -eq 0 ]
+endef
+
+build-snapshots:
+	xcodebuild build-for-testing $(SNAPSHOT_TEST_BUILD)
+
+test-snapshots:
+	@$(call run-snapshots,never)
+
+record-snapshots:
+	@set -eu; \
+	if [ "$${CI:-}" = true ]; then echo "record-snapshots: recording is local only" >&2; exit 2; fi; \
+	if [ '$(DESTINATION)' != '$(SNAPSHOT_REFERENCE_DESTINATION)' ]; then \
+		echo "record-snapshots: references require $(SNAPSHOT_REFERENCE_DESTINATION)" >&2; exit 2; \
+	fi; \
+	if [ -n "$$(git status --porcelain -- '$(SNAPSHOTS_DIR)')" ]; then \
+		echo "record-snapshots: review and commit reference changes before recording" >&2; exit 2; \
+	fi
+	@$(call run-snapshots,failed)
+	@$(call run-snapshots,never)
+	@git status --short -- '$(SNAPSHOTS_DIR)'
+	@git ls-files --others --exclude-standard -- '$(SNAPSHOTS_DIR)'
+
 # Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
@@ -161,7 +241,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint test-scripts check-resolved test build-ui-tests test-ui
+ci: lint test-scripts check-resolved test build-snapshot-kit build-ui-tests test-ui build-snapshots test-snapshots
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:
