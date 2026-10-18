@@ -142,7 +142,10 @@ jobs:
         id: test-snapshots
         if: ${{ !cancelled() && steps.build-snapshots.outcome == 'success' }}
         timeout-minutes: 15
-        run: make test-snapshots
+        run: |
+          sw_vers
+          sysctl -n machdep.cpu.brand_string || echo '::warning::CPU brand is unavailable on this runner'
+          TEST_RUNNER_SNAPSHOT_RASTER_DIAGNOSTICS=1 make test-snapshots
 
       # Every result bundle: its failed tests, tests that passed only on a retry, and the slowest tests, which add up
       # on the runner's few cores. Diagnostics only: a changed result-bundle format must not fail a run whose tests
@@ -167,6 +170,17 @@ jobs:
           name: test-results
           path: .build/TestResults/
           if-no-files-found: ignore
+          retention-days: 14
+
+      # Keep the native pixel probe even if this runner happens to match every reference.
+      - name: Keep snapshot raster diagnostics
+        if: ${{ !cancelled() && steps.build-snapshots.outcome == 'success' }}
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v7
+        with:
+          name: snapshot-raster-diagnostics
+          path: .build/TestResults/Snapshots-*-artifacts/*-raster.json
+          if-no-files-found: warn
           retention-days: 14
 
       # Pull requests only restore caches, so their revisions do not evict the main branch caches.
