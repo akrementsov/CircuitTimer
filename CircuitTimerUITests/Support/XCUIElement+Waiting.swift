@@ -40,6 +40,23 @@ extension XCUIElement {
         }
     }
 
+    /// Wait for the final order and then for the drop animation's spacing, reporting the two failures separately.
+    func waitUntilBelow(_ above: XCUIElement, gap: CGFloat, description: String, file: StaticString, line: UInt) {
+        let ordered = NSPredicate { _, _ in self.exists && above.exists && self.frame.minY > above.frame.minY }
+        guard ordered.evaluate(with: nil)
+            || XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ordered, object: nil)], timeout: screenTimeout) == .completed
+        else {
+            XCTFail("\(description) in the expected order within \(Int(screenTimeout)) s", file: file, line: line)
+            return
+        }
+
+        let spaced = NSPredicate { _, _ in abs(self.frame.minY - above.frame.maxY - gap) <= 1 }
+        if !spaced.evaluate(with: nil)
+            && XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: spaced, object: nil)], timeout: screenTimeout) != .completed {
+            XCTFail("\(description) with a \(gap) pt gap; actual gap is \(frame.minY - above.frame.maxY)", file: file, line: line)
+        }
+    }
+
     /// The accessibility value as text; `value` itself is untyped.
     private var stringValue: String? { value as? String }
 }

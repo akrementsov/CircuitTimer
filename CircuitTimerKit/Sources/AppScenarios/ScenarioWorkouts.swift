@@ -15,6 +15,8 @@ extension AppScenario {
                 [.legDay]
             case .threeWorkouts:
                 [.legDay, .legDayCopy(2), .legDayCopy(3)]
+            case .manyWorkouts:
+                [.legDay] + (2...20).map { .legDayCopy($0) }
         }
     }
 }
@@ -23,7 +25,7 @@ private extension Workout {
     static func legDayCopy(_ index: Int) -> Self {
         Workout(
             id: UUID(0xF2_0000 + index),
-            name: index == 2 ? ScenarioFixture.secondWorkoutName : ScenarioFixture.thirdWorkoutName,
+            name: "\(ScenarioFixture.workoutName) \(index)",
             training: legDay.training,
             trainingRounds: legDay.trainingRounds
         )
@@ -61,6 +63,10 @@ extension WorkoutStorageClient {
             delete: { _ in fatalError("Scenario storage has no delete yet; implement it with the scenario that needs it") },
             reorder: { ids in
                 stored.withValue { workouts in
+                    precondition(
+                        ids.count == workouts.count && Set(ids) == Set(workouts.map(\.id)),
+                        "Scenario reorder must list every workout exactly once"
+                    )
                     let byID = Dictionary(uniqueKeysWithValues: workouts.map { ($0.id, $0) })
                     workouts = ids.compactMap { byID[$0] }
                 }

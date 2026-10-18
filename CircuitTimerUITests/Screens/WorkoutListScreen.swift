@@ -60,11 +60,26 @@ struct WorkoutListScreen: Screen {
         return self
     }
 
+    func moveWorkoutToBottom(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
+        let source = row(name, file: file, line: line)
+            .waitUntilHittable("The workout to move", file: file, line: line)
+        let edge = app.scrollViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
+        source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.6, thenDragTo: edge, withVelocity: .fast, thenHoldForDuration: 3)
+        return self
+    }
+
     @discardableResult
     func assertOrder(_ names: [String], file: StaticString = #filePath, line: UInt = #line) -> Self {
-        let frames = names.map { row($0, file: file, line: line).frame }
-        for (above, below) in zip(frames, frames.dropFirst()) {
-            XCTAssertEqual(below.minY - above.maxY, 12, accuracy: 1, "Rows keep their gap after a drop", file: file, line: line)
+        for index in names.indices.dropFirst() {
+            let above = row(names[index - 1], file: file, line: line)
+            row(names[index], file: file, line: line).waitUntilBelow(
+                above,
+                gap: 12,
+                description: "\"\(names[index])\" follows \"\(names[index - 1])\"",
+                file: file,
+                line: line
+            )
         }
         return self
     }

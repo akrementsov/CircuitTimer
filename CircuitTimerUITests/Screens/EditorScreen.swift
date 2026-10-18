@@ -51,14 +51,13 @@ struct EditorScreen: Screen {
     }
 
     func moveTrainingStage(from: Int, to targetIndex: Int, file: StaticString = #filePath, line: UInt = #line) -> Self {
-        let source = app.textFields[AccessibilityID.Editor.stageDuration(.training, from)]
+        let source = app.textFields[AccessibilityID.Editor.stageName(.training, from)]
             .waitUntilHittable("The source stage", file: file, line: line)
-        let destination = app.textFields[AccessibilityID.Editor.stageDuration(.training, targetIndex)]
+        let destination = app.textFields[AccessibilityID.Editor.stageName(.training, targetIndex)]
             .waitUntilHittable("The destination stage", file: file, line: line)
-        // Hold the stage's name plaque, leaving the duration's cursor gestures alone.
-        let start = source.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
-            .withOffset(CGVector(dx: -80, dy: 0))
-        let end = start.withOffset(CGVector(dx: 0, dy: destination.frame.midY - source.frame.midY))
+        // Hold the name itself, leaving the duration's cursor gestures alone.
+        let start = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.6, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
         return self
     }

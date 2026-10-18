@@ -102,7 +102,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stage changes on the Lock Screen. Open the app from time to time to refresh notifications."
+            "value" : "Notifies you of stage changes on the Lock Screen. Open the app from time to time to refresh notifications."
           }
         },
         "ru" : {

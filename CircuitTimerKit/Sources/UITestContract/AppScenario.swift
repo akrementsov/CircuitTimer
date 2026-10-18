@@ -4,6 +4,7 @@ public enum AppScenario: String, CaseIterable, Sendable {
     case emptyList
     case oneWorkout
     case threeWorkouts
+    case manyWorkouts
 }
 
 /// The launch environment that selects a scenario.
@@ -20,5 +21,6 @@ public enum ScenarioFixture {
     public static let workoutName = "Leg day"
     public static let secondWorkoutName = "Leg day 2"
     public static let thirdWorkoutName = "Leg day 3"
+    public static let lastWorkoutName = "Leg day 20"
 }
 #endif

@@ -3,6 +3,14 @@ import XCTest
 
 @MainActor
 final class WorkoutReorderUITests: XCTestCase {
+    func test_workouts_dragNearBottom_scrollsToLastPosition() {
+        let app = launch(.manyWorkouts)
+
+        WorkoutListScreen(app)
+            .moveWorkoutToBottom(ScenarioFixture.workoutName)
+            .assertOrder([ScenarioFixture.lastWorkoutName, ScenarioFixture.workoutName])
+    }
+
     func test_workouts_dragDownThenUp_preservesOrderAndSpacing() {
         let app = launch(.threeWorkouts)
         let first = ScenarioFixture.workoutName
