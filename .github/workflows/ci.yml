@@ -137,7 +137,7 @@ jobs:
       # A test step past its timeout may end cancelled rather than failed; its log is kept either way.
       - name: Keep the test results
         if: >-
-          ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true'
+          ${{ !cancelled() && (true || failure() || steps.report.outputs.upload == 'true'
           || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
