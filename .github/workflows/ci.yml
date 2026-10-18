@@ -107,18 +107,19 @@ jobs:
         timeout-minutes: 35
         run: make test
 
-      # Built even when a package test failed, so the UI tests still report; never on mismatched lockfiles.
-      - name: Build the app
-        id: build-app
+      # Built even when a package test failed, so the UI tests still report; never on mismatched lockfiles. The app
+      # with its UI tests, into the next step's DerivedData: about 4 minutes cold.
+      - name: Build the app and its UI tests
+        id: build-ui-tests
         if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
         timeout-minutes: 20
-        run: make build-app
+        run: make build-ui-tests
 
-      # About 4 minutes for the tests and 10 for a cold build of the app with its UI tests. A failing UI test runs
-      # once more and is reported as flaky if it then passes; a hung runner gets one more run as above.
+      # About 2 minutes: the step above built everything. A failing UI test runs once more and is reported as flaky
+      # if it then passes; a hung runner gets one more run as above.
       - name: Test the UI
         id: test-ui
-        if: ${{ !cancelled() && steps.build-app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build-ui-tests.outcome == 'success' }}
         timeout-minutes: 25
         run: make test-ui
 

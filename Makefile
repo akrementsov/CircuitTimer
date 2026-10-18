@@ -17,6 +17,9 @@ UI_TEST_WORKERS ?= 1
 # names the types, which Swift metadata keeps; `AppScenario` also matches the module `AppScenarios`. Keep it in step
 # with UITestContract's AppScenario.swift.
 RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
+# What `build-ui-tests` builds and `test-ui` runs: the same arguments, so the tests find the build done.
+UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
+	-derivedDataPath "$(DERIVED_DATA)/UITests-$(UI_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -32,8 +35,8 @@ PACKAGE_RESOLVED := CircuitTimerKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint test-scripts check-resolved resolve build-package test build-app test-ui archive check-release-app upload ci \
-	verify-clean
+.PHONY: lint test-scripts check-resolved resolve build-package test build-app build-ui-tests test-ui archive \
+	check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -80,6 +83,10 @@ build-app:
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
 
+# The app with its UI tests, as `test-ui` builds them, so CI shows a build error in a step of its own.
+build-ui-tests:
+	xcodebuild build-for-testing $(UI_TEST_BUILD)
+
 # Each destination has its own result bundle, log and DerivedData, so runs on different simulators can overlap; the
 # package checkouts are shared and only read. A failing test gets one more run, and one that passes only then is
 # reported as flaky. Parallel workers stay off unless UI_TEST_WORKERS says otherwise, which xcodebuild needs to hear
@@ -95,11 +102,9 @@ test-ui:
 	if [ "$$w" -eq 1 ]; then par="-parallel-testing-enabled NO"; \
 	else par="-parallel-testing-enabled YES -parallel-testing-worker-count $$w"; fi; \
 	scripts/run-tests.sh "$(TEST_RESULTS)/UITests-$(UI_RUN).xcresult" \
-		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
-		-derivedDataPath "$(DERIVED_DATA)/UITests-$(UI_RUN)" $$par \
+		xcodebuild test $(UI_TEST_BUILD) $$par \
 		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
-		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 \
-		CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)
 
 # Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
 archive:
@@ -132,7 +137,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint test-scripts check-resolved test build-app test-ui
+ci: lint test-scripts check-resolved test build-ui-tests test-ui
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

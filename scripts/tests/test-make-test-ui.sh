@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests `make test-ui` up to xcodebuild, which a stand-in replaces: its paths per destination and its guard of
-# UI_TEST_WORKERS. Make exits 2 when the recipe fails.
+# Tests `make test-ui` and `make build-ui-tests` up to xcodebuild, which a stand-in replaces: their paths per
+# destination, the build the tests find done, and the guard of UI_TEST_WORKERS. Make exits 2 when the recipe fails.
 . "$(dirname "$0")/lib.sh"
 
 # Records its arguments, one per line.
@@ -31,6 +31,19 @@ run make -n -C "$root" test-ui DESTINATION="$oldest" TEST_RESULTS="$work/results
 expect_status 0
 expect_in "$work/out" "$work/results/UITests-iPhone-15-17.5.xcresult"
 expect_in "$work/out" "$work/dd/UITests-iPhone-15-17.5"
+
+describe "the build the tests run"
+rm -f "$work/arguments"
+run make -s -C "$root" build-ui-tests DESTINATION="$second" DERIVED_DATA="$work/dd" SOURCE_PACKAGES="$work/sp"
+expect_status 0
+expect_equal "$(head -1 "$work/arguments")" build-for-testing
+mv "$work/arguments" "$work/build-arguments"
+test_ui
+expect_status 0
+expect_equal "$(head -1 "$work/arguments")" test
+# Every argument of the build reaches the tests' run, which otherwise builds again.
+expect_equal "$(sed 1d "$work/build-arguments" | LC_ALL=C sort | LC_ALL=C comm -23 - <(LC_ALL=C sort "$work/arguments"))" ""
+expect_in "$work/build-arguments" "$work/dd/UITests-iPhone-17-2-27.0"
 
 describe "one worker"
 test_ui UI_TEST_WORKERS=1

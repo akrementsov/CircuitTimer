@@ -122,6 +122,7 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | `make test-scripts` | Tests of the scripts, the make targets around xcodebuild and the custom lint rules |
 | `make test` | Builds and tests the package with warnings as errors |
 | `make build-app` | Builds the app for the simulator |
+| `make build-ui-tests` | Builds the app with its UI tests, as `make test-ui` does |
 | `make test-ui` | Builds the app and runs its UI tests on `DESTINATION` |
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
