@@ -17,13 +17,13 @@ struct EditorScreen: Screen {
     }
 
     /// Types the name and ends with Return, which closes the keyboard: the panel with Save rides above the keyboard
-    /// and would cover the stages a later step taps on a small screen.
+    /// and would cover the stages a later step taps on a small screen. That step waits until its field can be tapped,
+    /// which it cannot while covered; the keyboard itself stays in the element tree for seconds after it has gone.
     func typeName(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
         nameField
             .waitUntilHittable("The workout's name field", file: file, line: line)
             .tap()
         nameField.typeText(name + "\n")
-        app.keyboards.firstMatch.waitUntilGone("The keyboard", file: file, line: line)
         return self
     }
 
