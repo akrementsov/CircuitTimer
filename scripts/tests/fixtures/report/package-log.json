@@ -120,10 +120,10 @@
                 {
                   "attachments": [],
                   "domainType": "com.apple.dt.IDE.UnitTestLogSection",
-                  "duration": 2,
+                  "duration": 1.5,
                   "messages": [],
                   "result": "succeeded",
-                  "startTime": 1792336242,
+                  "startTime": 1792336243,
                   "subsections": [],
                   "testDetails": {
                     "emittedOutput": "",

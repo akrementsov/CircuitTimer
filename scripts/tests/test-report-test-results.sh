@@ -92,6 +92,7 @@ expect_equal "$(cat "$work/output")" "$(printf 'flaky=false\nupload=true')"
 
 describe "passed tests"
 passed=$(bundle Passed "$fixtures/package-passed.json")
+cp "$fixtures/package-log.json" "$passed/log.json"
 : > "$work/output"
 run env GITHUB_ACTIONS=true GITHUB_OUTPUT="$work/output" "$report" "$passed"
 expect_status 0
@@ -118,26 +119,29 @@ jq '.testNodes[0].children[0].children[0].children as $cases
 	"$fixtures/package-passed.json" > "$many/tests.json"
 run "$report" "$many"
 expect_status 0
-expect_in "$work/out" 'The log has no test runs, so each time includes waiting'
+expect_in "$work/out" 'WARNING: Many.xcresult: xcresulttool could not read the action log'
+expect_in "$work/out" 'Without the action log each time includes waiting'
 expect_in "$work/out" '| Seconds | Test |'
 expect_equal "$(grep -c '^| [0-9]' "$work/out")" 20
 expect_in "$work/out" '| 24 | `Slow/test_24()` |'
 expect_not_in "$work/out" '`Slow/test_4()`'
 
-# In process 101 test_waits runs 0–4 s, test_works 0–2 s and test_param 1–2 and 2–4 s, one run per argument; spans
-# 0–1, 1–2 and 2–4 s have 2, 3 and 2 runs going on. test_instant takes no time. Process 102 runs another test_waits
-# alone, which keeps apart from the first.
+# In process 101 test_waits runs 0–4 s, test_works 0–2 s and test_param 1–2 and 3–4.5 s, one run per argument; spans
+# 0–1, 1–2, 2–3, 3–4 and 4–4.5 s have 2, 3, 1, 2 and 1 runs going on. test_param's total leaves out the gap between
+# its runs. test_instant takes no time. Process 102 runs another test_waits alone, which keeps apart from the first.
 describe "own time"
 own=$(bundle Own "$fixtures/package-passed.json")
 cp "$fixtures/package-log.json" "$own/log.json"
 : > "$work/summary"
 run env GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$work/summary" "$report" "$own"
 expect_status 0
+expect_not_in "$work/out" '::warning'
 expect_in "$work/summary" '### Slowest tests in Own.xcresult'
+expect_in "$work/summary" 'From 6 runs of 5 tests in 2 test processes.'
 expect_in "$work/summary" '| Own, s | Waited, s | Total, s | At once | Test |'
-expect_equal "$(grep '^| [0-9]' "$work/summary")" '| 1.83 | 2.17 | 4 | 2 | `Slow/test_waits()` |
-| 1.33 | 1.67 | 3 | 2 | `Slow/test_param(value:)` |
-| 1 | 0 | 1 | 1 | `Slow/test_waits()` |
+expect_equal "$(grep '^| [0-9]' "$work/summary")" '| 2.33 | 1.67 | 4 | 2 | `Slow/test_waits()` in xctest (101) |
+| 1.33 | 1.17 | 2.5 | 2 | `Slow/test_param(value:)` |
+| 1 | 0 | 1 | 1 | `Slow/test_waits()` in xctest (102) |
 | 0.83 | 1.17 | 2 | 3 | `Slow/test_works()` |
 | 0 | 0 | 0 | 1 | `Fast/test_instant()` |'
 
@@ -155,18 +159,21 @@ expect_not_in "$work/out" '`Slow/test_4()`'
 describe "a log without test runs"
 no_runs=$(bundle NoRuns "$fixtures/package-passed.json")
 echo '{"title": "Test CircuitTimerKit-Package", "subsections": []}' > "$no_runs/log.json"
-run "$report" "$no_runs"
+: > "$work/output"
+run env GITHUB_ACTIONS=true GITHUB_OUTPUT="$work/output" "$report" "$no_runs"
 expect_status 0
+expect_in "$work/out" '::warning::NoRuns.xcresult: the action log has no test runs'
 expect_in "$work/out" '| Seconds | Test |'
 expect_in "$work/out" '`ScenarioStorageTests/test_save_concurrentNewWorkouts_keepsEveryOne()` |'
+expect_equal "$(cat "$work/output")" "$(printf 'flaky=false\nupload=false')"
 
 describe "a log that is not JSON"
 broken=$(bundle Broken "$fixtures/package-passed.json")
 echo 'not JSON' > "$broken/log.json"
-run "$report" "$broken"
+run env GITHUB_ACTIONS=true "$report" "$broken"
 expect_status 0
+expect_in "$work/out" '::warning::Broken.xcresult: the action log has an unexpected format'
 expect_in "$work/out" '| Seconds | Test |'
-expect_not_in "$work/out" 'parse error'
 
 describe "usage"
 run "$report"
