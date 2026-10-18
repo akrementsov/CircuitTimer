@@ -12,7 +12,15 @@ import UITestContract
 
 @main
 struct CircuitTimerApp: App {
-    @MainActor private static let store = makeStore()
+    @MainActor private static let store = Store(initialState: AppFeature.State()) {
+        AppFeature()
+    } withDependencies: { dependencies in
+        #if DEBUG
+        if let scenario = requestedScenario() {
+            scenario.prepare(&dependencies)
+        }
+        #endif
+    }
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "App")
 
@@ -27,27 +35,20 @@ struct CircuitTimerApp: App {
         }
     }
 
-    /// A UI test's scenario replaces every dependency inside the store. `init` reads its clients from the process's
-    /// context instead, so a scenario runs only in the preview context, where none of them is live.
-    @MainActor private static func makeStore() -> StoreOf<AppFeature> {
-        #if DEBUG
-        if let scenario = AppScenario.requested(in: ProcessInfo.processInfo.environment) {
-            @Dependency(\.context) var context
-            guard context == .preview else {
-                let launch = "\(ScenarioLaunch.dependencyContextKey)=\(ScenarioLaunch.dependencyContext)"
-                fatalError("UI test scenario \(scenario.rawValue) needs \(launch)")
-            }
-            return Store(initialState: AppFeature.State()) {
-                AppFeature()
-            } withDependencies: {
-                scenario.prepare(&$0)
-            }
+    #if DEBUG
+    /// The scenario a UI test asked for, which replaces every dependency inside the store. `init` reads its clients
+    /// from the process's context instead, so a scenario runs only in the preview context, where none of them is live.
+    private static func requestedScenario() -> AppScenario? {
+        guard let scenario = AppScenario.requested(in: ProcessInfo.processInfo.environment) else { return nil }
+
+        @Dependency(\.context) var context
+        guard context == .preview else {
+            let launch = "\(ScenarioLaunch.dependencyContextKey)=\(ScenarioLaunch.dependencyContext)"
+            fatalError("UI test scenario \(scenario.rawValue) needs \(launch)")
         }
-        #endif
-        return Store(initialState: AppFeature.State()) {
-            AppFeature()
-        }
+        return scenario
     }
+    #endif
 
     var body: some Scene {
         WindowGroup {

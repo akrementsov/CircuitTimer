@@ -9,8 +9,9 @@ EXPORT_PATH ?= $(CURDIR)/.build/Export
 # One result bundle and log per test run; scripts/report-test-results.sh reads them all.
 TEST_RESULTS ?= $(CURDIR)/.build/TestResults
 TEST_FLAGS ?=
-# UI test runs keep apart by destination: `iPhone 17 #2` on 27.0 runs as `iPhone-17-2-27.0`.
-UI_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
+# Test runs keep apart by destination, so runs on different simulators can overlap: `iPhone 17 #2` on 27.0 runs as
+# `iPhone-17-2-27.0`.
+TEST_RUN ?= $(shell printf '%s' '$(DESTINATION)' | sed -E 's/.*name=([^,]+).*OS=([0-9.]+).*/\1-\2/; s/[^A-Za-z0-9.]+/-/g')
 # Parallel workers clone the simulator, so more than one is allowed only on CI.
 UI_TEST_WORKERS ?= 1
 # What `check-release-app` looks for. An optimized build may fold a short string literal into code, so the list also
@@ -19,7 +20,7 @@ UI_TEST_WORKERS ?= 1
 RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
 # What `build-ui-tests` builds and `test-ui` runs: the same arguments, so the tests find the build done.
 UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
-	-derivedDataPath "$(DERIVED_DATA)/UITests-$(UI_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
+	-derivedDataPath "$(DERIVED_DATA)/UITests-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -71,12 +72,13 @@ build-package:
 
 # Tests run in English so assertions on localized text do not depend on the machine's language.
 # The output is quiet, so failure messages live only in the result bundle, which run-tests.sh names. Diagnostics are
-# never collected: the simulator can keep xcodebuild waiting ten minutes for them.
+# never collected: the simulator can keep xcodebuild waiting ten minutes for them. Each destination has its own result
+# bundle, log and DerivedData, as in `test-ui`.
 test:
-	cd CircuitTimerKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/Package.xcresult" \
+	cd CircuitTimerKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/Package-$(TEST_RUN).xcresult" \
 		xcodebuild test -scheme CircuitTimerKit-Package \
 		-destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/Package" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+		-derivedDataPath "$(DERIVED_DATA)/Package-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
@@ -101,7 +103,7 @@ test-ui:
 	fi; \
 	if [ "$$w" -eq 1 ]; then par="-parallel-testing-enabled NO"; \
 	else par="-parallel-testing-enabled YES -parallel-testing-worker-count $$w"; fi; \
-	scripts/run-tests.sh "$(TEST_RESULTS)/UITests-$(UI_RUN).xcresult" \
+	scripts/run-tests.sh "$(TEST_RESULTS)/UITests-$(TEST_RUN).xcresult" \
 		xcodebuild test $(UI_TEST_BUILD) $$par \
 		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
 		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)

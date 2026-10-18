@@ -8,6 +8,7 @@ import WorkoutDomain
 /// Read-only it keeps its layout on the inactive field color and takes no taps, like the original cell.
 struct StageRow: View {
     let stage: Stage
+    /// Where the stage stands on the screen, which names the field for UI tests.
     let section: StageSection
     let index: Int
     let isEditable: Bool

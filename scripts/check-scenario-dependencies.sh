@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails when a UI test scenario could reach the outside world: a client whose preview value is its live one, a
 # client or key that `AppScenario.prepare` does not set, a dependency looked up by type, or a storage strategy whose
-# default store `prepare` does not replace. It reads the code with comments removed, but not string literals, and
+# default store `prepare` does not replace. It reads the code with comments removed, keeping string literals, and
 # knows nothing about our own `SharedKey`s or keys only a library reads. A key's declaration, up to its
 # `DependencyKey` conformance, must fit on one line.
 # Runs with bash 3.2 and with BSD, GNU or mawk awk, so on a Mac and on CI's Linux lint job alike.
@@ -21,40 +21,68 @@ fail() {
 	failures=$((failures + 1))
 }
 
-# Copies the Swift files under $1 to $2 without `//` and `/* */` comments, keeping their paths and line numbers.
+# Copies the Swift files under $1 to $2 without `//` and `/* */` comments, keeping their paths and line numbers. String
+# literals keep their text, so a `//` in a URL ends nothing, though a quote inside a raw string `#"…"#` ends it
+# early; block comments nest, as in Swift.
 strip_comments() {
 	find "$1" -name '*.swift' | while IFS= read -r file; do
 		copy="$2/${file#"$1"/}"
 		mkdir -p "$(dirname "$copy")"
 		awk '
 			{
-				line = $0
 				out = ""
-				while (line != "") {
-					if (inblock) {
-						i = index(line, "*/")
-						if (i == 0) {
-							line = ""
+				n = length($0)
+				i = 1
+				while (i <= n) {
+					ch = substr($0, i, 1)
+					two = substr($0, i, 2)
+					three = substr($0, i, 3)
+					if (blocks > 0) {
+						if (two == "*/") {
+							blocks--
+							i += 2
+						} else if (two == "/*") {
+							blocks++
+							i += 2
 						} else {
-							line = substr(line, i + 2)
-							inblock = 0
+							i++
 						}
+					} else if (multiline || quoted) {
+						if (ch == "\\") {
+							# The escaped character, such as a quote, is text.
+							out = out two
+							i += 2
+						} else if (multiline && three == "\"\"\"") {
+							out = out three
+							multiline = 0
+							i += 3
+						} else {
+							if (quoted && ch == "\"") {
+								quoted = 0
+							}
+							out = out ch
+							i++
+						}
+					} else if (three == "\"\"\"") {
+						out = out three
+						multiline = 1
+						i += 3
+					} else if (ch == "\"") {
+						out = out ch
+						quoted = 1
+						i++
+					} else if (two == "//") {
+						break
+					} else if (two == "/*") {
+						blocks = 1
+						i += 2
 					} else {
-						b = index(line, "/*")
-						c = index(line, "//")
-						if (c > 0 && (b == 0 || c < b)) {
-							out = out substr(line, 1, c - 1)
-							line = ""
-						} else if (b > 0) {
-							out = out substr(line, 1, b - 1)
-							line = substr(line, b + 2)
-							inblock = 1
-						} else {
-							out = out line
-							line = ""
-						}
+						out = out ch
+						i++
 					}
 				}
+				# A single-line string ends with its line.
+				quoted = 0
 				print out
 			}
 		' "$file" > "$copy"

@@ -213,6 +213,27 @@ enum QuietKey: DependencyKey {
 }
 EOF
 
+failing live-value-after-a-url "$kit/Case.swift" "Case.swift:3: previewValue reads liveValue" <<'EOF'
+enum LinkKey: DependencyKey {
+    static let liveValue = Link(url: "https://example.com")
+    static let previewValue = Link(url: "https://example.com", base: liveValue)
+}
+EOF
+
+passing comment-marks-in-strings "$kit/Case.swift" <<'EOF'
+enum GlobKey: DependencyKey {
+    static let liveValue = "/*"
+    static let previewValue = "\"*/ // \\"
+}
+
+enum TextKey: DependencyKey {
+    static let liveValue = """
+        /* not a comment, "nor" // this
+        """
+    static let previewValue = "" /* a comment /* nested */ liveValue */
+}
+EOF
+
 passing generic-constraints "$kit/Case.swift" <<'EOF'
 struct Cache<K: DependencyKey, V> {
     var keys: [K]

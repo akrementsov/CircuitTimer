@@ -161,3 +161,23 @@ jobs:
         with:
           path: .build/DerivedData
           key: xcode27.1-dd-${{ steps.keys.outputs.resolved }}-${{ github.sha }}
+
+  # Each push to main saves a DerivedData cache of its own, about 1 GB against the repository's 10 GB, and runs restore
+  # only the newest, so the older ones go before they evict the package sources.
+  prune-caches:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete older DerivedData caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          gh cache list --ref refs/heads/main --sort created_at --order desc --limit 100 --json id,key \
+            --jq '[.[] | select(.key | test("^xcode[0-9.]+-dd-"))] | .[1:][] | .id' \
+            | while read -r id; do gh cache delete "$id"; done

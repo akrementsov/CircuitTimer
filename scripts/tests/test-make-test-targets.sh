@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Tests `make test-ui` and `make build-ui-tests` up to xcodebuild, which a stand-in replaces: their paths per
-# destination, the build the tests find done, and the guard of UI_TEST_WORKERS. Make exits 2 when the recipe fails.
+# Tests `make test`, `make test-ui` and `make build-ui-tests` up to xcodebuild, which a stand-in replaces: their paths
+# per destination, the build the UI tests find done, and the guard of UI_TEST_WORKERS. Make exits 2 when the recipe
+# fails.
 . "$(dirname "$0")/lib.sh"
 
 # Records its arguments, one per line.
@@ -22,7 +23,7 @@ test_ui() {
 		SOURCE_PACKAGES="$work/sp" TEST_FLAGS= "$@"
 }
 
-describe "paths per destination"
+describe "UI test paths per destination"
 run make -n -C "$root" test-ui DESTINATION="$second" TEST_RESULTS="$work/results" DERIVED_DATA="$work/dd"
 expect_status 0
 expect_in "$work/out" "$work/results/UITests-iPhone-17-2-27.0.xcresult"
@@ -31,6 +32,16 @@ run make -n -C "$root" test-ui DESTINATION="$oldest" TEST_RESULTS="$work/results
 expect_status 0
 expect_in "$work/out" "$work/results/UITests-iPhone-15-17.5.xcresult"
 expect_in "$work/out" "$work/dd/UITests-iPhone-15-17.5"
+
+describe "package test paths per destination"
+run make -n -C "$root" test DESTINATION="$second" TEST_RESULTS="$work/results" DERIVED_DATA="$work/dd"
+expect_status 0
+expect_in "$work/out" "$work/results/Package-iPhone-17-2-27.0.xcresult"
+expect_in "$work/out" "$work/dd/Package-iPhone-17-2-27.0"
+run make -n -C "$root" test DESTINATION="$oldest" TEST_RESULTS="$work/results" DERIVED_DATA="$work/dd"
+expect_status 0
+expect_in "$work/out" "$work/results/Package-iPhone-15-17.5.xcresult"
+expect_in "$work/out" "$work/dd/Package-iPhone-15-17.5"
 
 describe "the build the tests run"
 rm -f "$work/arguments"

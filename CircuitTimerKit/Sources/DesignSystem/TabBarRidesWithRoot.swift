@@ -56,6 +56,8 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
             image.frame = window.convert(frame, to: root.view)
             // Over the real bar for a moment after the pop; taps go through to it.
             image.isUserInteractionEnabled = false
+            // In the root's own view, which the push moves. UIKit warns about a snapshot in a hosting controller's view;
+            // accepted, as the picture must ride with the root.
             root.view.addSubview(image)
             snapshot = image
         }
