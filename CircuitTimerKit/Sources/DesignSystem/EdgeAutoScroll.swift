@@ -32,7 +32,9 @@ enum EdgeAutoScroll {
 }
 
 /// The content's place in the visible area of the scroll view, both in the global space.
-struct ScrollContentGeometry: Equatable, Sendable {
+@MainActor
+@Observable
+final class ScrollContentGeometry {
     var contentFrame: CGRect = .zero
     var visibleRect: CGRect = .zero
 }

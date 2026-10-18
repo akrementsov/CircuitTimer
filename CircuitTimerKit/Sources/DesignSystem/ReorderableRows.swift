@@ -26,6 +26,11 @@ struct ReorderGeometry: Equatable {
         min(max(offset, offsetRange.lowerBound), offsetRange.upperBound)
     }
 
+    /// Drawing and dropping use the same scroll content frame: content moving up adds to the finger's travel.
+    func offset(fingerTravel: CGFloat, contentMinYAtLift: CGFloat, contentMinY: CGFloat) -> CGFloat {
+        clampedOffset(fingerTravel + contentMinYAtLift - contentMinY)
+    }
+
     /// The place the lifted row would take: it passes a neighbour once its edge crosses the neighbour's middle.
     func destination(for offset: CGFloat) -> Int {
         let top = top(of: from) + offset
@@ -86,7 +91,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     /// Rows' places in the scroll content, which don't move while it scrolls.
     @State private var frames: [Item.ID: CGRect] = [:]
     @State private var drag: ReorderDrag<Item.ID>?
-    /// The lifted row's last offset, as drawn. A plain reference: it changes on every frame the screen scrolls by
+    /// The lifted row's latest computed offset. A plain reference: it changes on every frame the screen scrolls by
     /// itself, and redrawing every row for it would stall a long list.
     @State private var liftedOffset = LiftedOffset()
     @Environment(RowInteraction<Item.ID>.self) private var interaction: RowInteraction<Item.ID>?
@@ -129,8 +134,10 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
                             scale: isLifted ? Self.liftScale : 1,
                             shift: shift(ofRowAt: index),
                             fingerTravel: isLifted ? drag?.fingerTravel ?? .zero : .zero,
-                            offsetRange: isLifted ? drag?.geometry.offsetRange ?? 0...0 : 0...0,
-                            onOffsetChange: { _ in updateDragPosition() }
+                            geometry: isLifted ? drag?.geometry : nil,
+                            contentGeometry: interaction?.geometry,
+                            contentMinYAtLift: drag?.contentMinYAtLift ?? .zero,
+                            onPositionChange: updateDragPosition
                         )
                     )
                     .gesture(TapGesture().onEnded { onRowTap?(item) }, including: onRowTap != nil ? .all : .subviews)
@@ -245,8 +252,11 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     private func updateDragPosition() {
         guard let current = drag, let interaction else { return }
 
-        let scrolled = current.contentMinYAtLift - interaction.geometry.contentFrame.minY
-        let offset = current.geometry.clampedOffset(current.fingerTravel + scrolled)
+        let offset = current.geometry.offset(
+            fingerTravel: current.fingerTravel,
+            contentMinYAtLift: current.contentMinYAtLift,
+            contentMinY: interaction.geometry.contentFrame.minY
+        )
         liftedOffset.value = offset
         let destination = current.geometry.destination(for: offset)
         if destination != current.destination {
@@ -440,37 +450,31 @@ private struct LiftedRowTracker: ViewModifier {
     let scale: CGFloat
     let shift: CGFloat
     let fingerTravel: CGFloat
-    let offsetRange: ClosedRange<CGFloat>
-    let onOffsetChange: (CGFloat) -> Void
-
-    @State private var placeMinYAtLift: CGFloat?
-    @State private var placeMinY: CGFloat = .zero
+    let geometry: ReorderGeometry?
+    let contentGeometry: ScrollContentGeometry?
+    let contentMinYAtLift: CGFloat
+    let onPositionChange: () -> Void
 
     func body(content: Content) -> some View {
-        let scrolled = placeMinYAtLift.map { $0 - placeMinY } ?? .zero
-        let liftedOffset = min(max(fingerTravel + scrolled, offsetRange.lowerBound), offsetRange.upperBound)
+        let liftedOffset = offset
         content
             .scaleEffect(scale)
             .offset(y: isLifted ? liftedOffset : shift)
-            // Outside the offset, so it measures the row's place and not where the row is drawn. Only the lifted row
-            // reports it, or every row would write state on every scrolled frame.
-            .onGeometryChange(for: CGFloat?.self) { [isLifted] proxy in
-                isLifted ? proxy.frame(in: .global).minY : nil
-            } action: { minY in
-                guard let minY else {
-                    placeMinYAtLift = nil
-                    return
-                }
-
-                if placeMinYAtLift == nil {
-                    placeMinYAtLift = minY
-                }
-                placeMinY = minY
-            }
             .onChange(of: isLifted ? liftedOffset : nil) { _, offset in
-                if let offset {
-                    onOffsetChange(offset)
+                if offset != nil {
+                    onPositionChange()
                 }
             }
+    }
+
+    private var offset: CGFloat {
+        // Only the lifted row reads the observable frame; other rows keep their existing observation unchanged.
+        guard isLifted, let geometry, let contentGeometry else { return .zero }
+
+        return geometry.offset(
+            fingerTravel: fingerTravel,
+            contentMinYAtLift: contentMinYAtLift,
+            contentMinY: contentGeometry.contentFrame.minY
+        )
     }
 }
