@@ -7,7 +7,7 @@ import WorkoutActivity
 /// clock, then the stage that comes next.
 enum IslandViews {
     @MainActor
-    static func dynamicIsland(_ display: WorkoutActivityDisplay) -> DynamicIsland {
+    static func dynamicIsland(_ display: WorkoutActivityDisplay, activityID: String, generation: Int) -> DynamicIsland {
         DynamicIsland {
             // One full-width region: the leading and trailing ones beside the camera are too narrow for a stage name.
             DynamicIslandExpandedRegion(.bottom) {
@@ -27,6 +27,10 @@ enum IslandViews {
                         ActivityClockText(display.islandClock, style: .expandedClock, glyphSide: .token(size: .activityGlyph))
                             .foregroundStyle(display.tone.accent)
                             .layoutPriority(1)
+                        if let command = display.control {
+                            ActivityControlButton(command: command, activityID: activityID, generation: generation)
+                                .foregroundStyle(display.tone.accent)
+                        }
                     }
                     if let next = display.next {
                         nextRow(next)

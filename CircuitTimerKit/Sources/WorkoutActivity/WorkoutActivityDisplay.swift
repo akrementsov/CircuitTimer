@@ -55,6 +55,18 @@ public struct WorkoutActivityDisplay: Hashable, Sendable {
     /// `nil` once the workout is over.
     public let next: Next?
 
+    /// The single action matching the stage this projection shows, including stale content.
+    public var control: LiveActivityCommand? {
+        switch clock {
+            case .counting:
+                .pause
+            case .pauseGlyph:
+                .resume
+            case .fixed, .finishedGlyph, .none:
+                nil
+        }
+    }
+
     public init(attributes: WorkoutActivityAttributes, content: WorkoutActivityAttributes.ContentState, isStale: Bool) {
         let name = attributes.workoutName
         let title: Title = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .untitled : .named(name)

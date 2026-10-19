@@ -1,0 +1,44 @@
+{
+  "actions": {
+    "PauseWorkoutIntent": {
+      "fullyQualifiedTypeName": "WorkoutActivity.PauseWorkoutIntent",
+      "isDiscoverable": false,
+      "openAppWhenRun": false,
+      "authenticationPolicy": 0,
+      "supportedModes": 1,
+      "allowedTargets": [
+        {
+          "type": 1
+        }
+      ],
+      "parameters": [
+        {
+          "name": "activityID"
+        },
+        {
+          "name": "generation"
+        }
+      ]
+    },
+    "ResumeWorkoutIntent": {
+      "fullyQualifiedTypeName": "WorkoutActivity.ResumeWorkoutIntent",
+      "isDiscoverable": false,
+      "openAppWhenRun": false,
+      "authenticationPolicy": 0,
+      "supportedModes": 1,
+      "allowedTargets": [
+        {
+          "type": 1
+        }
+      ],
+      "parameters": [
+        {
+          "name": "activityID"
+        },
+        {
+          "name": "generation"
+        }
+      ]
+    }
+  }
+}

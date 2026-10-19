@@ -15,6 +15,20 @@ struct WorkoutActivityDisplayTests {
         .running(Attributes.Running(stage: .work(), stageStart: start, stageEnd: end, next: next))
     }
 
+    @Test(arguments: [
+        (Attributes.Phase.getReady(first: Attributes.HeldStage(stage: .work(), remainingMilliseconds: 10_000)), false, nil),
+        (Self.running(next: .finish), false, LiveActivityCommand.pause),
+        (Self.running(next: .stage(.rest(), end: moment(15))), true, .pause),
+        (Self.running(next: .manualPause), true, .resume),
+        (Self.running(next: .finish), true, nil),
+        (.paused(Attributes.HeldStage(stage: .work(), remainingMilliseconds: 10_000)), false, .resume),
+        (.awaitingUser(next: nil), false, .resume),
+        (.finished, false, nil),
+    ])
+    func test_control_matchesTheDisplayedPhase(phase: Attributes.Phase, isStale: Bool, command: LiveActivityCommand?) {
+        #expect(Self.display(phase, isStale: isStale).control == command)
+    }
+
     @Test
     func test_init_getReady_showsTheFirstStageInFullNext() {
         let display = Self.display(.getReady(first: Attributes.HeldStage(stage: .work(), remainingMilliseconds: 10_000)))

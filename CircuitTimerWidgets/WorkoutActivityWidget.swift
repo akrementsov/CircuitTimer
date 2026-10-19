@@ -9,12 +9,16 @@ import WorkoutActivity
 struct WorkoutActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
-            LockScreenView(display: WorkoutActivityDisplay(context))
+            LockScreenView(
+                display: WorkoutActivityDisplay(context), activityID: context.activityID, generation: context.state.controlGeneration
+            )
                 .activityBackgroundTint(.surface(.screen))
                 .activitySystemActionForegroundColor(.text(.primary))
                 .environment(\.colorScheme, .dark)
         } dynamicIsland: { context in
-            IslandViews.dynamicIsland(WorkoutActivityDisplay(context))
+            IslandViews.dynamicIsland(
+                WorkoutActivityDisplay(context), activityID: context.activityID, generation: context.state.controlGeneration
+            )
         }
     }
 }
