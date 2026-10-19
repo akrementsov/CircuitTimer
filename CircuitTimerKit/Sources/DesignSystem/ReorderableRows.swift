@@ -244,8 +244,8 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
             drag?.fingerYAtLift = fingerY
         }
         drag?.fingerY = fingerY
-        // Commit the destination in the gesture callback: SwiftUI's geometry/onChange callbacks can arrive after
-        // the finger has already lifted, especially for short stage rows.
+        // This update must stay synchronous: SwiftUI's geometry/onChange callbacks can arrive after the finger
+        // has already lifted, especially for short stage rows.
         updateDragPosition()
     }
 
@@ -384,7 +384,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
             recognizer.delegate = self
         }
 
-        @objc private func handle(_ recognizer: UILongPressGestureRecognizer) {
+        @objc func handle(_ recognizer: UILongPressGestureRecognizer) {
             let point = recognizer.location(in: nil)
             switch recognizer.state {
                 case .began:
@@ -460,6 +460,7 @@ private struct LiftedRowTracker: ViewModifier {
         content
             .scaleEffect(scale)
             .offset(y: isLifted ? liftedOffset : shift)
+            // Auto-scroll moves the content under a resting finger, without another fingerMoved callback.
             .onChange(of: isLifted ? liftedOffset : nil) { _, offset in
                 if offset != nil {
                     onPositionChange()

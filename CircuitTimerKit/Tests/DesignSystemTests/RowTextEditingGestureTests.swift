@@ -24,7 +24,7 @@ struct RowTextEditingGestureTests {
 
         // Invoke the registered UIKit target with an ended recognizer: its final point need not have appeared in
         // a preceding .changed event. Dropping first would commit the previous point (or none at all).
-        coordinator.perform(NSSelectorFromString("handle:"), with: EndedLongPress(point: finalPoint))
+        coordinator.handle(EndedLongPress(point: finalPoint))
 
         #expect(droppedAt == finalPoint)
     }

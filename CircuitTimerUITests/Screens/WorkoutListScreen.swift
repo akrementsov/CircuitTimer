@@ -6,6 +6,9 @@ import XCTest
 struct WorkoutListScreen: Screen {
     let app: XCUIApplication
 
+    // Mirrors DesignSystem's .m spacing token; the UI test target imports only UITestContract.
+    private static let cardGap: CGFloat = 12
+
     private var addButton: XCUIElement { app.buttons[AccessibilityID.WorkoutList.add] }
     private var emptyState: XCUIElement { app.staticTexts[AccessibilityID.WorkoutList.empty] }
 
@@ -75,7 +78,7 @@ struct WorkoutListScreen: Screen {
             let above = row(names[index - 1], file: file, line: line)
             row(names[index], file: file, line: line).waitUntilBelow(
                 above,
-                gap: 12,
+                gap: Self.cardGap,
                 description: "\"\(names[index])\" follows \"\(names[index - 1])\"",
                 file: file,
                 line: line

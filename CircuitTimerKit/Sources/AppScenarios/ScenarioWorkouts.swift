@@ -22,6 +22,7 @@ extension AppScenario {
 }
 
 private extension Workout {
+    /// Stage IDs are intentionally shared: stages are identified within each workout, never across workouts.
     static func legDayCopy(_ index: Int) -> Self {
         Workout(
             id: UUID(0xF2_0000 + index),
