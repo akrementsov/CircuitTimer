@@ -9,7 +9,7 @@ enum SnapshotWindow {
     static func firstFrame(
         variant: SnapshotVariant,
         makeRoot: (SnapshotVariant) throws -> SnapshotRoot
-    ) async throws -> (image: UIImage, succeeded: Bool) {
+    ) async throws -> (image: UIImage, succeeded: Bool, environment: [String: Int]) {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         guard version.majorVersion == 27, version.minorVersion == 0, version.patchVersion == 0 else {
             throw SnapshotCaptureFailure("Snapshots require the iOS 27.0 simulator.")
@@ -19,13 +19,16 @@ enum SnapshotWindow {
             throw SnapshotCaptureFailure("Snapshots require a 402×874 pt scene at 3x.")
         }
         let root = try makeRoot(variant)
-        let traits = variant.traits(over: SnapshotViewport.configuration.traits)
+        let forceSRGB = ProcessInfo.processInfo.environment["SNAPSHOT_RASTER_SRGB_TRAITS"] == "1"
+        let baseTraits = variant.traits(over: SnapshotViewport.configuration.traits)
+        let traits = forceSRGB ? baseTraits.modifyingTraits { $0.displayGamut = .SRGB } : baseTraits
         let controller = root.controller
         controller.traitOverrides.userInterfaceStyle = .dark
         controller.traitOverrides.preferredContentSizeCategory = variant.textSize.contentSizeCategory
         controller.traitOverrides.horizontalSizeClass = traits.horizontalSizeClass
         controller.traitOverrides.verticalSizeClass = traits.verticalSizeClass
         controller.traitOverrides.displayScale = SnapshotViewport.scale
+        if forceSRGB { controller.traitOverrides.displayGamut = .SRGB }
 
         let previousKey = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(frame: CGRect(origin: .zero, size: SnapshotViewport.size))
@@ -41,6 +44,7 @@ enum SnapshotWindow {
         window.traitOverrides.horizontalSizeClass = traits.horizontalSizeClass
         window.traitOverrides.verticalSizeClass = traits.verticalSizeClass
         window.traitOverrides.displayScale = SnapshotViewport.scale
+        if forceSRGB { window.traitOverrides.displayGamut = .SRGB }
         window.windowScene = scene
         window.frame = CGRect(origin: .zero, size: SnapshotViewport.size)
         window.rootViewController = controller
@@ -73,7 +77,18 @@ enum SnapshotWindow {
               raster.height == Int(SnapshotViewport.pixelSize.height) else {
             throw SnapshotCaptureFailure("The snapshot raster must be 1206×2622 px.")
         }
-        return (image, succeeded)
+        let environment = [
+            "screenDisplayGamut": scene.screen.traitCollection.displayGamut.rawValue,
+            "windowDisplayGamut": window.traitCollection.displayGamut.rawValue,
+            "rootDisplayGamut": controller.traitCollection.displayGamut.rawValue,
+            "requestedDisplayGamut": traits.displayGamut.rawValue
+        ]
+        if forceSRGB {
+            guard window.traitCollection.displayGamut == .SRGB, controller.traitCollection.displayGamut == .SRGB else {
+                throw SnapshotCaptureFailure("The sRGB trait experiment requires sRGB window and root traits; got \(environment).")
+            }
+        }
+        return (image, succeeded, environment)
     }
 
     private static func activeScene() async throws -> UIWindowScene {

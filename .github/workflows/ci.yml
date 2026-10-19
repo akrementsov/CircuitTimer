@@ -145,6 +145,7 @@ jobs:
         env:
           TEST_RUNNER_SNAPSHOT_RASTER_DIAGNOSTICS: '1'
           TEST_RUNNER_SNAPSHOT_RASTER_STANDARD_RANGE: '1'
+          TEST_RUNNER_SNAPSHOT_RASTER_SRGB_TRAITS: '1'
         run: |
           sw_vers
           sysctl -n machdep.cpu.brand_string || echo '::warning::CPU brand is unavailable on this runner'

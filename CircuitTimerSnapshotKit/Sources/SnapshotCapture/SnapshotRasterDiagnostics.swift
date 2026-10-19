@@ -14,7 +14,9 @@ enum SnapshotRasterDiagnostics {
         key: String,
         reference: UIImage?,
         first: UIImage,
+        firstEnvironment: [String: Int],
         second: UIImage? = nil,
+        secondEnvironment: [String: Int]? = nil,
         secondData: Data? = nil
     ) throws {
         guard ProcessInfo.processInfo.environment["SNAPSHOT_RASTER_DIAGNOSTICS"] == "1" else { return }
@@ -23,10 +25,11 @@ enum SnapshotRasterDiagnostics {
         }
         var report: [String: Any] = [
             "key": key, "runtime": ProcessInfo.processInfo.operatingSystemVersionString,
-            "firstNative": try describe(first)
+            "firstNative": try describe(first), "firstEnvironment": firstEnvironment
         ]
         if let reference { report["reference"] = try describe(reference) }
         if let second { report["secondNative"] = try describe(second) }
+        if let secondEnvironment { report["secondEnvironment"] = secondEnvironment }
         if let secondData {
             guard let decoded = UIImage(data: secondData) else {
                 throw SnapshotCaptureFailure("Raster diagnostics could not decode the comparison PNG.")

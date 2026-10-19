@@ -46,7 +46,9 @@ public func assertFirstFrameSnapshot(
         let diffing = Diffing<UIImage>.image(precision: 1, perceptualPrecision: 1, scale: SnapshotViewport.scale)
         let first = try await SnapshotWindow.firstFrame(variant: variant, makeRoot: makeRoot)
         if first.succeeded, let previous, diffing.diffV2(previous.image, first.image) == nil {
-            try SnapshotRasterDiagnostics.write(key: key, reference: previous.image, first: first.image)
+            try SnapshotRasterDiagnostics.write(
+                key: key, reference: previous.image, first: first.image, firstEnvironment: first.environment
+            )
             try journal.append(key: key, path: reference.relativePath, attempt: attempt, outcome: "passed")
             return
         }
@@ -59,7 +61,8 @@ public func assertFirstFrameSnapshot(
         let secondData = diffing.toData(second.image)
         // Inspect pixels after both captures and reuse the comparison PNG, preserving the capture sequence.
         try SnapshotRasterDiagnostics.write(
-            key: key, reference: previous?.image, first: first.image, second: second.image, secondData: secondData
+            key: key, reference: previous?.image, first: first.image, firstEnvironment: first.environment,
+            second: second.image, secondEnvironment: second.environment, secondData: secondData
         )
         let message = verifySnapshot(
             of: second.image,
