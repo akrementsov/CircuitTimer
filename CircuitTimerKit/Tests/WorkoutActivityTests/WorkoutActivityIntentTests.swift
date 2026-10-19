@@ -1,5 +1,6 @@
 import AppIntents
 import Dependencies
+import Foundation
 import Testing
 import WorkoutActivity
 
@@ -23,6 +24,25 @@ struct WorkoutActivityIntentTests {
             }
         }
         #expect(deliveries.value == [LiveActivityControlRequest(id: 0, command: command, generation: 17)])
+    }
+
+    @Test(arguments: [LiveActivityCommand.pause, .resume])
+    func test_perform_staleDelivery_reportsALocalizedError(command: LiveActivityCommand) async {
+        await withDependencies {
+            $0.liveActivity.deliver = { _, _, _ in .stale }
+        } operation: {
+            do {
+                switch command {
+                    case .pause:
+                        _ = try await PauseWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
+                    case .resume:
+                        _ = try await ResumeWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
+                }
+                Issue.record("A stale Live Activity command must report an error.")
+            } catch {
+                #expect((error as? any LocalizedError)?.errorDescription?.isEmpty == false)
+            }
+        }
     }
 
     @Test(arguments: [LiveActivityControlResult.busy, .failed, .timedOut, .unavailable])

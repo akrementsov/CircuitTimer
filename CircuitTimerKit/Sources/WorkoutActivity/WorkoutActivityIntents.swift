@@ -64,8 +64,10 @@ public struct ResumeWorkoutIntent: LiveActivityIntent {
 
 private func controlResult(_ result: LiveActivityControlResult) throws {
     switch result {
-        case .applied, .stale, .orphanEnded:
+        case .applied, .orphanEnded:
             return
+        case .stale:
+            throw ControlError.stale
         case .busy:
             throw ControlError.busy
         case .timedOut:
@@ -78,12 +80,15 @@ private func controlResult(_ result: LiveActivityControlResult) throws {
 }
 
 private enum ControlError: LocalizedError {
+    case stale
     case busy
     case timedOut
     case unavailable
 
     var errorDescription: String? {
         switch self {
+            case .stale:
+                String(localized: "activity.intent.error.stale", bundle: .module)
             case .busy:
                 String(localized: "The previous workout action is still finishing. Try again shortly.", bundle: .module)
             case .timedOut:
