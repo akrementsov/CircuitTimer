@@ -12,6 +12,11 @@ public enum AccessibilityID {
         public static let save = "editor.save"
         public static let start = "editor.start"
 
+        /// A stage's name field by its section and place, independent of user data.
+        public static func stageName(_ section: StageSection, _ index: Int) -> String {
+            "editor.stageName.\(section.rawValue).\(index)"
+        }
+
         /// A stage's duration field by its place on the screen, which stays put while the stage's name changes.
         public static func stageDuration(_ section: StageSection, _ index: Int) -> String {
             "editor.stageDuration.\(section.rawValue).\(index)"

@@ -43,6 +43,38 @@ struct EditorScreen: Screen {
         return self
     }
 
+    func tapEdit(file: StaticString = #filePath, line: UInt = #line) -> Self {
+        app.buttons["Edit"]
+            .waitUntilHittable("The Edit button", file: file, line: line)
+            .tap()
+        return self
+    }
+
+    func moveTrainingStage(from: Int, to targetIndex: Int, file: StaticString = #filePath, line: UInt = #line) -> Self {
+        let source = app.textFields[AccessibilityID.Editor.stageName(.training, from)]
+            .waitUntilHittable("The source stage", file: file, line: line)
+        let destination = app.textFields[AccessibilityID.Editor.stageName(.training, targetIndex)]
+            .waitUntilHittable("The destination stage", file: file, line: line)
+        // Hold the name itself, leaving the duration's cursor gestures alone.
+        let start = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.6, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
+        return self
+    }
+
+    @discardableResult
+    func assertDuration(
+        _ value: String,
+        in section: StageSection,
+        stage: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Self {
+        app.textFields[AccessibilityID.Editor.stageDuration(section, stage)]
+            .waitUntilValue("The stage's duration", is: value, file: file, line: line)
+        return self
+    }
+
     /// Saves the draft and waits until the screen shows the saved workout.
     func tapSave(file: StaticString = #filePath, line: UInt = #line) -> Self {
         saveButton

@@ -277,7 +277,10 @@ public struct WorkoutEditorView: View {
             ReorderableRows(
                 items: stages,
                 spacing: .zero,
-                isEnabled: store.state.canReorderStages(in: section) && focusedField == nil && rowInteraction.swipedID == nil,
+                // A pending TextField focus callback can arrive after the row has lifted. It must not disable
+                // the recognizer midway through the drag; the lifted row is already disabled.
+                isEnabled: store.state.canReorderStages(in: section)
+                    && (focusedField == nil || rowInteraction.liftedID != nil) && rowInteraction.swipedID == nil,
                 canLift: { _ in true },
                 onRowTap: isEditable && Self.focusesWholeRow ? { focusedField = .stageName($0.id) } : nil,
                 onMove: { send(.stagesMoved(section, IndexSet(integer: $0), $1)) },
