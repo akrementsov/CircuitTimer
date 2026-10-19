@@ -43,7 +43,8 @@ public func assertFirstFrameSnapshot(
         try reference.validateNames()
         let mode = try SnapshotReference.recordMode()
         let previous = try reference.load()
-        let diffing = Diffing<UIImage>.image(precision: 1, perceptualPrecision: 1, scale: SnapshotViewport.scale)
+        let strategy = SnapshotImageComparison.strategy
+        let diffing = strategy.diffing
         let first = try await SnapshotWindow.firstFrame(variant: variant, makeRoot: makeRoot)
         if first.succeeded, let previous, diffing.diffV2(previous.image, first.image) == nil {
             try SnapshotRasterDiagnostics.write(
@@ -74,7 +75,7 @@ public func assertFirstFrameSnapshot(
         )
         let message = verifySnapshot(
             of: second.image,
-            as: .image(precision: 1, perceptualPrecision: 1, scale: SnapshotViewport.scale),
+            as: strategy,
             named: variant.name,
             record: mode,
             snapshotDirectory: reference.directory.path,
