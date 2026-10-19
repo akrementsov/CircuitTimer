@@ -62,7 +62,11 @@ enum SnapshotWindow {
                 guard tabBar?.isHidden == true else { throw SnapshotCaptureFailure("The tab bar must be hidden.") }
         }
         var succeeded = false
-        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: UIGraphicsImageRendererFormat(for: traits)).image { _ in
+        let format = UIGraphicsImageRendererFormat(for: traits)
+        if ProcessInfo.processInfo.environment["SNAPSHOT_RASTER_STANDARD_RANGE"] == "1" {
+            format.preferredRange = .standard
+        }
+        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
             succeeded = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
         guard let raster = image.cgImage, raster.width == Int(SnapshotViewport.pixelSize.width),

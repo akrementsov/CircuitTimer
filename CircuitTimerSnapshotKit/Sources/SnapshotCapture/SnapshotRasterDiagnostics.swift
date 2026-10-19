@@ -11,8 +11,11 @@ enum SnapshotRasterDiagnostics {
     ]
 
     static func write(
-        key: String, reference: UIImage?, first: UIImage,
-        second: UIImage? = nil, secondData: Data? = nil
+        key: String,
+        reference: UIImage?,
+        first: UIImage,
+        second: UIImage? = nil,
+        secondData: Data? = nil
     ) throws {
         guard ProcessInfo.processInfo.environment["SNAPSHOT_RASTER_DIAGNOSTICS"] == "1" else { return }
         guard let artifacts = ProcessInfo.processInfo.environment["SNAPSHOT_ARTIFACTS"], !artifacts.isEmpty else {
