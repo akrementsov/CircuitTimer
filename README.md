@@ -127,6 +127,8 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | `make build-ui-tests` | Builds the app with its UI tests, as `make test-ui` does |
 | `make test-ui` | Builds the app and runs its UI tests on `DESTINATION` |
 | `make build-snapshots` | Builds the snapshot host and tests, as `make test-snapshots` does |
+| `make test-snapshot-kit` | Tests the image comparison, references, journal and environment checks without an app host |
+| `make test-snapshot-contracts` | Tests capture, recording, cancellation and window cleanup in the snapshot host, separately from the PNG matrix |
 | `make test-snapshots` | Compares every snapshot with its reference, in English and in Russian |
 | `make record-snapshots` | Records missing references or those differing beyond the comparison bounds, on `iPhone 17` only |
 | `make ci` | Everything CI runs |
@@ -168,6 +170,11 @@ final class WorkoutTimerUITests: XCTestCase {
 7. **Time stands still.** A scenario's clock never advances, so a started timer stays on its first countdown digit. The timer's logic is tested in the package with `TestStore` and `TestClock`.
 
 ## Snapshot tests
+
+The capture harness has its own tests: `make test-snapshot-kit` runs the package tests, and
+`make test-snapshot-contracts` runs `CircuitTimerSnapshotContractTests` inside the empty snapshot host.
+Contract tests use temporary synthetic references and do not change the screen references below. Run these two commands one at a time per checkout, including across simulator destinations; the Fusion build queue enforces this. Generated contract PNGs are ignored if a process is interrupted. The dedicated ru/de runs must execute their selected language test without skipping it.
+`make test-scripts` also checks the snapshot runner and make targets using fixture result bundles.
 
 `CircuitTimerSnapshotTests` compares screens of the app with reference PNGs. A test describes a screen by its state — the stack, the editor's phase, the data — not by the taps that lead there. The host draws the whole app in that state in a window of iPhone 17's size and compares its first frame with a reference PNG. Drawing and comparing live in `SnapshotCapture`, in the local package `CircuitTimerSnapshotKit`, the only code of ours that depends on SnapshotTesting; what the app's states look like lives in the test target.
 

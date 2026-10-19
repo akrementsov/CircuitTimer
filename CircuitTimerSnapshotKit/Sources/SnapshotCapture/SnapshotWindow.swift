@@ -10,14 +10,9 @@ enum SnapshotWindow {
         variant: SnapshotVariant,
         makeRoot: (SnapshotVariant) throws -> SnapshotRoot
     ) async throws -> (image: UIImage, succeeded: Bool) {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        guard version.majorVersion == 27, version.minorVersion == 0, version.patchVersion == 0 else {
-            throw SnapshotCaptureFailure("Snapshots require the iOS 27.0 simulator.")
-        }
+        try SnapshotViewport.validateRuntime(ProcessInfo.processInfo.operatingSystemVersion)
         let scene = try await activeScene()
-        guard scene.coordinateSpace.bounds.size == SnapshotViewport.size, scene.screen.scale == SnapshotViewport.scale else {
-            throw SnapshotCaptureFailure("Snapshots require a 402×874 pt scene at 3x.")
-        }
+        try SnapshotViewport.validateScene(size: scene.coordinateSpace.bounds.size, scale: scene.screen.scale)
         let root = try makeRoot(variant)
         let traits = variant.traits(over: SnapshotViewport.configuration.traits)
         let controller = root.controller
@@ -51,9 +46,7 @@ enum SnapshotWindow {
         await runLoopTurn()
         try Task.checkCancellation()
         window.layoutIfNeeded()
-        guard window.safeAreaInsets == SnapshotViewport.safeArea else {
-            throw SnapshotCaptureFailure("Snapshots require safe area insets of 62/34 pt; got \(window.safeAreaInsets).")
-        }
+        try SnapshotViewport.validateSafeArea(window.safeAreaInsets)
         switch root.tabBar {
             case .none: break
             case .shown:
@@ -65,10 +58,7 @@ enum SnapshotWindow {
         let image = UIGraphicsImageRenderer(bounds: window.bounds, format: UIGraphicsImageRendererFormat(for: traits)).image { _ in
             succeeded = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
-        guard let raster = image.cgImage, raster.width == Int(SnapshotViewport.pixelSize.width),
-              raster.height == Int(SnapshotViewport.pixelSize.height) else {
-            throw SnapshotCaptureFailure("The snapshot raster must be 1206×2622 px.")
-        }
+        try SnapshotViewport.validateRaster(image.cgImage)
         return (image, succeeded)
     }
 

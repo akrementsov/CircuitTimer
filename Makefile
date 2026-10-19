@@ -44,7 +44,7 @@ PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swif
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
 .PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
-	build-snapshots test-snapshots record-snapshots check-release-app upload ci verify-clean
+	build-snapshots test-snapshots test-snapshot-kit test-snapshot-contracts record-snapshots check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -92,6 +92,30 @@ build-snapshot-kit:
 	cd CircuitTimerSnapshotKit && $(STRICT) xcodebuild build -scheme CircuitTimerSnapshotKit \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
+
+test-snapshot-kit:
+	cd CircuitTimerSnapshotKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/SnapshotKit-$(TEST_RUN).xcresult" \
+		xcodebuild test -scheme CircuitTimerSnapshotKit -destination '$(DESTINATION)' -testLanguage en -testRegion US \
+		-derivedDataPath "$(DERIVED_DATA)/SnapshotKitTests-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+	cd CircuitTimerSnapshotKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(TEST_RESULTS)/SnapshotKit-$(TEST_RUN)-ru.xcresult" \
+		xcodebuild test -scheme CircuitTimerSnapshotKit -destination '$(DESTINATION)' -testLanguage ru -testRegion RU \
+		-derivedDataPath "$(DERIVED_DATA)/SnapshotKitTests-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) \
+		-only-testing:'SnapshotCaptureTests/SnapshotCaptureTests/test_capture_bundleLanguageMismatch_throwsBeforeRoot()'
+	@report=$$(xcrun xcresulttool get test-results summary --path "$(TEST_RESULTS)/SnapshotKit-$(TEST_RUN)-ru.xcresult") && \
+		printf '%s\n' "$$report" | jq -e '.passedTests == 1 and .skippedTests == 0 and .failedTests == 0' > /dev/null
+
+test-snapshot-contracts:
+	scripts/run-tests.sh "$(TEST_RESULTS)/SnapshotContracts-$(TEST_RUN).xcresult" \
+		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
+		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage en -testRegion US \
+		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
+	scripts/run-tests.sh "$(TEST_RESULTS)/SnapshotContracts-$(TEST_RUN)-de.xcresult" \
+		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
+		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage de -testRegion DE \
+		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) \
+		-only-testing:CircuitTimerSnapshotContractTests/SnapshotLanguageContractTests
+	@report=$$(xcrun xcresulttool get test-results summary --path "$(TEST_RESULTS)/SnapshotContracts-$(TEST_RUN)-de.xcresult") && \
+		printf '%s\n' "$$report" | jq -e '.passedTests == 1 and .skippedTests == 0 and .failedTests == 0' > /dev/null
 
 build-package:
 	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme CircuitTimerKit-Package \
@@ -249,7 +273,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint test-scripts check-resolved test build-snapshot-kit build-ui-tests test-ui build-snapshots test-snapshots
+ci: lint test-scripts check-resolved test build-snapshot-kit test-snapshot-kit build-ui-tests test-ui build-snapshots test-snapshot-contracts test-snapshots
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

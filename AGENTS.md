@@ -72,10 +72,12 @@ Layering:
 | `make resolve` | Re-resolves the three lockfiles: both packages, then the project through the `CircuitTimer` and `CircuitTimerSnapshots` schemes |
 | `make test-ui` | Builds the app and runs its UI tests on `DESTINATION`; the result bundle and log go to `.build/TestResults/UITests-<run>.{xcresult,log}` and DerivedData to `.build/DerivedData/UITests-<run>`, where `TEST_RUN` (`iPhone-17-2-27.0` for `iPhone 17 #2` on 27.0) comes from `DESTINATION`. `UI_TEST_WORKERS` (1 by default) sets Xcode's parallel workers |
 | `make build-snapshot-kit` | Builds `CircuitTimerSnapshotKit` on its own with warnings as errors, as `build-package` does for `CircuitTimerKit` |
+| `make test-snapshot-kit` | Tests `SnapshotCapture` with warnings as errors, without an app host; bundle `SnapshotKit-<run>` and DerivedData `SnapshotKitTests-<run>` |
+| `make test-snapshot-contracts` | Runs app-hosted capture contract tests separately from the screen matrix; bundle `SnapshotContracts-<run>`, sharing `Snapshots-<run>` DerivedData |
 | `make build-snapshots` | Builds the snapshot host and tests for `DESTINATION` exactly as `make test-snapshots` does, into its DerivedData `.build/DerivedData/Snapshots-<run>`, with `<run>` as in `make test-ui`, so a build error shows apart from failing snapshots |
 | `make test-snapshots` | Compares every snapshot with its reference on `DESTINATION` (an iPhone 17 on iOS 27.0), building first if needed, in one test process per language of `SNAPSHOT_LANGUAGES` (`en ru`, never empty) and text size (`large`, `ax5`); never writes a reference and refuses flags that select or repeat tests in `TEST_FLAGS` or `XCODEBUILD_FLAGS`. `scripts/check-snapshot-run.sh` then fails a run on another device, platform or runtime, a reference or applicable test function left unchecked, a duplicate test function name, a case that did not compare, a test without text sizes, a process category that differs from its argument, or the combined language matrices running different cases; it prints the failure of every case that errored or left no journal line, the runtime build and the snapshots that matched only on the second mount. Result bundles, logs and the images that differ go to `.build/TestResults/Snapshots-<run>-<language>-<size>*` |
 | `make record-snapshots` | Only on `iPhone 17` / iOS 27.0, outside CI and with no uncommitted change under `CircuitTimerSnapshotTests/__Snapshots__`: writes the references that are missing or differ beyond the comparison bounds, leaves matching ones untouched (including differences within the bounds), accepts a failed case only where it confirmed writing that case's reference, compares again and lists the new references |
-| `make ci` | `lint`, `test-scripts`, `check-resolved`, `test`, `build-snapshot-kit`, `build-ui-tests`, `test-ui`, `build-snapshots`, `test-snapshots` |
+| `make ci` | `lint`, `test-scripts`, `check-resolved`, `test`, `build-snapshot-kit`, `test-snapshot-kit`, `build-ui-tests`, `test-ui`, `build-snapshots`, `test-snapshot-contracts`, `test-snapshots` |
 | `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
 | `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
 | `make check-release-app` | Fails if a file of the archived app names a UI test scenario's type, module, launch key or fixture |
@@ -180,6 +182,8 @@ How to add one, step by step: README › UI tests.
 - TipKit keeps its configured datastore on the device; the UI tests hide tips with the `-com.apple.TipKit.HideAllTips 1` launch argument.
 
 ## Snapshot tests
+
+- Harness regression tests run separately from the 16-PNG screen matrix: the package's `SnapshotCaptureTests` and the app-hosted `CircuitTimerSnapshotContractTests`. The latter shares only the screen tests' `Support` sources and uses synthetic references it removes after every case. Keep contract tests out of `CircuitTimerSnapshots`, whose run checker requires every case to correspond to a screen reference. Environment overrides are scoped and restored; the contract suite is serialized because UIKit windows and process environment belong to the process. Run these two commands one at a time per checkout (the Fusion build queue enforces this): temporary reference directories are shared across simulator destinations. Their generated PNGs are ignored if a process is interrupted. Dedicated ru/de processes fail unless their selected language test passes without a skip.
 
 How to add one, step by step: README › Snapshot tests.
 

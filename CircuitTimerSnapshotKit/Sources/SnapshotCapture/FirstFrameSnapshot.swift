@@ -29,9 +29,26 @@ public func assertFirstFrameSnapshot(
     sourceLocation: SourceLocation,
     makeRoot: (SnapshotVariant) throws -> SnapshotRoot
 ) async throws {
-    let processLanguage = Locale.preferredLanguages.first.flatMap {
-        Locale.Language(identifier: $0).languageCode?.identifier
-    } ?? "unknown"
+    try await assertFirstFrameSnapshot(
+        textSize: textSize,
+        testName: testName,
+        filePath: filePath,
+        sourceLocation: sourceLocation,
+        firstFrame: { variant in
+            try await SnapshotWindow.firstFrame(variant: variant, makeRoot: makeRoot)
+        }
+    )
+}
+
+@MainActor
+func assertFirstFrameSnapshot(
+    textSize: SnapshotTextSize,
+    testName: String,
+    filePath: StaticString,
+    sourceLocation: SourceLocation,
+    firstFrame: @MainActor (SnapshotVariant) async throws -> (image: UIImage, succeeded: Bool)
+) async throws {
+    let processLanguage = SnapshotLanguage.languageCode(in: Locale.preferredLanguages) ?? "unknown"
     var key = "\(testName).\(processLanguage)-\(textSize.rawValue)"
     let reference = SnapshotReference(filePath: filePath, testName: testName, variantName: "\(processLanguage)-\(textSize.rawValue)")
     let journal = SnapshotJournal()
@@ -46,14 +63,14 @@ public func assertFirstFrameSnapshot(
         let previous = try reference.load()
         let strategy = SnapshotImageComparison.strategy
         let diffing = strategy.diffing
-        let first = try await SnapshotWindow.firstFrame(variant: variant, makeRoot: makeRoot)
+        let first = try await firstFrame(variant)
         if first.succeeded, let previous, diffing.diffV2(previous.image, first.image) == nil {
             try journal.append(key: key, path: reference.relativePath, attempt: attempt, outcome: "passed")
             return
         }
 
         attempt = "second"
-        let second = try await SnapshotWindow.firstFrame(variant: variant, makeRoot: makeRoot)
+        let second = try await firstFrame(variant)
         guard second.succeeded else {
             throw SnapshotCaptureFailure("drawHierarchy failed on the second mount.")
         }

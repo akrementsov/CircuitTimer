@@ -24,5 +24,10 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "SnapshotCaptureTests",
+            dependencies: ["SnapshotCapture"],
+            swiftSettings: strictSettings
+        ),
     ]
 )

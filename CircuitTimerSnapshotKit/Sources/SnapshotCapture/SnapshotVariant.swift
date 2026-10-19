@@ -7,13 +7,15 @@ public enum SnapshotLanguage: String, Sendable {
     case english = "en"
     case russian = "ru"
 
+    static func languageCode(in preferredLanguages: [String]) -> String? {
+        preferredLanguages.first.flatMap {
+            Locale.Language(identifier: $0).languageCode?.identifier
+        }
+    }
+
     public static func current() throws -> Self {
-        let processLanguage = Locale.preferredLanguages.first.flatMap {
-            Locale.Language(identifier: $0).languageCode?.identifier
-        }
-        let bundleLanguage = Bundle.main.preferredLocalizations.first.flatMap {
-            Locale.Language(identifier: $0).languageCode?.identifier
-        }
+        let processLanguage = languageCode(in: Locale.preferredLanguages)
+        let bundleLanguage = languageCode(in: Bundle.main.preferredLocalizations)
         guard let processLanguage, let language = Self(rawValue: processLanguage),
               bundleLanguage == processLanguage else {
             throw LanguageError(process: processLanguage, bundle: bundleLanguage)
