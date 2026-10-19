@@ -29,4 +29,48 @@ run python3 "$root/scripts/check-activity-intents.py" "$app"
 expect_status 1
 expect_in "$work/out" "CircuitTimerWidgets.appex"
 
+describe "an incorrect execution policy cannot run a control in the wrong process"
+fixture
+python3 - "$app/Metadata.appintents/extract.actionsdata" <<'PYDATA'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+data["actions"]["PauseWorkoutIntent"]["allowedTargets"] = []
+path.write_text(json.dumps(data))
+PYDATA
+run python3 "$root/scripts/check-activity-intents.py" "$app"
+expect_status 1
+expect_in "$work/out" "PauseWorkoutIntent.allowedTargets"
+
+describe "a missing generation parameter cannot bypass the stale-card fence"
+fixture
+python3 - "$app/Metadata.appintents/extract.actionsdata" <<'PYDATA'
+import json
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+action = data["actions"]["ResumeWorkoutIntent"]
+action["parameters"] = [parameter for parameter in action["parameters"] if parameter["name"] != "generation"]
+path.write_text(json.dumps(data))
+PYDATA
+run python3 "$root/scripts/check-activity-intents.py" "$app"
+expect_status 1
+expect_in "$work/out" "activityID and generation"
+
+describe "malformed and missing metadata fail with a nonzero result"
+for malformed in yes no; do
+	fixture
+	if [ "$malformed" = yes ]; then
+		printf '%s\n' '{broken' > "$app/Metadata.appintents/extract.actionsdata"
+	else
+		rm "$app/Metadata.appintents/extract.actionsdata"
+	fi
+	run python3 "$root/scripts/check-activity-intents.py" "$app"
+	expect_status 1
+	expect_in "$work/out" "activity intents:"
+done
+
 finish

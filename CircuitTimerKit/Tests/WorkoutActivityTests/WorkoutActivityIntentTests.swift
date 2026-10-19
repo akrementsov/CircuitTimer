@@ -1,8 +1,9 @@
+@testable import WorkoutActivity
+
 import AppIntents
 import Dependencies
 import Foundation
 import Testing
-import WorkoutActivity
 
 @Suite
 struct WorkoutActivityIntentTests {
@@ -26,33 +27,81 @@ struct WorkoutActivityIntentTests {
         #expect(deliveries.value == [LiveActivityControlRequest(id: 0, command: command, generation: 17)])
     }
 
-    @Test(arguments: [LiveActivityCommand.pause, .resume])
-    func test_perform_staleDelivery_reportsALocalizedError(command: LiveActivityCommand) async {
+    @Test(arguments: [LiveActivityCommand.pause, .resume], [
+        LiveActivityControlResult.stale, .busy, .timedOut, .unavailable, .failed,
+    ])
+    func test_perform_failedDelivery_reportsTheExpectedMessage(
+        command: LiveActivityCommand, result: LiveActivityControlResult
+    ) async {
         await withDependencies {
-            $0.liveActivity.deliver = { _, _, _ in .stale }
+            $0.liveActivity.deliver = { _, _, _ in result }
         } operation: {
             do {
-                switch command {
-                    case .pause:
-                        _ = try await PauseWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
-                    case .resume:
-                        _ = try await ResumeWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
-                }
-                Issue.record("A stale Live Activity command must report an error.")
+                try await perform(command)
+                Issue.record("A failed Live Activity command must report an error.")
             } catch {
-                #expect((error as? any LocalizedError)?.errorDescription?.isEmpty == false)
+                #expect((error as? any LocalizedError)?.errorDescription == Self.message(for: result))
             }
         }
     }
 
-    @Test(arguments: [LiveActivityControlResult.busy, .failed, .timedOut, .unavailable])
-    func test_perform_failedDelivery_doesNotReportSuccess(result: LiveActivityControlResult) async {
-        await withDependencies {
+    @Test(arguments: [LiveActivityCommand.pause, .resume], [LiveActivityControlResult.applied, .orphanEnded])
+    func test_perform_successfulDelivery_doesNotThrow(command: LiveActivityCommand, result: LiveActivityControlResult) async throws {
+        try await withDependencies {
             $0.liveActivity.deliver = { _, _, _ in result }
         } operation: {
-            await #expect(throws: (any Error).self) {
+            try await perform(command)
+        }
+    }
+
+    @Test(arguments: [LiveActivityCommand.pause, .resume])
+    func test_perform_cancelledDelivery_preservesCancellation(command: LiveActivityCommand) async {
+        await withDependencies {
+            $0.liveActivity.deliver = { _, _, _ in .cancelled }
+        } operation: {
+            await #expect(throws: CancellationError.self) { try await perform(command) }
+        }
+    }
+
+    @Test(arguments: [
+        ("activity.intent.error.stale", "Состояние тренировки изменилось. Повторите действие на обновлённой карточке."),
+        (
+            "The previous workout action is still finishing. Try again shortly.",
+            "Предыдущее действие ещё выполняется. Повторите чуть позже."
+        ),
+        (
+            "The workout action is taking longer than expected. Check the timer in the app.",
+            "Действие занимает больше времени, чем ожидалось. Проверьте таймер в приложении."
+        ),
+        ("The workout could not be updated. Open the timer in the app.", "Не удалось обновить тренировку. Откройте таймер в приложении."),
+    ])
+    func test_errorResources_russian_containsTheExpectedTranslation(key: String, expected: String) throws {
+        let path = try #require(Bundle.module.path(forResource: "ru", ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        #expect(bundle.localizedString(forKey: key, value: nil, table: nil) == expected)
+    }
+
+    private func perform(_ command: LiveActivityCommand) async throws {
+        switch command {
+            case .pause:
                 _ = try await PauseWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
-            }
+            case .resume:
+                _ = try await ResumeWorkoutIntent(activityID: "rendered-activity", generation: 17).perform()
+        }
+    }
+
+    private static func message(for result: LiveActivityControlResult) -> String {
+        switch result {
+            case .stale:
+                "The workout has changed. Try again from the updated card."
+            case .busy:
+                "The previous workout action is still finishing. Try again shortly."
+            case .timedOut:
+                "The workout action is taking longer than expected. Check the timer in the app."
+            case .unavailable, .failed:
+                "The workout could not be updated. Open the timer in the app."
+            default:
+                "Unexpected outcome in the failure table"
         }
     }
 }

@@ -116,7 +116,8 @@ struct TimerLiveActivityTests {
         await timer.store.finish()
 
         #expect(timer.calls.value == [.end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
-        // A record completion after close must not publish another card.
+        // Neither record completion nor late readiness may publish after the owner ended.
+        #expect(timer.store.state.activityControls?.generation == 0)
         #expect(activity.syncs.value.isEmpty)
     }
 
@@ -142,8 +143,24 @@ struct TimerLiveActivityTests {
         await timer.store.finish()
 
         #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
+        #expect(timer.store.state.activityControls?.generation == 1)
         // The close and its record write sync; the finish choice returns early.
         #expect(activity.syncs.value.map(\.revision) == [1, 2])
+    }
+
+    @Test
+    func test_activityRequestsReady_ownerAlreadyClosing_doesNotPublishOrWrite() async {
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        state.activityControls = WorkoutTimerFeature.ActivityControlState(isEnding: true, generation: 7)
+        let timer = TimerHarness(state)
+        let activity = timer.recordActivity()
+        await timer.send(.internal(.activityRequestsReady))
+        await timer.send(.view(.notificationPreferencesChanged))
+        await timer.store.finish()
+        #expect(timer.store.state.activityControls?.isReady == false)
+        #expect(timer.store.state.activityControls?.generation == 7)
+        #expect(activity.syncs.value.isEmpty)
+        #expect(timer.writes.value.isEmpty)
     }
 
     private static func stage(_ content: Content) -> WorkoutActivityAttributes.Stage? {

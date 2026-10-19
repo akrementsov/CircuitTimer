@@ -21,8 +21,9 @@ struct ContentStateTests {
         var run = makeRun(makePausedWorkout())
         run.start(at: origin)
 
-        let content = Content(run: run, at: moment(3))
+        let content = Content(run: run, at: moment(3), controlGeneration: 17)
 
+        #expect(content.controlGeneration == 17)
         #expect(content.phase == .running(Attributes.Running(
             stage: .work(),
             stageStart: origin,
@@ -130,7 +131,7 @@ struct ContentStateTests {
             stageStart: origin,
             stageEnd: moment(10),
             next: .stage(.rest(cyrillic), end: moment(15))
-        )))
+        )), controlGeneration: 17)
 
         let size = try Attributes(workoutName: cyrillic).encodedSize(with: content)
         let emojiSize = try Attributes(workoutName: emoji).encodedSize(with: content)

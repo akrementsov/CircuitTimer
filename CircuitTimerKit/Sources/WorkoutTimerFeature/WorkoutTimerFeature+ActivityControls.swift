@@ -45,7 +45,8 @@ extension WorkoutTimerFeature {
         if case let .internal(.clockFailed(generation)) = action, generation == before.clockGeneration {
             changed = true
         }
-        if case .internal(.activityRequestReceived) = action, state.activityControls?.pending?.result == .applied {
+        if case let .internal(.activityRequestReceived(request)) = action,
+           state.activityControls?.pending?.id == request.id, state.activityControls?.pending?.result == .applied {
             changed = true
         }
         if changed { state.activityControls?.generation += 1 }

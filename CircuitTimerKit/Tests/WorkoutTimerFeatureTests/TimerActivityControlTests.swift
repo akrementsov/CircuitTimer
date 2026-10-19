@@ -115,7 +115,7 @@ struct TimerActivityControlTests {
         state.$isSoundOn = SharedReader(value: false)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let runningTimer = TimerHarness(state, notifications: true)
-        _ = runningTimer.recordActivity()
+        let activity = runningTimer.recordActivity()
         let writes = holdRecordWrites(runningTimer)
         let acknowledgements = recordAcknowledgements(runningTimer)
         let notificationGate = AsyncStream<Void>.makeStream()
@@ -157,6 +157,14 @@ struct TimerActivityControlTests {
         #expect(await iterator.next() == .applied)
         #expect(requests.value.count == 1)
         #expect(requests.value.first?.isEmpty == (command == .pause))
+        #expect(runningTimer.store.state.activityControls?.generation == 8)
+        if command == .pause {
+            #expect(runningTimer.store.state.snapshot.status == .paused)
+            #expect(activity.syncs.value.last?.content == WorkoutActivityAttributes.ContentState(
+                phase: .paused(.init(stage: .init(kind: .work, name: "Stage 1"), remainingMilliseconds: 7_000)),
+                controlGeneration: 8
+            ))
+        }
         if command == .resume { #expect(runningTimer.store.state.notificationFootnote == "timer.notifications.failed") }
         writes.finish()
         await runningTimer.recordSaved(revision: 1)
@@ -188,14 +196,30 @@ struct TimerActivityControlTests {
         }
         await timer.recordSaved(revision: 2)
         #expect(activity.syncs.value.isEmpty)
+        await timer.store.send(.view(.playPauseButtonTapped)) {
+            $0.run.pause(at: origin)
+            $0.settle(at: origin)
+            $0.clockGeneration = 3
+            $0.clockAnchor = nil
+            $0.requestedAwake = false
+            $0.awakeRevision = 2
+            $0.activityControls?.generation = 1
+            $0.recordSync = .pending(revision: 3, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+        }
+        await timer.recordSaved(revision: 3)
+        #expect(activity.syncs.value.isEmpty)
 
         registration.continuation.finish()
         await timer.receive(.internal(.activityRequestsReady)) { $0.activityControls?.isReady = true }
-        #expect(timer.store.state.clockGeneration == 2)
+        #expect(timer.store.state.clockGeneration == 3)
         await subscription.cancel()
         await clockEffect.cancel()
         await timer.store.finish()
         #expect(activity.revisionsTaken.value == 1)
+        #expect(activity.syncs.value.last?.content == WorkoutActivityAttributes.ContentState(
+            phase: .paused(.init(stage: .init(kind: .work, name: "Stage 1"), remainingMilliseconds: 7_000)),
+            controlGeneration: 1
+        ))
     }
 
     @Test(arguments: [LiveActivitySyncResult.Outcome.failed, .superseded])
@@ -234,10 +258,10 @@ struct TimerActivityControlTests {
 
     @Test(arguments: [
         (TimerPhase.startCountdown, LiveActivityCommand.resume),
-        (.idle, .resume), (.finished, .resume), (.running, .resume), (.paused, .pause),
+        (.idle, .resume), (.finished, .resume), (.running, .resume), (.paused, .pause), (.awaitingUser, .pause),
     ])
     func test_command_incompatiblePhase_doesNotStartSkipOrWrite(phase: TimerPhase, command: LiveActivityCommand) async {
-        var state = WorkoutTimerFeature.State.fixture(phase)
+        var state = WorkoutTimerFeature.State.fixture(phase, schedule: phase == .awaitingUser ? Schedules.withPause : Schedules.workRest)
         state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, generation: 7)
         let timer = TimerHarness(state)
         _ = timer.recordActivity()

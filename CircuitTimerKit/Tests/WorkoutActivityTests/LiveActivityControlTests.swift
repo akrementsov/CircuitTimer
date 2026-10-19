@@ -126,6 +126,55 @@ struct LiveActivityControlTests {
     }
 
     @Test
+    func test_deliver_twoOwners_admitAndCompleteIndependently() async throws {
+        let coordinator = LiveActivityCoordinator(transport: fake.transport)
+        let first = await coordinator.requests(owner: Self.owner)
+        let second = await coordinator.requests(owner: Self.other)
+        var firstIterator = first.makeAsyncIterator()
+        var secondIterator = second.makeAsyncIterator()
+        await show(coordinator)
+        await show(coordinator, owner: Self.other)
+
+        let firstDelivery = Task { await deliver(coordinator) }
+        let firstRequest = try #require(await firstIterator.next())
+        let secondDelivery = Task { await deliver(coordinator, activityID: "activity-2", command: .pause) }
+        let secondRequest = try #require(await secondIterator.next())
+        #expect(secondRequest.command == .pause)
+        #expect(await deliver(coordinator) == .busy)
+        #expect(await deliver(coordinator, activityID: "activity-2") == .busy)
+
+        await coordinator.requestHandled(owner: Self.other, requestID: secondRequest.id, result: .applied)
+        #expect(await secondDelivery.value == .applied)
+        #expect(await deliver(coordinator) == .busy)
+        await coordinator.requestHandled(owner: Self.owner, requestID: firstRequest.id, result: .stale)
+        #expect(await firstDelivery.value == .stale)
+    }
+
+    @Test
+    func test_deliver_parallelOrphanTaps_coalesceThePhysicalRemoval() async {
+        let gate = Gate()
+        fake.presence.setValue(["orphan": .alive])
+        fake.endGate.setValue(gate)
+        let lookups = AsyncStream<Void>.makeStream()
+        var transport = fake.transport
+        let allIDs = transport.allIDs
+        transport.allIDs = {
+            lookups.continuation.yield()
+            return allIDs()
+        }
+        let coordinator = LiveActivityCoordinator(transport: transport)
+        let first = Task { await deliver(coordinator, activityID: "orphan") }
+        await lookups.stream.next()
+        await gate.entered.next()
+        let second = Task { await deliver(coordinator, activityID: "orphan") }
+        await lookups.stream.next()
+        gate.open()
+        #expect(await first.value == .orphanEnded)
+        #expect(await second.value == .orphanEnded)
+        #expect(fake.calls.value == [.end("orphan", nil, .immediate)])
+    }
+
+    @Test
     func test_requests_replacementClosesOldStream_andKeepsNewSubscription() async throws {
         let coordinator = LiveActivityCoordinator(transport: fake.transport)
         let first = await coordinator.requests(owner: Self.owner)
