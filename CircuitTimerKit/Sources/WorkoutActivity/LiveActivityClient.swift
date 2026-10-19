@@ -33,6 +33,16 @@ public struct LiveActivityClient: Sendable {
     public var end: @Sendable (_ owner: UUID) async -> Void
     /// Removes the activities of earlier processes.
     public var endOrphans: @Sendable () async -> Void
+    /// Subscribes the live timer before its first card is published.
+    public var requests: @Sendable (_ owner: UUID) async -> AsyncStream<LiveActivityControlRequest> = { _ in
+        AsyncStream { $0.finish() }
+    }
+    public var deliver: @Sendable (
+        _ activityID: String, _ command: LiveActivityCommand, _ generation: Int
+    ) async -> LiveActivityControlResult = { _, _, _ in .unavailable }
+    public var requestHandled: @Sendable (
+        _ owner: UUID, _ requestID: Int, _ result: LiveActivityControlResult
+    ) async -> Void = { _, _, _ in }
 }
 
 extension LiveActivityClient: DependencyKey {
@@ -54,7 +64,10 @@ extension LiveActivityClient: DependencyKey {
                 @Dependency(\.continuousClock) var clock
                 await coordinator.end(owner: owner, clock: clock)
             },
-            endOrphans: { await coordinator.endOrphans() }
+            endOrphans: { await coordinator.endOrphans() },
+            requests: { _ in AsyncStream { $0.finish() } },
+            deliver: { _, _, _ in .unavailable },
+            requestHandled: { _, _, _ in }
         )
     }()
 
@@ -63,7 +76,10 @@ extension LiveActivityClient: DependencyKey {
         nextRevision: { 1 },
         sync: { _, _, _, _ in nil },
         end: { _ in },
-        endOrphans: {}
+        endOrphans: {},
+        requests: { _ in AsyncStream { $0.finish() } },
+        deliver: { _, _, _ in .unavailable },
+        requestHandled: { _, _, _ in }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()

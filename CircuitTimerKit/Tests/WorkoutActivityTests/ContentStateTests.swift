@@ -7,6 +7,16 @@ import WorkoutDomain
 @Suite
 struct ContentStateTests {
     @Test
+    func test_coding_controlGeneration_survivesActivityDelivery() throws {
+        let data = Data(#"{"phase":{"finished":{}},"controlGeneration":17}"#.utf8)
+        let content = try JSONDecoder().decode(Content.self, from: data)
+        let encoded = try JSONEncoder().encode(content)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+        #expect(object["controlGeneration"] as? Int == 17)
+    }
+
+    @Test
     func test_init_runningStage_carriesItsBoundariesAndTheNextStage() {
         var run = makeRun(makePausedWorkout())
         run.start(at: origin)
