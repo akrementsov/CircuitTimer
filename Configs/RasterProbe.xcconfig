@@ -1,0 +1,4 @@
+#include "SnapshotHost.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = $(APP_BUNDLE_ID).rasterprobe
+INFOPLIST_KEY_CFBundleDisplayName = Raster Probe

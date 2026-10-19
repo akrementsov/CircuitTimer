@@ -3,13 +3,19 @@ import UIKit
 
 @MainActor
 enum SnapshotWindow {
+    struct Frame {
+        let image: UIImage
+        let succeeded: Bool
+        let environment: [String: Int]
+    }
+
     // One startup budget for the process, including both mounts, without mutable shared state.
     private static let activationDeadline = ContinuousClock.now.advanced(by: .seconds(10))
 
     static func firstFrame(
         variant: SnapshotVariant,
         makeRoot: (SnapshotVariant) throws -> SnapshotRoot
-    ) async throws -> (image: UIImage, succeeded: Bool, environment: [String: Int]) {
+    ) async throws -> Frame {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         guard version.majorVersion == 27, version.minorVersion == 0, version.patchVersion == 0 else {
             throw SnapshotCaptureFailure("Snapshots require the iOS 27.0 simulator.")
@@ -88,7 +94,7 @@ enum SnapshotWindow {
                 throw SnapshotCaptureFailure("The sRGB trait experiment requires sRGB window and root traits; got \(environment).")
             }
         }
-        return (image, succeeded, environment)
+        return Frame(image: image, succeeded: succeeded, environment: environment)
     }
 
     private static func activeScene() async throws -> UIWindowScene {

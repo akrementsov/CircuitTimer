@@ -50,7 +50,7 @@ jobs:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 155
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@v7
 
@@ -99,6 +99,22 @@ jobs:
               '.devices[$rt][]? | select(.name == $name) | .udid' | head -1)
           [ -n "$udid" ] || { echo "::error::No $name on iOS $os"; xcrun simctl list devices available; exit 1; }
           xcrun simctl bootstatus "$udid" -b
+
+      # Temporary standalone primitive experiment, before the slower feature builds.
+      - name: Run the raster primitive probe
+        id: raster-probe
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 10
+        run: make raster-probe
+
+      - name: Keep the raster primitive probe
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v7
+        with:
+          name: raster-primitive-probe
+          path: .build/TestResults/RasterProbe-*
+          if-no-files-found: warn
 
       # A runner that still hangs before connecting tests nothing, so scripts/run-tests.sh retries it once; a failing
       # package test gets no retry.
