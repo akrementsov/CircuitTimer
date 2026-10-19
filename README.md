@@ -17,9 +17,9 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 ## Architecture
 
-All code lives in one local Swift package, `CircuitTimerKit`. The Xcode project is a thin shell that launches `AppFeature`, configures TipKit and installs the injected notification presentation delegate before the UI starts.
+The app's code lives in one local Swift package, `CircuitTimerKit`; a second one, `CircuitTimerSnapshotKit`, holds only `SnapshotCapture` for the snapshot tests. The Xcode project is a thin shell that launches `AppFeature`, configures TipKit and installs the injected notification presentation delegate before the UI starts.
 
-The app and its widget extension are thin targets over the package's modules, which form four layers; a module imports only from the layers below it:
+The app and its widget extension are thin targets over `CircuitTimerKit`'s modules, which form four layers; a module imports only from the layers below it:
 
 ```mermaid
 flowchart TD
@@ -69,7 +69,7 @@ flowchart TD
     Widgets --> DesignSystem
 ```
 
-Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. Also left out are `UITestContract`, which the features and the UI tests share, and the Debug-only `AppScenarios` above the features (see [UI tests](#ui-tests)). `Package.swift` is the exact list.
+Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. Also left out are `UITestContract`, which the features and the UI tests share, and the Debug-only `AppScenarios` above the features (see [UI tests](#ui-tests)). `CircuitTimerKit/Package.swift` is the exact list.
 
 | Module | Layer | Responsibility |
 |---|---|---|
@@ -86,6 +86,8 @@ Not drawn, to keep the picture readable: `AppFeature`, the composition root, als
 | `WorkoutDomain` | Domain | Workout model, normalization limits, the linear schedule and its fingerprint, and the `WorkoutRun` timer engine. Foundation and CryptoKit only, so the widget can use it. |
 | `UITestContract` | Core | The accessibility identifiers the app and its UI tests share and, in Debug, the scenario names, launch keys and fixture names the tests read. No dependencies. |
 | `AppScenarios` | App, Debug only | Each UI test scenario: its workouts and a value for every dependency the app reads, none of them live. The app builds its store from one when a UI test asks. |
+
+Outside these layers, `SnapshotCapture`, in the separate package `CircuitTimerSnapshotKit`, serves only the snapshot tests and is the only code of ours that depends on SnapshotTesting: the snapshot variants, mounting a screen's root in its own window, its first frame, the bounded comparison with one fresh remount, references and the run journal. It imports none of our modules, and the app and the widget never link it (see [Snapshot tests](#snapshot-tests)).
 
 Features never import each other, Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
@@ -124,6 +126,9 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | `make build-app` | Builds the app for the simulator |
 | `make build-ui-tests` | Builds the app with its UI tests, as `make test-ui` does |
 | `make test-ui` | Builds the app and runs its UI tests on `DESTINATION` |
+| `make build-snapshots` | Builds the snapshot host and tests, as `make test-snapshots` does |
+| `make test-snapshots` | Compares every snapshot with its reference, in English and in Russian |
+| `make record-snapshots` | Records the references that are missing or differ, on `iPhone 17` only |
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
 
@@ -162,6 +167,38 @@ final class WorkoutTimerUITests: XCTestCase {
 6. **Run.** `make test-ui` runs on `iPhone 17`; another simulator takes its own result bundle, log and DerivedData, for example `make test-ui DESTINATION='platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'`. Runs on two simulators may overlap only after one run on each has finished alone; each first run is a cold build and its DerivedData takes several GB. `scripts/report-test-results.sh .build/TestResults/*.xcresult` prints failures, flaky tests and the slowest tests. More than one Xcode worker (`UI_TEST_WORKERS`) runs only on CI.
 7. **Time stands still.** A scenario's clock never advances, so a started timer stays on its first countdown digit. The timer's logic is tested in the package with `TestStore` and `TestClock`.
 
+## Snapshot tests
+
+`CircuitTimerSnapshotTests` compares screens of the app with reference PNGs. A test describes a screen by its state — the stack, the editor's phase, the data — not by the taps that lead there. The host draws the whole app in that state in a window of iPhone 17's size and compares its first frame with a reference PNG. Drawing and comparing live in `SnapshotCapture`, in the local package `CircuitTimerSnapshotKit`, the only code of ours that depends on SnapshotTesting; what the app's states look like lives in the test target.
+
+```swift
+extension SnapshotTests {
+    @MainActor
+    @Suite
+    struct WorkoutEditorSnapshotTests {
+        @Test(arguments: SnapshotTextSize.allCases)
+        func test_editor_editing_matchesReference(textSize: SnapshotTextSize) async throws {
+            try await assertAppSnapshot(textSize: textSize) { language in
+                .editing(SnapshotFixtures.editorWorkout(language: language))
+            }
+        }
+    }
+}
+```
+
+Both images are normalized to 8-bit sRGB for comparison. Their dimensions and alpha bytes must match exactly. RGB channels may differ by at most 2/255 on at most 1.25% of the pixels; exceeding either limit fails the test. These bounds cover the measured host-dependent edge and glass rendering differences. The same criterion applies to both mounts; PNG recording keeps the renderer's original output.
+
+### How to add a snapshot
+
+1. **State.** Build the `AppFeature.State` the screen shows once its transitions have finished, with a factory in `Support/AppFeature+SnapshotStates.swift` (`list`, `failedList`, `viewing`, `editing`) or a new one there. Set the Workouts stack's `path` and the editor's `phase` directly; `@testable import` reaches their internal setters. Never `send` actions to get there. Data comes from `SnapshotFixtures`, in the language the closure receives. The closure runs once per mount, inside the snapshot's dependencies, so it must build the same state every time.
+2. **Test.** One test function per state, in `<Area>SnapshotTests.swift` inside `extension SnapshotTests`, named `test_<screen>_<state>_matchesReference` and unique across the snapshot tests. It always takes text sizes as its arguments: `SnapshotTextSize.allCases` (`large`, `ax5`), or `[.large]` where the largest text adds nothing. Call `assertAppSnapshot(textSize:)` once.
+3. **Language.** Every snapshot runs in English and in Russian: `make test-snapshots` starts one test process per language, because a Russian process breaks lines differently from Russian strings in an English one. Narrow a run only with `SNAPSHOT_LANGUAGES=en` or `ru`; flags that select or repeat tests are refused. The app is dark only.
+4. **Record.** `make record-snapshots` on `iPhone 17` / iOS 27.0, with no uncommitted change under `CircuitTimerSnapshotTests/__Snapshots__`. It writes the references that are missing or differ, leaves the others untouched, compares everything again and lists the new references: check that your test's appear. References are `__Snapshots__/<test file>/<test function>.<language>-<size>.png`. If the final comparison fails, run `git restore` and `git clean -f` on that folder and record again. A reference that does not load or has the wrong size fails its test: delete it and record.
+5. **Review.** Open every new or changed PNG and say in the pull request why it changed. Delete the references of a test you rename or remove: a reference no test checks fails the run. `make test-snapshots` and CI never write references; a failure keeps the actual image in `.build/TestResults/Snapshots-<run>-<language>-artifacts/<test file>/`, with `<run>` as for `make test-ui`, and the reference, failure and difference images in the result bundle.
+6. **Effects.** Dependencies are the test context's, except what `Support/SnapshotDependencies.swift` sets. These are rendering tests, not exhaustive effect tests. Unconfigured dependency endpoints keep their test values; a passing snapshot does not prove that no effects ran. TipKit is not configured in the host, so no tip shows.
+
+The timer's full-screen cover does not draw in the first frame, so the host fails a state that presents it. The timer snapshots will describe a `WorkoutTimerFeature.State` and draw `WorkoutTimerStack` as the window's root: with the timer's reducer replaced by `EmptyReducer`, that root was measured to match the presented cover in every variant; with the real reducer it is not measured yet. Alerts and dialogs are not supported yet. Snapshots run only on iOS 27.0 with iPhone 17's screen. They do not cover how the tab bar leaves on a push (`TabBarRidesWithRoot`).
+
 ## Releasing
 
 1. For a new version, bump `MARKETING_VERSION` through a pull request. Wait for CI on `main` to pass.
@@ -184,7 +221,7 @@ final class WorkoutTimerUITests: XCTestCase {
 - [ ] **CT-QA** — tests through the UI, in slices:
   - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
   - [ ] UI smoke tests of the main flows: the workout list, creating and editing, the timer, Settings
-  - [ ] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
+  - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
   - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button
