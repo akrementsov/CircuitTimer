@@ -22,7 +22,7 @@ actor LiveActivityCoordinator {
     private struct Request {
         let attributes: WorkoutActivityAttributes
         let content: WorkoutActivityAttributes.ContentState
-        let waiter: CheckedContinuation<LiveActivityNotice?, Never>
+        let waiter: CheckedContinuation<LiveActivitySyncResult, Never>
     }
 
     private enum Job {
@@ -80,12 +80,22 @@ actor LiveActivityCoordinator {
         content: WorkoutActivityAttributes.ContentState,
         clock: any Clock<Duration>
     ) async -> LiveActivityNotice? {
+        await syncWithResult(owner: id, revision: revision, attributes: attributes, content: content, clock: clock).notice
+    }
+
+    func syncWithResult(
+        owner id: UUID,
+        revision: Int,
+        attributes: WorkoutActivityAttributes,
+        content: WorkoutActivityAttributes.ContentState,
+        clock: any Clock<Duration>
+    ) async -> LiveActivitySyncResult {
         var owner = owners[id] ?? Owner()
-        guard !owner.isEnding, revision > owner.acceptedRevision else { return nil }
+        guard !owner.isEnding, revision > owner.acceptedRevision else { return .init(outcome: .superseded) }
 
         return await withCheckedContinuation { waiter in
             owner.acceptedRevision = revision
-            owner.request?.waiter.resume(returning: nil)
+            owner.request?.waiter.resume(returning: .init(outcome: .superseded))
             owner.request = Request(attributes: attributes, content: content, waiter: waiter)
             owners[id] = owner
             startDraining(id, clock: clock)
@@ -101,7 +111,7 @@ actor LiveActivityCoordinator {
             owner.subscription = nil
             owner.control?.complete(.unavailable)
             owner.control = nil
-            owner.request?.waiter.resume(returning: nil)
+            owner.request?.waiter.resume(returning: .init(outcome: .superseded))
             owner.request = nil
         }
         let signal = CompletionSignal()
@@ -140,7 +150,14 @@ actor LiveActivityCoordinator {
             switch job {
                 case let .apply(request):
                     let outcome = await apply(id, request, clock: clock)
-                    request.waiter.resume(returning: settle(id, outcome))
+                    let result: LiveActivitySyncResult.Outcome = switch outcome {
+                        case .shown: .applied
+                        case .unavailable: .unavailable
+                        case .deferred: .deferred
+                        case .failed: .failed
+                        case .superseded: .superseded
+                    }
+                    request.waiter.resume(returning: .init(outcome: result, notice: settle(id, outcome)))
                 case .end:
                     await finishEnding(id)
             }

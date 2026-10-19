@@ -14,7 +14,7 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_liveActivityNoticeChanged_acceptsOnlyANewerSerial() async {
-        let timer = TimerHarness(.fixture(.paused))
+        let timer = TimerHarness(.fixture(.paused), activity: true)
         let activity = timer.recordActivity()
         let failing = LiveActivityNotice(serial: 1, isFailing: true)
         let recovered = LiveActivityNotice(serial: 2, isFailing: false)
@@ -33,7 +33,7 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_action_afterTheClockStarted_syncsTheRunAndReceivesANotice() async {
-        let timer = TimerHarness(.fixture(.paused))
+        let timer = TimerHarness(.fixture(.paused), activity: true)
         let notice = LiveActivityNotice(serial: 1, isFailing: true)
         let activity = timer.recordActivity { $0 == 1 ? notice : nil }
         let content = Content(run: timer.store.state.run, at: origin)
@@ -51,7 +51,7 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_action_beforeTheClockStarted_neverSyncs() async {
-        let timer = TimerHarness(.fresh())
+        let timer = TimerHarness(.fresh(), activity: true)
         let activity = timer.recordActivity()
 
         await timer.send(.view(.notificationPreferencesChanged))
@@ -63,7 +63,7 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_ticked_stageChange_syncsTheNextStageWithoutWritingTheRecord() async {
-        let timer = TimerHarness(.fixture(.running))
+        let timer = TimerHarness(.fixture(.running), activity: true)
         let activity = timer.recordActivity()
 
         for seconds in [1.0, 1, 6] {
@@ -85,7 +85,7 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_ticked_wallClockMovedBack_syncsTheRebasedBoundaries() async throws {
-        let timer = TimerHarness(.fixture(.running))
+        let timer = TimerHarness(.fixture(.running), activity: true)
         let activity = timer.recordActivity()
         await timer.clock.advance(by: .seconds(1))
         timer.moveWall(seconds: 0.749)
@@ -106,32 +106,39 @@ struct TimerLiveActivityTests {
 
     @Test
     func test_close_finished_endsTheActivityAfterTheSessionAndBeforeDismissing() async {
-        let timer = TimerHarness(.fixture(.finished))
+        let timer = TimerHarness(.fixture(.finished), activity: true)
         let activity = timer.recordActivity()
 
-        await timer.send(.view(.closeButtonTapped), saving: true) { $0.clockGeneration = 2 }
+        await timer.send(.view(.closeButtonTapped), saving: true) {
+            $0.clockGeneration = 2
+            $0.activityControls?.isEnding = true
+        }
         await timer.store.finish()
 
         #expect(timer.calls.value == [.end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
-        // Only the record write's completion syncs; the close itself returns early.
-        #expect(activity.syncs.value.map(\.revision) == [1])
+        // A record completion after close must not publish another card.
+        #expect(activity.syncs.value.isEmpty)
     }
 
     @Test
     func test_closeThenFinish_running_endsTheActivityBeforeDismissing() async {
-        let timer = TimerHarness(.fixture(.running))
+        let timer = TimerHarness(.fixture(.running), activity: true)
         let activity = timer.recordActivity()
 
         await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
+            $0.activityControls?.generation += 1
             $0.destination = .closeConfirmation(.closeConfirmation(restart: .resume))
             $0.clockGeneration = 2
             $0.clockAnchor = nil
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await timer.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
+        await timer.send(.destination(.presented(.closeConfirmation(.finish)))) {
+            $0.destination = nil
+            $0.activityControls?.isEnding = true
+        }
         await timer.store.finish()
 
         #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
@@ -180,6 +187,12 @@ extension TimerHarness {
                 $0.append(ActivitySync(owner: owner, revision: revision, workoutName: attributes.workoutName, content: content))
             }
             return notice(revision)
+        }
+        store.dependencies.liveActivity.syncWithResult = { owner, revision, attributes, content in
+            recorder.syncs.withValue {
+                $0.append(ActivitySync(owner: owner, revision: revision, workoutName: attributes.workoutName, content: content))
+            }
+            return LiveActivitySyncResult(outcome: .applied, notice: notice(revision))
         }
         store.dependencies.liveActivity.end = { owner in
             calls.withValue { $0.append(.endLiveActivity(owner: owner)) }

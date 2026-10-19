@@ -28,3 +28,22 @@ public enum LiveActivityControlResult: Equatable, Sendable {
     case cancelled
     case orphanEnded
 }
+
+/// The actual drain outcome, independent of whether a warning changed.
+public struct LiveActivitySyncResult: Equatable, Sendable {
+    public enum Outcome: Equatable, Sendable {
+        case applied
+        case unavailable
+        case deferred
+        case failed
+        case superseded
+    }
+
+    public let outcome: Outcome
+    public let notice: LiveActivityNotice?
+
+    public init(outcome: Outcome, notice: LiveActivityNotice? = nil) {
+        self.outcome = outcome
+        self.notice = notice
+    }
+}

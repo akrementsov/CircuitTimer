@@ -28,6 +28,11 @@ public struct LiveActivityClient: Sendable {
         _ attributes: WorkoutActivityAttributes,
         _ content: WorkoutActivityAttributes.ContentState
     ) async -> LiveActivityNotice? = { _, _, _, _ in nil }
+    /// Like `sync`, with the drain outcome needed before acknowledging a control command.
+    public var syncWithResult: @Sendable (
+        _ owner: UUID, _ revision: Int, _ attributes: WorkoutActivityAttributes,
+        _ content: WorkoutActivityAttributes.ContentState
+    ) async -> LiveActivitySyncResult = { _, _, _, _ in .init(outcome: .unavailable) }
     /// Removes the owner's activity at once and refuses its later syncs. Waits a bounded time
     /// (`LiveActivityCoordinator.endTimeout`); the removal finishes in the background after that.
     public var end: @Sendable (_ owner: UUID) async -> Void
@@ -68,6 +73,12 @@ extension LiveActivityClient: DependencyKey {
                 @Dependency(\.continuousClock) var clock
                 return await coordinator.sync(owner: owner, revision: revision, attributes: attributes, content: content, clock: clock)
             },
+            syncWithResult: { owner, revision, attributes, content in
+                @Dependency(\.continuousClock) var clock
+                return await coordinator.syncWithResult(
+                    owner: owner, revision: revision, attributes: attributes, content: content, clock: clock
+                )
+            },
             end: { owner in
                 @Dependency(\.continuousClock) var clock
                 await coordinator.end(owner: owner, clock: clock)
@@ -86,6 +97,7 @@ extension LiveActivityClient: DependencyKey {
     public static let previewValue = Self(
         nextRevision: { 1 },
         sync: { _, _, _, _ in nil },
+        syncWithResult: { _, _, _, _ in .init(outcome: .unavailable) },
         end: { _ in },
         endOrphans: {},
         requests: { _ in AsyncStream { $0.finish() } },

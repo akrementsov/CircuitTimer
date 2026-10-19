@@ -22,6 +22,8 @@ public struct WorkoutTimerStack: View {
         }
         // The back button is white, like the legacy bar.
         .tint(.text(.primary))
+        // The subscription belongs to the stack, so opening the stage list keeps controls alive.
+        .task { await send(.activityTask).finish() }
         // Shared app-storage values can change outside this view; keep the live queue in sync.
         .onChange(of: store.isBackgroundNotificationsOn) { _, _ in
             send(.notificationPreferencesChanged)
