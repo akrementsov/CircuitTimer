@@ -27,8 +27,6 @@ SNAPSHOTS_DIR := CircuitTimerSnapshotTests/__Snapshots__
 SNAPSHOT_LANGUAGES ?= en ru
 SNAPSHOT_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots -destination '$(DESTINATION)' \
 	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
-RASTER_PROBE_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerRasterProbe -destination '$(DESTINATION)' \
-	-derivedDataPath "$(DERIVED_DATA)/RasterProbe-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -46,7 +44,7 @@ PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swif
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
 .PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
-	build-snapshots test-snapshots record-snapshots check-release-app upload ci verify-clean raster-probe
+	build-snapshots test-snapshots record-snapshots check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -191,18 +189,6 @@ define run-snapshots
 	fi; \
 	[ "$$failed" -eq 0 ]
 endef
-
-raster-probe:
-	@case '$(DESTINATION)' in \
-		'platform=iOS Simulator,name=iPhone 17,OS=27.0'|\
-		'platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'|\
-		'platform=iOS Simulator,name=iPhone 17 #3,OS=27.0') ;; \
-		*) echo 'raster-probe: use an allowed iPhone 17 on iOS27.0' >&2; exit 2 ;; \
-	 esac
-	xcodebuild build $(RASTER_PROBE_BUILD)
-	bash scripts/run-raster-probe.sh '$(DESTINATION)' \
-		'$(DERIVED_DATA)/RasterProbe-$(TEST_RUN)/Build/Products/Debug-iphonesimulator/CircuitTimerRasterProbe.app' \
-		'$(TEST_RESULTS)/RasterProbe-$(TEST_RUN)'
 
 build-snapshots:
 	xcodebuild build-for-testing $(SNAPSHOT_TEST_BUILD)
