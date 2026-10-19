@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import Metal
+import os
 import SwiftUI
 import UIKit
 
@@ -8,7 +9,7 @@ import UIKit
 enum RasterProbe {
     static var directory: URL { URL.documentsDirectory.appendingPathComponent("RasterProbe", isDirectory: true) }
 
-    static func run(anchor: UIWindow) async throws {
+    static func run(anchor: UIWindow) async throws -> Int {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let deadline = ContinuousClock.now.advanced(by: .seconds(10))
         while anchor.windowScene?.activationState != .foregroundActive {
@@ -22,6 +23,7 @@ enum RasterProbe {
             throw ProbeFailure("Expected iOS27.0")
         }
         var cases: [[String: Any]] = []
+        var failures: [[String: String]] = []
         for renderer in PrimitiveRenderer.allCases {
             for rounded in [true, false] {
                 for antialias in [true, false] {
@@ -29,8 +31,18 @@ enum RasterProbe {
                         let sample = PrimitiveRenderer.Sample(rounded: rounded, antialias: antialias, halfPixel: halfPixel)
                         for repetition in 1...2 {
                             try Task.checkCancellation()
-                            let capture = try await renderer.capture(sample, anchor: anchor)
-                            cases.append(try save(capture, renderer: renderer, sample: sample, repetition: repetition))
+                            do {
+                                let capture = try await renderer.capture(sample, anchor: anchor)
+                                cases.append(try save(capture, renderer: renderer, sample: sample, repetition: repetition))
+                            } catch is CancellationError {
+                                throw CancellationError()
+                            } catch {
+                                let key = "\(renderer.rawValue)-\(sample.key)-\(repetition)"
+                                let message = String(reflecting: error)
+                                Logger(subsystem: "CircuitTimerRasterProbe", category: "Capture")
+                                    .error("Capture \(key, privacy: .public) failed: \(message, privacy: .public)")
+                                failures.append(["id": key, "error": message])
+                            }
                             await runLoopTurn()
                         }
                     }
@@ -38,7 +50,8 @@ enum RasterProbe {
             }
         }
         let report: [String: Any] = [
-            "status": "complete", "runtime": ProcessInfo.processInfo.operatingSystemVersionString,
+            "status": failures.isEmpty ? "complete" : "partial", "failures": failures,
+            "runtime": ProcessInfo.processInfo.operatingSystemVersionString,
             "metalDevice": MTLCreateSystemDefaultDevice()?.name ?? "unavailable",
             "screenGamut": scene.screen.traitCollection.displayGamut.rawValue,
             "scale": PrimitiveRenderer.scale, "roi": [114, 2121, 64, 64],
@@ -48,6 +61,7 @@ enum RasterProbe {
         ]
         let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys, .prettyPrinted])
         try data.write(to: directory.appendingPathComponent("report.json"), options: .atomic)
+        return failures.count
     }
 
     private static func save(
@@ -57,10 +71,24 @@ enum RasterProbe {
         repetition: Int
     ) throws -> [String: Any] {
         let image = capture.image
-        guard image.width == 1206, image.height == 2622, let provider = image.dataProvider?.data,
-              let png = UIImage(cgImage: image, scale: PrimitiveRenderer.scale, orientation: .up).pngData() else {
-            throw ProbeFailure("Invalid or unencodable raster from \(renderer.rawValue)")
+        let key = "\(renderer.rawValue)-\(sample.key)-\(repetition)"
+        let provider = image.dataProvider?.data
+        let png = UIImage(cgImage: image, scale: PrimitiveRenderer.scale, orientation: .up).pngData()
+        let observation: [String: Any] = [
+            "width": image.width, "height": image.height, "bytesPerRow": image.bytesPerRow,
+            "bitsPerComponent": image.bitsPerComponent, "bitsPerPixel": image.bitsPerPixel,
+            "bitmapInfo": image.bitmapInfo.rawValue, "colorSpace": image.colorSpace?.name as String? ?? "unknown",
+            "providerBytes": provider.map { CFDataGetLength($0) } ?? -1, "pngBytes": png?.count ?? -1,
+            "path": try commands(sample.path.cgPath), "environment": capture.environment
+        ]
+        try JSONSerialization.data(withJSONObject: observation, options: [.sortedKeys, .prettyPrinted])
+            .write(to: directory.appendingPathComponent("\(key).observation.json"), options: .atomic)
+        if let png { try png.write(to: directory.appendingPathComponent("\(key).png"), options: .atomic) }
+        guard image.width == 1206, image.height == 2622 else {
+            throw ProbeFailure("Unexpected raster size \(image.width)x\(image.height): \(key)")
         }
+        guard let provider else { throw ProbeFailure("No native provider bytes: \(key)") }
+        guard png != nil else { throw ProbeFailure("PNG encoding failed: \(key)") }
         let raw = provider as Data
         let stride = image.bitsPerPixel / 8
         guard stride > 0, raw.count >= image.bytesPerRow * image.height else { throw ProbeFailure("Invalid native buffer") }
@@ -69,8 +97,6 @@ enum RasterProbe {
             let start = row * image.bytesPerRow + 114 * stride
             patch.append(raw[start..<(start + 64 * stride)])
         }
-        let key = "\(renderer.rawValue)-\(sample.key)-\(repetition)"
-        try png.write(to: directory.appendingPathComponent("\(key).png"), options: .atomic)
         try patch.write(to: directory.appendingPathComponent("\(key).native"), options: .atomic)
         let center = CGPoint(x: Int((sample.origin.x + 8.5) * 3), y: Int((sample.origin.y + 8.5) * 3))
         let background = try pixel(image, at: .zero)

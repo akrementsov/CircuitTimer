@@ -8,7 +8,8 @@ import sys
 def read(directory):
     report = json.loads((directory / "report.json").read_text())
     cases = {case["id"]: case for case in report["cases"]}
-    assert report["status"] == "complete" and len(cases) == 64, "Incomplete probe"
+    assert report["status"] in ("complete", "partial") and 0 < len(cases) <= 64, "No comparable captures"
+    assert len(cases) == len(report["cases"]), "Duplicate capture identifiers"
     return report, cases
 
 
@@ -35,19 +36,23 @@ def difference(left_directory, left, right_directory, right):
 def compare(left_directory, right_directory, output):
     left_report, left = read(left_directory)
     right_report, right = read(right_directory)
-    assert left.keys() == right.keys(), "Different case matrices"
     report = {"inputs": {key: [left_report[key], right_report[key]] for key in ("foreground", "background", "scale", "roi")
                          if left_report[key] != right_report[key]}, "cases": {}, "repeatDifferences": {}}
-    for key in sorted(left):
+    report["completion"] = {"left": left_report["status"], "right": right_report["status"]}
+    report["failures"] = {"left": left_report.get("failures", []), "right": right_report.get("failures", [])}
+    report["missingCaptures"] = {"left": sorted(right.keys() - left.keys()), "right": sorted(left.keys() - right.keys())}
+    for key in sorted(left.keys() & right.keys()):
         report["cases"][key] = difference(left_directory, left[key], right_directory, right[key])
     for name, directory, cases in (("left", left_directory, left), ("right", right_directory, right)):
         report["repeatDifferences"][name] = {
             key: difference(directory, case, directory, cases[key[:-1] + "2"])
-            for key, case in cases.items() if case["repeat"] == 1
+            for key, case in cases.items() if case["repeat"] == 1 and key[:-1] + "2" in cases
         }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n")
     print("Input color/viewport differences:", report["inputs"])
+    print("Completion:", report["completion"], "; missing capture counts:",
+          {side: len(cases) for side, cases in report["missingCaptures"].items()})
     for renderer in ("coreGraphics", "imageRenderer", "drawHierarchy", "layerRender"):
         rows = [row for key, row in report["cases"].items() if key.startswith(renderer + "-")]
         print(renderer, ":", sum(row["differentPixels"] != 0 for row in rows), "/", len(rows), "captures differ")

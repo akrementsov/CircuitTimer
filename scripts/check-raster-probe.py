@@ -8,9 +8,10 @@ import struct
 import sys
 
 
-def check(directory):
+def check(directory, allow_partial=False):
     report = json.loads((directory / "report.json").read_text())
-    assert report["status"] == "complete", "Probe did not complete"
+    failures = report.get("failures", [])
+    assert report["status"] == ("partial" if failures else "complete"), "Inconsistent completion status"
     expected = set(itertools.product(
         ("coreGraphics", "imageRenderer", "drawHierarchy", "layerRender"),
         ("rounded", "rectangle"), (False, True), ("integer", "half"), (1, 2),
@@ -33,12 +34,20 @@ def check(directory):
         assert center[1] > center[0] + 40 and center[2] > center[0] + 40, f"Missing marker: {key}"
         assert max(abs(a - b) for a, b in zip(background[:3], center[:3])) > 80, f"Blank capture: {key}"
         assert case["path"], f"Missing path commands: {key}"
-    assert actual == expected, f"Incomplete matrix: missing={expected-actual}, extra={actual-expected}"
-    print(f"raster-probe: {len(actual)} captures validated")
+    identifiers = {f"{r}-{s}-{'aa' if a else 'noaa'}-{p}-{n}" for r, s, a, p, n in expected}
+    successful = {case["id"] for case in report["cases"]}
+    failed = {case["id"] for case in failures}
+    assert len(failed) == len(failures), "Duplicate failure identifiers"
+    assert not successful & failed, "Capture marked both successful and failed"
+    assert actual <= expected and successful | failed == identifiers, "Incomplete capture attempts"
+    assert all(case.get("error") for case in failures), "Missing failure description"
+    assert allow_partial or not failures, f"Probe incomplete: {len(successful)} captures, {len(failed)} failures"
+    print(f"raster-probe: {len(actual)} captures validated, {len(failed)} explicit failures")
 
 
 try:
-    check(Path(sys.argv[1]))
+    assert len(sys.argv) in (2, 3) and (len(sys.argv) == 2 or sys.argv[2] == "--allow-partial"), "Invalid arguments"
+    check(Path(sys.argv[1]), allow_partial=len(sys.argv) == 3)
 except (AssertionError, OSError, ValueError, KeyError, IndexError, struct.error) as error:
     print(f"raster-probe: {error}", file=sys.stderr)
     sys.exit(1)

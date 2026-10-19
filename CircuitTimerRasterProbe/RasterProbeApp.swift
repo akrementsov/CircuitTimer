@@ -36,8 +36,8 @@ private final class ProbeController: UIViewController {
         started = true
         Task {
             do {
-                try await RasterProbe.run(anchor: window)
-                status.rootView = ProbeMessage(title: "Probe complete")
+                let failures = try await RasterProbe.run(anchor: window)
+                status.rootView = ProbeMessage(title: failures == 0 ? "Probe complete" : "Probe partial: \(failures) failures")
             } catch is CancellationError {
                 status.rootView = ProbeMessage(title: "Probe cancelled")
             } catch {

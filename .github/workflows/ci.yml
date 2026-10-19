@@ -120,6 +120,7 @@ jobs:
       # package test gets no retry.
       - name: Test the package
         id: test
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
         timeout-minutes: 35
         run: make test
 
