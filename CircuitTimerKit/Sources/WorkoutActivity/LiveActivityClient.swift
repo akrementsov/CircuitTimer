@@ -33,13 +33,18 @@ public struct LiveActivityClient: Sendable {
     public var end: @Sendable (_ owner: UUID) async -> Void
     /// Removes the activities of earlier processes.
     public var endOrphans: @Sendable () async -> Void
-    /// Subscribes the live timer before its first card is published.
+    /// Subscribes the live timer before its first card is published; replaces its previous stream.
     public var requests: @Sendable (_ owner: UUID) async -> AsyncStream<LiveActivityControlRequest> = { _ in
         AsyncStream { $0.finish() }
     }
+    /// Admits one command per owner, returning `busy` for overlap. The caller waits up to five
+    /// seconds; cancelling or timing out does not cancel an admitted command. An app process
+    /// with no matching owner removes only that orphan card, without touching the run record.
     public var deliver: @Sendable (
         _ activityID: String, _ command: LiveActivityCommand, _ generation: Int
     ) async -> LiveActivityControlResult = { _, _, _ in .unavailable }
+    /// Releases admission after the timer applies or rejects this exact request and finishes
+    /// its required synchronization. A late acknowledgement cannot release a newer request.
     public var requestHandled: @Sendable (
         _ owner: UUID, _ requestID: Int, _ result: LiveActivityControlResult
     ) async -> Void = { _, _, _ in }
@@ -47,7 +52,10 @@ public struct LiveActivityClient: Sendable {
 
 extension LiveActivityClient: DependencyKey {
     public static let liveValue: Self = {
-        let coordinator = LiveActivityCoordinator(transport: .live())
+        let coordinator = LiveActivityCoordinator(
+            transport: .live(),
+            isAppProcess: Bundle.main.bundleURL.pathExtension == "app"
+        )
         let revision = LockIsolated(0)
         return Self(
             nextRevision: {
@@ -65,9 +73,12 @@ extension LiveActivityClient: DependencyKey {
                 await coordinator.end(owner: owner, clock: clock)
             },
             endOrphans: { await coordinator.endOrphans() },
-            requests: { _ in AsyncStream { $0.finish() } },
-            deliver: { _, _, _ in .unavailable },
-            requestHandled: { _, _, _ in }
+            requests: { await coordinator.requests(owner: $0) },
+            deliver: { activityID, command, generation in
+                @Dependency(\.continuousClock) var clock
+                return await coordinator.deliver(activityID: activityID, command: command, generation: generation, clock: clock)
+            },
+            requestHandled: { await coordinator.requestHandled(owner: $0, requestID: $1, result: $2) }
         )
     }()
 
