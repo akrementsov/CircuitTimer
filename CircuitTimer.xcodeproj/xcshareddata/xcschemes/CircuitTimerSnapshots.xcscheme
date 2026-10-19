@@ -52,6 +52,10 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
+      <CommandLineArguments>
+         <CommandLineArgument argument = "-UIPreferredContentSizeCategoryName" isEnabled = "YES" />
+         <CommandLineArgument argument = "$(SNAPSHOT_CONTENT_SIZE_CATEGORY)" isEnabled = "YES" />
+      </CommandLineArguments>
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference

@@ -81,7 +81,7 @@ enum SnapshotWindow {
                 return scene
             }
             guard ContinuousClock.now < deadline else {
-                throw SnapshotCaptureFailure("No foreground-active window scene within the process's 10-second startup budget.")
+                throw SnapshotCaptureFailure("No foreground-active window scene; the process's 10-second activation budget is exhausted.")
             }
             await runLoopTurn()
         }

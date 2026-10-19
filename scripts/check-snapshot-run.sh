@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Usage: check-snapshot-run.sh never|failed en|ru XCODEBUILD_STATUS BUNDLE ARTIFACTS
-# Or: check-snapshot-run.sh --same-cases EN_BUNDLE RU_BUNDLE
+# Usage: check-snapshot-run.sh never|failed en|ru large|ax5 XCODEBUILD_STATUS BUNDLE ARTIFACTS
+# Or: check-snapshot-run.sh --same-cases EN_LARGE EN_AX5 RU_LARGE RU_AX5
 # A successful xcodebuild is not enough: every snapshot function, argument and committed reference must run once,
 # and every case must have exactly one capture journal row. Recording accepts only confirmed reference writes.
 set -euo pipefail
@@ -11,17 +11,22 @@ fail() {
 }
 
 usage() {
-	echo "usage: check-snapshot-run.sh never|failed en|ru STATUS BUNDLE ARTIFACTS | --same-cases EN_BUNDLE RU_BUNDLE" >&2
+	echo "usage: check-snapshot-run.sh never|failed en|ru large|ax5 STATUS BUNDLE ARTIFACTS | --same-cases EN_LARGE EN_AX5 RU_LARGE RU_AX5" >&2
 	exit 2
 }
 
-if [ "$#" -eq 3 ] && [ "$1" = --same-cases ]; then
+if [ "$#" -eq 5 ] && [ "$1" = --same-cases ]; then
 	compare=true
-elif [ "$#" -eq 5 ]; then
+elif [ "$#" -eq 6 ]; then
 	compare=false
-	mode=$1; language=$2; status=$3; bundle=$4; artifacts=$5
+	mode=$1; language=$2; text_size=$3; status=$4; bundle=$5; artifacts=$6
 	case "$mode" in never|failed) ;; *) usage ;; esac
 	case "$language" in en|ru) ;; *) usage ;; esac
+	case "$text_size" in
+		large) category=UICTContentSizeCategoryL ;;
+		ax5) category=UICTContentSizeCategoryAccessibilityXXXL ;;
+		*) usage ;;
+	esac
 	case "$status" in ''|*[!0-9]*) usage ;; esac
 else
 	usage
@@ -43,16 +48,21 @@ JQ_CASES='
 			| . as $test
 			| (.name | sub("\\(.*$"; "")) as $function
 			| [(.children // [])[] | select(.nodeType == "Arguments")] as $arguments
-			| {function: $function, arguments: $arguments}];
+			| {function: $function, name: .name, result: .result, arguments: $arguments}];
 	def keys_without_language:
 		[cases[] | .function as $function | .arguments[] | "\($function).\(.name)"] | sort;
 '
 
 if [ "$compare" = true ]; then
-	read_bundle "$2" "$work/en.json"
-	read_bundle "$3" "$work/ru.json"
-	jq -r "$JQ_CASES keys_without_language[]" "$work/en.json" > "$work/en-keys"
-	jq -r "$JQ_CASES keys_without_language[]" "$work/ru.json" > "$work/ru-keys"
+	read_bundle "$2" "$work/en-large.json"
+	read_bundle "$3" "$work/en-ax5.json"
+	read_bundle "$4" "$work/ru-large.json"
+	read_bundle "$5" "$work/ru-ax5.json"
+	for language in en ru; do
+		for text_size in large ax5; do
+			jq -r "$JQ_CASES keys_without_language[]" "$work/$language-$text_size.json"
+		done | sort > "$work/$language-keys"
+	done
 	[ -s "$work/en-keys" ] && [ -s "$work/ru-keys" ] || fail "no snapshot cases ran in one of the languages"
 	if ! diff -u "$work/en-keys" "$work/ru-keys"; then
 		fail "en and ru ran different snapshot cases"
@@ -70,11 +80,21 @@ git -C "$root" ls-files -- "$snapshots" | awk '/\.png$/' > "$work/references"
 for file in "$root"/CircuitTimerSnapshotTests/*SnapshotTests.swift; do
 	[ -f "$file" ] || continue
 	awk '
+		/@Test/ {
+			sizes = "invalid"
+			if ($0 ~ /arguments:[[:space:]]*SnapshotTextSize\.currentCases\(\)/) sizes = "large,ax5"
+			if ($0 ~ /arguments:[[:space:]]*SnapshotTextSize\.currentCases\(in:[[:space:]]*\[\.large\]\)/) sizes = "large"
+		}
 		/func[[:space:]]+test_[A-Za-z0-9_]+\(/ {
 			name = $0
 			sub(/^.*func[[:space:]]+/, "", name)
 			sub(/\(.*/, "", name)
-			print name
+			if (sizes == "" || sizes == "invalid") {
+				print "check-snapshot-run: " name ": use currentCases() or currentCases(in: [.large]) on one @Test line" > "/dev/stderr"
+				exit 1
+			}
+			print name "\t" sizes
+			sizes = ""
 		}
 	' "$file"
 done > "$work/functions"
@@ -89,14 +109,18 @@ JQ_VALIDATE='
 	def messages: [.. | objects | select(.nodeType == "Failure Message") | .name] | join("\n");
 	def lines: split("\n") | map(select(length > 0));
 	. as $report
-	| cases as $tests
+	| cases as $allTests
+	| ($functions | lines | map(split("\t") | {function: .[0], sizes: (.[1] | split(","))})) as $inventory
+	| [$inventory[] | .function] as $allFunctions
+	| [$inventory[] | select(.sizes | index($size)) | .function] as $functions
+	| [$allTests[] | .function as $function | select($functions | index($function))] as $tests
 	| [$tests[] | .function as $function | .arguments[]
 		| {key: "\($function).\($lang)-\(.name)", function: $function, argument: .name,
 			result: .result, messages: messages}] as $cases
-	| ($functions | lines) as $functions
 	| ($references | lines | map(select(endswith(".png"))
 		| {path: ltrimstr($prefix), key: (split("/")[-1] | sub("\\.png$"; ""))}
-		| select(.key | test("\\.\($lang)-[^/]+$")))) as $references
+		| select(.key | test("\\.\($lang)-[^/]+$")))) as $allReferences
+	| [$allReferences[] | select(.key | endswith(".\($lang)-\($size)"))] as $references
 	| ($journal | lines) as $journalLines
 	| [$journalLines[] | select(startswith("#") | not) | split("\t")] as $fields
 	| [$fields[] | {key: .[0], path: .[1], attempt: .[2], outcome: .[3]}] as $rows
@@ -106,17 +130,20 @@ JQ_VALIDATE='
 		($report.devices[]? | select(.platform != "iOS Simulator" or .modelName != "iPhone 17" or .osVersion != "27.0")
 			| "unexpected snapshot device: \(.platform) / \(.modelName) / \(.osVersion)"),
 		($report | .. | objects | select(.nodeType == "Repetition") | "Xcode repetitions are not allowed"),
-		($report | .. | objects | select(.result == "Skipped") | "skipped snapshot node: \(.name)"),
+		($tests[] | .. | objects | select(.result == "Skipped") | "skipped snapshot node: \(.name)"),
 		($tests[] | select((.arguments | length) == 0) | "\(.function): snapshot tests take text sizes as arguments"),
-		($tests | group_by(.function)[] | select(length > 1) | "duplicate Test Case name: \(.[0].function)"),
-		($functions | group_by(.)[] | select(length > 1) | "duplicate snapshot function in sources: \(.[0])"),
+		($allTests | group_by(.function)[] | select(length > 1) | "duplicate Test Case name: \(.[0].function)"),
+		($allFunctions | group_by(.)[] | select(length > 1) | "duplicate snapshot function in sources: \(.[0])"),
 		($functions[] as $function | select(any($tests[]; .function == $function) | not)
 			| "snapshot function did not run: \($function)"),
-		($tests[] | .function as $function | select($functions | index($function) | not)
+		($allTests[] | .function as $function | select($allFunctions | index($function) | not)
 			| "Test Case has no snapshot function in sources: \($function)"),
-		($cases[] | select(.argument != "large" and .argument != "ax5") | "\(.key): unsupported text-size argument"),
+		($allTests[] | .function as $function | select($functions | index($function) | not)
+			| select(.arguments | length > 0) | "\($function): arguments ran outside its declared text sizes"),
+		($cases[] | select(.argument != $size) | "\(.key): argument differs from process text size \($size)"),
 		($cases | group_by(.key)[] | select(length > 1) | "duplicate snapshot case: \(.[0].key)"),
 		(if ($journalLines[0] // "" | startswith("# runtime ") | not) then "missing capture journal runtime header" else empty end),
+		(if $journalLines[1] != "# text-size \($size) \($category)" then "capture journal process text size does not match \($size) / \($category)" else empty end),
 		($fields[] | select(length != 4) | "capture journal rows must have four tab-separated fields"),
 		($rows | group_by(.key)[] | select(length > 1) | "duplicate capture journal key: \(.[0].key)"),
 		($rows[] | select(.attempt != "first" and .attempt != "second") | "\(.key): invalid capture attempt"),
@@ -126,6 +153,8 @@ JQ_VALIDATE='
 			| "\(.key): journal PNG path does not match its key"),
 		($rows[] | .key as $key | select(any($cases[]; .key == $key) | not) | "journal key has no snapshot case: \($key)"),
 		($references | group_by(.key)[] | select(length > 1) | "duplicate reference PNG key: \(.[0].key)"),
+		($allReferences[] | select(.key | test("\\.\($lang)-(large|ax5)$") | not)
+			| "unsupported reference text size: \(.path)"),
 		($references[] as $reference | select(any($cases[]; .key == $reference.key) | not)
 			| "orphan reference PNG: \($reference.path)"),
 		($references[] as $reference | $rows[] | select(.key == $reference.key and .path != $reference.path)
@@ -153,7 +182,8 @@ JQ_VALIDATE='
 		count: ($cases | length), second: [$rows[] | select(.attempt == "second" and .outcome == "passed") | .key]}
 '
 
-jq --arg lang "$language" --arg mode "$mode" --argjson status "$status" --arg prefix "${snapshots#"$root"/}/" \
+jq --arg lang "$language" --arg size "$text_size" --arg category "$category" --arg mode "$mode" \
+	--argjson status "$status" --arg prefix "${snapshots#"$root"/}/" \
 	--rawfile functions "$work/functions" --rawfile references "$work/references" --rawfile journal "$work/journal" \
 	"$JQ_CASES $JQ_VALIDATE" "$work/tests.json" > "$work/validation.json" || fail "unexpected result bundle or journal format"
 
@@ -166,7 +196,7 @@ notice() {
 	fi
 }
 
-notice "$(jq -r --arg lang "$language" '"\($lang): iOS \(.runtime); \(.second | length) of \(.count) snapshots matched only on the second mount"' "$work/validation.json")"
+notice "$(jq -r --arg lang "$language" --arg size "$text_size" '"\($lang)-\($size): iOS \(.runtime); \(.second | length) of \(.count) snapshots matched only on the second mount"' "$work/validation.json")"
 while IFS= read -r key; do notice "Second mount: $key"; done < <(jq -r '.second[]' "$work/validation.json")
 if [ "$(jq '.errors | length' "$work/validation.json")" -gt 0 ]; then
 	jq -r '.errors[] | "check-snapshot-run: " + .' "$work/validation.json" >&2

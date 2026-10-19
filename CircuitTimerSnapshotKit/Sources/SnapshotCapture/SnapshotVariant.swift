@@ -39,6 +39,26 @@ public enum SnapshotTextSize: String, CaseIterable, Sendable, CustomTestStringCo
 
     public var testDescription: String { rawValue }
 
+    public static func currentCases(in sizes: [Self] = Self.allCases) -> [Self] {
+        guard let value = ProcessInfo.processInfo.environment["SNAPSHOT_TEXT_SIZE"], let selected = Self(rawValue: value) else {
+            // Keep tests discoverable so a missing launch configuration fails instead of silently skipping them.
+            return sizes
+        }
+        return sizes.filter { $0 == selected }
+    }
+
+    @MainActor
+    func validateProcess() throws {
+        let selected = ProcessInfo.processInfo.environment["SNAPSHOT_TEXT_SIZE"] ?? "missing"
+        let actual = UIApplication.shared.preferredContentSizeCategory
+        guard selected == rawValue, actual == contentSizeCategory else {
+            throw SnapshotCaptureFailure(
+                "Snapshot text size must match its process (argument: \(rawValue), selected: \(selected), "
+                    + "process: \(actual.rawValue), expected: \(contentSizeCategory.rawValue)). Use make test-snapshots."
+            )
+        }
+    }
+
     public var dynamicTypeSize: DynamicTypeSize {
         switch self {
             case .large: .large

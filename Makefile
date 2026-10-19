@@ -136,7 +136,7 @@ test-ui:
 		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
 		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)
 
-# Snapshot tests use a fresh process per language and no test selection or Xcode retry: their result must describe
+# Snapshot tests use a fresh process per language and text size, with no test selection or Xcode retry: results describe
 # the whole reference matrix. The only retry of an image is the capture helper's second mount.
 define validate-snapshot-run
 	case '$(DESTINATION)' in \
@@ -168,24 +168,32 @@ define run-snapshots
 	version=$$(xcodebuild -version); \
 	printf '%s\n' "$$version"; \
 	if [ -n "$${GITHUB_STEP_SUMMARY:-}" ]; then printf '%s\n' "$$version" >> "$$GITHUB_STEP_SUMMARY"; fi; \
-	failed=0; english_bundle=""; russian_bundle=""; suffix=""; \
+	failed=0; english_large=""; english_ax5=""; russian_large=""; russian_ax5=""; suffix=""; \
 	if [ '$(1)' = failed ]; then suffix=-record; fi; \
 	for language in $(SNAPSHOT_LANGUAGES); do \
 		case "$$language" in en) region=US ;; ru) region=RU ;; esac; \
-		base="$(abspath $(TEST_RESULTS))/Snapshots-$(TEST_RUN)-$$language$$suffix"; \
-		bundle="$$base.xcresult"; artifacts="$$base-artifacts"; \
-		rm -rf "$$artifacts"; mkdir -p "$$artifacts"; \
-		status=0; \
-		env TEST_RUNNER_SNAPSHOT_TESTING_RECORD='$(1)' TEST_RUNNER_SNAPSHOT_ARTIFACTS="$$artifacts" \
-			scripts/run-tests.sh "$$bundle" xcodebuild test $(SNAPSHOT_TEST_BUILD) \
-			-testLanguage "$$language" -testRegion "$$region" -parallel-testing-enabled NO \
-			-collect-test-diagnostics never $(TEST_FLAGS) || status=$$?; \
-		SNAPSHOTS_DIR="$(SNAPSHOTS_DIR)" scripts/check-snapshot-run.sh '$(1)' "$$language" "$$status" \
-			"$$bundle" "$$artifacts" || failed=1; \
-		case "$$language" in en) english_bundle="$$bundle" ;; ru) russian_bundle="$$bundle" ;; esac; \
+		for text_size in large ax5; do \
+			case "$$text_size" in large) category=UICTContentSizeCategoryL ;; ax5) category=UICTContentSizeCategoryAccessibilityXXXL ;; esac; \
+			base="$(abspath $(TEST_RESULTS))/Snapshots-$(TEST_RUN)-$$language-$$text_size$$suffix"; \
+			bundle="$$base.xcresult"; artifacts="$$base-artifacts"; \
+			rm -rf "$$artifacts"; mkdir -p "$$artifacts"; \
+			status=0; \
+			env TEST_RUNNER_SNAPSHOT_TESTING_RECORD='$(1)' TEST_RUNNER_SNAPSHOT_ARTIFACTS="$$artifacts" \
+				TEST_RUNNER_SNAPSHOT_TEXT_SIZE="$$text_size" \
+				scripts/run-tests.sh "$$bundle" xcodebuild test $(SNAPSHOT_TEST_BUILD) \
+				SNAPSHOT_CONTENT_SIZE_CATEGORY="$$category" \
+				-testLanguage "$$language" -testRegion "$$region" -parallel-testing-enabled NO \
+				-collect-test-diagnostics never $(TEST_FLAGS) || status=$$?; \
+			SNAPSHOTS_DIR="$(SNAPSHOTS_DIR)" scripts/check-snapshot-run.sh '$(1)' "$$language" "$$text_size" "$$status" \
+				"$$bundle" "$$artifacts" || failed=1; \
+			case "$$language-$$text_size" in \
+				en-large) english_large="$$bundle" ;; en-ax5) english_ax5="$$bundle" ;; \
+				ru-large) russian_large="$$bundle" ;; ru-ax5) russian_ax5="$$bundle" ;; \
+			esac; \
+		done; \
 	done; \
-	if [ "$$failed" -eq 0 ] && [ -n "$$english_bundle" ] && [ -n "$$russian_bundle" ]; then \
-		scripts/check-snapshot-run.sh --same-cases "$$english_bundle" "$$russian_bundle" || failed=1; \
+	if [ "$$failed" -eq 0 ] && [ -n "$$english_large" ] && [ -n "$$russian_large" ]; then \
+		scripts/check-snapshot-run.sh --same-cases "$$english_large" "$$english_ax5" "$$russian_large" "$$russian_ax5" || failed=1; \
 	fi; \
 	[ "$$failed" -eq 0 ]
 endef

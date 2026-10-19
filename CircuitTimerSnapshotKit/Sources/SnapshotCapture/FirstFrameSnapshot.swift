@@ -39,6 +39,7 @@ public func assertFirstFrameSnapshot(
 
     do {
         let variant = SnapshotVariant(language: try SnapshotLanguage.current(), textSize: textSize)
+        try textSize.validateProcess()
         key = "\(testName).\(variant.name)"
         try reference.validateNames()
         let mode = try SnapshotReference.recordMode()

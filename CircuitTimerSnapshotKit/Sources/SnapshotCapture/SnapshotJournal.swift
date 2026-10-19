@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 @MainActor
 struct SnapshotJournal {
@@ -14,7 +15,9 @@ struct SnapshotJournal {
         if FileManager.default.fileExists(atPath: url.path) {
             previous = try String(contentsOf: url, encoding: .utf8)
         } else {
+            let size = ProcessInfo.processInfo.environment["SNAPSHOT_TEXT_SIZE"] ?? "missing"
             previous = "# runtime \(ProcessInfo.processInfo.operatingSystemVersionString)\n"
+                + "# text-size \(size) \(UIApplication.shared.preferredContentSizeCategory.rawValue)\n"
         }
         try (previous + "\(key)\t\(path)\t\(attempt)\t\(outcome)\n").write(to: url, atomically: true, encoding: .utf8)
     }
