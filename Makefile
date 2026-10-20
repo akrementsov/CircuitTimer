@@ -61,8 +61,7 @@ test-scripts:
 check-resolved:
 	@set -eu; \
 	command -v jq >/dev/null || { echo "check-resolved: jq is required" >&2; exit 1; }; \
-	conflicts=$$(jq -sr '[.[].pins[] | {identity, version: .state.version, revision: .state.revision}] | \
-		group_by(.identity)[] | select((unique | length) > 1) | .[0].identity' \
+	conflicts=$$(jq -sr '[.[].pins[] | {identity, version: .state.version, revision: .state.revision}] | group_by(.identity)[] | select((unique | length) > 1) | .[0].identity' \
 		$(PACKAGE_RESOLVED) $(SNAPSHOT_KIT_RESOLVED)); \
 	if [ -n "$$conflicts" ]; then \
 		echo "check-resolved: CircuitTimerKit and CircuitTimerSnapshotKit pin $$conflicts differently; run 'make resolve' and commit all three" >&2; exit 1; \
@@ -73,9 +72,7 @@ check-resolved:
 	if [ "$$package" != "$$project" ]; then \
 		echo "check-resolved: the packages' lockfiles together differ from the project's; run 'make resolve' and commit all three" >&2; exit 1; \
 	fi; \
-	if ! jq -es '([.[0].pins[] | select(.identity == "swift-snapshot-testing")] | length) == 0 and \
-		all(.[1:][]; ([.pins[] | select(.identity == "swift-snapshot-testing")] | length) == 1 and \
-		any(.pins[]; .identity == "swift-snapshot-testing" and .state.version == "1.19.6"))' \
+	if ! jq -es '([.[0].pins[] | select(.identity == "swift-snapshot-testing")] | length) == 0 and all(.[1:][]; ([.pins[] | select(.identity == "swift-snapshot-testing")] | length) == 1 and any(.pins[]; .identity == "swift-snapshot-testing" and .state.version == "1.19.6"))' \
 		$(PACKAGE_RESOLVED) $(SNAPSHOT_KIT_RESOLVED) $(PROJECT_RESOLVED) >/dev/null; then \
 		echo "check-resolved: SnapshotTesting 1.19.6 belongs to CircuitTimerSnapshotKit and the project only; run 'make resolve' and commit all three" >&2; exit 1; \
 	fi
