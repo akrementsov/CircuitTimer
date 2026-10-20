@@ -12,6 +12,7 @@ cat > "$repo/scripts/run-tests.sh" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 printf 'bundle:%s\n' "$1" >> "$TRACE/calls"
+mkdir -p "$1"
 shift
 "$@"
 EOF
@@ -43,6 +44,15 @@ cat > "$work/bin/xcrun" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 if [ "${SUMMARY_READ_FAIL:-}" = 1 ]; then exit 1; fi
+while [ "$#" -gt 0 ]; do
+	if [ "$1" = --path ]; then
+		shift
+		printf 'summary:%s\n' "$1" >> "$TRACE/calls"
+		[ -d "$1" ] || { echo "Missing result bundle: $1" >&2; exit 1; }
+		break
+	fi
+	shift
+done
 if [ -n "${CONTRACT_SUMMARY:-}" ]; then
 	printf '%s\n' "$CONTRACT_SUMMARY"
 else
@@ -147,7 +157,8 @@ done
 describe 'S105: selection and repetition flags are rejected by both entry points'
 for target in test-snapshots record-snapshots; do
 	for variable in TEST_FLAGS XCODEBUILD_FLAGS; do
-		for flag in '-only-testing:Probe' '-skip-testing:Probe' '-test-iterations 2' '-retry-tests-on-failure' '-run-tests-until-failure'; do
+		for flag in '-only-testing:Probe' '-skip-testing:Probe' '-test-iterations 2' '-retry-tests-on-failure' '-run-tests-until-failure' \
+			'-only-test-configuration Probe' '-skip-test-configuration Probe' '-testPlan Probe' '-test-repetition-relaunch-enabled YES'; do
 			reset_trace
 			snapshot_make "$target" "$variable=$flag"
 			expect_status 2
@@ -215,6 +226,22 @@ for target in test-snapshot-kit test-snapshot-contracts; do
 	reset_trace
 	SUMMARY_READ_FAIL=1 snapshot_make "$target"
 	expect_status 2
+done
+
+describe 'PR30: relative result overrides resolve from the checkout for harness commands'
+# make's CURDIR uses the physical path; macOS TMPDIR may go through the /var symlink.
+relative_results="$(cd "$repo" && pwd -P)/relative-results"
+for target in test-snapshot-kit test-snapshot-contracts; do
+	reset_trace
+	snapshot_make "$target" TEST_RESULTS=relative-results
+	expect_status 0
+	case "$target" in
+		test-snapshot-kit) suite=SnapshotKit; language=ru ;;
+		*) suite=SnapshotContracts; language=de ;;
+	esac
+	expect_in "$TRACE/calls" "bundle:$relative_results/$suite-iPhone-17-27.0.xcresult"
+	expect_in "$TRACE/calls" "bundle:$relative_results/$suite-iPhone-17-27.0-$language.xcresult"
+	expect_in "$TRACE/calls" "summary:$relative_results/$suite-iPhone-17-27.0-$language.xcresult"
 done
 
 describe 'S040/S107: lockfile union, shared pins and SnapshotTesting ownership'

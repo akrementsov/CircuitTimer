@@ -1,3 +1,4 @@
+import Foundation
 import SnapshotTesting
 import UIKit
 
