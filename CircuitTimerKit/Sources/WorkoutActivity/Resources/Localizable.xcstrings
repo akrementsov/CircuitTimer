@@ -1,0 +1,150 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "activity.intent.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control the current workout from its Live Activity."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Управление текущей тренировкой из Live Activity."
+          }
+        }
+      }
+    },
+    "activity.intent.error.busy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The previous workout action is still finishing. Try again shortly."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Предыдущее действие ещё выполняется. Повторите чуть позже."
+          }
+        }
+      }
+    },
+    "activity.intent.error.stale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The workout has changed. Try again from the updated card."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Состояние тренировки изменилось. Повторите действие на обновлённой карточке."
+          }
+        }
+      }
+    },
+    "activity.intent.error.timedOut": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The workout action is taking longer than expected. Check the timer in the app."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Действие занимает больше времени, чем ожидалось. Проверьте таймер в приложении."
+          }
+        }
+      }
+    },
+    "activity.intent.error.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the timer in the app. The Live Activity may show an earlier workout state."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Проверьте таймер в приложении. Карточка Live Activity может показывать прежнее состояние."
+          }
+        }
+      }
+    },
+    "activity.intent.parameter.activity": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Активность"
+          }
+        }
+      }
+    },
+    "activity.intent.parameter.generation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control generation"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Версия управления"
+          }
+        }
+      }
+    },
+    "activity.intent.pause.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause workout"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Приостановить тренировку"
+          }
+        }
+      }
+    },
+    "activity.intent.resume.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume workout"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Продолжить тренировку"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

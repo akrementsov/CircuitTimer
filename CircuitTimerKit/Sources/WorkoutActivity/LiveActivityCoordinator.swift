@@ -7,6 +7,7 @@ actor LiveActivityCoordinator {
     static let endTimeout: Duration = .milliseconds(500)
     /// An activity iOS has not listed by then is ended and requested again on a later sync.
     static let visibilityTimeout: Duration = .seconds(10)
+    static let controlTimeout: Duration = .seconds(5)
 
     enum Outcome {
         case shown
@@ -21,7 +22,7 @@ actor LiveActivityCoordinator {
     private struct Request {
         let attributes: WorkoutActivityAttributes
         let content: WorkoutActivityAttributes.ContentState
-        let waiter: CheckedContinuation<LiveActivityNotice?, Never>
+        let waiter: CheckedContinuation<LiveActivitySyncResult, Never>
     }
 
     private enum Job {
@@ -44,6 +45,9 @@ actor LiveActivityCoordinator {
         var endSignals: [CompletionSignal] = []
         var isDraining = false
         var activityID: String?
+        var endingActivityID: String?
+        var subscription: Subscription?
+        var control: ControlTicket?
         var applied: WorkoutActivityAttributes.ContentState?
         var wasSeen = false
         var isGone = false
@@ -58,10 +62,15 @@ actor LiveActivityCoordinator {
     }
 
     private let transport: ActivityTransport
+    private let isAppProcess: Bool
     private var owners: [UUID: Owner] = [:]
+    private var controlSerial = 0
+    private var subscriptionSerial = 0
+    private var orphanEnds: [String: [CompletionSignal]] = [:]
 
-    init(transport: ActivityTransport) {
+    init(transport: ActivityTransport, isAppProcess: Bool = true) {
         self.transport = transport
+        self.isAppProcess = isAppProcess
     }
 
     func sync(
@@ -71,12 +80,22 @@ actor LiveActivityCoordinator {
         content: WorkoutActivityAttributes.ContentState,
         clock: any Clock<Duration>
     ) async -> LiveActivityNotice? {
+        await syncWithResult(owner: id, revision: revision, attributes: attributes, content: content, clock: clock).notice
+    }
+
+    func syncWithResult(
+        owner id: UUID,
+        revision: Int,
+        attributes: WorkoutActivityAttributes,
+        content: WorkoutActivityAttributes.ContentState,
+        clock: any Clock<Duration>
+    ) async -> LiveActivitySyncResult {
         var owner = owners[id] ?? Owner()
-        guard !owner.isEnding, revision > owner.acceptedRevision else { return nil }
+        guard !owner.isEnding, revision > owner.acceptedRevision else { return .init(outcome: .superseded) }
 
         return await withCheckedContinuation { waiter in
             owner.acceptedRevision = revision
-            owner.request?.waiter.resume(returning: nil)
+            owner.request?.waiter.resume(returning: .init(outcome: .superseded))
             owner.request = Request(attributes: attributes, content: content, waiter: waiter)
             owners[id] = owner
             startDraining(id, clock: clock)
@@ -87,7 +106,12 @@ actor LiveActivityCoordinator {
         var owner = owners[id] ?? Owner()
         if !owner.isEnding {
             owner.isEnding = true
-            owner.request?.waiter.resume(returning: nil)
+            owner.endingActivityID = owner.activityID
+            owner.subscription?.continuation.finish()
+            owner.subscription = nil
+            owner.control?.complete(.unavailable)
+            owner.control = nil
+            owner.request?.waiter.resume(returning: .init(outcome: .superseded))
             owner.request = nil
         }
         let signal = CompletionSignal()
@@ -126,7 +150,14 @@ actor LiveActivityCoordinator {
             switch job {
                 case let .apply(request):
                     let outcome = await apply(id, request, clock: clock)
-                    request.waiter.resume(returning: settle(id, outcome))
+                    let result: LiveActivitySyncResult.Outcome = switch outcome {
+                        case .shown: .applied
+                        case .unavailable: .unavailable
+                        case .deferred: .deferred
+                        case .failed: .failed
+                        case .superseded: .superseded
+                    }
+                    request.waiter.resume(returning: .init(outcome: result, notice: settle(id, outcome)))
                 case .end:
                     await finishEnding(id)
             }
@@ -306,5 +337,139 @@ actor LiveActivityCoordinator {
         } else {
             Logger.liveActivity.debug("\(message, privacy: .public)")
         }
+    }
+}
+
+// MARK: - Commands from the card
+
+extension LiveActivityCoordinator {
+    private struct Subscription {
+        let id: Int
+        let continuation: AsyncStream<LiveActivityControlRequest>.Continuation
+    }
+
+    /// Admission outlives the intent's wait: a timeout must not admit another command while the
+    /// reducer is still applying the first. Each ticket has exactly one bounded waiter.
+    private final class ControlTicket: Sendable {
+        let request: LiveActivityControlRequest
+        let signal = CompletionSignal()
+        private let response = OSAllocatedUnfairLock<LiveActivityControlResult?>(initialState: nil)
+
+        init(request: LiveActivityControlRequest) {
+            self.request = request
+        }
+
+        var result: LiveActivityControlResult? { response.withLock { $0 } }
+
+        func complete(_ result: LiveActivityControlResult) {
+            let first = response.withLock { response in
+                guard response == nil else { return false }
+                response = result
+                return true
+            }
+            if first { signal.complete() }
+        }
+    }
+
+    func requests(owner id: UUID) -> AsyncStream<LiveActivityControlRequest> {
+        var owner = owners[id] ?? Owner()
+        guard !owner.isEnding else { return AsyncStream { $0.finish() } }
+
+        owner.subscription?.continuation.finish()
+        owner.control?.complete(.unavailable)
+        owner.control = nil
+        subscriptionSerial += 1
+        let subscriptionID = subscriptionSerial
+        let pair = AsyncStream<LiveActivityControlRequest>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        pair.continuation.onTermination = { [weak self] _ in
+            // Stream termination is synchronous; only actor housekeeping escapes its callback.
+            // swiftlint:disable:next no_unstructured_task
+            Task { await self?.subscriptionEnded(owner: id, subscriptionID: subscriptionID) }
+        }
+        owner.subscription = Subscription(id: subscriptionID, continuation: pair.continuation)
+        owners[id] = owner
+        return pair.stream
+    }
+
+    func deliver(
+        activityID: String, command: LiveActivityCommand, generation: Int, clock: any Clock<Duration>
+    ) async -> LiveActivityControlResult {
+        // An extension must never mistake the app's live owner for an orphan in its own process.
+        guard isAppProcess else { return .unavailable }
+        guard !Task.isCancelled else { return .cancelled }
+        guard let (id, owner) = owners.first(where: {
+            $0.value.activityID == activityID || $0.value.endingActivityID == activityID
+        }) else {
+            return await endOrphan(activityID, clock: clock)
+        }
+        guard !owner.isEnding, let subscription = owner.subscription else { return .unavailable }
+        guard owner.control == nil else { return .busy }
+
+        controlSerial += 1
+        let request = LiveActivityControlRequest(id: controlSerial, command: command, generation: generation)
+        let ticket = ControlTicket(request: request)
+        owners[id]?.control = ticket
+        switch subscription.continuation.yield(request) {
+            case .enqueued:
+                break
+            case .terminated:
+                subscriptionEnded(owner: id, subscriptionID: subscription.id)
+                return .unavailable
+            case .dropped:
+                Logger.liveActivity.error("An admitted live activity command did not fit its empty stream buffer")
+                subscriptionEnded(owner: id, subscriptionID: subscription.id)
+                return .unavailable
+            @unknown default:
+                Logger.liveActivity.error("An admitted live activity command could not be delivered")
+                subscriptionEnded(owner: id, subscriptionID: subscription.id)
+                return .unavailable
+        }
+        _ = await ticket.signal.wait(timeout: Self.controlTimeout, clock: clock)
+        if let result = ticket.result { return result }
+        if Task.isCancelled { return .cancelled }
+
+        Logger.liveActivity.notice("A live activity command took over \(Self.controlTimeout, privacy: .public); the timer still owns it")
+        return .timedOut
+    }
+
+    func requestHandled(owner id: UUID, requestID: Int, result: LiveActivityControlResult) {
+        guard let ticket = owners[id]?.control, ticket.request.id == requestID else { return }
+
+        owners[id]?.control = nil
+        ticket.complete(result)
+    }
+
+    private func subscriptionEnded(owner id: UUID, subscriptionID: Int) {
+        guard owners[id]?.subscription?.id == subscriptionID else { return }
+
+        owners[id]?.subscription?.continuation.finish()
+        owners[id]?.subscription = nil
+        owners[id]?.control?.complete(.unavailable)
+        owners[id]?.control = nil
+    }
+
+    private func endOrphan(_ activityID: String, clock: any Clock<Duration>) async -> LiveActivityControlResult {
+        guard transport.allIDs().contains(activityID) else { return .unavailable }
+
+        let signal = CompletionSignal()
+        let isFirst = orphanEnds[activityID] == nil
+        orphanEnds[activityID, default: []].append(signal)
+        if isFirst {
+            // Removal outlives a cancelled or timed-out intent; each caller has its own bounded wait.
+            // swiftlint:disable:next no_unstructured_task
+            Task {
+                await transport.end(activityID, nil, .immediate)
+                let signals = orphanEnds.removeValue(forKey: activityID) ?? []
+                signals.forEach { $0.complete() }
+            }
+        }
+        let completed = await signal.wait(timeout: Self.endTimeout, clock: clock)
+        // Keep the removal registered, but release a caller that no longer waits for it.
+        orphanEnds[activityID]?.removeAll { $0 === signal }
+        if Task.isCancelled { return .cancelled }
+        if !completed {
+            Logger.liveActivity.notice("Ending an orphan activity took over \(Self.endTimeout, privacy: .public); removal continues")
+        }
+        return .orphanEnded
     }
 }

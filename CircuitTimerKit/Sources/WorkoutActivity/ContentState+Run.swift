@@ -4,11 +4,11 @@ import WorkoutDomain
 extension WorkoutActivityAttributes.ContentState {
     /// The state of `run` settled at `now`. The run never counts while it waits for the start
     /// countdown or the resume countdown, so those read as `getReady` and `paused`.
-    public init(run: WorkoutRun, at now: Date) {
+    public init(run: WorkoutRun, at now: Date, controlGeneration: Int = 0) {
         var run = run
         run.tick(at: now)
         let snapshot = run.snapshot(at: now)
-        self.init(phase: Self.phase(of: snapshot, outlook: run.outlook(at: now)))
+        self.init(phase: Self.phase(of: snapshot, outlook: run.outlook(at: now)), controlGeneration: controlGeneration)
     }
 
     private static func phase(of snapshot: WorkoutRun.Snapshot, outlook: WorkoutRun.Outlook?) -> WorkoutActivityAttributes.Phase {

@@ -49,7 +49,9 @@ struct TimerNotificationReducerTests {
         }
         await store.receive(.internal(.notificationAccessLoaded(generation: 2, .authorized)))
         syncGate.continuation.yield(())
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(reads.value == 2)
         #expect(removed.value == [timerID])
     }
@@ -102,7 +104,9 @@ struct TimerNotificationReducerTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(store.state.notifications.projection?.isAudible == false)
         #expect(plans.value.count == 1)
         #expect(plans.value.first?.allSatisfy { !$0.isAudible } == true)
@@ -136,7 +140,9 @@ struct TimerNotificationReducerTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(plans.value == [[]])
         await store.send(.internal(.notificationAccessLoaded(generation: 1, .authorized))) {
             $0.notifications.access = .authorized
@@ -144,7 +150,9 @@ struct TimerNotificationReducerTests {
             $0.notifications.revision = 2
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 2, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 2, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 2
+        }
         #expect(plans.value.count == 2)
         #expect(plans.value.last?.map(\.key) == ["stage.1", "finish"])
         #expect(store.state.clockGeneration == 1)
@@ -182,7 +190,9 @@ struct TimerNotificationReducerTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(plans.value.last?.map(\.key) == ["finish"])
         #expect(store.state.clockGeneration == 1)
     }
@@ -233,7 +243,9 @@ struct TimerNotificationReducerTests {
         }
         _ = try #require(await cancellations.next())
         accessReply.resume(returning: .authorized)
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         await store.finish()
         #expect(plans.value == [[]])
         #expect(store.state.notifications.projection?.language == "ru")
@@ -453,7 +465,9 @@ struct TimerNotificationReducerTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(reads.value == 1)
         #expect(plans.value == [[]])
         #expect(store.state.destination != nil)

@@ -27,6 +27,8 @@ extension DesignSystem.Token {
         case title
         /// «Next», «Now».
         case label
+        /// Pause/Resume inside the Live Activity's 44 pt target.
+        case activityControl
     }
 }
 
@@ -54,6 +56,8 @@ extension Font {
                 .system(size: 13, weight: .semibold)
             case .label:
                 .system(size: 13)
+            case .activityControl:
+                .system(size: 22, weight: .semibold)
         }
     }
 }

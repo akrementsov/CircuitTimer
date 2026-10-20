@@ -14,7 +14,8 @@ struct TimerStageListTests {
     @Test(arguments: TimerPhase.allCases)
     func test_stagesButtonTapped_eachPhase_stopsTheClockAndPushesTheOutline(phase: TimerPhase) async {
         let schedule = phase == .awaitingUser ? Schedules.withPause : Schedules.workRest
-        let timer = TimerHarness(.fixture(phase, schedule: schedule))
+        let timer = TimerHarness(.fixture(phase, schedule: schedule), activity: true)
+        let activity = timer.recordActivity()
         let store = timer.store
         let expectedCalls: [TimerCall]
 
@@ -24,6 +25,7 @@ struct TimerStageListTests {
                 await timer.send(.view(.stagesButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.requestedAwake = false
                     $0.awakeRevision = 2
                     $0.path.append(.stageList($0.outline))
@@ -35,6 +37,7 @@ struct TimerStageListTests {
                     $0.run.pause(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = nil
                     $0.requestedAwake = false
                     $0.awakeRevision = 2
@@ -49,6 +52,8 @@ struct TimerStageListTests {
         #expect(store.state.outline == WorkoutOutline(schedule: schedule))
         await store.finish()
         #expect(timer.calls.value == expectedCalls)
+        let expectedGeneration = [TimerPhase.running, .startCountdown, .resumeCountdown].contains(phase) ? 1 : 0
+        #expect(activity.syncs.value.last?.content.controlGeneration == expectedGeneration)
     }
 
     @Test

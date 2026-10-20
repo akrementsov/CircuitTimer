@@ -21,6 +21,7 @@ extension WorkoutTimerFeature {
         var accessGeneration = 0
         var projection: NotificationProjection?
         var revision = 0
+        var completedRevision = 0
         var lastAttempt: MonotonicInstant?
         var needsRetry = false
         var hasSchedulingFailed = false
@@ -100,6 +101,7 @@ extension WorkoutTimerFeature {
     func notificationsSynced(revision: Int, report: NotificationSyncReport?, _ state: inout State) {
         guard revision == state.notifications.revision, report?.superseded != true else { return }
 
+        state.notifications.completedRevision = revision
         if state.isBackgroundNotificationsOn, state.notifications.access == nil, let access = report?.access {
             state.notifications.access = access
             // The scheduler recovered the missing status; an earlier read must not erase it on timeout.

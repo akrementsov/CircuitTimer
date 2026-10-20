@@ -23,6 +23,9 @@ extension DesignSystem.Token {
         case activityCompactClock = 44
         /// Width of the clock in the minimal Dynamic Island.
         case activityMinimalClock = 36
+
+        /// Minimum side of the Live Activity's Pause/Resume target, also 44 pt.
+        public static let activityControl = Self.activityCompactClock
     }
 }
 

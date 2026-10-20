@@ -280,6 +280,24 @@ struct LiveActivityCoordinatorTests {
         #expect(await sync(.held(3), revision: 3) == LiveActivityNotice(serial: 2, isFailing: false))
     }
 
+    @Test
+    func test_syncWithResult_repeatedFailure_isNotHiddenByAnUnchangedNotice() async {
+        fake.requestFailures.setValue([.transient("busy"), .transient("busy")])
+        let first = await coordinator.syncWithResult(
+            owner: Self.owner, revision: 1, attributes: Self.attributes, content: .held(1), clock: clock
+        )
+        let second = await coordinator.syncWithResult(
+            owner: Self.owner, revision: 2, attributes: Self.attributes, content: .held(1), clock: clock
+        )
+        let recovered = await coordinator.syncWithResult(
+            owner: Self.owner, revision: 3, attributes: Self.attributes, content: .held(1), clock: clock
+        )
+
+        #expect(first == LiveActivitySyncResult(outcome: .failed, notice: LiveActivityNotice(serial: 1, isFailing: true)))
+        #expect(second == LiveActivitySyncResult(outcome: .failed))
+        #expect(recovered == LiveActivitySyncResult(outcome: .applied, notice: LiveActivityNotice(serial: 2, isFailing: false)))
+    }
+
     // MARK: - Concurrency
 
     @Test

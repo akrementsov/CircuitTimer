@@ -56,12 +56,15 @@ struct TimerGenerationTests {
     func test_internalAction_olderGeneration_changesNothing(action: WorkoutTimerFeature.Action.Internal) async {
         var state = State.fixture(.running)
         state.clockGeneration = 3
-        let timer = TimerHarness(state)
+        let timer = TimerHarness(state, activity: true)
+        let activity = timer.recordActivity()
         await timer.advance(seconds: 1)
 
         await timer.send(.internal(action))
         #expect(!timer.store.state.hasClockFailed)
         #expect(timer.calls.value.isEmpty)
+        await timer.store.finish()
+        #expect(activity.syncs.value.last?.content.controlGeneration == 0)
     }
 
     @Test
@@ -91,8 +94,9 @@ struct TimerGenerationTests {
 
     @Test
     func test_clockFailed_tickLoopSleepThrows_pausesAndAsksToResume() async {
-        let timer = TimerHarness(.appearing(elapsed: 3))
+        let timer = TimerHarness(.appearing(elapsed: 3), activity: true)
         let store = timer.store
+        let activity = timer.recordActivity()
         timer.failures.setValue(1)
 
         await timer.appearRunning()
@@ -100,6 +104,7 @@ struct TimerGenerationTests {
             $0.run.pause(at: origin)
             $0.settle(at: origin)
             $0.hasClockFailed = true
+            $0.activityControls?.generation = 1
             $0.clockGeneration = 2
             $0.clockAnchor = nil
             $0.requestedAwake = false
@@ -107,6 +112,8 @@ struct TimerGenerationTests {
         }
         #expect(store.state.currentCard.name == String(localized: "timer.failed.resume", bundle: .module))
         #expect(timer.calls.value == [.awake(true, 1), .awake(false, 2)])
+        await store.finish()
+        #expect(activity.syncs.value.last?.content.controlGeneration == 1)
     }
 
     @Test

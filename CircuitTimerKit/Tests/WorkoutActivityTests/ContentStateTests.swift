@@ -7,12 +7,23 @@ import WorkoutDomain
 @Suite
 struct ContentStateTests {
     @Test
+    func test_coding_controlGeneration_survivesActivityDelivery() throws {
+        let data = Data(#"{"phase":{"finished":{}},"controlGeneration":17}"#.utf8)
+        let content = try JSONDecoder().decode(Content.self, from: data)
+        let encoded = try JSONEncoder().encode(content)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+
+        #expect(object["controlGeneration"] as? Int == 17)
+    }
+
+    @Test
     func test_init_runningStage_carriesItsBoundariesAndTheNextStage() {
         var run = makeRun(makePausedWorkout())
         run.start(at: origin)
 
-        let content = Content(run: run, at: moment(3))
+        let content = Content(run: run, at: moment(3), controlGeneration: 17)
 
+        #expect(content.controlGeneration == 17)
         #expect(content.phase == .running(Attributes.Running(
             stage: .work(),
             stageStart: origin,
@@ -120,7 +131,7 @@ struct ContentStateTests {
             stageStart: origin,
             stageEnd: moment(10),
             next: .stage(.rest(cyrillic), end: moment(15))
-        )))
+        )), controlGeneration: 17)
 
         let size = try Attributes(workoutName: cyrillic).encodedSize(with: content)
         let emojiSize = try Attributes(workoutName: emoji).encodedSize(with: content)

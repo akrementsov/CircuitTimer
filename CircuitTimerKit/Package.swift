@@ -162,6 +162,7 @@ let package = Package(
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
         .target(

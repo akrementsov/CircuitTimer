@@ -106,6 +106,7 @@ struct TimerNotificationTests {
             $0.preferredLocales = [Locale(identifier: "en")]
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
             $0.notifications.needsRetry = false
         }
         #expect(store.state.notifications.hasSchedulingFailed)
@@ -124,6 +125,7 @@ struct TimerNotificationTests {
             $0.preferredLocales = [Locale(identifier: "en")]
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
             $0.notifications.hasSchedulingFailed = false
         }
     }
@@ -140,6 +142,7 @@ struct TimerNotificationTests {
             $0.preferredLocales = [Locale(identifier: "en")]
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport(imminentUnconfirmed: 1)))) {
+            $0.notifications.completedRevision = 1
             $0.notifications.hasSchedulingFailed = true
             $0.notifications.needsRetry = true
         }
@@ -178,6 +181,7 @@ struct TimerNotificationTests {
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
         await store.receive(.internal(.notificationsSynced(revision: 2, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 2
             $0.notifications.needsRetry = false
         }
         #expect(calls.value == 1)
@@ -205,7 +209,9 @@ struct TimerNotificationTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: clock)
         }
-        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport())))
+        await store.receive(.internal(.notificationsSynced(revision: 1, report: NotificationSyncReport()))) {
+            $0.notifications.completedRevision = 1
+        }
         #expect(store.state.notifications.projection?.language == language)
         #expect(store.state.clockGeneration == 1)
     }
@@ -234,6 +240,7 @@ struct TimerNotificationTests {
             $0.date = .constant(origin)
         }
         await store.send(.internal(.notificationsSynced(revision: 1, report: nil))) {
+            $0.notifications.completedRevision = 1
             $0.notifications.hasSchedulingFailed = true
             $0.notifications.needsRetry = true
         }
@@ -349,6 +356,7 @@ struct TimerNotificationTests {
         }
         let report = NotificationSyncReport(access: access)
         await store.send(.internal(.notificationsSynced(revision: 1, report: report))) {
+            $0.notifications.completedRevision = 1
             $0.notifications.access = access
             $0.notifications.accessGeneration = 2
             $0.notifications.needsRetry = false
