@@ -9,9 +9,18 @@ mkdir -p "$work/bin"
 cat > "$work/bin/xcodebuild" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$XCODEBUILD_ARGUMENTS"
+if [ "$1" = build-for-testing ]; then
+	while [ "$1" != -derivedDataPath ]; do shift; done
+	app="$2/Build/Products/Debug-iphonesimulator/CircuitTimer.app"
+	for host in "$app" "$app/PlugIns/CircuitTimerWidgets.appex"; do
+		mkdir -p "$host/Metadata.appintents"
+		cp "$ACTIVITY_INTENTS_FIXTURE"/* "$host/Metadata.appintents/"
+	done
+fi
 EOF
 chmod +x "$work/bin/xcodebuild"
 export PATH="$work/bin:$PATH" XCODEBUILD_ARGUMENTS="$work/arguments"
+export ACTIVITY_INTENTS_FIXTURE="$root/scripts/tests/fixtures/activity-intents"
 
 second='platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'
 oldest='platform=iOS Simulator,name=iPhone 15,OS=17.5'

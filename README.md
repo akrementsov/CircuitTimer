@@ -110,6 +110,16 @@ The engine works on wall-clock time because only a date survives an app restart 
 - **Clock moved back:** the timer does not stall and committed progress is kept. If the clock goes back past the anchor the run re-anchors at the current time, and `rebase(at:keepingTotalElapsed:)` lets the UI restore the progress it has already shown.
 - **Clock moved forward:** this is an accepted compromise. The run cannot tell it apart from time spent in the background, so it advances through timed stages up to the next manual pause.
 
+### Live Activity controls
+
+The Lock Screen card and expanded Dynamic Island have one Pause/Resume button beside the clock. Resume continues immediately, including a manual pause, and closes an open stage list or finish confirmation in the app. The initial countdown and finished card have no control; compact and minimal Island views stay read-only.
+
+A card command targets its activity and control generation, so an older card cannot toggle a later pause. If the app process has gone, tapping ends only that orphan card: the saved run stays available for the next launch's Continue prompt. An intent waits at most five seconds for the card and notification sync; timing out does not undo a command already delivered. The run's existing background assertion protects its disk write; intent execution takes no additional assertion.
+
+App and UI-test builds check the compiled intent metadata in both hosts, including the static-module registration needed on iOS 17.
+
+CT-4-2 stays unchecked below until the system runtime checks pass, including locked-screen delivery on the supported iOS versions.
+
 ## Getting started
 
 ```sh

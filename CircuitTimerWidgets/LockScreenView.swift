@@ -5,6 +5,8 @@ import WorkoutActivity
 /// The workout's name, a card in the stage's colour with its clock, and the stage that comes next.
 struct LockScreenView: View {
     let display: WorkoutActivityDisplay
+    let activityID: String
+    let generation: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: .token(spacing: .s)) {
@@ -31,6 +33,9 @@ struct LockScreenView: View {
             // The clock never gives way: a long name wraps or truncates instead.
             ActivityClockText(display.clock, style: .lockScreenClock, glyphSide: .token(size: .activityGlyph))
                 .layoutPriority(1)
+            if let command = display.control {
+                ActivityControlButton(command: command, activityID: activityID, generation: generation)
+            }
         }
         .foregroundStyle(display.tone.ink)
         .padding(.vertical, .token(spacing: .s))

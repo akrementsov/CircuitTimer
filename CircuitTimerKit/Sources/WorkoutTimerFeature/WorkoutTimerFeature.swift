@@ -80,6 +80,8 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var hasRecordFailed = false
         /// Whether the Lock Screen cannot show the workout; the newest serial wins.
         public internal(set) var liveActivityNotice: LiveActivityNotice?
+        /// Exists for the timer stack's control subscription, independently of its clock loops.
+        var activityControls: ActivityControlState?
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @SharedReader(.keepScreenOn) var isKeepScreenOn = true
@@ -140,6 +142,7 @@ public struct WorkoutTimerFeature: Sendable {
         @CasePathable
         public enum View: Equatable, Sendable {
             case task
+            case activityTask
             case closeButtonTapped
             case playPauseButtonTapped
             case nextButtonTapped
@@ -160,6 +163,10 @@ public struct WorkoutTimerFeature: Sendable {
             case notificationAccessLoaded(generation: Int, NotificationAccess?)
             case notificationsSynced(revision: Int, report: NotificationSyncReport?)
             case liveActivityNoticeChanged(LiveActivityNotice)
+            case activityRequestsReady
+            case activityRequestsEnded
+            case activityRequestReceived(LiveActivityControlRequest)
+            case activitySynchronized(revision: Int, LiveActivitySyncResult)
         }
     }
 
@@ -167,6 +174,7 @@ public struct WorkoutTimerFeature: Sendable {
         case clock(generation: Int)
         case cues
         case notificationAccess
+        case activityRequests
     }
 
     /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
@@ -189,6 +197,7 @@ public struct WorkoutTimerFeature: Sendable {
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
+            let controlMoment = ControlMoment(state)
             let effect: Effect<Action> = switch action {
                 case let .view(action):
                     reduce(into: &state, action)
@@ -202,6 +211,7 @@ public struct WorkoutTimerFeature: Sendable {
                     // Leaving the stage list keeps the run paused, like the original app.
                     .none
             }
+            updateControlGeneration(&state, after: action, from: controlMoment)
             return effect
         }
         .ifLet(\.$destination, action: \.destination)
@@ -211,12 +221,11 @@ public struct WorkoutTimerFeature: Sendable {
             if case .destination(.presented(.closeConfirmation(.finish))) = action { return .none }
             if case .view(.closeButtonTapped) = action, state.snapshot.status == .finished { return .none }
             let now = date()
-            return .merge(
-                signal(&state),
-                syncScreenAwake(&state),
-                syncNotifications(&state, after: action, at: now),
-                syncLiveActivity(state, after: action, at: now)
-            )
+            let signals = signal(&state)
+            let awake = syncScreenAwake(&state)
+            let notifications = syncNotifications(&state, after: action, at: now)
+            let activity = syncLiveActivity(&state, after: action, at: now)
+            return .merge(signals, awake, notifications, activity, finishActivityControl(&state))
         }
     }
 
@@ -226,7 +235,7 @@ public struct WorkoutTimerFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         // The close alert relies on a stopped clock; a control that slips under it would restart the clock or
         // replace the alert. Leaving and coming back still count: the clock is stopped, and the run is saved.
-        if action != .task, !action.is(\.scenePhaseChanged), action != .notificationPreferencesChanged,
+        if action != .task, action != .activityTask, !action.is(\.scenePhaseChanged), action != .notificationPreferencesChanged,
            state.destination != nil { return .none }
 
         let now = date()
@@ -236,6 +245,10 @@ public struct WorkoutTimerFeature: Sendable {
                 guard state.clockGeneration == 0 else { return .none }
 
                 return syncClock(&state, at: now)
+            case .activityTask:
+                guard state.activityControls == nil else { return .none }
+                state.activityControls = ActivityControlState()
+                return subscribeActivityRequests(state.id)
             case .notificationPreferencesChanged:
                 return .none
             case .closeButtonTapped:
@@ -253,6 +266,21 @@ public struct WorkoutTimerFeature: Sendable {
 
     private func reduce(into state: inout State, _ action: Action.Internal) -> Effect<Action> {
         switch action {
+            case .activityRequestsReady:
+                guard state.activityControls?.isEnding == false else { return .none }
+                state.activityControls?.isReady = true
+                let now = date()
+                return advance(&state, at: now) ? syncClock(&state, at: now) : .none
+            case .activityRequestsEnded:
+                state.activityControls?.isReady = false
+                guard let pending = state.activityControls?.pending else { return .none }
+                state.activityControls?.pending = nil
+                return acknowledgeActivityRequest(state.id, requestID: pending.id, result: .unavailable)
+            case let .activityRequestReceived(request):
+                return handleActivityRequest(request, &state, at: date())
+            case let .activitySynchronized(revision, result):
+                activitySynchronized(revision: revision, result: result, &state)
+                return .none
             case let .notificationAccessLoaded(generation, access):
                 guard generation == state.notifications.accessGeneration, state.isBackgroundNotificationsOn else { return .none }
                 state.notifications.access = access
@@ -406,7 +434,7 @@ public struct WorkoutTimerFeature: Sendable {
                     restart = nil
                 case .finished:
                     let stop = syncClock(&state, at: now)
-                    return .merge(stop, closeScreen(state))
+                    return .merge(stop, closeScreen(&state))
             }
         }
         state.destination = .closeConfirmation(.closeConfirmation(restart: restart))
@@ -416,7 +444,7 @@ public struct WorkoutTimerFeature: Sendable {
     private func closeConfirmed(_ choice: CloseConfirmation, _ state: inout State) -> Effect<Action> {
         switch choice {
             case .finish:
-                return closeScreen(state)
+                return closeScreen(&state)
             case let .stay(restart):
                 let now = date()
                 let mustSync = advance(&state, at: now)
@@ -434,7 +462,8 @@ public struct WorkoutTimerFeature: Sendable {
     }
 
     /// The only way the timer closes; its clock must have stopped already.
-    private func closeScreen(_ state: State) -> Effect<Action> {
+    private func closeScreen(_ state: inout State) -> Effect<Action> {
+        state.activityControls?.isEnding = true
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the closed workout run")
@@ -591,40 +620,6 @@ public struct WorkoutTimerFeature: Sendable {
             }
         }
         .cancellable(id: CancelID.clock(generation: generation))
-    }
-
-    // Wakes whenever the stage clock changes its second and ends once its copy of the run stops.
-    // Every input is passed in, so the loop reads nothing from the store or the dependencies.
-    // swiftlint:disable:next function_parameter_count
-    static func tickLoop<C: Clock<Duration>>(
-        clock: C,
-        date: DateGenerator,
-        session: TimerSessionClient,
-        owner: UUID,
-        run: WorkoutRun,
-        generation: Int,
-        send: Send<Action>
-    ) async throws {
-        while true {
-            // A loop that starts after its screen closed ends before it sleeps.
-            guard await !session.isEnded(owner: owner) else { return }
-
-            // The loop's copy only schedules wake-ups; the reducer commits and shows its own reading.
-            let shown = run.snapshot(at: date())
-            let stopped = shown.status != .running
-            if !stopped {
-                try await clock.sleep(for: wakeDelay(stageRemaining: shown.stageRemaining), tolerance: .zero)
-            }
-            await send(.internal(.ticked(generation: generation, isFinal: stopped)))
-            if stopped { return }
-        }
-    }
-
-    /// Time until `stageRemaining` crosses a whole second, where the stage clock, which rounds up, changes.
-    /// Never zero, so the loop never spins.
-    static func wakeDelay(stageRemaining: Duration) -> Duration {
-        let fraction = stageRemaining - .seconds(stageRemaining.components.seconds)
-        return fraction > .zero ? fraction : .seconds(1)
     }
 
 }

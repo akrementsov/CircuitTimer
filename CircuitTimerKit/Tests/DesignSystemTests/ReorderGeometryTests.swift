@@ -104,4 +104,26 @@ struct ReorderGeometryTests {
     func test_clampedOffset_insideOrBeyondTheRange_staysWithinIt(offset: CGFloat, expected: CGFloat) {
         #expect(ReorderGeometry(heights: Self.heights, from: 1, spacing: 10).clampedOffset(offset) == expected)
     }
+
+    @Test(arguments: [
+        (CGFloat.zero, CGFloat(110), CGFloat(60), 2),
+        (0, 260, -50, 0),
+        (-10, 250, -50, 0),
+        (15, 190, 25, 1),
+        (-35, 160, 5, 1),
+        (0, 200, 0, 1),
+    ])
+    func test_offset_scrolledContent_keepsDrawingAndDestinationTogether(
+        fingerTravel: CGFloat,
+        contentMinY: CGFloat,
+        expectedOffset: CGFloat,
+        expectedDestination: Int
+    ) {
+        let geometry = ReorderGeometry(heights: Self.heights, from: 1, spacing: 10)
+
+        let offset = geometry.offset(fingerTravel: fingerTravel, contentMinYAtLift: 200, contentMinY: contentMinY)
+
+        #expect(offset == expectedOffset)
+        #expect(geometry.destination(for: offset) == expectedDestination)
+    }
 }

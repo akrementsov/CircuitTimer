@@ -15,8 +15,8 @@ public final class RowInteraction<ID: Hashable> {
     /// Points per frame the screen scrolls by itself while a lifted row is held near an edge.
     var autoScrollVelocity: CGFloat = .zero
     var isScrolled = false
-    /// Read only when the screen scrolls by itself; written on every scrolled frame without redrawing anything.
-    @ObservationIgnored var geometry = ScrollContentGeometry()
+    /// Only the lifted row observes the content frame, so auto-scroll does not redraw the whole list.
+    let geometry = ScrollContentGeometry()
     /// Where the content was when a swipe opened; scrolling away from it closes the swipe.
     @ObservationIgnored var swipeAnchorMinY: CGFloat?
 

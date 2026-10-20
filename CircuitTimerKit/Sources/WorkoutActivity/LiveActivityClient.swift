@@ -28,16 +28,39 @@ public struct LiveActivityClient: Sendable {
         _ attributes: WorkoutActivityAttributes,
         _ content: WorkoutActivityAttributes.ContentState
     ) async -> LiveActivityNotice? = { _, _, _, _ in nil }
+    /// Like `sync`, with the drain outcome needed before acknowledging a control command.
+    public var syncWithResult: @Sendable (
+        _ owner: UUID, _ revision: Int, _ attributes: WorkoutActivityAttributes,
+        _ content: WorkoutActivityAttributes.ContentState
+    ) async -> LiveActivitySyncResult = { _, _, _, _ in .init(outcome: .unavailable) }
     /// Removes the owner's activity at once and refuses its later syncs. Waits a bounded time
     /// (`LiveActivityCoordinator.endTimeout`); the removal finishes in the background after that.
     public var end: @Sendable (_ owner: UUID) async -> Void
     /// Removes the activities of earlier processes.
     public var endOrphans: @Sendable () async -> Void
+    /// Subscribes the live timer before its first card is published; replaces its previous stream.
+    public var requests: @Sendable (_ owner: UUID) async -> AsyncStream<LiveActivityControlRequest> = { _ in
+        AsyncStream { $0.finish() }
+    }
+    /// Admits one command per owner, returning `busy` for overlap. The caller waits up to five
+    /// seconds; cancelling or timing out does not cancel an admitted command. An app process
+    /// with no matching owner removes only that orphan card, without touching the run record.
+    public var deliver: @Sendable (
+        _ activityID: String, _ command: LiveActivityCommand, _ generation: Int
+    ) async -> LiveActivityControlResult = { _, _, _ in .unavailable }
+    /// Releases admission after the timer applies or rejects this exact request and finishes
+    /// its required synchronization. A late acknowledgement cannot release a newer request.
+    public var requestHandled: @Sendable (
+        _ owner: UUID, _ requestID: Int, _ result: LiveActivityControlResult
+    ) async -> Void = { _, _, _ in }
 }
 
 extension LiveActivityClient: DependencyKey {
     public static let liveValue: Self = {
-        let coordinator = LiveActivityCoordinator(transport: .live())
+        let coordinator = LiveActivityCoordinator(
+            transport: .live(),
+            isAppProcess: Bundle.main.bundleURL.pathExtension == "app"
+        )
         let revision = LockIsolated(0)
         return Self(
             nextRevision: {
@@ -50,11 +73,23 @@ extension LiveActivityClient: DependencyKey {
                 @Dependency(\.continuousClock) var clock
                 return await coordinator.sync(owner: owner, revision: revision, attributes: attributes, content: content, clock: clock)
             },
+            syncWithResult: { owner, revision, attributes, content in
+                @Dependency(\.continuousClock) var clock
+                return await coordinator.syncWithResult(
+                    owner: owner, revision: revision, attributes: attributes, content: content, clock: clock
+                )
+            },
             end: { owner in
                 @Dependency(\.continuousClock) var clock
                 await coordinator.end(owner: owner, clock: clock)
             },
-            endOrphans: { await coordinator.endOrphans() }
+            endOrphans: { await coordinator.endOrphans() },
+            requests: { await coordinator.requests(owner: $0) },
+            deliver: { activityID, command, generation in
+                @Dependency(\.continuousClock) var clock
+                return await coordinator.deliver(activityID: activityID, command: command, generation: generation, clock: clock)
+            },
+            requestHandled: { await coordinator.requestHandled(owner: $0, requestID: $1, result: $2) }
         )
     }()
 
@@ -62,8 +97,12 @@ extension LiveActivityClient: DependencyKey {
     public static let previewValue = Self(
         nextRevision: { 1 },
         sync: { _, _, _, _ in nil },
+        syncWithResult: { _, _, _, _ in .init(outcome: .unavailable) },
         end: { _ in },
-        endOrphans: {}
+        endOrphans: {},
+        requests: { _ in AsyncStream { $0.finish() } },
+        deliver: { _, _, _ in .unavailable },
+        requestHandled: { _, _, _ in }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()

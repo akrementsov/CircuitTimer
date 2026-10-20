@@ -17,7 +17,8 @@ struct TimerControlTests {
 
     @Test(arguments: TimerPhase.allCases)
     func test_playPause_eachPhase_movesToItsCounterpart(phase: TimerPhase) async {
-        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)))
+        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)), activity: true)
+        let activity = timer.recordActivity()
         let store = timer.store
         let expectedCalls: [TimerCall]
 
@@ -27,6 +28,7 @@ struct TimerControlTests {
                 await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.countdown = nil
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.requestedAwake = false
                     $0.awakeRevision = 2
                 }
@@ -36,6 +38,7 @@ struct TimerControlTests {
                 await timer.send(.view(.playPauseButtonTapped), saving: true) {
                     $0.countdown = Countdown(.start)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.requestedAwake = true
                     $0.awakeRevision = 3
                 }
@@ -45,6 +48,7 @@ struct TimerControlTests {
                     $0.run.pause(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = nil
                     $0.requestedAwake = false
                     $0.awakeRevision = 2
@@ -55,6 +59,7 @@ struct TimerControlTests {
                     $0.run.resume(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = timer.anchor(totalElapsed: $0.snapshot.totalElapsed)
                     $0.requestedAwake = true
                     $0.awakeRevision = 3
@@ -67,11 +72,14 @@ struct TimerControlTests {
         }
         await timer.cancelClockLoop()
         #expect(timer.calls.value == expectedCalls)
+        #expect(timer.store.state.activityControls?.generation == (phase == .finished ? 0 : 1))
+        #expect(activity.syncs.value.last?.content.controlGeneration == (phase == .finished ? 0 : 1))
     }
 
     @Test(arguments: TimerPhase.allCases)
     func test_next_eachPhase_movesOnOrStarts(phase: TimerPhase) async {
-        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)))
+        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)), activity: true)
+        let activity = timer.recordActivity()
         let store = timer.store
         let expectedCalls: [TimerCall]
 
@@ -83,6 +91,7 @@ struct TimerControlTests {
                     $0.run.start(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = timer.anchor(totalElapsed: .zero)
                     $0.requestedAwake = true
                     $0.awakeRevision = phase == .idle ? 3 : 1
@@ -97,6 +106,7 @@ struct TimerControlTests {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = timer.anchor(totalElapsed: .seconds(10))
                 }
                 #expect(store.state.snapshot.status == .running)
@@ -106,6 +116,7 @@ struct TimerControlTests {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = timer.anchor(totalElapsed: .seconds(10))
                 }
                 expectedCalls = []
@@ -115,6 +126,7 @@ struct TimerControlTests {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                 }
                 #expect(store.state.snapshot.status == .paused)
                 #expect(store.state.snapshot.currentStage?.index == 1)
@@ -124,6 +136,7 @@ struct TimerControlTests {
                     $0.run.skipToNextStage(at: origin)
                     $0.settle(at: origin)
                     $0.clockGeneration = 2
+                    $0.activityControls?.generation = 1
                     $0.clockAnchor = timer.anchor(totalElapsed: .seconds(2))
                     $0.requestedAwake = true
                     $0.awakeRevision = 3
@@ -136,6 +149,8 @@ struct TimerControlTests {
         }
         await timer.cancelClockLoop()
         #expect(timer.calls.value == expectedCalls)
+        #expect(timer.store.state.activityControls?.generation == (phase == .finished ? 0 : 1))
+        #expect(activity.syncs.value.last?.content.controlGeneration == (phase == .finished ? 0 : 1))
     }
 
     @Test
@@ -176,7 +191,8 @@ struct TimerControlTests {
 
     @Test(arguments: [TimerPhase.startCountdown, .resumeCountdown, .running, .idle, .paused, .awaitingUser])
     func test_closeThenStay_eachPhase_restartsTheCountdownItStopped(phase: TimerPhase) async {
-        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)))
+        let timer = TimerHarness(.fixture(phase, schedule: Self.schedule(for: phase)), activity: true)
+        let activity = timer.recordActivity()
         let restart: Countdown.Purpose? = switch phase {
             case .startCountdown: .start
             case .resumeCountdown, .running: .resume
@@ -194,6 +210,7 @@ struct TimerControlTests {
                 $0.clockAnchor = nil
             }
             $0.clockGeneration = 2
+            $0.activityControls?.generation = 1
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
@@ -203,10 +220,12 @@ struct TimerControlTests {
 
             $0.countdown = Countdown(restart)
             $0.clockGeneration = 3
+            $0.activityControls?.generation = 2
             $0.requestedAwake = true
             $0.awakeRevision = 3
         }
         await timer.cancelClockLoop()
+        #expect(activity.syncs.value.last?.content.controlGeneration == (restart == nil ? 0 : 2))
         #expect(timer.calls.value == (restart == nil ? [] : [.awake(false, 2), .awake(true, 3)]))
     }
 

@@ -140,10 +140,12 @@ build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
+	python3 scripts/check-activity-intents.py "$(DERIVED_DATA)/App/Build/Products/Debug-iphonesimulator/CircuitTimer.app"
 
 # The app with its UI tests, as `test-ui` builds them, so CI shows a build error in a step of its own.
 build-ui-tests:
 	xcodebuild build-for-testing $(UI_TEST_BUILD)
+	python3 scripts/check-activity-intents.py "$(DERIVED_DATA)/UITests-$(TEST_RUN)/Build/Products/Debug-iphonesimulator/CircuitTimer.app"
 
 # Each destination has its own result bundle, log and DerivedData, so runs on different simulators can overlap; the
 # package checkouts are shared and only read. A failing test gets one more run, and one that passes only then is

@@ -57,6 +57,7 @@ struct StageRow: View {
                 onChange: onNameChange
             )
             .focused(focus, equals: .stageName(stage.id))
+            .accessibilityIdentifier(AccessibilityID.Editor.stageName(section, index))
             .font(.token(.body))
             .animation(nil) { $0.disabled(!isEditable) }
         }

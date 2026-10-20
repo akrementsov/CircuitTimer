@@ -1,11 +1,34 @@
 @testable import DesignSystem
 
+import Foundation
 import Testing
 import UIKit
 
 @MainActor
 @Suite
 struct RowTextEditingGestureTests {
+    @Test
+    func test_longPress_finalTouch_updatesPositionBeforeDrop() {
+        let finalPoint = CGPoint(x: 50, y: 120)
+        var latestPoint: CGPoint?
+        var droppedAt: CGPoint?
+        let coordinator = ScrollViewLongPress(
+            isEnabled: true,
+            pressDuration: 0.35,
+            accepts: { _ in true },
+            onLift: { _ in },
+            onFingerMove: { latestPoint = $0 },
+            onDrop: { droppedAt = latestPoint },
+            onCancel: {}
+        ).makeCoordinator()
+
+        // Invoke the registered UIKit target with an ended recognizer: its final point need not have appeared in
+        // a preceding .changed event. Dropping first would commit the previous point (or none at all).
+        coordinator.handle(EndedLongPress(point: finalPoint))
+
+        #expect(droppedAt == finalPoint)
+    }
+
     @Test(arguments: [false, true])
     func test_longPress_numericField_doesNotLiftRow(touchesChild: Bool) {
         let field = NativeNumericField()
@@ -61,6 +84,23 @@ struct RowTextEditingGestureTests {
 
         #expect(receivesTouch)
     }
+}
+
+@MainActor
+private final class EndedLongPress: UILongPressGestureRecognizer {
+    private let point: CGPoint
+
+    init(point: CGPoint) {
+        self.point = point
+        super.init(target: nil, action: nil)
+    }
+
+    override var state: UIGestureRecognizer.State {
+        get { .ended }
+        set {}
+    }
+
+    override func location(in view: UIView?) -> CGPoint { point }
 }
 
 @MainActor

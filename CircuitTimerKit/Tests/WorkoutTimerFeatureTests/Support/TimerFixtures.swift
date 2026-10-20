@@ -219,8 +219,9 @@ final class TimerHarness {
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
-    init(_ state: WorkoutTimerFeature.State, signals: Bool = false, notifications: Bool = false) {
+    init(_ state: WorkoutTimerFeature.State, signals: Bool = false, notifications: Bool = false, activity: Bool = false) {
         var state = state
+        if activity { state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true) }
         state.$isBackgroundNotificationsOn = SharedReader(value: notifications)
         if !signals {
             state.isPreparingCountdown = false
@@ -359,7 +360,11 @@ final class TimerHarness {
         saving: Bool = false,
         assert update: ((inout WorkoutTimerFeature.State) -> Void)? = nil
     ) async {
-        if !saving, update == nil {
+        let notificationRevision: Int? = if case let .internal(.notificationsSynced(revision, report)) = action,
+            revision == store.state.notifications.revision, report?.superseded != true {
+            revision
+        } else { nil }
+        if !saving, update == nil, notificationRevision == nil {
             await store.receive(action)
             return
         }
@@ -367,6 +372,7 @@ final class TimerHarness {
         let revision = expectedRecordRevision
         await store.receive(action) {
             update?(&$0)
+            if let notificationRevision { $0.notifications.completedRevision = notificationRevision }
             if saving {
                 $0.recordSync = .pending(
                     revision: revision,

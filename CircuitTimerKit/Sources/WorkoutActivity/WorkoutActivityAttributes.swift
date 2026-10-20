@@ -22,9 +22,12 @@ public struct WorkoutActivityAttributes: ActivityAttributes, Hashable, Sendable 
 
     public struct ContentState: Codable, Hashable, Sendable {
         public let phase: Phase
+        /// Invalidates controls rendered before a change of the run's control state.
+        public let controlGeneration: Int
 
-        public init(phase: Phase) {
+        public init(phase: Phase, controlGeneration: Int = 0) {
             self.phase = phase
+            self.controlGeneration = controlGeneration
         }
 
         /// When the running stage ends: from then on the system marks the content stale, and the

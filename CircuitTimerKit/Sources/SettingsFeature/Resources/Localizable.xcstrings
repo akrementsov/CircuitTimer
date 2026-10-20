@@ -102,13 +102,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Shows workout and stage names on the Lock Screen. Sound follows Sound above. Covers the next 32 transitions, up to a manual pause; reopen CircuitTimer to extend coverage. iOS controls delivery and sound."
+            "value" : "Notifies you of stage changes on the Lock Screen. Open the app from time to time to refresh notifications."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Показывает названия тренировки и этапов на экране блокировки. Звук следует переключателю выше. Охватывает ближайшие 32 перехода, до ручной паузы; открывайте CircuitTimer для следующих уведомлений. Показом и звуком управляет iOS."
+            "value" : "Сообщает о смене этапов на экране блокировки. Открывайте приложение время от времени, чтобы обновить уведомления."
           }
         }
       }

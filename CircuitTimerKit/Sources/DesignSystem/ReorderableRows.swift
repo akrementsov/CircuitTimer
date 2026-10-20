@@ -26,6 +26,11 @@ struct ReorderGeometry: Equatable {
         min(max(offset, offsetRange.lowerBound), offsetRange.upperBound)
     }
 
+    /// Drawing and dropping use the same scroll content frame: content moving up adds to the finger's travel.
+    func offset(fingerTravel: CGFloat, contentMinYAtLift: CGFloat, contentMinY: CGFloat) -> CGFloat {
+        clampedOffset(fingerTravel + contentMinYAtLift - contentMinY)
+    }
+
     /// The place the lifted row would take: it passes a neighbour once its edge crosses the neighbour's middle.
     func destination(for offset: CGFloat) -> Int {
         let top = top(of: from) + offset
@@ -86,7 +91,7 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
     /// Rows' places in the scroll content, which don't move while it scrolls.
     @State private var frames: [Item.ID: CGRect] = [:]
     @State private var drag: ReorderDrag<Item.ID>?
-    /// The lifted row's last offset, as drawn. A plain reference: it changes on every frame the screen scrolls by
+    /// The lifted row's latest computed offset. A plain reference: it changes on every frame the screen scrolls by
     /// itself, and redrawing every row for it would stall a long list.
     @State private var liftedOffset = LiftedOffset()
     @Environment(RowInteraction<Item.ID>.self) private var interaction: RowInteraction<Item.ID>?
@@ -129,8 +134,10 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
                             scale: isLifted ? Self.liftScale : 1,
                             shift: shift(ofRowAt: index),
                             fingerTravel: isLifted ? drag?.fingerTravel ?? .zero : .zero,
-                            offsetRange: isLifted ? drag?.geometry.offsetRange ?? 0...0 : 0...0,
-                            onOffsetChange: liftedOffsetChanged
+                            geometry: isLifted ? drag?.geometry : nil,
+                            contentGeometry: interaction?.geometry,
+                            contentMinYAtLift: drag?.contentMinYAtLift ?? .zero,
+                            onPositionChange: updateDragPosition
                         )
                     )
                     .gesture(TapGesture().onEnded { onRowTap?(item) }, including: onRowTap != nil ? .all : .subviews)
@@ -219,7 +226,13 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
         let geometry = ReorderGeometry(heights: sizes.map(\.height), from: from, spacing: spacing)
         liftedOffset.value = .zero
         withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) {
-            drag = ReorderDrag(id: item.id, ids: items.map(\.id), sizes: sizes, geometry: geometry)
+            drag = ReorderDrag(
+                id: item.id,
+                ids: items.map(\.id),
+                sizes: sizes,
+                geometry: geometry,
+                contentMinYAtLift: interaction.geometry.contentFrame.minY
+            )
             interaction.liftedID = item.id
         }
     }
@@ -231,12 +244,19 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
             drag?.fingerYAtLift = fingerY
         }
         drag?.fingerY = fingerY
-        updateVelocity()
+        // This update must stay synchronous: SwiftUI's geometry/onChange callbacks can arrive after the finger
+        // has already lifted, especially for short stage rows.
+        updateDragPosition()
     }
 
-    private func liftedOffsetChanged(_ offset: CGFloat) {
-        guard let current = drag else { return }
+    private func updateDragPosition() {
+        guard let current = drag, let interaction else { return }
 
+        let offset = current.geometry.offset(
+            fingerTravel: current.fingerTravel,
+            contentMinYAtLift: current.contentMinYAtLift,
+            contentMinY: interaction.geometry.contentFrame.minY
+        )
         liftedOffset.value = offset
         let destination = current.geometry.destination(for: offset)
         if destination != current.destination {
@@ -300,15 +320,17 @@ private struct ReorderDrag<ID: Hashable>: Equatable {
     let ids: [ID]
     let sizes: [CGSize]
     let geometry: ReorderGeometry
+    let contentMinYAtLift: CGFloat
     var destination: Int
     var fingerYAtLift: CGFloat?
     var fingerY: CGFloat?
 
-    init(id: ID, ids: [ID], sizes: [CGSize], geometry: ReorderGeometry) {
+    init(id: ID, ids: [ID], sizes: [CGSize], geometry: ReorderGeometry, contentMinYAtLift: CGFloat) {
         self.id = id
         self.ids = ids
         self.sizes = sizes
         self.geometry = geometry
+        self.contentMinYAtLift = contentMinYAtLift
         destination = geometry.from
     }
 
@@ -362,7 +384,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
             recognizer.delegate = self
         }
 
-        @objc private func handle(_ recognizer: UILongPressGestureRecognizer) {
+        @objc func handle(_ recognizer: UILongPressGestureRecognizer) {
             let point = recognizer.location(in: nil)
             switch recognizer.state {
                 case .began:
@@ -370,6 +392,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
                 case .changed:
                     parent.onFingerMove(point)
                 case .ended:
+                    parent.onFingerMove(point)
                     parent.onDrop()
                 case .cancelled, .failed:
                     parent.onCancel()
@@ -427,37 +450,32 @@ private struct LiftedRowTracker: ViewModifier {
     let scale: CGFloat
     let shift: CGFloat
     let fingerTravel: CGFloat
-    let offsetRange: ClosedRange<CGFloat>
-    let onOffsetChange: (CGFloat) -> Void
-
-    @State private var placeMinYAtLift: CGFloat?
-    @State private var placeMinY: CGFloat = .zero
+    let geometry: ReorderGeometry?
+    let contentGeometry: ScrollContentGeometry?
+    let contentMinYAtLift: CGFloat
+    let onPositionChange: () -> Void
 
     func body(content: Content) -> some View {
-        let scrolled = placeMinYAtLift.map { $0 - placeMinY } ?? .zero
-        let liftedOffset = min(max(fingerTravel + scrolled, offsetRange.lowerBound), offsetRange.upperBound)
+        let liftedOffset = offset
         content
             .scaleEffect(scale)
             .offset(y: isLifted ? liftedOffset : shift)
-            // Outside the offset, so it measures the row's place and not where the row is drawn. Only the lifted row
-            // reports it, or every row would write state on every scrolled frame.
-            .onGeometryChange(for: CGFloat?.self) { [isLifted] proxy in
-                isLifted ? proxy.frame(in: .global).minY : nil
-            } action: { minY in
-                guard let minY else {
-                    placeMinYAtLift = nil
-                    return
-                }
-
-                if placeMinYAtLift == nil {
-                    placeMinYAtLift = minY
-                }
-                placeMinY = minY
-            }
+            // Auto-scroll moves the content under a resting finger, without another fingerMoved callback.
             .onChange(of: isLifted ? liftedOffset : nil) { _, offset in
-                if let offset {
-                    onOffsetChange(offset)
+                if offset != nil {
+                    onPositionChange()
                 }
             }
+    }
+
+    private var offset: CGFloat {
+        // Only the lifted row reads the observable frame; other rows keep their existing observation unchanged.
+        guard isLifted, let geometry, let contentGeometry else { return .zero }
+
+        return geometry.offset(
+            fingerTravel: fingerTravel,
+            contentMinYAtLift: contentMinYAtLift,
+            contentMinY: contentGeometry.contentFrame.minY
+        )
     }
 }
