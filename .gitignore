@@ -47,3 +47,7 @@ playground.xcworkspace
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+
+# Temporary references owned by capture contract tests; screen baselines remain tracked.
+/CircuitTimerSnapshotContractTests/__Snapshots__/
+/CircuitTimerSnapshotKit/Tests/SnapshotCaptureTests/__Snapshots__/

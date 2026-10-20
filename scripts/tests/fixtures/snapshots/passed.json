@@ -1,0 +1,34 @@
+{
+  "devices": [
+    {
+      "platform": "iOS Simulator",
+      "modelName": "iPhone 17",
+      "osVersion": "27.0",
+      "osBuildNumber": "24A335"
+    }
+  ],
+  "testNodes": [
+    {
+      "nodeType": "Test Suite",
+      "name": "SnapshotTests",
+      "children": [
+        {
+          "nodeType": "Test Case",
+          "name": "test_list_loaded_matchesReference(textSize:)",
+          "result": "Passed",
+          "children": [
+            {"nodeType": "Arguments", "name": "large", "result": "Passed"}
+          ]
+        },
+        {
+          "nodeType": "Test Case",
+          "name": "test_list_empty_matchesReference(textSize:)",
+          "result": "Passed",
+          "children": [
+            {"nodeType": "Arguments", "name": "large", "result": "Passed"}
+          ]
+        }
+      ]
+    }
+  ]
+}

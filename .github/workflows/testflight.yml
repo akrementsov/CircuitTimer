@@ -46,7 +46,7 @@ jobs:
       - name: Cache keys
         id: keys
         run: |
-          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimerSnapshotKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore package sources
         timeout-minutes: 10

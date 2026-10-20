@@ -32,11 +32,15 @@ struct CallbackBridgeTests {
 
     @Test
     func test_wait_noCallback_timesOutOnInjectedClock() async throws {
-        let clock = TestClock()
-        let bridge = CallbackBridge<Int>()
-        let task = Task { try await bridge.wait(timeout: .milliseconds(500), clock: clock) }
-        await clock.advance(by: .milliseconds(500))
-        await #expect(throws: NotificationFailure.timedOut) { try await task.value }
-        bridge.resolve(.success(3))
+        try await withMainSerialExecutor {
+            let clock = TestClock<Duration>()
+            let bridge = CallbackBridge<Int>()
+            let task = Task { try await bridge.wait(timeout: .milliseconds(500), clock: clock) }
+            defer { task.cancel() }
+            try await #require(throws: SuspensionError.self) { try await clock.checkSuspension() }
+            await clock.advance(by: .milliseconds(500))
+            await #expect(throws: NotificationFailure.timedOut) { try await task.value }
+            bridge.resolve(.success(3))
+        }
     }
 }

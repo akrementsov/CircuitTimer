@@ -50,7 +50,7 @@ jobs:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 110
+    timeout-minutes: 185
     steps:
       - uses: actions/checkout@v7
 
@@ -67,7 +67,7 @@ jobs:
       - name: Cache keys
         id: keys
         run: |
-          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+          echo "resolved=${{ hashFiles('CircuitTimerKit/Package.resolved', 'CircuitTimerSnapshotKit/Package.resolved', 'CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore package sources
         id: spm-cache
@@ -123,6 +123,39 @@ jobs:
         timeout-minutes: 25
         run: make test-ui
 
+      # The package checks warnings strictly; the host build compiles it as a dependency with warnings suppressed.
+      # Each build still runs after a failed test, provided the lockfiles agree.
+      - name: Build the snapshot kit
+        id: build-snapshot-kit
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 10
+        run: make build-snapshot-kit
+
+      - name: Test the snapshot kit
+        id: test-snapshot-kit
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 10
+        run: make test-snapshot-kit
+
+      # Into the next step's DerivedData, so compilation errors are reported separately from image differences.
+      - name: Build the snapshot tests
+        id: build-snapshots
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 20
+        run: make build-snapshots
+
+      - name: Test the snapshot capture contracts
+        id: test-snapshot-contracts
+        if: ${{ !cancelled() && steps.build-snapshots.outcome == 'success' }}
+        timeout-minutes: 20
+        run: make test-snapshot-contracts
+
+      - name: Test the snapshots
+        id: test-snapshots
+        if: ${{ !cancelled() && steps.build-snapshots.outcome == 'success' }}
+        timeout-minutes: 15
+        run: make test-snapshots
+
       # Every result bundle: its failed tests, tests that passed only on a retry, and the slowest tests, which add up
       # on the runner's few cores. Diagnostics only: a changed result-bundle format must not fail a run whose tests
       # passed.
@@ -138,7 +171,9 @@ jobs:
       - name: Keep the test results
         if: >-
           ${{ !cancelled() && (failure() || steps.report.outputs.upload == 'true'
-          || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled') }}
+          || steps.test.outcome == 'cancelled' || steps.test-ui.outcome == 'cancelled'
+          || steps.test-snapshots.outcome == 'cancelled' || steps.test-snapshot-kit.outcome == 'cancelled'
+          || steps.test-snapshot-contracts.outcome == 'cancelled') }}
         timeout-minutes: 5
         uses: actions/upload-artifact@v7
         with:
