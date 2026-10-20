@@ -66,14 +66,17 @@ struct WorkoutActivityIntentTests {
     @Test(arguments: [
         ("activity.intent.error.stale", "Состояние тренировки изменилось. Повторите действие на обновлённой карточке."),
         (
-            "The previous workout action is still finishing. Try again shortly.",
+            "activity.intent.error.busy",
             "Предыдущее действие ещё выполняется. Повторите чуть позже."
         ),
         (
-            "The workout action is taking longer than expected. Check the timer in the app.",
+            "activity.intent.error.timedOut",
             "Действие занимает больше времени, чем ожидалось. Проверьте таймер в приложении."
         ),
-        ("The workout could not be updated. Open the timer in the app.", "Не удалось обновить тренировку. Откройте таймер в приложении."),
+        (
+            "activity.intent.error.unavailable",
+            "Проверьте таймер в приложении. Карточка Live Activity может показывать прежнее состояние."
+        ),
     ])
     func test_errorResources_russian_containsTheExpectedTranslation(key: String, expected: String) throws {
         let path = try #require(Bundle.module.path(forResource: "ru", ofType: "lproj"))
@@ -99,7 +102,7 @@ struct WorkoutActivityIntentTests {
             case .timedOut:
                 "The workout action is taking longer than expected. Check the timer in the app."
             case .unavailable, .failed:
-                "The workout could not be updated. Open the timer in the app."
+                "Check the timer in the app. The Live Activity may show an earlier workout state."
             default:
                 "Unexpected outcome in the failure table"
         }

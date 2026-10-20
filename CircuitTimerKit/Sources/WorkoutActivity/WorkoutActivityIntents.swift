@@ -5,9 +5,17 @@ import Foundation
 public struct WorkoutActivityIntents: AppIntentsPackage {}
 
 public struct PauseWorkoutIntent: LiveActivityIntent {
-    public static var title: LocalizedStringResource { LocalizedStringResource("Pause workout", bundle: Bundle.module) }
+    public static var title: LocalizedStringResource {
+        LocalizedStringResource("activity.intent.pause.title", defaultValue: "Pause workout", bundle: Bundle.module)
+    }
     public static var description: IntentDescription {
-        IntentDescription(LocalizedStringResource("Control the current workout from its Live Activity.", bundle: Bundle.module))
+        IntentDescription(
+            LocalizedStringResource(
+                "activity.intent.description",
+                defaultValue: "Control the current workout from its Live Activity.",
+                bundle: Bundle.module
+            )
+        )
     }
     public static var isDiscoverable: Bool { false }
     public static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
@@ -16,8 +24,12 @@ public struct PauseWorkoutIntent: LiveActivityIntent {
     @available(iOS 27, *)
     public static var allowedExecutionTargets: IntentExecutionTargets { .main }
 
-    @Parameter(title: LocalizedStringResource("Activity", bundle: Bundle.module)) public var activityID: String
-    @Parameter(title: LocalizedStringResource("Control generation", bundle: Bundle.module)) public var generation: Int
+    @Parameter(title: LocalizedStringResource("activity.intent.parameter.activity", defaultValue: "Activity", bundle: Bundle.module))
+    public var activityID: String
+    @Parameter(
+        title: LocalizedStringResource("activity.intent.parameter.generation", defaultValue: "Control generation", bundle: Bundle.module)
+    )
+    public var generation: Int
 
     public init() {}
 
@@ -34,9 +46,17 @@ public struct PauseWorkoutIntent: LiveActivityIntent {
 }
 
 public struct ResumeWorkoutIntent: LiveActivityIntent {
-    public static var title: LocalizedStringResource { LocalizedStringResource("Resume workout", bundle: Bundle.module) }
+    public static var title: LocalizedStringResource {
+        LocalizedStringResource("activity.intent.resume.title", defaultValue: "Resume workout", bundle: Bundle.module)
+    }
     public static var description: IntentDescription {
-        IntentDescription(LocalizedStringResource("Control the current workout from its Live Activity.", bundle: Bundle.module))
+        IntentDescription(
+            LocalizedStringResource(
+                "activity.intent.description",
+                defaultValue: "Control the current workout from its Live Activity.",
+                bundle: Bundle.module
+            )
+        )
     }
     public static var isDiscoverable: Bool { false }
     public static var authenticationPolicy: IntentAuthenticationPolicy { .alwaysAllowed }
@@ -45,8 +65,12 @@ public struct ResumeWorkoutIntent: LiveActivityIntent {
     @available(iOS 27, *)
     public static var allowedExecutionTargets: IntentExecutionTargets { .main }
 
-    @Parameter(title: LocalizedStringResource("Activity", bundle: Bundle.module)) public var activityID: String
-    @Parameter(title: LocalizedStringResource("Control generation", bundle: Bundle.module)) public var generation: Int
+    @Parameter(title: LocalizedStringResource("activity.intent.parameter.activity", defaultValue: "Activity", bundle: Bundle.module))
+    public var activityID: String
+    @Parameter(
+        title: LocalizedStringResource("activity.intent.parameter.generation", defaultValue: "Control generation", bundle: Bundle.module)
+    )
+    public var generation: Int
 
     public init() {}
 
@@ -90,11 +114,11 @@ private enum ControlError: LocalizedError {
             case .stale:
                 String(localized: "activity.intent.error.stale", bundle: .module)
             case .busy:
-                String(localized: "The previous workout action is still finishing. Try again shortly.", bundle: .module)
+                String(localized: "activity.intent.error.busy", bundle: .module)
             case .timedOut:
-                String(localized: "The workout action is taking longer than expected. Check the timer in the app.", bundle: .module)
+                String(localized: "activity.intent.error.timedOut", bundle: .module)
             case .unavailable:
-                String(localized: "The workout could not be updated. Open the timer in the app.", bundle: .module)
+                String(localized: "activity.intent.error.unavailable", bundle: .module)
         }
     }
 }
