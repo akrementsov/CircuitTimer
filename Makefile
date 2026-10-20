@@ -91,27 +91,34 @@ build-snapshot-kit:
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
 
 test-snapshot-kit:
-	cd CircuitTimerSnapshotKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(abspath $(TEST_RESULTS))/SnapshotKit-$(TEST_RUN).xcresult" \
+	@set -eu; \
+	results="$(TEST_RESULTS)"; \
+	case "$$results" in /*) ;; *) results="$(CURDIR)/$$results" ;; esac; \
+	cd CircuitTimerSnapshotKit; \
+	$(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$$results/SnapshotKit-$(TEST_RUN).xcresult" \
 		xcodebuild test -scheme CircuitTimerSnapshotKit -destination '$(DESTINATION)' -testLanguage en -testRegion US \
-		-derivedDataPath "$(DERIVED_DATA)/SnapshotKitTests-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
-	cd CircuitTimerSnapshotKit && $(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$(abspath $(TEST_RESULTS))/SnapshotKit-$(TEST_RUN)-ru.xcresult" \
+		-derivedDataPath "$(DERIVED_DATA)/SnapshotKitTests-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS); \
+	$(STRICT) "$(CURDIR)/scripts/run-tests.sh" "$$results/SnapshotKit-$(TEST_RUN)-ru.xcresult" \
 		xcodebuild test -scheme CircuitTimerSnapshotKit -destination '$(DESTINATION)' -testLanguage ru -testRegion RU \
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKitTests-$(TEST_RUN)" -collect-test-diagnostics never $(XCODEBUILD_FLAGS) \
-		-only-testing:'SnapshotCaptureTests/SnapshotCaptureTests/test_capture_bundleLanguageMismatch_throwsBeforeRoot()'
-	@report=$$(xcrun xcresulttool get test-results summary --path "$(abspath $(TEST_RESULTS))/SnapshotKit-$(TEST_RUN)-ru.xcresult") && \
+		-only-testing:'SnapshotCaptureTests/SnapshotCaptureTests/test_capture_bundleLanguageMismatch_throwsBeforeRoot()'; \
+	report=$$(xcrun xcresulttool get test-results summary --path "$$results/SnapshotKit-$(TEST_RUN)-ru.xcresult"); \
 		printf '%s\n' "$$report" | jq -e '.passedTests == 1 and .skippedTests == 0 and .failedTests == 0' > /dev/null
 
 test-snapshot-contracts:
-	scripts/run-tests.sh "$(abspath $(TEST_RESULTS))/SnapshotContracts-$(TEST_RUN).xcresult" \
+	@set -eu; \
+	results="$(TEST_RESULTS)"; \
+	case "$$results" in /*) ;; *) results="$(CURDIR)/$$results" ;; esac; \
+	scripts/run-tests.sh "$$results/SnapshotContracts-$(TEST_RUN).xcresult" \
 		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
 		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage en -testRegion US \
-		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS)
-	scripts/run-tests.sh "$(abspath $(TEST_RESULTS))/SnapshotContracts-$(TEST_RUN)-de.xcresult" \
+		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS); \
+	scripts/run-tests.sh "$$results/SnapshotContracts-$(TEST_RUN)-de.xcresult" \
 		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
 		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage de -testRegion DE \
 		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) \
-		-only-testing:CircuitTimerSnapshotContractTests/SnapshotLanguageContractTests
-	@report=$$(xcrun xcresulttool get test-results summary --path "$(abspath $(TEST_RESULTS))/SnapshotContracts-$(TEST_RUN)-de.xcresult") && \
+		-only-testing:CircuitTimerSnapshotContractTests/SnapshotLanguageContractTests; \
+	report=$$(xcrun xcresulttool get test-results summary --path "$$results/SnapshotContracts-$(TEST_RUN)-de.xcresult"); \
 		printf '%s\n' "$$report" | jq -e '.passedTests == 1 and .skippedTests == 0 and .failedTests == 0' > /dev/null
 
 build-package:

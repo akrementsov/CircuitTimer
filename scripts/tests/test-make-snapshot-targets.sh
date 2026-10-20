@@ -228,20 +228,23 @@ for target in test-snapshot-kit test-snapshot-contracts; do
 	expect_status 2
 done
 
-describe 'PR30: relative result overrides resolve from the checkout for harness commands'
+describe 'PR30: result overrides resolve from the checkout and preserve spaces'
 # make's CURDIR uses the physical path; macOS TMPDIR may go through the /var symlink.
-relative_results="$(cd "$repo" && pwd -P)/relative-results"
-for target in test-snapshot-kit test-snapshot-contracts; do
-	reset_trace
-	snapshot_make "$target" TEST_RESULTS=relative-results
-	expect_status 0
-	case "$target" in
-		test-snapshot-kit) suite=SnapshotKit; language=ru ;;
-		*) suite=SnapshotContracts; language=de ;;
-	esac
-	expect_in "$TRACE/calls" "bundle:$relative_results/$suite-iPhone-17-27.0.xcresult"
-	expect_in "$TRACE/calls" "bundle:$relative_results/$suite-iPhone-17-27.0-$language.xcresult"
-	expect_in "$TRACE/calls" "summary:$relative_results/$suite-iPhone-17-27.0-$language.xcresult"
+physical_repo="$(cd "$repo" && pwd -P)"
+for results in relative-results 'relative results' "$work/absolute results"; do
+	case "$results" in /*) expected_results="$results" ;; *) expected_results="$physical_repo/$results" ;; esac
+	for target in test-snapshot-kit test-snapshot-contracts; do
+		reset_trace
+		snapshot_make "$target" TEST_RESULTS="$results"
+		expect_status 0
+		case "$target" in
+			test-snapshot-kit) suite=SnapshotKit; language=ru ;;
+			*) suite=SnapshotContracts; language=de ;;
+		esac
+		expect_in "$TRACE/calls" "bundle:$expected_results/$suite-iPhone-17-27.0.xcresult"
+		expect_in "$TRACE/calls" "bundle:$expected_results/$suite-iPhone-17-27.0-$language.xcresult"
+		expect_in "$TRACE/calls" "summary:$expected_results/$suite-iPhone-17-27.0-$language.xcresult"
+	done
 done
 
 describe 'S040/S107: lockfile union, shared pins and SnapshotTesting ownership'
