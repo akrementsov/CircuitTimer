@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class WorkoutEditorUITests: XCTestCase {
+    func test_savedWorkout_editThenSave_keepsChangesWhenReopened() {
+        let app = launch(.oneWorkout)
+        let updatedName = ScenarioFixture.workoutName + " updated"
+
+        WorkoutListScreen(app)
+            .openWorkout(ScenarioFixture.workoutName)
+            .tapEdit()
+            .typeName(" updated")
+            .tapSave()
+            .assertTitle(updatedName)
+            .tapBack()
+            .assertHasWorkout(updatedName, duration: "2 minutes")
+            .openWorkout(updatedName)
+            .assertTitle(updatedName)
+            .tapEdit()
+            .assertName(updatedName)
+    }
+
     func test_savedWorkout_dragStage_changesOrder() {
         let app = launch(.oneWorkout)
 

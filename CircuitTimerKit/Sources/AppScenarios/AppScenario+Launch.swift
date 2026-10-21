@@ -36,7 +36,7 @@ extension AppScenario {
         dependencies.timerSession = .previewValue
         dependencies.backgroundTask = .previewValue
         dependencies.saveTip = .previewValue
-        dependencies.appVersion = .previewValue
+        dependencies.appVersion = .init(shortVersion: { ScenarioFixture.appVersion })
         dependencies.defaultAppStorage = .inMemory
         dependencies.uuid = .incrementing
         // Never advanced: a started timer stands still on its first countdown digit.
