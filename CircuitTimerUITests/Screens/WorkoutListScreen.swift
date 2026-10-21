@@ -24,6 +24,13 @@ struct WorkoutListScreen: Screen {
         return EditorScreen(app, file: file, line: line)
     }
 
+    func tapSettings(file: StaticString = #filePath, line: UInt = #line) -> SettingsScreen {
+        app.tabBars.buttons["Settings"]
+            .waitUntilHittable("The Settings tab", file: file, line: line)
+            .tap()
+        return SettingsScreen(app, file: file, line: line)
+    }
+
     func openWorkout(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> EditorScreen {
         row(name, file: file, line: line).tap()
         return EditorScreen(app, file: file, line: line)

@@ -99,6 +99,12 @@ struct EditorScreen: Screen {
     }
 
     @discardableResult
+    func assertName(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
+        nameField.waitUntilValue("The workout's name", is: name, file: file, line: line)
+        return self
+    }
+
+    @discardableResult
     func assertTitle(_ title: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
         app.navigationBars.staticTexts[title].waitUntilExists("The title \"\(title)\"", file: file, line: line)
         return self
