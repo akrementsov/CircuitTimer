@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. The domain, the timer engine, the workout list with its editor, stored in SwiftData, the Settings tab and a full-screen timer that plays a workout in the foreground are in place; the timer keeps its progress across backgrounding and relaunches; foreground tones, haptics and spoken stage names, plus background stage-start and finish notifications, are controlled by persistent Settings switches (see the roadmap).
+An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between.
+
+The app has a workout list and editor backed by SwiftData, a full-screen timer and persistent Settings. Workouts keep their progress across backgrounding and relaunches. Foreground tones, haptics, spoken stage names and background notifications follow the Settings switches. A Live Activity shows the workout on the Lock Screen and in the Dynamic Island, with Pause/Resume controls on the card and expanded Island. See the [roadmap](#roadmap) for delivered features and remaining work.
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -11,7 +13,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 - Swift 6 language mode with complete strict concurrency, iOS 17+
 - SwiftUI and [The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) 1.26 with the 2.0 deprecations trait enabled
 - [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect
-- Swift Testing; XCTest for the UI tests
+- Swift Testing for unit and snapshot tests; XCTest for the UI tests
 - SwiftLint, GitHub Actions
 - Xcode 27.1; tests run on the iOS 27.0 simulator
 
@@ -75,14 +77,14 @@ Not drawn, to keep the picture readable: `AppFeature`, the composition root, als
 |---|---|---|
 | `AppFeature` | App | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. Before the first Start it requests notification permission. At launch it offers to continue or finish a saved run while separately cleaning notifications and ending Live Activities left by the previous process. |
 | `WorkoutEditorFeature` | Features | The workout screen in the original app's cards: a saved workout opens read-only with Start workout at the bottom; the pencil edits a draft that the bottom Save workout button saves, back to read-only, or Back discards; a new workout starts with an empty stage in every section; stage durations typed as MM:SS on the number pad, and a dimmed Save that explains itself; stage editing within `WorkoutLimits`. |
-| `WorkoutTimerFeature` | Features | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It schedules stage-start and finish notifications for the background, in a bounded rolling window. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. It shows the run on the Lock Screen and in the Dynamic Island as a Live Activity, with a footnote when iOS refuses one. |
+| `WorkoutTimerFeature` | Features | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It schedules stage-start and finish notifications for the background, in a bounded rolling window. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. It shows the run as a Live Activity and handles its Pause/Resume commands, with a footnote when iOS refuses an activity. |
 | `SettingsFeature` | Features | The Settings tab with persistent Sound, Vibration and Speak stage names, Background notifications and Keep screen on switches; notification permission status and a route to iOS Settings; its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `DesignSystem` | Core | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows, the caption plate and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll; the tab bar kept to the stacks' roots; the Live Activity's typography. Lint rejects literal styles anywhere else. |
 | `WorkoutStorage` | Core | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. `WorkoutRunRecordClient`, the saved run as one JSON file. |
 | `TimerPreferences` | Core | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles as `@Shared(.appStorage)` keys, shared by Settings and the timer. |
 | `BackgroundExecution` | Core | `BackgroundTaskClient`: a background-task assertion around the run record writes of the timer and `AppFeature`. |
 | `BackgroundNotifications` | Core | Injected local notification client, owner-scoped scheduling and cleanup, permission access, foreground suppression. |
-| `WorkoutActivity` | Core | The Live Activity: a compact state of the run within iOS's 4 KB limit, what the Lock Screen and the Dynamic Island show for it, and `LiveActivityClient`, whose coordinator starts, updates and ends one activity per timer. The `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. |
+| `WorkoutActivity` | Core | The Live Activity: a compact state of the run within iOS's 4 KB limit, what the Lock Screen and the Dynamic Island show for it, and `LiveActivityClient`, whose coordinator starts, updates and ends one activity per timer and routes owner-scoped Pause/Resume intents. The `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. |
 | `WorkoutDomain` | Domain | Workout model, normalization limits, the linear schedule and its fingerprint, and the `WorkoutRun` timer engine. Foundation and CryptoKit only, so the widget can use it. |
 | `UITestContract` | Core | The accessibility identifiers the app and its UI tests share and, in Debug, the scenario names, launch keys and fixture names the tests read. No dependencies. |
 | `AppScenarios` | App, Debug only | Each UI test scenario: its workouts and a value for every dependency the app reads, none of them live. The app builds its store from one when a UI test asks. |
@@ -118,7 +120,15 @@ A card command targets its activity and control generation, so an older card can
 
 App and UI-test builds check the compiled intent metadata in both hosts, including the static-module registration needed on iOS 17.
 
-CT-4-2 stays unchecked below until the system runtime checks pass, including locked-screen delivery on the supported iOS versions.
+CT-4-2 is merged. Its roadmap checkbox records delivery; the following verification limits were accepted at merge and remain open before release:
+
+- protected Lock Screen delivery and system error presentation on a physical device;
+- real process suspension at the five-second wait bound;
+- runtime absence from Shortcuts and Spotlight;
+- Release runtime on a physical device;
+- complete system coverage of all card states, maximum text sizes, English labels and RTL.
+
+Release simulator probes exercised card and expanded-Island Pause/Resume on iOS 17.5 and 27.0. They do not establish the physical-device checks above.
 
 ## Getting started
 
@@ -237,7 +247,8 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
   - [x] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list; own drag reorder (delivered with CT-3-2)
 - [ ] **CT-QA** — tests through the UI, in slices:
   - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
-  - [ ] UI smoke tests of the main flows: the workout list, creating and editing, the timer, Settings
+  - [x] UI smoke tests: empty list, creating and saving a workout, workout and stage reorder, starting and closing the timer
+  - [ ] Remaining UI smoke flows: saving edits to an existing workout and Settings
   - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
@@ -245,9 +256,9 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
   - [x] **CT-3-3** — background and restore
   - [x] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
   - [x] **CT-3-5** — cues in the background through local notifications
-- [ ] **CT-4** — Live Activity and Dynamic Island, in slices:
+- [x] **CT-4** — Live Activity and Dynamic Island, in slices (remaining system checks are listed [above](#live-activity-controls)):
   - [x] **CT-4-1** — the running workout on the Lock Screen and in the Dynamic Island, and signing checks of both bundles on TestFlight
-  - [ ] **CT-4-2** — pause and resume from the Live Activity
+  - [x] **CT-4-2** — pause and resume from the Live Activity
 - [ ] **CT-5** — iCloud sync
 - [ ] **CT-6** — in-app purchase with StoreKit 2
 - [ ] **CT-7** — App Store release
