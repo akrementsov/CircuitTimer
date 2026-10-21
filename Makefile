@@ -300,13 +300,25 @@ record-snapshot:
 	@git status --short -- '$(SNAPSHOTS_DIR)'
 	@git ls-files --others --exclude-standard -- '$(SNAPSHOTS_DIR)'
 
-# Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
+# Built unsigned: an App Store Connect API key can sign only at export, so `upload` signs. The export keeps the
+# entitlements of the archived signature and an unsigned app has none, so the archived bundles are then signed ad hoc,
+# the widget before the app that contains it, and the app with Configs/CircuitTimer.entitlements for its container.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
 	xcodebuild archive -project CircuitTimer.xcodeproj -scheme CircuitTimer -configuration Release \
 		-destination 'generic/platform=iOS' -archivePath "$(ARCHIVE_PATH)" \
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
+	@set -eu; \
+	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
+	container=$$(plutil -extract CTCloudKitContainerIdentifier raw "$$app/Info.plist"); \
+	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
+	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
+	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
+	plutil -replace com.apple.developer.icloud-container-identifiers -json "[\"$$container\"]" "$$entitlements"; \
+	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
+	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
+	codesign --verify --deep --strict "$$app"
 
 # UI test scenarios are Debug-only: no file of the archived app may name one.
 check-release-app:
