@@ -56,6 +56,8 @@ actor WorkoutStore {
         try write { context in
             if let model = primaryRecords(in: try allSorted(in: context)).model(for: workout.id) {
                 model.update(from: workout, in: context)
+                // Saved by the user, so a sample another device seeds later never outranks it.
+                model.assign(false, to: \.isFreshSample)
             } else {
                 try append(workout, in: context)
             }
@@ -227,8 +229,9 @@ actor WorkoutStore {
         try context.fetch(FetchDescriptor<WorkoutModel>()).sorted { $0.storedRank < $1.storedRank }
     }
 
-    /// Picks the visible record of every workout: the first readable one in stored order.
-    /// Reads and writes go through it, so an edit always lands in the record the user sees.
+    /// Picks the visible record of every workout: of its readable copies, the one with the lowest copy rank, which every
+    /// device picks alike. Reads and writes go through it, so an edit always lands in the record the user sees. The
+    /// other readable copies are a workout already shown, so they stay stored and are not reported as hidden.
     private func primaryRecords(in sorted: [WorkoutModel]) -> PrimaryRecords {
         var records = PrimaryRecords()
         var groupOrder: [UUID] = []
@@ -246,34 +249,38 @@ actor WorkoutStore {
 
         for id in groupOrder {
             let group = records.groups[id] ?? []
-            guard let primary = firstReadable(in: group) else {
+            let readable = group.compactMap(readable)
+            guard let primary = readable.min(by: { $0.model.copyRank < $1.model.copyRank }) else {
                 records.hiddenRecordCount += group.count
                 continue
             }
             records.primaries.append(primary)
-            records.hiddenRecordCount += group.count - 1
+            records.hiddenRecordCount += group.count - readable.count
         }
         let position = Dictionary(uniqueKeysWithValues: sorted.enumerated().map { (ObjectIdentifier($1), $0) })
         records.primaries.sort { position[ObjectIdentifier($0.model), default: 0] < position[ObjectIdentifier($1.model), default: 0] }
         return records
     }
 
-    private func firstReadable(in group: [WorkoutModel]) -> (model: WorkoutModel, workout: Workout)? {
-        for model in group {
-            do {
-                return (model, try model.toDomain())
-            } catch {
-                Logger.workoutStore.error("Skipping an unreadable stored workout: \(String(describing: error), privacy: .public)")
-            }
+    private func readable(_ model: WorkoutModel) -> (model: WorkoutModel, workout: Workout)? {
+        do {
+            return (model, try model.toDomain())
+        } catch {
+            Logger.workoutStore.error("Skipping an unreadable stored workout: \(String(describing: error), privacy: .public)")
+            return nil
         }
-        return nil
     }
 }
 
 private extension WorkoutModel {
-    /// A copy without an identifier sorts after every copy with one; uppercase hexadecimal sorts before "~".
     var storedRank: (Int, String, Int, String, PersistentIdentifier) {
-        (order, workoutID?.uuidString ?? "", isFreshSample ? 1 : 0, copyID?.uuidString ?? "~", persistentModelID)
+        (order, workoutID?.uuidString ?? "", copyRank.0, copyRank.1, persistentModelID)
+    }
+
+    /// Which copy of a workout shows: one a device seeded and nobody changed loses to any other, then the lower
+    /// identifier wins. A copy without one ranks last; uppercase hexadecimal sorts before "~".
+    var copyRank: (Int, String) {
+        (isFreshSample ? 1 : 0, copyID?.uuidString ?? "~")
     }
 }
 

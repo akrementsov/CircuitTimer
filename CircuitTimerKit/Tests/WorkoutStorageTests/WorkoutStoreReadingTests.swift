@@ -120,7 +120,7 @@ struct WorkoutStoreReadingTests {
     }
 
     @Test
-    func test_fetchAll_copiesOfOneWorkout_showFirstReadable() async throws {
+    func test_fetchAll_copiesOfOneWorkout_showOneReadable() async throws {
         let id = 1
         let damage: (WorkoutModel) -> Void = { $0.sortedStages[0].section = "bogus" }
 
@@ -128,8 +128,8 @@ struct WorkoutStoreReadingTests {
         let firstDamaged = try await readCopies(of: id, damagingFirst: true, damagingSecond: false, damage: damage)
         let bothDamaged = try await readCopies(of: id, damagingFirst: true, damagingSecond: true, damage: damage)
 
-        #expect(bothReadable.workouts.map(\.name) == ["First"])
-        #expect(bothReadable.hiddenRecordCount == 1)
+        #expect(bothReadable.workouts.count == 1)
+        #expect(bothReadable.hiddenRecordCount == 0)
         #expect(firstDamaged.workouts.map(\.name) == ["Second"])
         #expect(firstDamaged.hiddenRecordCount == 1)
         #expect(bothDamaged == StoredWorkouts(workouts: [], hiddenRecordCount: 2))
