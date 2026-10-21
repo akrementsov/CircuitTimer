@@ -89,10 +89,14 @@ case "$snapshots" in /*) ;; *) snapshots="$root/$snapshots" ;; esac
 for file in "$root"/CircuitTimerSnapshotTests/*SnapshotTests.swift; do
 	[ -f "$file" ] || continue
 	awk '
-		/struct[[:space:]]+[A-Za-z_]/ {
-			suite = $0
-			sub(/^.*struct[[:space:]]+/, "", suite)
-			sub(/[^A-Za-z0-9_].*$/, "", suite)
+		/^[[:space:]]*@Suite([[:space:](]|$)/ { annotated_suite = 1 }
+		/^[[:space:]]*((public|internal|private|fileprivate|package)[[:space:]]+)?struct[[:space:]]+[A-Za-z_]/ {
+			if (annotated_suite) {
+				suite = $0
+				sub(/^[[:space:]]*((public|internal|private|fileprivate|package)[[:space:]]+)?struct[[:space:]]+/, "", suite)
+				sub(/[^A-Za-z0-9_].*$/, "", suite)
+			}
+			annotated_suite = 0
 		}
 		/@Test/ {
 			sizes = "invalid"

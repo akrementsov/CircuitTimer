@@ -30,6 +30,7 @@ EOF
 cat > "$work/bin/xcodebuild" <<'EOF'
 #!/usr/bin/env bash
 set -eu
+printf '%s|%s|%s\n' "${SNAPSHOT_LANGUAGE-unset}" "${SNAPSHOT_TEXT_SIZE-unset}" "${SNAPSHOT_SELECTED_TEST-unset}" >> "$TRACE/selection-environment"
 if [ "$1" = -version ]; then
 	printf 'Xcode 27.1\nBuild version 18B1\n'
 	exit
@@ -312,6 +313,34 @@ snapshot_make test-snapshot TEST=test_probe_matchesReference
 expect_status 0
 expect_in "$TRACE/calls" 'environment:never large'
 expect_in "$TRACE/calls" 'check:never en large'
+
+describe 'Single snapshot: default selection environment is limited to the local targets'
+for target in build-snapshots test-snapshots; do
+    reset_trace
+    snapshot_make "$target"
+    expect_status 0
+    expect_equal "$(LC_ALL=C sort -u "$TRACE/selection-environment")" 'unset|unset|unset'
+done
+reset_trace
+snapshot_make test-snapshot TEST=test_probe_matchesReference
+expect_status 0
+expect_equal "$(LC_ALL=C sort -u "$TRACE/selection-environment")" 'en|large|test_probe_matchesReference'
+
+describe 'Single snapshot: reject the plural language option before Xcode'
+for target in test-snapshot record-snapshot; do
+    for singular in en ru; do
+        reset_trace
+        snapshot_make "$target" TEST=test_probe_matchesReference SNAPSHOT_LANGUAGES=ru SNAPSHOT_LANGUAGE="$singular"
+        expect_status 2
+        expect_in "$work/out" 'use SNAPSHOT_LANGUAGE'
+        expect_equal "$(cat "$TRACE/calls")" ''
+    done
+    reset_trace
+    SNAPSHOT_LANGUAGES=ru snapshot_make "$target" TEST=test_probe_matchesReference
+    expect_status 2
+    expect_in "$work/out" 'use SNAPSHOT_LANGUAGE'
+    expect_equal "$(cat "$TRACE/calls")" ''
+done
 
 describe 'Single snapshot: record then compare exactly the same selection'
 reset_trace

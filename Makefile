@@ -25,9 +25,9 @@ UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destinatio
 SNAPSHOT_REFERENCE_DESTINATION := platform=iOS Simulator,name=iPhone 17,OS=27.0
 SNAPSHOTS_DIR := CircuitTimerSnapshotTests/__Snapshots__
 SNAPSHOT_LANGUAGES ?= en ru
-export SNAPSHOT_LANGUAGE ?= en
-export SNAPSHOT_TEXT_SIZE ?= large
-export SNAPSHOT_SELECTED_TEST = $(TEST)
+test-snapshot record-snapshot: export SNAPSHOT_LANGUAGE ?= en
+test-snapshot record-snapshot: export SNAPSHOT_TEXT_SIZE ?= large
+test-snapshot record-snapshot: export SNAPSHOT_SELECTED_TEST = $(TEST)
 SNAPSHOT_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots -destination '$(DESTINATION)' \
 	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
@@ -169,8 +169,9 @@ test-ui:
 		-retry-tests-on-failure -test-iterations 2 -test-timeouts-enabled YES -collect-test-diagnostics never \
 		-default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 $(TEST_FLAGS)
 
-# Snapshot tests use a fresh process per language and text size, with no test selection or Xcode retry: results describe
-# the whole reference matrix. The only retry of an image is the capture helper's second mount.
+# All snapshot targets use a fresh process per language and text size, without user-supplied selection or Xcode retries.
+# Full-matrix runs never select tests; the local single targets supply their own selection.
+# The only retry of an image is the capture helper's second mount.
 define validate-snapshot-process
 	case '$(DESTINATION)' in \
 		'platform=iOS Simulator,name=iPhone 17,OS=27.0'|\
@@ -182,7 +183,7 @@ define validate-snapshot-process
 		case "$$flag" in \
 			-only-testing*|-skip-testing*|-only-test-configuration*|-skip-test-configuration*|-testPlan*|\
 			-test-iterations*|-retry-tests-on-failure*|-run-tests-until-failure*|-test-repetition-relaunch-enabled*) \
-				echo "snapshots: '$$flag' would select or repeat cases; narrow only with SNAPSHOT_LANGUAGES" >&2; exit 2 ;; \
+				echo "snapshots: '$$flag' would select or repeat cases; use the snapshot target's language/size options and TEST for a single snapshot" >&2; exit 2 ;; \
 		esac; \
 	done;
 endef
@@ -264,6 +265,7 @@ record-snapshots:
 define run-single-snapshot
 	set -eu; \
 	[ "$${CI:-}" != true ] || { echo "single snapshots are local only" >&2; exit 2; }; \
+	$(if $(filter file,$(origin SNAPSHOT_LANGUAGES)),,echo "single snapshots: use SNAPSHOT_LANGUAGE; SNAPSHOT_LANGUAGES is for the full matrix" >&2; exit 2;) \
 	$(validate-snapshot-process) \
 	language="$$SNAPSHOT_LANGUAGE"; text_size="$$SNAPSHOT_TEXT_SIZE"; selected="$$SNAPSHOT_SELECTED_TEST"; \
 	case "$$language" in en) region=US ;; ru) region=RU ;; *) echo "SNAPSHOT_LANGUAGE must be en or ru" >&2; exit 2 ;; esac; \

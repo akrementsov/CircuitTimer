@@ -26,6 +26,7 @@ reset_case() {
 	mkdir -p "$bundle" "$artifacts" "$reference_dir"
 	cp "$fixture" "$bundle/tests.json"
 	cat > "$source_file" <<'EOF'
+@Suite
 struct ProbeSnapshotTests {
 @Test(arguments: SnapshotTextSize.currentCases())
 func test_list_loaded_matchesReference(textSize: SnapshotTextSize) {}
@@ -317,6 +318,33 @@ cp "$source_file" "$repo/CircuitTimerSnapshotTests/DuplicateSnapshotTests.swift"
 run "$checker" --select test_list_loaded_matchesReference large
 expect_status 1
 expect_in "$work/out" 'not unique'
+
+describe 'Single snapshot: comments and helper types cannot replace the annotated suite'
+reset_case
+cat > "$source_file" <<'EOF'
+struct BeforeSuite {}
+extension SnapshotTests {
+    @Suite
+    @MainActor
+    private struct ProbeSnapshotTests {
+        struct Helper {
+            let value: String
+        }
+        // construct a state; struct PretendSuite is only a comment.
+        @Test(arguments: SnapshotTextSize.currentCases())
+        func test_list_loaded_matchesReference(textSize: SnapshotTextSize) {}
+        struct OtherHelper {}
+        @Test(arguments: SnapshotTextSize.currentCases(in: [.large]))
+        func test_list_empty_matchesReference(textSize: SnapshotTextSize) {}
+    }
+}
+struct AfterSuite {}
+EOF
+for selected in test_list_loaded_matchesReference test_list_empty_matchesReference; do
+    run "$checker" --select "$selected" large
+    expect_status 0
+    expect_equal "$(cat "$work/out")" "CircuitTimerSnapshotTests/SnapshotTests/ProbeSnapshotTests/$selected(textSize:)"
+done
 
 describe 'Single snapshot: scope references but require exactly the selected execution'
 reset_case
