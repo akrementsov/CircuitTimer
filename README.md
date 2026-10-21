@@ -250,13 +250,15 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
 
 ## Roadmap
 
+Next: finish the two remaining CT-QA smoke flows, then move on to CT-5. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
 - [x] **CT-2** — workout list and editor, SwiftData persistence
 - [x] **CT-UI** — dark design of the original app, in slices:
   - [x] **CT-UI-1** — dark design tokens and the launch screen
   - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
-  - [x] **CT-UI-3** — tab bar and the Settings tab with About and the legal pages
+  - [x] **CT-UI-3** — tab bar and the Settings tab with About and legal-page navigation; legal texts remain in CT-7
   - [x] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
   - [x] **CT-UI-5** — editor layout of the original app
   - [x] **CT-UI-6** — stage durations typed as MM:SS
@@ -264,7 +266,8 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
 - [ ] **CT-QA** — tests through the UI, in slices:
   - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
   - [x] UI smoke tests: empty list, creating and saving a workout, workout and stage reorder, starting and closing the timer
-  - [ ] Remaining UI smoke flows: saving edits to an existing workout and Settings
+  - [ ] UI smoke test: edit an existing workout, save it and verify the changes
+  - [ ] UI smoke tests: Settings
   - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
@@ -278,6 +281,11 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
 - [ ] **CT-5** — iCloud sync
 - [ ] **CT-6** — in-app purchase with StoreKit 2
 - [ ] **CT-7** — App Store release
+  - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
+  - [ ] Complete the [foreground signal device checklist](docs/timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
+  - [ ] Complete the [background notification device checks](docs/timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
+  - [ ] Complete the remaining [Live Activity system checks](#live-activity-controls), including Release on a physical device
+- [ ] **CT-9** — Apple Watch app
 
 ## License
 
