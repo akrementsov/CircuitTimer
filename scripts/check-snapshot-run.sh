@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Usage: check-snapshot-run.sh never|failed en|ru large|ax5 XCODEBUILD_STATUS BUNDLE ARTIFACTS
+# Usage: check-snapshot-run.sh never|failed en|ru large|ax5 XCODEBUILD_STATUS BUNDLE ARTIFACTS [SELECTED_FUNCTION]
+# Or: check-snapshot-run.sh --select FUNCTION large|ax5 (resolve the Xcode identifier before running)
 # Or: check-snapshot-run.sh --same-cases EN_LARGE EN_AX5 RU_LARGE RU_AX5
 # A successful xcodebuild is not enough: every snapshot function, argument and committed reference must run once,
 # and every case must have exactly one capture journal row. Recording accepts only confirmed reference writes.
@@ -11,15 +12,25 @@ fail() {
 }
 
 usage() {
-	echo "usage: check-snapshot-run.sh never|failed en|ru large|ax5 STATUS BUNDLE ARTIFACTS | --same-cases EN_LARGE EN_AX5 RU_LARGE RU_AX5" >&2
+	echo "usage: check-snapshot-run.sh never|failed en|ru large|ax5 STATUS BUNDLE ARTIFACTS [FUNCTION] | --select FUNCTION large|ax5 | --same-cases EN_LARGE EN_AX5 RU_LARGE RU_AX5" >&2
 	exit 2
 }
 
-if [ "$#" -eq 5 ] && [ "$1" = --same-cases ]; then
+selection=""
+select_only=false
+if [ "$#" -eq 3 ] && [ "$1" = --select ]; then
+	compare=false; select_only=true; selection=$2; text_size=$3
+	case "$text_size" in large|ax5) ;; *) usage ;; esac
+elif [ "$#" -eq 5 ] && [ "$1" = --same-cases ]; then
 	compare=true
-elif [ "$#" -eq 6 ]; then
+elif [ "$#" -eq 6 ] || [ "$#" -eq 7 ]; then
 	compare=false
 	mode=$1; language=$2; text_size=$3; status=$4; bundle=$5; artifacts=$6
+	if [ "$#" -eq 7 ]; then
+		selection=$7
+		[ -n "$selection" ] || fail "selected function is required"
+		[ "${CI:-}" != true ] || fail "single snapshot checks are local only"
+	fi
 	case "$mode" in never|failed) ;; *) usage ;; esac
 	case "$language" in en|ru) ;; *) usage ;; esac
 	case "$text_size" in
@@ -70,16 +81,19 @@ if [ "$compare" = true ]; then
 	exit 0
 fi
 
-read_bundle "$bundle" "$work/tests.json"
 root=$(cd "$(dirname "$0")/.." && pwd)
 snapshots=${SNAPSHOTS_DIR:-CircuitTimerSnapshotTests/__Snapshots__}
 case "$snapshots" in /*) ;; *) snapshots="$root/$snapshots" ;; esac
 
 # The references are the manifest; new test functions still have to run before their first reference exists.
-git -C "$root" ls-files -- "$snapshots" | awk '/\.png$/' > "$work/references"
 for file in "$root"/CircuitTimerSnapshotTests/*SnapshotTests.swift; do
 	[ -f "$file" ] || continue
 	awk '
+		/struct[[:space:]]+[A-Za-z_]/ {
+			suite = $0
+			sub(/^.*struct[[:space:]]+/, "", suite)
+			sub(/[^A-Za-z0-9_].*$/, "", suite)
+		}
 		/@Test/ {
 			sizes = "invalid"
 			if ($0 ~ /arguments:[[:space:]]*SnapshotTextSize\.currentCases\(\)/) sizes = "large,ax5"
@@ -93,11 +107,28 @@ for file in "$root"/CircuitTimerSnapshotTests/*SnapshotTests.swift; do
 				print "check-snapshot-run: " name ": use currentCases() or currentCases(in: [.large]) on one @Test line" > "/dev/stderr"
 				exit 1
 			}
-			print name "\t" sizes
+			print name "\t" sizes "\t" suite
 			sizes = ""
 		}
 	' "$file"
 done > "$work/functions"
+if [ -n "$selection" ] || [ "$select_only" = true ]; then
+	printf '%s\n' "$selection" | LC_ALL=C grep -Eq '^test_[A-Za-z0-9_]+$' || fail "invalid selected function"
+	count=$(awk -F '\t' -v selected="$selection" '$1 == selected { count++ } END { print count + 0 }' "$work/functions")
+	[ "$count" -ne 0 ] || fail "snapshot function not found: $selection"
+	[ "$count" -eq 1 ] || fail "snapshot function is not unique: $selection"
+	entry=$(awk -F '\t' -v selected="$selection" '$1 == selected' "$work/functions")
+	sizes=$(printf '%s\n' "$entry" | cut -f 2)
+	case ",$sizes," in *",$text_size,"*) ;; *) fail "$selection does not support $text_size" ;; esac
+	if [ "$select_only" = true ]; then
+		suite=$(printf '%s\n' "$entry" | cut -f 3)
+		printf '%s\n' "$suite" | LC_ALL=C grep -Eq '^[A-Za-z_][A-Za-z0-9_]*$' || fail "cannot resolve snapshot suite"
+		printf 'CircuitTimerSnapshotTests/SnapshotTests/%s/%s(textSize:)\n' "$suite" "$selection"
+		exit 0
+	fi
+fi
+read_bundle "$bundle" "$work/tests.json"
+git -C "$root" ls-files -- "$snapshots" | awk '/\.png$/' > "$work/references"
 if [ -f "$artifacts/snapshots.tsv" ]; then
 	cp "$artifacts/snapshots.tsv" "$work/journal"
 else
@@ -112,14 +143,15 @@ JQ_VALIDATE='
 	| cases as $allTests
 	| ($functions | lines | map(split("\t") | {function: .[0], sizes: (.[1] | split(","))})) as $inventory
 	| [$inventory[] | .function] as $allFunctions
-	| [$inventory[] | select(.sizes | index($size)) | .function] as $functions
+	| [$inventory[] | select(.sizes | index($size)) | select($selection == "" or .function == $selection) | .function] as $functions
 	| [$allTests[] | .function as $function | select($functions | index($function))] as $tests
 	| [$tests[] | .function as $function | .arguments[]
 		| {key: "\($function).\($lang)-\(.name)", function: $function, argument: .name,
 			result: .result, messages: messages}] as $cases
 	| ($references | lines | map(select(endswith(".png"))
 		| {path: ltrimstr($prefix), key: (split("/")[-1] | sub("\\.png$"; ""))}
-		| select(.key | test("\\.\($lang)-[^/]+$")))) as $allReferences
+		| select(.key | test("\\.\($lang)-[^/]+$"))
+		| select($selection == "" or (.key | startswith($selection + "."))))) as $allReferences
 	| [$allReferences[] | select(.key | endswith(".\($lang)-\($size)"))] as $references
 	| ($journal | lines) as $journalLines
 	| [$journalLines[] | select(startswith("#") | not) | split("\t")] as $fields
@@ -136,6 +168,8 @@ JQ_VALIDATE='
 		($allFunctions | group_by(.)[] | select(length > 1) | "duplicate snapshot function in sources: \(.[0])"),
 		($functions[] as $function | select(any($tests[]; .function == $function) | not)
 			| "snapshot function did not run: \($function)"),
+		($allTests[] | select($selection != "" and .function != $selection and (.arguments | length) > 0)
+			| "unselected snapshot function ran: \(.function)"),
 		($allTests[] | .function as $function | select($allFunctions | index($function) | not)
 			| "Test Case has no snapshot function in sources: \($function)"),
 		($allTests[] | .function as $function | select($functions | index($function) | not)
@@ -182,7 +216,7 @@ JQ_VALIDATE='
 		count: ($cases | length), second: [$rows[] | select(.attempt == "second" and .outcome == "passed") | .key]}
 '
 
-jq --arg lang "$language" --arg size "$text_size" --arg category "$category" --arg mode "$mode" \
+jq --arg selection "$selection" --arg lang "$language" --arg size "$text_size" --arg category "$category" --arg mode "$mode" \
 	--argjson status "$status" --arg prefix "${snapshots#"$root"/}/" \
 	--rawfile functions "$work/functions" --rawfile references "$work/references" --rawfile journal "$work/journal" \
 	"$JQ_CASES $JQ_VALIDATE" "$work/tests.json" > "$work/validation.json" || fail "unexpected result bundle or journal format"
@@ -196,6 +230,7 @@ notice() {
 	fi
 }
 
+if [ -n "$selection" ]; then notice "local selection: $selection (one $language-$text_size variant)"; fi
 notice "$(jq -r --arg lang "$language" --arg size "$text_size" '"\($lang)-\($size): iOS \(.runtime); \(.second | length) of \(.count) snapshots matched only on the second mount"' "$work/validation.json")"
 while IFS= read -r key; do notice "Second mount: $key"; done < <(jq -r '.second[]' "$work/validation.json")
 if [ "$(jq '.errors | length' "$work/validation.json")" -gt 0 ]; then

@@ -19,6 +19,11 @@ EOF
 cat > "$repo/scripts/check-snapshot-run.sh" <<'EOF'
 #!/usr/bin/env bash
 set -eu
+if [ "${1:-}" = --select ]; then
+	if [ "${FAIL_SELECTION:-}" = 1 ]; then echo 'unknown snapshot test' >&2; exit 1; fi
+	printf 'CircuitTimerSnapshotTests/SnapshotTests/ProbeSnapshotTests/%s(textSize:)\n' "$2"
+	exit
+fi
 printf 'check:%s\n' "$*" >> "$TRACE/calls"
 if [ "${1:-}" != --same-cases ] && [ "${FAIL_PAIR:-}" = "$1-$2-$3" ]; then exit 1; fi
 EOF
@@ -283,5 +288,83 @@ for invalid in missing wrong-version in-kit; do
 	expect_in "$work/out" 'SnapshotTesting 1.19.6 belongs to CircuitTimerSnapshotKit and the project only'
 	expect_in "$work/out" 'commit all three'
 done
+
+describe 'Single snapshot: one selected case, language and actual process size'
+for variant in en-large ru-ax5; do
+	reset_trace
+	language=${variant%-*}; size=${variant#*-}
+	snapshot_make test-snapshot TEST=test_probe_matchesReference SNAPSHOT_LANGUAGE="$language" SNAPSHOT_TEXT_SIZE="$size"
+	expect_status 0
+	expect_equal "$(grep -c '^bundle:' "$TRACE/calls" || true)" 1
+	expect_in "$TRACE/calls" "environment:never $size"
+	expect_in "$TRACE/calls" "check:never $language $size 0"
+	expect_in "$TRACE/calls" 'test_probe_matchesReference'
+	arguments=$(find "$TRACE" -name '*.args' -print | head -1)
+	if [ -n "$arguments" ]; then
+		expect_in "$arguments" '-only-testing:CircuitTimerSnapshotTests/SnapshotTests/ProbeSnapshotTests/test_probe_matchesReference(textSize:)'
+		case "$size" in large) category=UICTContentSizeCategoryL ;; ax5) category=UICTContentSizeCategoryAccessibilityXXXL ;; esac
+		expect_in "$arguments" "SNAPSHOT_CONTENT_SIZE_CATEGORY=$category"
+	else fail 'xcodebuild did not receive the selected case'; fi
+	expect_not_in "$TRACE/calls" 'check:--same-cases'
+done
+reset_trace
+snapshot_make test-snapshot TEST=test_probe_matchesReference
+expect_status 0
+expect_in "$TRACE/calls" 'environment:never large'
+expect_in "$TRACE/calls" 'check:never en large'
+
+describe 'Single snapshot: record then compare exactly the same selection'
+reset_trace
+snapshot_make record-snapshot TEST=test_probe_matchesReference
+expect_status 0
+expect_equal "$(grep -c '^bundle:' "$TRACE/calls" || true)" 2
+expect_equal "$(grep '^environment:' "$TRACE/calls" | sed 's/^environment:\([^ ]*\).*/\1/' | uniq)" 'failed
+never'
+expect_equal "$(tail -2 "$TRACE/calls")" 'final-status
+final-new-references'
+reset_trace
+FAIL_PAIR=failed-en-large snapshot_make record-snapshot TEST=test_probe_matchesReference
+expect_status 2
+expect_not_in "$TRACE/calls" 'check:never'
+expect_not_in "$TRACE/calls" final-status
+reset_trace
+FAIL_PAIR=never-en-large snapshot_make record-snapshot TEST=test_probe_matchesReference
+expect_status 2
+expect_equal "$(grep -c '^bundle:' "$TRACE/calls" || true)" 2
+expect_not_in "$TRACE/calls" final-status
+
+describe 'Single snapshot: reject invalid input and unknown selection before Xcode'
+for target in test-snapshot record-snapshot; do
+	for invalid in 'TEST=' 'TEST=not/a/function' 'SNAPSHOT_LANGUAGE=de' 'SNAPSHOT_LANGUAGE=en ru' 'SNAPSHOT_TEXT_SIZE=medium'; do
+		reset_trace
+		snapshot_make "$target" TEST=test_probe_matchesReference "$invalid"
+		expect_status 2
+		expect_equal "$(cat "$TRACE/calls")" ''
+	done
+	reset_trace
+	FAIL_SELECTION=1 snapshot_make "$target" TEST=test_unknown
+	expect_status 2
+	expect_in "$work/out" 'unknown snapshot test'
+	expect_equal "$(cat "$TRACE/calls")" ''
+	reset_trace
+	CI=true snapshot_make "$target" TEST=test_probe_matchesReference
+	expect_status 2
+	expect_in "$work/out" 'local only'
+	expect_equal "$(cat "$TRACE/calls")" ''
+	reset_trace
+	snapshot_make "$target" TEST=test_probe_matchesReference TEST_FLAGS='-only-testing:Another'
+	expect_status 2
+	expect_in "$work/out" 'would select or repeat cases'
+done
+reset_trace
+DIRTY_REFERENCES=1 snapshot_make record-snapshot TEST=test_probe_matchesReference
+expect_status 2
+expect_in "$work/out" 'review and commit reference changes'
+expect_equal "$(cat "$TRACE/calls")" ''
+reset_trace
+snapshot_make record-snapshot TEST=test_probe_matchesReference DESTINATION="$second"
+expect_status 2
+expect_in "$work/out" 'references require'
+expect_equal "$(cat "$TRACE/calls")" ''
 
 finish

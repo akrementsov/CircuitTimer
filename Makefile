@@ -25,6 +25,9 @@ UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destinatio
 SNAPSHOT_REFERENCE_DESTINATION := platform=iOS Simulator,name=iPhone 17,OS=27.0
 SNAPSHOTS_DIR := CircuitTimerSnapshotTests/__Snapshots__
 SNAPSHOT_LANGUAGES ?= en ru
+export SNAPSHOT_LANGUAGE ?= en
+export SNAPSHOT_TEXT_SIZE ?= large
+export SNAPSHOT_SELECTED_TEST = $(TEST)
 SNAPSHOT_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots -destination '$(DESTINATION)' \
 	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
 
@@ -44,7 +47,7 @@ PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swif
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
 .PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
-	build-snapshots test-snapshots test-snapshot-kit test-snapshot-contracts record-snapshots check-release-app upload ci verify-clean
+	build-snapshots test-snapshots test-snapshot record-snapshot test-snapshot-kit test-snapshot-contracts record-snapshots check-release-app upload ci verify-clean
 
 lint:
 	$(SWIFTLINT) lint --strict --quiet
@@ -168,13 +171,24 @@ test-ui:
 
 # Snapshot tests use a fresh process per language and text size, with no test selection or Xcode retry: results describe
 # the whole reference matrix. The only retry of an image is the capture helper's second mount.
-define validate-snapshot-run
+define validate-snapshot-process
 	case '$(DESTINATION)' in \
 		'platform=iOS Simulator,name=iPhone 17,OS=27.0'|\
 		'platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'|\
 		'platform=iOS Simulator,name=iPhone 17 #3,OS=27.0') ;; \
 		*) echo "snapshots: comparisons require iPhone 17, #2 or #3 on iOS 27.0" >&2; exit 2 ;; \
 	esac; \
+	for flag in $(TEST_FLAGS) $(XCODEBUILD_FLAGS); do \
+		case "$$flag" in \
+			-only-testing*|-skip-testing*|-only-test-configuration*|-skip-test-configuration*|-testPlan*|\
+			-test-iterations*|-retry-tests-on-failure*|-run-tests-until-failure*|-test-repetition-relaunch-enabled*) \
+				echo "snapshots: '$$flag' would select or repeat cases; narrow only with SNAPSHOT_LANGUAGES" >&2; exit 2 ;; \
+		esac; \
+	done;
+endef
+
+define validate-snapshot-run
+	$(validate-snapshot-process) \
 	if [ -z '$(strip $(SNAPSHOT_LANGUAGES))' ]; then \
 		echo "snapshots: SNAPSHOT_LANGUAGES must contain en or ru" >&2; exit 2; \
 	fi; \
@@ -183,13 +197,6 @@ define validate-snapshot-run
 		case "$$language" in en|ru) ;; *) echo "snapshots: unsupported language '$$language'" >&2; exit 2 ;; esac; \
 		case "$$seen" in *" $$language "*) echo "snapshots: duplicate language '$$language'" >&2; exit 2 ;; esac; \
 		seen="$$seen$$language "; \
-	done; \
-	for flag in $(TEST_FLAGS) $(XCODEBUILD_FLAGS); do \
-		case "$$flag" in \
-			-only-testing*|-skip-testing*|-only-test-configuration*|-skip-test-configuration*|-testPlan*|\
-			-test-iterations*|-retry-tests-on-failure*|-run-tests-until-failure*|-test-repetition-relaunch-enabled*) \
-				echo "snapshots: '$$flag' would select or repeat cases; narrow only with SNAPSHOT_LANGUAGES" >&2; exit 2 ;; \
-		esac; \
 	done;
 endef
 
@@ -235,17 +242,59 @@ build-snapshots:
 test-snapshots:
 	@$(call run-snapshots,never)
 
-record-snapshots:
-	@set -eu; \
-	if [ "$${CI:-}" = true ]; then echo "record-snapshots: recording is local only" >&2; exit 2; fi; \
+define validate-snapshot-recording
+set -eu; \
+	if [ "$${CI:-}" = true ]; then echo "$@: recording is local only" >&2; exit 2; fi; \
 	if [ '$(DESTINATION)' != '$(SNAPSHOT_REFERENCE_DESTINATION)' ]; then \
-		echo "record-snapshots: references require $(SNAPSHOT_REFERENCE_DESTINATION)" >&2; exit 2; \
+		echo "$@: references require $(SNAPSHOT_REFERENCE_DESTINATION)" >&2; exit 2; \
 	fi; \
 	if [ -n "$$(git status --porcelain -- '$(SNAPSHOTS_DIR)')" ]; then \
-		echo "record-snapshots: review and commit reference changes before recording" >&2; exit 2; \
+		echo "$@: review and commit reference changes before recording" >&2; exit 2; \
 	fi
+endef
+
+record-snapshots:
+	@$(validate-snapshot-recording)
 	@$(call run-snapshots,failed)
 	@$(call run-snapshots,never)
+	@git status --short -- '$(SNAPSHOTS_DIR)'
+	@git ls-files --others --exclude-standard -- '$(SNAPSHOTS_DIR)'
+
+# Local iteration checks one function and one process variant; CI always uses the full matrix.
+define run-single-snapshot
+	set -eu; \
+	[ "$${CI:-}" != true ] || { echo "single snapshots are local only" >&2; exit 2; }; \
+	$(validate-snapshot-process) \
+	language="$$SNAPSHOT_LANGUAGE"; text_size="$$SNAPSHOT_TEXT_SIZE"; selected="$$SNAPSHOT_SELECTED_TEST"; \
+	case "$$language" in en) region=US ;; ru) region=RU ;; *) echo "SNAPSHOT_LANGUAGE must be en or ru" >&2; exit 2 ;; esac; \
+	case "$$text_size" in \
+		large) category=UICTContentSizeCategoryL ;; ax5) category=UICTContentSizeCategoryAccessibilityXXXL ;; \
+		*) echo "SNAPSHOT_TEXT_SIZE must be large or ax5" >&2; exit 2 ;; \
+	esac; \
+	printf '%s\n' "$$selected" | LC_ALL=C grep -Eq '^test_[A-Za-z0-9_]+$$' || { echo "TEST must name one snapshot function" >&2; exit 2; }; \
+	identifier=$$(scripts/check-snapshot-run.sh --select "$$selected" "$$text_size"); \
+	xcodebuild -version; \
+	suffix=""; if [ '$(1)' = failed ]; then suffix=-record; fi; \
+	base="$(abspath $(TEST_RESULTS))/Snapshot-$(TEST_RUN)-$$selected-$$language-$$text_size$$suffix"; \
+	bundle="$$base.xcresult"; artifacts="$$base-artifacts"; \
+	rm -rf "$$artifacts"; mkdir -p "$$artifacts"; status=0; \
+	env TEST_RUNNER_SNAPSHOT_TESTING_RECORD='$(1)' TEST_RUNNER_SNAPSHOT_ARTIFACTS="$$artifacts" \
+		TEST_RUNNER_SNAPSHOT_TEXT_SIZE="$$text_size" \
+		scripts/run-tests.sh "$$bundle" xcodebuild test $(SNAPSHOT_TEST_BUILD) \
+			SNAPSHOT_CONTENT_SIZE_CATEGORY="$$category" \
+			-testLanguage "$$language" -testRegion "$$region" -parallel-testing-enabled NO \
+			-collect-test-diagnostics never $(TEST_FLAGS) "-only-testing:$$identifier" || status=$$?; \
+	SNAPSHOTS_DIR="$(SNAPSHOTS_DIR)" scripts/check-snapshot-run.sh '$(1)' "$$language" "$$text_size" "$$status" \
+		"$$bundle" "$$artifacts" "$$selected"
+endef
+
+test-snapshot:
+	@$(call run-single-snapshot,never)
+
+record-snapshot:
+	@$(validate-snapshot-recording)
+	@$(call run-single-snapshot,failed)
+	@$(call run-single-snapshot,never)
 	@git status --short -- '$(SNAPSHOTS_DIR)'
 	@git ls-files --others --exclude-standard -- '$(SNAPSHOTS_DIR)'
 
