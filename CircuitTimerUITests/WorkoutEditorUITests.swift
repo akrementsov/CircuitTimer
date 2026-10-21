@@ -5,19 +5,20 @@ import XCTest
 final class WorkoutEditorUITests: XCTestCase {
     func test_savedWorkout_editThenSave_keepsChangesWhenReopened() {
         let app = launch(.oneWorkout)
+        let updatedName = ScenarioFixture.workoutName + " updated"
 
         WorkoutListScreen(app)
             .openWorkout(ScenarioFixture.workoutName)
             .tapEdit()
             .typeName(" updated")
             .tapSave()
-            .assertTitle("Leg day updated")
+            .assertTitle(updatedName)
             .tapBack()
-            .assertHasWorkout("Leg day updated", duration: "2 minutes")
-            .openWorkout("Leg day updated")
-            .assertTitle("Leg day updated")
+            .assertHasWorkout(updatedName, duration: "2 minutes")
+            .openWorkout(updatedName)
+            .assertTitle(updatedName)
             .tapEdit()
-            .assertName("Leg day updated")
+            .assertName(updatedName)
     }
 
     func test_savedWorkout_dragStage_changesOrder() {

@@ -41,10 +41,6 @@ public enum AccessibilityID {
         public static let version = "about.version"
         public static let privacyPolicy = "about.privacyPolicy"
         public static let userAgreement = "about.userAgreement"
-
-        public static func legalDocument(isPrivacyPolicy: Bool) -> String {
-            isPrivacyPolicy ? privacyPolicy : userAgreement
-        }
     }
 }
 

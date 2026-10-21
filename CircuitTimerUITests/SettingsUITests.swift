@@ -3,7 +3,8 @@ import XCTest
 
 @MainActor
 final class SettingsUITests: XCTestCase {
-    func test_settings_togglePreferences_keepsValuesWhenReturningToTab() {
+    /// Each launch resets the scenario's in-memory preferences; this checks retention within one process.
+    func test_emptyList_toggleSettings_keepsValuesWhenReturningToTab() {
         let app = launch(.emptyList)
 
         WorkoutListScreen(app)
@@ -26,13 +27,13 @@ final class SettingsUITests: XCTestCase {
             .assertAllPreferences(areOn: true)
     }
 
-    func test_settings_openLegalPages_returnsThroughAboutToSettings() {
+    func test_emptyList_openLegalPages_returnsThroughAboutToSettings() {
         let app = launch(.emptyList)
 
         WorkoutListScreen(app)
             .tapSettings()
             .tapAbout()
-            .assertVersion("App version: 0.1.0")
+            .assertVersion("App version: \(ScenarioFixture.appVersion)")
             .tapPrivacyPolicy()
             .assertTitle("Privacy policy")
             .tapBack()
