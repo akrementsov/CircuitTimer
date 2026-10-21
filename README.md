@@ -151,6 +151,8 @@ Command line, with [SwiftLint](https://github.com/realm/SwiftLint) on `PATH` and
 | `make test-snapshot-contracts` | Tests capture, recording, cancellation and window cleanup in the snapshot host, separately from the PNG matrix |
 | `make test-snapshots` | Compares every snapshot with its reference, in English and in Russian |
 | `make record-snapshots` | Records missing references or those differing beyond the comparison bounds, on `iPhone 17` only |
+| `make test-snapshot TEST=<function>` | Locally compares one snapshot variant; defaults to English and `large` text |
+| `make record-snapshot TEST=<function>` | Locally records that variant if needed, then compares it again |
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
 
@@ -223,6 +225,20 @@ Both images are normalized to 8-bit sRGB for comparison. Their dimensions and al
 4. **Record.** `make record-snapshots` on `iPhone 17` / iOS 27.0, with no uncommitted change under `CircuitTimerSnapshotTests/__Snapshots__`. It writes the references that are missing or differ beyond the comparison bounds, leaves matching references untouched (including differences within the bounds), compares everything again and lists the new references: check that your test's appear. References are `__Snapshots__/<test file>/<test function>.<language>-<size>.png`. If the final comparison fails, run `git restore` and `git clean -f` on that folder and record again. A reference that does not load or has the wrong size fails its test. Replacing an invalid reference or intentionally replacing one accepted within the bounds requires removing its PNG in a reviewed commit before recording the replacement; the reference folder must be clean when recording starts.
 5. **Review.** Open every new or changed PNG and say in the pull request why it changed. Delete the references of a test you rename or remove: a reference no test checks fails the run. `make test-snapshots` and CI never write references; a failure keeps the actual image in `.build/TestResults/Snapshots-<run>-<language>-<size>-artifacts/<test file>/`, with `<run>` as for `make test-ui`, and, when the image strategy can produce them, the reference, failure and difference images in the result bundle. A normalization error or a failure for which the strict strategy supplies no attachments can leave only the failure text there.
 6. **Effects.** Dependencies are the test context's, except what `Support/SnapshotDependencies.swift` sets. These are rendering tests, not exhaustive effect tests. Unconfigured dependency endpoints keep their test values; a passing snapshot does not prove that no effects ran. TipKit is not configured in the host, so no tip shows.
+
+### Work on one snapshot
+
+While adding or changing a screen, select its test function without the suite name or `(textSize:)`:
+
+```sh
+make test-snapshot TEST=test_editor_editing_matchesReference
+make record-snapshot TEST=test_editor_editing_matchesReference \
+  SNAPSHOT_LANGUAGE=ru SNAPSHOT_TEXT_SIZE=ax5
+```
+
+`SNAPSHOT_LANGUAGE` is `en` (default) or `ru`; `SNAPSHOT_TEXT_SIZE` is `large` (default) or `ax5`. Use the singular `SNAPSHOT_LANGUAGE` here; the plural `SNAPSHOT_LANGUAGES` belongs to the full-matrix commands and is rejected by the single-snapshot commands. The function must exist exactly once inside an explicitly annotated `@Suite` in the screen snapshot sources and support that size. The command fails if the selected case does not run, skips, or runs alongside another case. Result bundles and artifacts use the `Snapshot-<run>-<function>-<language>-<size>` prefix, separate from the full matrix.
+
+These commands are local only. Comparison accepts the same simulators as `make test-snapshots`; recording requires `iPhone 17` / iOS 27.0 and a clean reference folder, as `make record-snapshots` does. Recording writes only the selected missing or out-of-bounds reference, then runs that comparison in `never` mode. Review the changed PNG before committing it. The reference folder must be clean before each recording command; use `make record-snapshots` when adding several variants of a new test. Before submitting a change, run the full `make test-snapshots` matrix; CI always checks all applicable cases.
 
 The timer's full-screen cover does not draw in the first frame, so the host fails a state that presents it. The timer snapshots will describe a `WorkoutTimerFeature.State` and draw `WorkoutTimerStack` as the window's root: with the timer's reducer replaced by `EmptyReducer`, that root was measured to match the presented cover in every variant; with the real reducer it is not measured yet. Alerts and dialogs are not supported yet. Snapshots run only on iOS 27.0 with iPhone 17's screen. They do not cover how the tab bar leaves on a push (`TabBarRidesWithRoot`).
 

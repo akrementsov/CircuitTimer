@@ -26,10 +26,13 @@ reset_case() {
 	mkdir -p "$bundle" "$artifacts" "$reference_dir"
 	cp "$fixture" "$bundle/tests.json"
 	cat > "$source_file" <<'EOF'
+@Suite
+struct ProbeSnapshotTests {
 @Test(arguments: SnapshotTextSize.currentCases())
 func test_list_loaded_matchesReference(textSize: SnapshotTextSize) {}
 @Test(arguments: SnapshotTextSize.currentCases(in: [.large]))
 func test_list_empty_matchesReference(textSize: SnapshotTextSize) {}
+}
 EOF
 	printf '# runtime iOS 27.0 (24A335)\n# text-size large UICTContentSizeCategoryL\n' > "$artifacts/snapshots.tsv"
 	for name in loaded empty; do
@@ -297,5 +300,82 @@ for variant in en-large en-ax5 ru-large ru-ax5; do
 	expect_not_in "$work/out" 'unexpected result bundle or journal format'
 	cp "$work/before.json" "$work/$variant/tests.json"
 done
+
+describe 'Single snapshot: resolve a source test before its first reference exists'
+reset_case
+rm "$reference_dir/test_list_loaded_matchesReference.en-large.png"
+run "$checker" --select test_list_loaded_matchesReference ax5
+expect_status 0
+expect_in "$work/out" 'CircuitTimerSnapshotTests/SnapshotTests/ProbeSnapshotTests/test_list_loaded_matchesReference(textSize:)'
+for selected in test_unknown 'bad/selection'; do
+	run "$checker" --select "$selected" large
+	expect_status 1
+done
+run "$checker" --select test_list_empty_matchesReference ax5
+expect_status 1
+expect_in "$work/out" 'does not support ax5'
+cp "$source_file" "$repo/CircuitTimerSnapshotTests/DuplicateSnapshotTests.swift"
+run "$checker" --select test_list_loaded_matchesReference large
+expect_status 1
+expect_in "$work/out" 'not unique'
+
+describe 'Single snapshot: comments and helper types cannot replace the annotated suite'
+reset_case
+cat > "$source_file" <<'EOF'
+struct BeforeSuite {}
+extension SnapshotTests {
+    @Suite
+    @MainActor
+    private struct ProbeSnapshotTests {
+        struct Helper {
+            let value: String
+        }
+        // construct a state; struct PretendSuite is only a comment.
+        @Test(arguments: SnapshotTextSize.currentCases())
+        func test_list_loaded_matchesReference(textSize: SnapshotTextSize) {}
+        struct OtherHelper {}
+        @Test(arguments: SnapshotTextSize.currentCases(in: [.large]))
+        func test_list_empty_matchesReference(textSize: SnapshotTextSize) {}
+    }
+}
+struct AfterSuite {}
+EOF
+for selected in test_list_loaded_matchesReference test_list_empty_matchesReference; do
+    run "$checker" --select "$selected" large
+    expect_status 0
+    expect_equal "$(cat "$work/out")" "CircuitTimerSnapshotTests/SnapshotTests/ProbeSnapshotTests/$selected(textSize:)"
+done
+
+describe 'Single snapshot: scope references but require exactly the selected execution'
+reset_case
+edit_report '.testNodes[0].children |= .[0:1]'
+sed -n '1,3p' "$artifacts/snapshots.tsv" > "$work/one.tsv"
+mv "$work/one.tsv" "$artifacts/snapshots.tsv"
+selected_check() { run "$checker" "${1:-never}" en large "${2:-0}" "$bundle" "$artifacts" test_list_loaded_matchesReference; }
+selected_check
+expect_status 0
+# The identical partial result must still fail the full-matrix check.
+check
+expect_status 1
+expect_in "$work/out" 'snapshot function did not run'
+selected_check
+expect_status 0
+edit_report '.testNodes=[]'
+selected_check
+expect_status 1
+expect_in "$work/out" 'no snapshot cases ran'
+reset_case
+selected_check
+expect_status 1
+expect_in "$work/out" 'unselected snapshot function ran'
+reset_case
+edit_report '.testNodes[0].children |= .[0:1] | .testNodes[0].children[0].children[0].result="Skipped"'
+sed -n '1,3p' "$artifacts/snapshots.tsv" > "$work/one.tsv"; mv "$work/one.tsv" "$artifacts/snapshots.tsv"
+selected_check
+expect_status 1
+expect_in "$work/out" 'skipped snapshot node'
+CI=true selected_check
+expect_status 1
+expect_in "$work/out" 'local only'
 
 finish
