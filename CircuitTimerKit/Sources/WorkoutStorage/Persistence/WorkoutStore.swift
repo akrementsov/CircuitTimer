@@ -1,3 +1,4 @@
+import Dependencies
 import Foundation
 import os
 import SwiftData
@@ -7,6 +8,8 @@ import WorkoutDomain
 @ModelActor
 actor WorkoutStore {
     private static let sampleSeedKey = "sample-workout-v1"
+
+    @Dependency(\.uuid) private var uuid
 
     private var isSampleSeedChecked = false
     private var saveContext: @Sendable (ModelContext) throws -> Void = { try $0.save() }
@@ -20,6 +23,13 @@ actor WorkoutStore {
     }
 
     func fetchAll() throws -> StoredWorkouts {
+        do {
+            try assignMissingCopyIDs()
+        } catch {
+            // The records still read; copies without an identifier only lose ties until the next read assigns one.
+            Logger.workoutStore.error("Failed to assign copy identifiers: \(String(reflecting: error), privacy: .public)")
+        }
+
         var seedingError: (any Error)?
         do {
             try seedSampleIfNeeded()
@@ -155,21 +165,37 @@ actor WorkoutStore {
                 FetchDescriptor<WorkoutModel>(predicate: #Predicate { $0.workoutID == sampleID })
             )
             if existing == 0 {
-                try append(sample)
+                try append(sample).isFreshSample = true
             }
             modelContext.insert(SeedMarkerModel(key: key))
         }
         isSampleSeedChecked = true
     }
 
-    private func append(_ workout: Workout) throws {
+    /// Gives records from before V2, and any that arrive without one, the identifier that orders their copies.
+    private func assignMissingCopyIDs() throws {
+        let missing = try modelContext.fetch(FetchDescriptor<WorkoutModel>(predicate: #Predicate { $0.copyID == nil }))
+        guard !missing.isEmpty else { return }
+
+        try write {
+            for model in missing {
+                model.copyID = uuid()
+            }
+        }
+    }
+
+    @discardableResult
+    private func append(_ workout: Workout) throws -> WorkoutModel {
         // Computed before the new model is inserted, so it never counts itself.
         let order = try nextOrder()
-        makeModel(for: workout).order = order
+        let model = makeModel(for: workout)
+        model.order = order
+        return model
     }
 
     private func makeModel(for workout: Workout) -> WorkoutModel {
         let model = WorkoutModel(workoutID: workout.id)
+        model.copyID = uuid()
         modelContext.insert(model)
         model.update(from: workout, in: modelContext)
         return model
@@ -192,9 +218,10 @@ actor WorkoutStore {
         }
     }
 
+    /// Stored order, the same on every device: equal `order` values, as two devices can write, are broken by
+    /// identifiers that sync, and `persistentModelID`, which differs per device, only settles what they leave equal.
     private func allSorted() throws -> [WorkoutModel] {
-        try modelContext.fetch(FetchDescriptor<WorkoutModel>())
-            .sorted { ($0.order, $0.persistentModelID) < ($1.order, $1.persistentModelID) }
+        try modelContext.fetch(FetchDescriptor<WorkoutModel>()).sorted { $0.storedRank < $1.storedRank }
     }
 
     /// Picks the visible record of every workout: the first readable one in stored order.
@@ -237,6 +264,13 @@ actor WorkoutStore {
             }
         }
         return nil
+    }
+}
+
+private extension WorkoutModel {
+    /// A copy without an identifier sorts after every copy with one; uppercase hexadecimal sorts before "~".
+    var storedRank: (Int, String, Int, String, PersistentIdentifier) {
+        (order, workoutID?.uuidString ?? "", isFreshSample ? 1 : 0, copyID?.uuidString ?? "~", persistentModelID)
     }
 }
 

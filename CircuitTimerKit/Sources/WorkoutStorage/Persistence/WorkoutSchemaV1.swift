@@ -1,11 +1,7 @@
 import Foundation
 import SwiftData
 
-/// The first persisted shape of workouts.
-///
-/// Built to sync through CloudKit later (CT-5): no unique attributes, every property has a default
-/// or is optional, relationships are optional, and order is an explicit field because CloudKit
-/// keeps no order for relationships. Durations are whole milliseconds.
+/// The first persisted shape of workouts, frozen: stores written before CT-5 migrate from it to V2.
 enum WorkoutSchemaV1: VersionedSchema {
     static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
     static var models: [any PersistentModel.Type] { [WorkoutModel.self, StageModel.self, SeedMarkerModel.self] }
@@ -51,7 +47,3 @@ enum WorkoutSchemaV1: VersionedSchema {
         }
     }
 }
-
-typealias WorkoutModel = WorkoutSchemaV1.WorkoutModel
-typealias StageModel = WorkoutSchemaV1.StageModel
-typealias SeedMarkerModel = WorkoutSchemaV1.SeedMarkerModel

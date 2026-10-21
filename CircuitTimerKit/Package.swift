@@ -235,7 +235,11 @@ let package = Package(
         ),
         .testTarget(
             name: "WorkoutStorageTests",
-            dependencies: ["WorkoutDomain", "WorkoutStorage"],
+            dependencies: [
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(

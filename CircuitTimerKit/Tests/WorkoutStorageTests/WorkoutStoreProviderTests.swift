@@ -1,10 +1,12 @@
 @testable import WorkoutStorage
 
+import DependenciesTestSupport
 import Foundation
 import SwiftData
 import Testing
 
-@Suite
+// Stored records take their copy identifiers from the store.
+@Suite(.dependency(\.uuid, .incrementing))
 struct WorkoutStoreProviderTests {
     private final class Opener: @unchecked Sendable {
         private let lock = NSLock()

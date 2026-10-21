@@ -1,11 +1,13 @@
 @testable import WorkoutStorage
 
+import DependenciesTestSupport
 import Foundation
 import SwiftData
 import Testing
 import WorkoutDomain
 
-@Suite
+// Stored records take their copy identifiers from the store.
+@Suite(.dependency(\.uuid, .incrementing))
 struct WorkoutStoreWritingTests {
     private let bogusSection: (WorkoutModel) -> Void = { $0.sortedStages[0].section = "bogus" }
 

@@ -1,11 +1,13 @@
 @testable import WorkoutStorage
 
+import DependenciesTestSupport
 import Foundation
 import SwiftData
 import Testing
 import WorkoutDomain
 
-@Suite
+// Stored records take their copy identifiers from the store.
+@Suite(.dependency(\.uuid, .incrementing))
 struct WorkoutStoreReadingTests {
     /// A way a stored record can be damaged, and the field that proves it was left as it is.
     struct Damage: CustomTestStringConvertible, Sendable {
