@@ -14,6 +14,7 @@
 		C7A10000000000000000004F /* CircuitTimerWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C7A100000000000000000040 /* CircuitTimerWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C7A100000000000000000052 /* AppScenarios in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000053 /* AppScenarios */; };
 		C7A100000000000000000054 /* UITestContract in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000055 /* UITestContract */; };
+		C7A100000000000000000092 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000093 /* WorkoutStorage */; };
 		C7A100000000000000000062 /* UITestContract in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000063 /* UITestContract */; };
 		C7A300000000000000000060 /* SnapshotCapture in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000005D /* SnapshotCapture */; };
 		C7A300000000000000000061 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000005E /* AppFeature */; };
@@ -165,6 +166,7 @@
 				C7A100000000000000000030 /* BackgroundNotifications in Frameworks */,
 				C7A100000000000000000052 /* AppScenarios in Frameworks */,
 				C7A100000000000000000054 /* UITestContract in Frameworks */,
+				C7A100000000000000000092 /* WorkoutStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -291,6 +293,7 @@
 				C7A100000000000000000031 /* BackgroundNotifications */,
 				C7A100000000000000000053 /* AppScenarios */,
 				C7A100000000000000000055 /* UITestContract */,
+				C7A100000000000000000093 /* WorkoutStorage */,
 			);
 			productName = CircuitTimer;
 			productReference = C7A100000000000000000006 /* CircuitTimer.app */;
@@ -901,6 +904,10 @@
 		C7A100000000000000000053 /* AppScenarios */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AppScenarios;
+		};
+		C7A100000000000000000093 /* WorkoutStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WorkoutStorage;
 		};
 		C7A100000000000000000055 /* UITestContract */ = {
 			isa = XCSwiftPackageProductDependency;
