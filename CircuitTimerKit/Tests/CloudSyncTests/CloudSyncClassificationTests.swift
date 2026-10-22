@@ -41,6 +41,16 @@ struct CloudSyncClassificationTests {
         ),
         Case(testDescription: "partial failure without items", error: ckError(.partialFailure), verdict: .failed),
         Case(
+            testDescription: "partial failure with an item outside CloudKit",
+            error: CKError(.partialFailure, userInfo: [
+                CKPartialErrorsByItemIDKey: [
+                    CKRecord.ID(recordName: "record-0"): ckError(.batchRequestFailed),
+                    CKRecord.ID(recordName: "record-1"): NSError(domain: "Other", code: 1),
+                ],
+            ]) as NSError,
+            verdict: .failed
+        ),
+        Case(
             testDescription: "quota among items",
             error: partialFailure([.batchRequestFailed, .quotaExceeded, .networkFailure]),
             verdict: .quotaExceeded

@@ -63,13 +63,17 @@ enum CloudSyncClassification {
         return .failed
     }
 
-    /// A partial failure whose items all failed only because they shared a batch; an unknown or empty one is not.
+    /// A partial failure whose items all failed only because they shared a batch; an unknown or empty one is not,
+    /// nor one with an item that carries no CloudKit code.
     private static func isBatchFailure(_ error: NSError) -> Bool {
         guard error.domain == CKError.errorDomain, CKError.Code(rawValue: error.code) == .partialFailure,
               let items = error.userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: any Error], !items.isEmpty
         else { return false }
 
-        return items.values.allSatisfy { cloudKitCodes(in: $0 as NSError).allSatisfy { $0 == .batchRequestFailed } }
+        return items.values.allSatisfy { item in
+            let codes = cloudKitCodes(in: item as NSError)
+            return !codes.isEmpty && codes.allSatisfy { $0 == .batchRequestFailed }
+        }
     }
 
     /// The CloudKit codes in `error`, its underlying errors and the per-item errors of a partial failure.
