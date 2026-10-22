@@ -17,8 +17,9 @@ struct WorkoutStoreWritingTests {
         try insertRecord(makeWorkout(1), order: 5, in: container)
         try insertRecord(makeWorkout(2), order: 7, in: container)
 
-        _ = try await store.save(makeWorkout(3))
+        let outcome = try await store.save(makeWorkout(3))
 
+        #expect(outcome == .saved)
         let records = try storedRecords(in: ModelContext(container))
         #expect(records.map(\.name) == ["Workout 1", "Workout 2", "Workout 3"])
         #expect(records.map(\.order) == [5, 7, 8])
@@ -218,6 +219,7 @@ struct WorkoutStoreWritingTests {
         #expect(try await store.delete(UUID(fixture: 99)) == .storeDiverged)
         #expect(try await store.delete(UUID(fixture: 1)) == .storeDiverged)
         #expect(try storedNames(in: container) == ["Damaged"])
+        #expect(try markerKeys(in: container) == ["sample-workout-v1"])
     }
 
     @Test
@@ -231,6 +233,43 @@ struct WorkoutStoreWritingTests {
         #expect(outcome == .applied)
         #expect(try await store.fetchAll().workouts.isEmpty)
         #expect(try count(WorkoutModel.self, in: container) == 0)
+        #expect(try markerKeys(in: container) == ["deleted:\(UUID(fixture: 1).uuidString)", "sample-workout-v1"])
+    }
+
+    @Test
+    func test_save_workoutDeletedOnDevice_reportsDeletedElsewhereWithoutWriting() async throws {
+        let (store, container) = try await makeEmptyStore()
+        _ = try await store.save(makeWorkout(1))
+        _ = try await store.delete(UUID(fixture: 1))
+        // A copy that synced in after the deletion; only a read removes it.
+        try insertRecord(makeWorkout(1, name: "Late"), order: 0, in: container)
+
+        let outcome = try await store.save(makeWorkout(1, name: "Edited", training: [makeStage(1), makeStage(2)]))
+
+        #expect(outcome == .deletedElsewhere)
+        #expect(try storedNames(in: container) == ["Late"])
+        #expect(try count(StageModel.self, in: container) == 1)
+        #expect(try markerKeys(in: container) == ["deleted:\(UUID(fixture: 1).uuidString)", "sample-workout-v1"])
+    }
+
+    enum SampleOperation: String, CaseIterable, Sendable {
+        case save, insert, reorder
+    }
+
+    @Test(arguments: SampleOperation.allCases)
+    func test_write_freshSample_onlySaveClearsFreshness(operation: SampleOperation) async throws {
+        let container = try await makeContainer()
+        let store = WorkoutStore(modelContainer: container)
+        _ = try await store.fetchAll()
+
+        switch operation {
+            case .save: #expect(try await store.save(.sample) == .saved)
+            case .insert: #expect(try await store.insert(makeWorkout(1), after: Workout.sample.id) == .applied)
+            case .reorder: #expect(try await store.reorder([Workout.sample.id]) == .applied)
+        }
+
+        let sample = try #require(try storedRecords(of: Workout.sample.id, in: container).first)
+        #expect(sample.isFreshSample == (operation != .save))
     }
 
     @Test
@@ -316,6 +355,50 @@ struct WorkoutStoreWritingTests {
         saveSwitch.fails = false
         #expect(try await store.fetchAll() == before)
         #expect(try storedNames(in: container) == ["A", "B"])
+    }
+
+    @Test
+    func test_operations_recordChangedThroughAnotherContext_readItAfresh() async throws {
+        let (store, container) = try await makeEmptyStore()
+        _ = try await store.save(makeWorkout(1, name: "A"))
+        _ = try await store.save(makeWorkout(2, name: "B"))
+        _ = try await store.fetchAll()
+
+        let otherContext = ModelContext(container)
+        try #require(try storedRecords(in: otherContext).first { $0.workoutID == UUID(fixture: 1) }).name = "Renamed"
+        try otherContext.save()
+
+        #expect(try await store.fetchAll().workouts.map(\.name) == ["Renamed", "B"])
+        #expect(try await store.reorder([UUID(fixture: 2), UUID(fixture: 1)]) == .applied)
+        #expect(try await store.fetchAll().workouts.map(\.name) == ["B", "Renamed"])
+        #expect(try storedNames(in: container) == ["B", "Renamed"])
+    }
+
+    @Test
+    func test_reorder_workoutInsertedThroughAnotherContextAfterRead_reportsDivergenceAndKeepsIt() async throws {
+        let (store, container) = try await makeEmptyStore()
+        _ = try await store.save(makeWorkout(1, name: "A"))
+        _ = try await store.save(makeWorkout(2, name: "B"))
+        let read = try await store.fetchAll()
+        try insertRecord(makeWorkout(3, name: "Imported"), order: 2, in: container)
+
+        let outcome = try await store.reorder(read.workouts.map(\.id).reversed())
+
+        #expect(outcome == .storeDiverged)
+        #expect(try storedNames(in: container) == ["B", "A", "Imported"])
+        #expect(try await store.fetchAll().workouts.map(\.name) == ["B", "A", "Imported"])
+    }
+
+    @Test
+    func test_save_concurrentNewWorkouts_readBackWithDifferentOrders() async throws {
+        let (store, container) = try await makeEmptyStore()
+
+        async let first = store.save(makeWorkout(1))
+        async let second = store.save(makeWorkout(2))
+        #expect(try await [first, second] == [.saved, .saved])
+
+        #expect(Set(try await store.fetchAll().workouts.map(\.id)) == [UUID(fixture: 1), UUID(fixture: 2)])
+        #expect(try storedRecords(in: ModelContext(container)).map(\.order) == [0, 1])
     }
 
     private func stageModelID(_ stageID: UUID, in container: ModelContainer) throws -> PersistentIdentifier? {

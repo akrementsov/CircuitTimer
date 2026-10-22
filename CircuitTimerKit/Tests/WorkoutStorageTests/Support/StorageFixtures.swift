@@ -47,9 +47,18 @@ func insertRecord(
 
 /// Marks the sample as already seeded, so a test starts from an empty list.
 func insertSeedMarker(in container: ModelContainer) throws {
+    try insertMarker("sample-workout-v1", in: container)
+}
+
+/// Writes a marker the way a synced one arrives, outside `WorkoutStore`.
+func insertMarker(_ key: String, in container: ModelContainer) throws {
     let context = ModelContext(container)
-    context.insert(SeedMarkerModel(key: "sample-workout-v1"))
+    context.insert(SeedMarkerModel(key: key))
     try context.save()
+}
+
+func markerKeys(in container: ModelContainer) throws -> [String] {
+    try ModelContext(container).fetch(FetchDescriptor<SeedMarkerModel>()).map(\.key).sorted()
 }
 
 /// A store over an empty list: the sample counts as seeded.
@@ -69,6 +78,11 @@ func storedNames(in container: ModelContainer) throws -> [String] {
 func storedRecords(in context: ModelContext) throws -> [WorkoutModel] {
     try context.fetch(FetchDescriptor<WorkoutModel>())
         .sorted { ($0.order, $0.persistentModelID) < ($1.order, $1.persistentModelID) }
+}
+
+/// Every stored record of the workout `id`, visible or not, in stored order.
+func storedRecords(of id: UUID, in container: ModelContainer) throws -> [WorkoutModel] {
+    try storedRecords(in: ModelContext(container)).filter { $0.workoutID == id }
 }
 
 func count<Model: PersistentModel>(_ type: Model.Type, in container: ModelContainer) throws -> Int {

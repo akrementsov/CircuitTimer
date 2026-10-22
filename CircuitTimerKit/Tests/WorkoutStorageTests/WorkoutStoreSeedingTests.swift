@@ -17,7 +17,10 @@ struct WorkoutStoreSeedingTests {
         let stored = try await store.fetchAll()
 
         #expect(stored == StoredWorkouts(workouts: [.sample]))
-        #expect(try count(SeedMarkerModel.self, in: container) == 1)
+        #expect(try markerKeys(in: container) == ["sample-workout-v1"])
+        let record = try #require(try storedRecords(of: Workout.sample.id, in: container).first)
+        #expect(record.isFreshSample)
+        #expect(record.copyID != nil)
     }
 
     @Test
@@ -44,6 +47,20 @@ struct WorkoutStoreSeedingTests {
 
         #expect(try await store.fetchAll().workouts.isEmpty)
         #expect(try await WorkoutStore(modelContainer: container).fetchAll().workouts.isEmpty)
+    }
+
+    @Test
+    func test_fetchAll_sampleMarkerGoneButSampleDeleted_seedsNothing() async throws {
+        let container = try await makeContainer()
+        try insertMarker("deleted:\(Workout.sample.id.uuidString)", in: container)
+        let store = WorkoutStore(modelContainer: container)
+
+        let first = try await store.fetchAll()
+        let second = try await store.fetchAll()
+
+        #expect(first.workouts.isEmpty)
+        #expect(second.workouts.isEmpty)
+        #expect(try count(WorkoutModel.self, in: container) == 0)
     }
 
     @Test

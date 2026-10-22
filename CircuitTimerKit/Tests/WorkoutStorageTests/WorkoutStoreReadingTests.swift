@@ -119,6 +119,34 @@ struct WorkoutStoreReadingTests {
         #expect(first.workouts.map(\.name).first == "Workout 1")
     }
 
+    @Test(arguments: [false, true])
+    func test_fetchAll_equalOrders_sortAlikeWhateverInsertionOrder(reversed: Bool) async throws {
+        let (store, container) = try await makeEmptyStore()
+        let stages = [makeStage(1), makeStage(2), makeStage(3)]
+        let records = [
+            (workout: makeWorkout(3, name: "C", training: reversed ? stages.reversed() : stages), copyID: 30),
+            (workout: makeWorkout(2, name: "B high"), copyID: 20),
+            (workout: makeWorkout(2, name: "B low"), copyID: 10),
+            (workout: makeWorkout(2, name: "B mid"), copyID: 15),
+        ]
+        for record in reversed ? records.reversed() : records {
+            try insertRecord(record.workout, order: 0, in: container) { model in
+                model.copyID = UUID(fixture: record.copyID)
+                for stage in model.stages ?? [] {
+                    stage.order = 0
+                }
+            }
+        }
+
+        let stored = try await store.fetchAll()
+        // Renumbering writes the store's order of every record, hidden copies included.
+        _ = try await store.reorder(stored.workouts.map(\.id))
+
+        #expect(stored.workouts.map(\.name) == ["B low", "C"])
+        #expect(stored.workouts[1].training.map(\.id) == stages.map(\.id))
+        #expect(try storedNames(in: container) == ["B low", "B mid", "B high", "C"])
+    }
+
     @Test
     func test_fetchAll_copiesOfOneWorkout_showOneReadable() async throws {
         let id = 1

@@ -260,8 +260,10 @@ let package = Package(
         .testTarget(
             name: "WorkoutStorageTests",
             dependencies: [
+                "CloudSync",
                 "WorkoutDomain",
                 "WorkoutStorage",
+                .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
