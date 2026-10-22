@@ -31,7 +31,7 @@ public enum WorkoutWriteOutcome: Equatable, Sendable {
 
 @DependencyClient
 public struct WorkoutStorageClient: Sendable {
-    /// Seeds the sample workout once, gives older records their copy identifiers, removes late copies of deleted
+    /// Seeds the sample workout unless its marker exists, gives older records their copy identifiers, removes late copies of deleted
     /// workouts, then reads all workouts.
     public var fetchAll: @Sendable () async throws -> StoredWorkouts
     /// Updates the workout, or appends it when it is new; reports `.deletedElsewhere` and writes nothing for a

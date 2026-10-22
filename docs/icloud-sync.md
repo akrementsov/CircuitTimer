@@ -65,8 +65,8 @@ Run on 2026-10-21/22 with a throwaway build, before the store code was written.
 | E1 | Does the archive carry the entitlements to the export? | Ad hoc signing during the archive fails ("requires a provisioning profile"). An unsigned archive exports without iCloud and Push. Signing the unsigned archive ad hoc first, then exporting, gives an IPA with Production CloudKit and production Push. |
 | E2 | Does a real V1 store migrate when opened with `.private`? | Yes, on iOS 27.0: lightweight V1→V2, `copyID` assigned, setup, import and export succeed; a second simulator received all records with their `copyID`. |
 | E3a | Which signal refreshes an open list? | Simulators get no pushes. On activation an import starts within about 1.5 s, ends successfully and posts its event. |
-| E4 | Does `.private` → `.none` → `.private` keep and upload the changes made in between? | Yes, on iOS 27.0: writes under `.none`, then the edit, deletion and new order reached the second simulator. |
 | E3b, E3c | Does an open, active list refresh on a real device; what happens on sign-out? | On the owner's iPhones, not run yet: see the checklist. |
+| E4 | Does `.private` → `.none` → `.private` keep and upload the changes made in between? | Yes, on iOS 27.0: writes under `.none`, then the edit, deletion and new order reached the second simulator. |
 | E5 | What does an unsigned build do? | Opening `.private` does not throw; creating a `CKContainer` traps. Hence the empty container in unsigned builds. |
 
 ## Device checklist

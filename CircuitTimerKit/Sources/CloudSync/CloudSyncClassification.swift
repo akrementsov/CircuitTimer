@@ -24,7 +24,7 @@ enum CloudSyncClassification {
     /// 134419: the system deferred the history analysis. 134417: an export gave way to one already pending.
     private static let transientCocoaCodes: Set<Int> = [134_419, 134_417]
 
-    /// Core Data resolves a changed server record itself when it retries the export.
+    /// The network or the service holds these back, and Core Data resolves a changed server record when it retries.
     private static let transientCodes: Set<CKError.Code> = [
         .networkUnavailable, .networkFailure, .serviceUnavailable, .requestRateLimited, .zoneBusy, .serverRecordChanged,
     ]
@@ -48,7 +48,7 @@ enum CloudSyncClassification {
         if !codes.isEmpty, codes.allSatisfy({ transientCodes.contains($0) || $0 == .operationCancelled }) {
             return .transient
         }
-        if codes.isEmpty, nsError.domain == CKError.errorDomain {
+        if codes.isEmpty, isBatchFailure(nsError) {
             // Nothing but batch failures inside a partial failure: the item that broke the batch is retried.
             return .transient
         }
@@ -61,6 +61,15 @@ enum CloudSyncClassification {
             }
         }
         return .failed
+    }
+
+    /// A partial failure whose items all failed only because they shared a batch; an unknown or empty one is not.
+    private static func isBatchFailure(_ error: NSError) -> Bool {
+        guard error.domain == CKError.errorDomain, CKError.Code(rawValue: error.code) == .partialFailure,
+              let items = error.userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: any Error], !items.isEmpty
+        else { return false }
+
+        return items.values.allSatisfy { cloudKitCodes(in: $0 as NSError).allSatisfy { $0 == .batchRequestFailed } }
     }
 
     /// The CloudKit codes in `error`, its underlying errors and the per-item errors of a partial failure.

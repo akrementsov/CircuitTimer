@@ -19,6 +19,9 @@ final class CloudSyncMonitor: Sendable {
         var accountProblem: CloudSyncProblem?
         /// Tells the latest account read from an older one that answers late.
         var accountGeneration = 0
+        /// An account change asked the list to read again once the status is known; the latest read does it, whichever
+        /// started it, since an older read's answer is dropped.
+        var announcesAccountRead = false
         var eventProblems: [EventKind: CloudSyncProblem] = [:]
         var nextSubscriber = 0
         var statusSubscribers: [Int: AsyncStream<CloudSyncStatus>.Continuation] = [:]
@@ -130,21 +133,21 @@ final class CloudSyncMonitor: Sendable {
             let isRequested = preference()
             let decision = (isRequested: isRequested, container: isRequested ? containerID() : nil)
             state.decision = decision
+            // Under the lock, so no caller sees the decision and opens the store before the observers are in place.
+            if decision.container != nil {
+                observe()
+            }
             return (decision, true)
         }
-        guard isNew else { return decision }
-
-        if decision.isRequested, decision.container == nil {
+        if isNew, decision.isRequested, decision.container == nil {
             Self.logger.fault("iCloud sync is on, but the app names no CloudKit container; the store stays local")
-        }
-        if decision.container != nil {
-            observe()
         }
         return decision
     }
 
-    /// Registers before the store opens, so its first setup and import are seen. The center keeps the observers for
-    /// the rest of the process, as long as the monitor of the live dependency lives.
+    /// Registers before the store opens, so its first setup and import are seen. The tokens are dropped: the center
+    /// keeps the observers as long as it lives, which for the live dependency is the whole process, and a handler of a
+    /// monitor that is gone does nothing.
     private func observe() {
         _ = notificationCenter.addObserver(
             forName: NSPersistentCloudKitContainer.eventChangedNotification,
@@ -230,6 +233,7 @@ final class CloudSyncMonitor: Sendable {
             guard state.isMirroring == true, let container = state.decision?.container else { return nil }
 
             state.accountGeneration += 1
+            state.announcesAccountRead = state.announcesAccountRead || announcesChange
             return (container, state.accountGeneration)
         }
         guard let read else { return }
@@ -257,14 +261,15 @@ final class CloudSyncMonitor: Sendable {
                 Self.logger.error("Failed to read the iCloud account status: \(String(reflecting: error), privacy: .public)")
                 problem = nil
             }
-            let isLatest = state.withValue { state in
+            let announces = state.withValue { state in
                 guard state.accountGeneration == read.generation else { return false }
 
                 state.accountProblem = problem
                 state.publishStatus()
-                return true
+                defer { state.announcesAccountRead = false }
+                return state.announcesAccountRead
             }
-            if isLatest, announcesChange {
+            if announces {
                 publishChange()
             }
         }
