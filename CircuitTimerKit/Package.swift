@@ -158,6 +158,14 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "CloudSyncTests",
+            dependencies: [
+                "CloudSync",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "TimerPreferences",
             dependencies: [

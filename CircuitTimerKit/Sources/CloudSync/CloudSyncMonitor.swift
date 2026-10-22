@@ -7,7 +7,7 @@ import os
 /// Decides once per launch whether the workouts store mirrors to iCloud, and follows what CloudKit reports about it:
 /// the account, import and export failures, and finished imports that may have changed the store.
 final class CloudSyncMonitor: Sendable {
-    private enum EventKind: Hashable, Sendable {
+    enum EventKind: Hashable, Sendable {
         case setup
         case `import`
         case export
@@ -165,20 +165,27 @@ final class CloudSyncMonitor: Sendable {
     }
 
     private func handle(_ event: NSPersistentCloudKitContainer.Event) {
-        // An event is posted when it starts and again when it ends; only the end tells how it went.
-        guard event.endDate != nil else { return }
-
         let kind: EventKind
         switch event.type {
             case .setup: kind = .setup
             case .import: kind = .import
             case .export: kind = .export
             @unknown default:
-                Self.logger.notice("Ignoring a CloudKit event of an unknown type \(event.type.rawValue)")
+                if event.endDate != nil {
+                    Self.logger.notice("Ignoring a CloudKit event of an unknown type \(event.type.rawValue)")
+                }
                 return
         }
+        handle(kind: kind, isFinished: event.endDate != nil, succeeded: event.succeeded, error: event.error)
+    }
 
-        if event.succeeded {
+    /// The parts of an event the monitor reads, taken apart so tests can report events:
+    /// `NSPersistentCloudKitContainer.Event` has no public initializer.
+    func handle(kind: EventKind, isFinished: Bool, succeeded: Bool, error: (any Error)?) {
+        // An event is posted when it starts and again when it ends; only the end tells how it went.
+        guard isFinished else { return }
+
+        if succeeded {
             state.withValue { state in
                 state.eventProblems.removeValue(forKey: kind)
                 state.publishStatus()
@@ -189,8 +196,8 @@ final class CloudSyncMonitor: Sendable {
             return
         }
 
-        let verdict = CloudSyncClassification.verdict(for: event.error)
-        let description = event.error.map { String(reflecting: $0) } ?? "no error"
+        let verdict = CloudSyncClassification.verdict(for: error)
+        let description = error.map { String(reflecting: $0) } ?? "no error"
         switch verdict {
             case .quotaExceeded:
                 Self.logger.error("CloudKit \(String(describing: kind), privacy: .public) failed: iCloud storage is full")
