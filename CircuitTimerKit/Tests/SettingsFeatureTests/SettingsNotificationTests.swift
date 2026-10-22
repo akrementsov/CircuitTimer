@@ -1,6 +1,7 @@
 @testable import SettingsFeature
 
 import BackgroundNotifications
+import CloudSync
 import ComposableArchitecture
 import Foundation
 import Testing
@@ -59,7 +60,9 @@ struct SettingsNotificationTests {
         let store = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
-            TestStore(initialState: SettingsFeature.State()) { SettingsFeature() }
+            TestStore(initialState: SettingsFeature.State()) { SettingsFeature() } withDependencies: {
+                $0.cloudSync = .previewValue
+            }
         }
         await store.send(.view(.task))
         await store.send(.view(.appeared))

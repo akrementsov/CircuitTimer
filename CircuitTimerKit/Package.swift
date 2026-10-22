@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "UITestContract", targets: ["UITestContract"]),
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
+        .library(name: "CloudSync", targets: ["CloudSync"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
         .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
@@ -44,6 +45,7 @@ let package = Package(
                 "TimerPreferences",
                 "BackgroundNotifications",
                 "BackgroundExecution",
+                "CloudSync",
                 "DesignSystem",
                 "SettingsFeature",
                 "UITestContract",
@@ -63,6 +65,7 @@ let package = Package(
                 "TimerPreferences",
                 "BackgroundNotifications",
                 "BackgroundExecution",
+                "CloudSync",
                 "AppFeature",
                 "SettingsFeature",
                 "WorkoutActivity",
@@ -80,6 +83,7 @@ let package = Package(
             dependencies: [
                 "BackgroundExecution",
                 "BackgroundNotifications",
+                "CloudSync",
                 "SettingsFeature",
                 "UITestContract",
                 "WorkoutActivity",
@@ -137,12 +141,30 @@ let package = Package(
             name: "SettingsFeature",
             dependencies: [
                 "BackgroundNotifications",
+                "CloudSync",
                 "TimerPreferences",
                 "DesignSystem",
                 "UITestContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "CloudSync",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "CloudSyncTests",
+            dependencies: [
+                "CloudSync",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .target(
@@ -185,6 +207,7 @@ let package = Package(
         .target(
             name: "WorkoutStorage",
             dependencies: [
+                "CloudSync",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
@@ -217,6 +240,7 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "BackgroundNotifications",
+                "CloudSync",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -236,7 +260,13 @@ let package = Package(
         ),
         .testTarget(
             name: "WorkoutStorageTests",
-            dependencies: ["WorkoutDomain", "WorkoutStorage"],
+            dependencies: [
+                "CloudSync",
+                "WorkoutDomain",
+                "WorkoutStorage",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(

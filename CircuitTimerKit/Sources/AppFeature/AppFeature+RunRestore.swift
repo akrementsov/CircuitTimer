@@ -185,7 +185,7 @@ extension AppFeature {
 
         state.runRestore = .resolved
         let now = date()
-        // The alert keeps the list from changing, so both checks are defensive.
+        // iCloud can change the list under the alert: the workout can be gone, or another copy of it can show.
         guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: stored.record.workoutID] else {
             Self.logger.notice("The offered run's workout is gone; dropping the run")
             state.destination = .alert(.runNotRestored)

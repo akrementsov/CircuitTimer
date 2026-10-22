@@ -95,7 +95,7 @@ struct AppFeatureListTests {
 
         var failed = AppFeature.State()
         failed.workouts = .failed
-        failed.path.append(.editor(WorkoutEditorFeature.State(viewing: first)))
+        failed.path.append(.editor(WorkoutEditorFeature.State(viewing: makeWorkout(3))))
         let failedID = try #require(failed.path.ids.first)
         let notLoaded = makeStore(failed) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [makeWorkout(3)]) }

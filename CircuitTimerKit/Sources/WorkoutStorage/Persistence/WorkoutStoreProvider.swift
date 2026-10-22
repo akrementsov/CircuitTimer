@@ -1,3 +1,5 @@
+import CloudSync
+import Dependencies
 import os
 import SwiftData
 
@@ -11,6 +13,33 @@ actor WorkoutStoreProvider {
 
     init(isStoredInMemoryOnly: Bool) {
         makeContainer = { try .workouts(isStoredInMemoryOnly: isStoredInMemoryOnly) }
+    }
+
+    /// The app's store on disk, mirrored to iCloud when this launch syncs. A store that fails to open with CloudKit
+    /// opens on the device instead, so the list keeps working; only a store that fails both ways reports an error.
+    /// `open` takes the CloudKit container, or `nil` for a local store, and lets tests replace the file.
+    static func live(
+        open: @escaping @Sendable (_ cloudKitContainer: String?) throws -> ModelContainer = {
+            try .workouts(isStoredInMemoryOnly: false, cloudKitContainer: $0)
+        }
+    ) -> WorkoutStoreProvider {
+        WorkoutStoreProvider {
+            @Dependency(\.cloudSync) var cloudSync
+            if let container = cloudSync.mirroredContainer() {
+                do {
+                    let mirrored = try open(container)
+                    cloudSync.storeOpened(true)
+                    return mirrored
+                } catch {
+                    Logger.workoutStore.fault(
+                        "Failed to open the workouts store with iCloud sync; opening it on the device: \(String(reflecting: error), privacy: .public)"
+                    )
+                }
+            }
+            let local = try open(nil)
+            cloudSync.storeOpened(false)
+            return local
+        }
     }
 
     /// Lets tests supply the container they inspect, or make opening it fail.

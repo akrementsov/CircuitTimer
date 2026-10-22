@@ -1,5 +1,6 @@
 import BackgroundExecution
 import BackgroundNotifications
+import CloudSync
 import ComposableArchitecture
 import Foundation
 import os
@@ -140,6 +141,8 @@ public struct AppFeature: Sendable {
         public enum Internal: Equatable, Sendable {
             case workoutsLoaded(StoredWorkouts)
             case workoutsLoadingFailed
+            /// Storage may hold what another device wrote, or have lost what an iCloud account change removed.
+            case workoutsChangedRemotely
             case mutationFinished(WorkoutWriteOutcome)
             case mutationFailed
             case runRecordLoaded(StoredRunRecord?)
@@ -160,6 +163,7 @@ public struct AppFeature: Sendable {
 
     enum CancelID {
         case load
+        case remoteChanges
         case readRunRecord
         case readRunRecordTimeout
         case notificationPermission
@@ -171,6 +175,7 @@ public struct AppFeature: Sendable {
 
     @Dependency(\.backgroundNotifications) var backgroundNotifications
     @Dependency(\.backgroundTask) var backgroundTask
+    @Dependency(\.cloudSync) var cloudSync
     @Dependency(\.continuousClock) var clock
     @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
@@ -178,7 +183,7 @@ public struct AppFeature: Sendable {
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) private var uuid
     @Dependency(\.workoutRunRecord) var workoutRunRecord
-    @Dependency(\.workoutStorage) private var workoutStorage
+    @Dependency(\.workoutStorage) var workoutStorage
 
     public init() {}
 
@@ -194,6 +199,8 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
+                case .path(.element(id: _, action: .editor(.delegate(.deletedElsewhere)))):
+                    outsideChange(&state)
                 case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
                     startWorkout(workout, &state)
                 case let .destination(.presented(.resumeRun(choice))):
@@ -224,7 +231,7 @@ public struct AppFeature: Sendable {
 
                 // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
-                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans())
+                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans(), observeRemoteChanges())
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -344,7 +351,7 @@ public struct AppFeature: Sendable {
                     state.needsReload = true
                     return .none
                 }
-                // Defensive: the write that overtook this read normally cancels it with a newer load.
+                // A save or a change from outside arrived during this read, so it may be stale.
                 if state.needsReload {
                     state.needsReload = false
                     return loadWorkouts(&state)
@@ -352,9 +359,12 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
+                let openWorkout = refreshOpenWorkout(&state)
                 // A continuation prompt takes precedence over any deferred screen.
                 let restore = resolveRestore(&state)
-                return .merge(restore, presentDeferredScreen(&state))
+                return .merge(openWorkout, restore, presentDeferredScreen(&state))
+            case .workoutsChangedRemotely:
+                return outsideChange(&state)
             case .workoutsLoadingFailed:
                 state.isReloading = false
                 state.workouts = .failed
@@ -594,30 +604,11 @@ public struct AppFeature: Sendable {
 
         workouts[id: workout.id] = workout
         state.workouts = .loaded(workouts)
+        // A reload in flight may have read before this save; read again once it lands.
+        if state.isReloading {
+            state.needsReload = true
+        }
         return .none
-    }
-
-    func loadWorkouts(_ state: inout State) -> Effect<Action> {
-        // A shown list stays until the new one arrives: a spinner in its place would flash, and a push right after the
-        // reload would carry the spinner's picture of the tab bar on iOS 26.
-        if case .loaded = state.workouts {
-            state.isReloading = true
-        } else {
-            state.workouts = .loading
-        }
-        return .run { [workoutStorage] send in
-            do {
-                let stored = try await workoutStorage.fetchAll()
-                await send(.internal(.workoutsLoaded(stored)))
-            } catch is CancellationError {
-                // Superseded by a newer load; not a failure.
-                return
-            } catch {
-                Self.logger.error("Failed to load workouts: \(String(reflecting: error), privacy: .public)")
-                await send(.internal(.workoutsLoadingFailed))
-            }
-        }
-        .cancellable(id: CancelID.load, cancelInFlight: true)
     }
 }
 

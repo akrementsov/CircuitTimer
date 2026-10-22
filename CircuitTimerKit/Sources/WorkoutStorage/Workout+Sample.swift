@@ -4,8 +4,8 @@ import WorkoutDomain
 extension Workout {
     /// The workout seeded on first launch, also used by previews and tests.
     ///
-    /// The identifiers are permanent: once seeded they live in users' stores, and iCloud sync (CT-5)
-    /// will merge copies seeded on different devices by them. They are random rather than sequential
+    /// The identifiers are permanent: once seeded they live in users' stores, and iCloud sync
+    /// shows one of the copies seeded on different devices by them. They are random rather than sequential
     /// so they never collide with `UUIDGenerator.incrementing` in tests. Names are localized when the
     /// workout is seeded and are stored in that language.
     public static var sample: Workout {

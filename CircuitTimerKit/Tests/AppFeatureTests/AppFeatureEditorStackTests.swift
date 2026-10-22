@@ -43,7 +43,10 @@ struct AppFeatureEditorStackTests {
     @Test
     func test_discardConfirmed_changedDraftPushedEditor_popsStackAndLeavesListUntouched() async {
         let store = makeStore(loaded([first, second])) {
-            $0.workoutStorage.save = { _ in Issue.record("Discarding must not save") }
+            $0.workoutStorage.save = { _ in
+                Issue.record("Discarding must not save")
+                return .saved
+            }
         }
         await store.send(.view(.workoutTapped(first.id))) {
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))

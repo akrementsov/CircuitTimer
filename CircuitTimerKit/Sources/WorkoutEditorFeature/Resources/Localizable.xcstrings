@@ -33,6 +33,54 @@
         }
       }
     },
+    "editor.deletedElsewhere.dontSave" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't save"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не сохранять"
+          }
+        }
+      }
+    },
+    "editor.deletedElsewhere.saveAsNew" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save as new"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сохранить как новую"
+          }
+        }
+      }
+    },
+    "editor.deletedElsewhere.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This workout was deleted on another device."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эту тренировку удалили на другом устройстве."
+          }
+        }
+      }
+    },
     "editor.discard.confirm" : {
       "localizations" : {
         "en" : {

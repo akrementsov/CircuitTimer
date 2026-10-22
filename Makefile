@@ -1,4 +1,6 @@
 SWIFTLINT ?= swiftlint
+# Edits the archive's entitlements; the script tests replace it, as Linux has none.
+PLISTBUDDY ?= /usr/libexec/PlistBuddy
 DESTINATION ?= platform=iOS Simulator,name=iPhone 17,OS=27.0
 BUILD_DESTINATION := generic/platform=iOS Simulator
 HOST_ARCH := $(shell uname -m)
@@ -18,9 +20,12 @@ UI_TEST_WORKERS ?= 1
 # names the types, which Swift metadata keeps; `AppScenario` also matches the module `AppScenarios`. Keep it in step
 # with UITestContract's AppScenario.swift.
 RELEASE_FORBIDDEN := AppScenario|ScenarioLaunch|ScenarioFixture|CT_APP_SCENARIO|Leg day
+# Simulator builds without a signature carry no iCloud entitlement, and CloudKit traps a process that uses a container
+# without it, so they name no container: the store stays on the device.
+UNSIGNED = CODE_SIGNING_ALLOWED=NO CT_CLOUDKIT_CONTAINER=
 # What `build-ui-tests` builds and `test-ui` runs: the same arguments, so the tests find the build done.
 UI_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimer -destination '$(DESTINATION)' \
-	-derivedDataPath "$(DERIVED_DATA)/UITests-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
+	-derivedDataPath "$(DERIVED_DATA)/UITests-$(TEST_RUN)" $(UNSIGNED) $(XCODEBUILD_FLAGS)
 
 SNAPSHOT_REFERENCE_DESTINATION := platform=iOS Simulator,name=iPhone 17,OS=27.0
 SNAPSHOTS_DIR := CircuitTimerSnapshotTests/__Snapshots__
@@ -29,7 +34,7 @@ test-snapshot record-snapshot: export SNAPSHOT_LANGUAGE ?= en
 test-snapshot record-snapshot: export SNAPSHOT_TEXT_SIZE ?= large
 test-snapshot record-snapshot: export SNAPSHOT_SELECTED_TEST = $(TEST)
 SNAPSHOT_TEST_BUILD = -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshots -destination '$(DESTINATION)' \
-	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO $(XCODEBUILD_FLAGS)
+	-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" $(UNSIGNED) $(XCODEBUILD_FLAGS)
 
 XCODEBUILD_FLAGS = -quiet \
 	-clonedSourcePackagesDirPath "$(SOURCE_PACKAGES)" \
@@ -114,11 +119,11 @@ test-snapshot-contracts:
 	case "$$results" in /*) ;; *) results="$(CURDIR)/$$results" ;; esac; \
 	scripts/run-tests.sh "$$results/SnapshotContracts-$(TEST_RUN).xcresult" \
 		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
-		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage en -testRegion US \
+		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" $(UNSIGNED) -testLanguage en -testRegion US \
 		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) $(TEST_FLAGS); \
 	scripts/run-tests.sh "$$results/SnapshotContracts-$(TEST_RUN)-de.xcresult" \
 		xcodebuild test -project CircuitTimer.xcodeproj -scheme CircuitTimerSnapshotContracts -destination '$(DESTINATION)' \
-		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" CODE_SIGNING_ALLOWED=NO -testLanguage de -testRegion DE \
+		-derivedDataPath "$(DERIVED_DATA)/Snapshots-$(TEST_RUN)" $(UNSIGNED) -testLanguage de -testRegion DE \
 		-parallel-testing-enabled NO -collect-test-diagnostics never $(XCODEBUILD_FLAGS) \
 		-only-testing:CircuitTimerSnapshotContractTests/SnapshotLanguageContractTests; \
 	report=$$(xcrun xcresulttool get test-results summary --path "$$results/SnapshotContracts-$(TEST_RUN)-de.xcresult"); \
@@ -141,7 +146,7 @@ test:
 
 build-app:
 	xcodebuild build -project CircuitTimer.xcodeproj -scheme CircuitTimer \
-		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) CODE_SIGNING_ALLOWED=NO \
+		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) $(UNSIGNED) \
 		-derivedDataPath "$(DERIVED_DATA)/App" $(XCODEBUILD_FLAGS)
 	python3 scripts/check-activity-intents.py "$(DERIVED_DATA)/App/Build/Products/Debug-iphonesimulator/CircuitTimer.app"
 
@@ -300,13 +305,25 @@ record-snapshot:
 	@git status --short -- '$(SNAPSHOTS_DIR)'
 	@git ls-files --others --exclude-standard -- '$(SNAPSHOTS_DIR)'
 
-# Unsigned on purpose: an App Store Connect API key can sign only at export, so `upload` signs.
+# Built unsigned: an App Store Connect API key can sign only at export, so `upload` signs. The export keeps the
+# entitlements of the archived signature and an unsigned app has none, so the archived bundles are then signed ad hoc,
+# the widget before the app that contains it, and the app with Configs/CircuitTimer.entitlements for its container.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
 	xcodebuild archive -project CircuitTimer.xcodeproj -scheme CircuitTimer -configuration Release \
 		-destination 'generic/platform=iOS' -archivePath "$(ARCHIVE_PATH)" \
 		CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION=$(BUILD_NUMBER) \
 		-derivedDataPath "$(DERIVED_DATA)/Archive" $(XCODEBUILD_FLAGS)
+	@set -eu; \
+	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
+	container=$$(plutil -extract CTCloudKitContainerIdentifier raw "$$app/Info.plist"); \
+	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
+	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
+	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
+	"$(PLISTBUDDY)" -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
+	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
+	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
+	codesign --verify --deep --strict "$$app"
 
 # UI test scenarios are Debug-only: no file of the archived app may name one.
 check-release-app:

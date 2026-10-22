@@ -46,6 +46,17 @@ public struct SettingsView: View {
                     isOn: Binding(get: { store.isKeepScreenOn }, set: { send(.keepScreenOnToggled($0)) })
                 )
                 .accessibilityIdentifier(AccessibilityID.Settings.keepScreenOn)
+                SettingsSwitchCard(
+                    title: Text("settings.iCloud.toggle", bundle: .module),
+                    isOn: Binding(get: { store.isICloudSyncOn }, set: { send(.iCloudSyncToggled($0)) })
+                )
+                if let footnote = store.cloudSyncFootnote {
+                    Text(LocalizedStringKey(footnote), bundle: .module)
+                        .font(.token(.footnote))
+                        .foregroundStyle(.text(.secondary))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, .token(spacing: .m))
+                }
                 Button {
                     send(.aboutTapped)
                 } label: {

@@ -59,6 +59,7 @@ extension WorkoutStorageClient {
                         workouts.append(workout)
                     }
                 }
+                return .saved
             },
             insert: { _, _ in fatalError("Scenario storage has no insert yet; implement it with the scenario that needs it") },
             delete: { _ in fatalError("Scenario storage has no delete yet; implement it with the scenario that needs it") },
