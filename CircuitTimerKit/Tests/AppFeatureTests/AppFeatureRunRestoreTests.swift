@@ -359,6 +359,109 @@ struct AppFeatureRunRestoreTests {
         #expect(store.state.destination == nil)
     }
 
+    @Test
+    func test_workoutsChangedRemotely_runRecordStillRead_offersTheRunOnceAfterTheSecondRead() async throws {
+        let saved = try stored(.running)
+        var state = AppFeature.State()
+        state.workouts = .loading
+        state.runRestore = .reading
+        let fetches = LockIsolated(0)
+        let store = makeStore(state) {
+            $0.date = .constant(now)
+            $0.workoutStorage.fetchAll = {
+                fetches.withValue { $0 += 1 }
+                return StoredWorkouts(workouts: [workout])
+            }
+        }
+
+        await store.send(.internal(.workoutsChangedRemotely)) { $0.needsReload = true }
+        await store.send(.internal(.runRecordLoaded(saved))) { $0.runRestore = .found(saved) }
+        await store.receive(\.internal.workoutsLoaded) { $0.needsReload = false }
+        await store.receive(\.internal.workoutsLoaded) {
+            $0.workouts = .loaded([workout])
+            $0.runRestore = .offered(saved)
+            $0.destination = .resumeRun(.resumeRun(workoutName: workout.name))
+        }
+
+        #expect(fetches.value == 2)
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            $0.runRestore = .resolved
+        }
+    }
+
+    @Test(arguments: ["gone", "otherSchedule"])
+    func test_continue_offeredWorkoutChangedRemotely_dropsTheRunWithoutATimer(change: String) async throws {
+        let saved = try stored(.paused)
+        var otherSchedule = workout
+        otherSchedule.training[0].duration = .seconds(20)
+        let reloaded = change == "gone" ? [makeWorkout(2)] : [otherSchedule]
+        let fetches = LockIsolated(0)
+        let writes = LockIsolated<[WorkoutRunRecord?]>([])
+        let store = offered(saved) {
+            $0.date = .constant(now)
+            $0.workoutStorage.fetchAll = {
+                fetches.withValue { $0 += 1 }
+                return StoredWorkouts(workouts: reloaded)
+            }
+            $0.workoutRunRecord.write = { record, _ in writes.withValue { $0.append(record) } }
+        }
+
+        await store.send(.internal(.workoutsChangedRemotely)) { $0.isReloading = true }
+        await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
+            $0.workouts = .loaded(IdentifiedArray(uniqueElements: reloaded))
+        }
+        #expect(store.state.runRestore == .offered(saved))
+        #expect(writes.value.isEmpty)
+
+        await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
+        await store.receive(.internal(.resumeRunConfirmed)) {
+            $0.runRestore = .resolved
+            $0.destination = .alert(.runNotRestored)
+        }
+        await store.finish()
+
+        #expect(writes.value == [nil])
+        #expect(fetches.value == 1)
+    }
+
+    @Test
+    func test_continue_offeredWorkoutRenamedRemotely_opensTheTimerWithTheReloadedWorkout() async throws {
+        let saved = try stored(.paused)
+        let renamed = makeWorkout(1, name: "Renamed")
+        let run = try WorkoutRun(schedule: WorkoutSchedule(workout: renamed), restoring: saved.record, at: now)
+        let store = offered(saved) {
+            $0.date = .constant(now)
+            $0.timerSession.end = { _ in }
+            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [renamed]) }
+        }
+
+        await store.send(.internal(.workoutsChangedRemotely)) { $0.isReloading = true }
+        await store.receive(\.internal.workoutsLoaded) {
+            $0.isReloading = false
+            $0.workouts = .loaded([renamed])
+        }
+        await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
+        await store.receive(.internal(.resumeRunConfirmed)) {
+            $0.runRestore = .presenting(saved)
+            $0.destination = .timer(WorkoutTimerFeature.State(
+                id: UUID(0), workoutID: renamed.id, title: "Renamed", workoutName: "Renamed", restoring: run, at: now
+            ))
+        }
+        #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(3))
+
+        await store.send(.view(.timerCoverAppeared)) {
+            $0.isTimerCoverUp = true
+            $0.runRestore = .resolved
+        }
+        await store.send(.destination(.dismiss)) {
+            $0.destination = nil
+            $0.isTimerCoverUp = false
+        }
+        await store.finish()
+    }
+
     private func stored(_ phase: WorkoutRunRecord.Phase) throws -> StoredRunRecord {
         var run = WorkoutRun(schedule: WorkoutSchedule(workout: workout))
         run.start(at: now)

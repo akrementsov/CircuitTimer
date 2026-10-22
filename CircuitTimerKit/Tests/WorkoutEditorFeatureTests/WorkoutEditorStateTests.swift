@@ -271,4 +271,45 @@ struct WorkoutEditorStateTests {
         #expect(!editingState(makeWorkout()).canStart)
         #expect(!newDraftState().canStart)
     }
+
+    @Test
+    func test_showStored_newerVersionWhileViewing_takesItAndKeepsTheScreenState() {
+        var state = WorkoutEditorFeature.State(viewing: makeWorkout())
+        state.hasSettled = true
+        state.saveTipSuppressed = true
+        var stored = makeWorkout()
+        stored.name = "Renamed"
+        stored.trainingRounds = 0
+
+        state.showStored(stored)
+
+        #expect(state.workout == stored)
+        #expect(state.original == WorkoutEditorFeature.State.editable(stored))
+        #expect(state.original.trainingRounds == 1)
+        #expect(state.draft == state.original)
+        #expect(state.phase == .viewing)
+        #expect(state.hasSettled)
+        #expect(state.saveTipSuppressed)
+    }
+
+    @Test(arguments: ["same", "editing", "alert", "starting"])
+    func test_showStored_sameVersionDraftAlertOrStart_changesNothing(_ situation: String) {
+        var state = situation == "editing" ? editingState() : WorkoutEditorFeature.State(viewing: makeWorkout())
+        // A draft the stored version would replace, so a replacement shows even when the stored workout is the same.
+        state.draft.name = "Draft"
+        var stored = makeWorkout()
+        switch situation {
+            case "alert": state.destination = .saveFailedAlert(.saveFailed)
+            case "starting": state.isStarting = true
+            default: break
+        }
+        if situation != "same" {
+            stored.name = "Renamed"
+        }
+        let before = state
+
+        state.showStored(stored)
+
+        #expect(state == before)
+    }
 }
