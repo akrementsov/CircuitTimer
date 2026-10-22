@@ -144,6 +144,7 @@ let package = Package(
                 "CloudSync",
                 "TimerPreferences",
                 "DesignSystem",
+                "UITestContract",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],

@@ -255,7 +255,7 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
 
 ## Roadmap
 
-Next: finish the two remaining CT-QA smoke flows, then move on to CT-5. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-5, iCloud sync. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -268,11 +268,11 @@ Next: finish the two remaining CT-QA smoke flows, then move on to CT-5. Checked 
   - [x] **CT-UI-5** — editor layout of the original app
   - [x] **CT-UI-6** — stage durations typed as MM:SS
   - [x] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list; own drag reorder (delivered with CT-3-2)
-- [ ] **CT-QA** — tests through the UI, in slices:
+- [x] **CT-QA** — tests through the UI, in slices:
   - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
   - [x] UI smoke tests: empty list, creating and saving a workout, workout and stage reorder, starting and closing the timer
-  - [ ] UI smoke test: edit an existing workout, save it and verify the changes
-  - [ ] UI smoke tests: Settings
+  - [x] UI smoke test: edit an existing workout, save it and verify the changes in the list and reopened editor
+  - [x] UI smoke tests: all five Settings switches in both directions and after returning to the tab; About version and navigation to both legal pages
   - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake

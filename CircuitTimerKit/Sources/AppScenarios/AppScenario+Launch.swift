@@ -37,7 +37,7 @@ extension AppScenario {
         dependencies.timerSession = .previewValue
         dependencies.backgroundTask = .previewValue
         dependencies.saveTip = .previewValue
-        dependencies.appVersion = .previewValue
+        dependencies.appVersion = .init(shortVersion: { ScenarioFixture.appVersion })
         dependencies.cloudSync = .previewValue
         dependencies.defaultAppStorage = .inMemory
         dependencies.uuid = .incrementing

@@ -27,6 +27,21 @@ public enum AccessibilityID {
         public static let close = "timer.close"
         public static let currentStage = "timer.currentStage"
     }
+
+    public enum Settings {
+        public static let sound = "settings.sound"
+        public static let vibration = "settings.vibration"
+        public static let speech = "settings.speech"
+        public static let backgroundNotifications = "settings.backgroundNotifications"
+        public static let keepScreenOn = "settings.keepScreenOn"
+        public static let about = "settings.about"
+    }
+
+    public enum About {
+        public static let version = "about.version"
+        public static let privacyPolicy = "about.privacyPolicy"
+        public static let userAgreement = "about.userAgreement"
+    }
 }
 
 /// The editor's sections as the tests name them; the contract knows no workout model.

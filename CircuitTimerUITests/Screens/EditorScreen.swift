@@ -20,10 +20,12 @@ struct EditorScreen: Screen {
     /// and would cover the stages a later step taps on a small screen. That step waits until its field can be tapped,
     /// which it cannot while covered; the keyboard itself stays in the element tree for seconds after it has gone.
     func typeName(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
-        nameField
+        // Tap beyond the short fixture name, so a suffix is appended rather than inserted in its middle.
+        let field = nameField
             .waitUntilHittable("The workout's name field", file: file, line: line)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
             .tap()
-        nameField.typeText(name + "\n")
+        field.typeText(name + "\n")
         return self
     }
 
@@ -96,6 +98,12 @@ struct EditorScreen: Screen {
             .waitUntilHittable("The Back button", file: file, line: line)
             .tap()
         return WorkoutListScreen(app, file: file, line: line)
+    }
+
+    @discardableResult
+    func assertName(_ name: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
+        nameField.waitUntilValue("The workout's name", is: name, file: file, line: line)
+        return self
     }
 
     @discardableResult

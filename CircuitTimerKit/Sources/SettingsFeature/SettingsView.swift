@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import SwiftUI
+import UITestContract
 
 @ViewAction(for: SettingsFeature.self)
 public struct SettingsView: View {
@@ -18,14 +19,17 @@ public struct SettingsView: View {
                     title: Text("settings.signals.sound", bundle: .module),
                     isOn: Binding(get: { store.isSoundOn }, set: { send(.soundToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.sound)
                 SettingsSwitchCard(
                     title: Text("settings.signals.vibration", bundle: .module),
                     isOn: Binding(get: { store.isVibrationOn }, set: { send(.vibrationToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.vibration)
                 SettingsSwitchCard(
                     title: Text("settings.signals.speech", bundle: .module),
                     isOn: Binding(get: { store.isSpeechOn }, set: { send(.speechToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.speech)
                 Text("settings.signals.footnote", bundle: .module)
                     .font(.token(.footnote))
                     .foregroundStyle(.text(.secondary))
@@ -35,11 +39,13 @@ public struct SettingsView: View {
                     title: Text("settings.notifications.toggle", bundle: .module),
                     isOn: Binding(get: { store.isBackgroundNotificationsOn }, set: { send(.backgroundNotificationsToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.backgroundNotifications)
                 notificationStatus
                 SettingsSwitchCard(
                     title: Text("settings.screen.keepOn", bundle: .module),
                     isOn: Binding(get: { store.isKeepScreenOn }, set: { send(.keepScreenOnToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.keepScreenOn)
                 SettingsSwitchCard(
                     title: Text("settings.iCloud.toggle", bundle: .module),
                     isOn: Binding(get: { store.isICloudSyncOn }, set: { send(.iCloudSyncToggled($0)) })
@@ -57,6 +63,7 @@ public struct SettingsView: View {
                     SettingsCard(Text("settings.about", bundle: .module), style: .active)
                 }
                 .buttonStyle(.settingsCard)
+                .accessibilityIdentifier(AccessibilityID.Settings.about)
             }
             .onAppear { send(.appeared) }
             .navigationTitle(Text("settings.title", bundle: .module))

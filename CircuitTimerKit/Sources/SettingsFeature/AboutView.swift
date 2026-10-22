@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import SwiftUI
+import UITestContract
 
 @ViewAction(for: SettingsFeature.self)
 struct AboutView: View {
@@ -10,14 +11,22 @@ struct AboutView: View {
     var body: some View {
         SettingsScroll {
             ForEach(LegalDocument.allCases, id: \.self) { document in
-                Button {
+                let button = Button {
                     send(.legalDocumentTapped(document))
                 } label: {
                     SettingsCard(document.title, style: .active)
                 }
                 .buttonStyle(.settingsCard)
+
+                switch document {
+                    case .privacyPolicy:
+                        button.accessibilityIdentifier(AccessibilityID.About.privacyPolicy)
+                    case .userAgreement:
+                        button.accessibilityIdentifier(AccessibilityID.About.userAgreement)
+                }
             }
             versionCard
+                .accessibilityIdentifier(AccessibilityID.About.version)
                 // Legacy puts the version section 24 below the legal cards; the stack already adds 12.
                 .padding(.top, .token(spacing: .m))
         }
