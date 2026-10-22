@@ -17,10 +17,42 @@ final class CloudSyncMonitor: Sendable {
         var decision: (isRequested: Bool, container: String?)?
         var isMirroring: Bool?
         var accountProblem: CloudSyncProblem?
+        /// Tells the latest account read from an older one that answers late.
+        var accountGeneration = 0
         var eventProblems: [EventKind: CloudSyncProblem] = [:]
         var nextSubscriber = 0
         var statusSubscribers: [Int: AsyncStream<CloudSyncStatus>.Continuation] = [:]
         var changeSubscribers: [Int: AsyncStream<Void>.Continuation] = [:]
+
+        var status: CloudSyncStatus {
+            let isRequested = decision?.isRequested ?? false
+            return CloudSyncStatus(isRequested: isRequested, isMirroring: isMirroring, problem: problem(isRequested: isRequested))
+        }
+
+        /// A failed open while sync is on, then the account, then full storage, then any other failed event.
+        private func problem(isRequested: Bool) -> CloudSyncProblem? {
+            if isRequested, decision?.container == nil || isMirroring == false {
+                return .syncFailed
+            }
+            guard isMirroring == true else { return nil }
+
+            if let accountProblem {
+                return accountProblem
+            }
+            let events = Set(eventProblems.values)
+            if events.contains(.quotaExceeded) {
+                return .quotaExceeded
+            }
+            return events.isEmpty ? nil : .syncFailed
+        }
+
+        /// Sends the status while the lock is held, so subscribers see changes in the order they happened.
+        func publishStatus() {
+            let status = status
+            for subscriber in statusSubscribers.values {
+                subscriber.yield(status)
+            }
+        }
     }
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "CloudSync")
@@ -50,13 +82,12 @@ final class CloudSyncMonitor: Sendable {
     }
 
     func storeOpened(isMirroring: Bool) {
-        let container = decide().container
-        state.withValue { $0.isMirroring = isMirroring }
-        publishStatus()
-        // Creating a container without the iCloud entitlement traps, so only a store that opened mirroring reads it.
-        if isMirroring, let container {
-            refreshAccount(container)
+        decide()
+        state.withValue { state in
+            state.isMirroring = isMirroring
+            state.publishStatus()
         }
+        refreshAccountIfMirroring(announcesChange: false)
     }
 
     /// The current status, then every change of it.
@@ -66,12 +97,12 @@ final class CloudSyncMonitor: Sendable {
         let id = state.withValue { state in
             state.nextSubscriber += 1
             state.statusSubscribers[state.nextSubscriber] = continuation
+            continuation.yield(state.status)
             return state.nextSubscriber
         }
         continuation.onTermination = { [weak self] _ in
             self?.state.withValue { _ = $0.statusSubscribers.removeValue(forKey: id) }
         }
-        continuation.yield(currentStatus())
         return stream
     }
 
@@ -112,26 +143,21 @@ final class CloudSyncMonitor: Sendable {
         return decision
     }
 
+    /// Registers before the store opens, so its first setup and import are seen. The center keeps the observers for
+    /// the rest of the process, as long as the monitor of the live dependency lives.
     private func observe() {
-        let center = notificationCenter
-        // The monitor follows CloudKit for the rest of the process; no caller owns these loops.
-        // swiftlint:disable:next no_unstructured_task
-        Task { [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    for await notification in center.notifications(named: NSPersistentCloudKitContainer.eventChangedNotification) {
-                        guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
-                            as? NSPersistentCloudKitContainer.Event else { continue }
+        _ = notificationCenter.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                as? NSPersistentCloudKitContainer.Event else { return }
 
-                        self?.handle(event)
-                    }
-                }
-                group.addTask {
-                    for await _ in center.notifications(named: .CKAccountChanged) {
-                        self?.accountChanged()
-                    }
-                }
-            }
+            self?.handle(event)
+        }
+        _ = notificationCenter.addObserver(forName: .CKAccountChanged, object: nil, queue: nil) { [weak self] _ in
+            self?.accountChanged()
         }
     }
 
@@ -150,8 +176,10 @@ final class CloudSyncMonitor: Sendable {
         }
 
         if event.succeeded {
-            state.withValue { _ = $0.eventProblems.removeValue(forKey: kind) }
-            publishStatus()
+            state.withValue { state in
+                state.eventProblems.removeValue(forKey: kind)
+                state.publishStatus()
+            }
             if kind != .export {
                 publishChange()
             }
@@ -163,37 +191,55 @@ final class CloudSyncMonitor: Sendable {
         switch verdict {
             case .quotaExceeded:
                 Self.logger.error("CloudKit \(String(describing: kind), privacy: .public) failed: iCloud storage is full")
-                state.withValue { $0.eventProblems[kind] = .quotaExceeded }
+                recordEventProblem(.quotaExceeded, for: kind)
             case .recheckAccount:
                 Self.logger.notice("CloudKit \(String(describing: kind), privacy: .public) failed on the account: \(description, privacy: .public)")
-                if let container = state.value.decision?.container {
-                    refreshAccount(container)
-                }
+                refreshAccountIfMirroring(announcesChange: false)
             case .transient:
                 Self.logger.notice("CloudKit \(String(describing: kind), privacy: .public) is held back: \(description, privacy: .public)")
+            case .cancelled:
+                return
             case .failed:
                 Self.logger.error("CloudKit \(String(describing: kind), privacy: .public) failed: \(description, privacy: .public)")
-                state.withValue { $0.eventProblems[kind] = .syncFailed }
+                recordEventProblem(.syncFailed, for: kind)
         }
-        publishStatus()
+    }
+
+    private func recordEventProblem(_ problem: CloudSyncProblem, for kind: EventKind) {
+        state.withValue { state in
+            state.eventProblems[kind] = problem
+            state.publishStatus()
+        }
     }
 
     private func accountChanged() {
-        // Signing out or switching accounts can remove the mirrored workouts, so the list reads again now and once
-        // more after the status is known.
-        publishChange()
-        if let container = state.value.decision?.container {
-            refreshAccount(container)
+        // Failures belonged to the previous account. Signing out or switching accounts can remove the mirrored
+        // workouts, so the list reads again now and once more after the status is known.
+        state.withValue { state in
+            state.eventProblems = [:]
+            state.publishStatus()
         }
+        publishChange()
+        refreshAccountIfMirroring(announcesChange: true)
     }
 
-    private func refreshAccount(_ container: String) {
+    /// Reads the account only for a store that opened mirroring: creating a container without the iCloud
+    /// entitlement traps, and a local store has no account to report.
+    private func refreshAccountIfMirroring(announcesChange: Bool) {
+        let read: (container: String, generation: Int)? = state.withValue { state in
+            guard state.isMirroring == true, let container = state.decision?.container else { return nil }
+
+            state.accountGeneration += 1
+            return (container, state.accountGeneration)
+        }
+        guard let read else { return }
+
         // Called synchronously from notifications and `storeOpened`; the read outlives them.
         // swiftlint:disable:next no_unstructured_task
         Task { [self, accountStatus] in
             let problem: CloudSyncProblem?
             do {
-                switch try await accountStatus(container) {
+                switch try await accountStatus(read.container) {
                     case .available, .couldNotDetermine:
                         problem = nil
                     case .noAccount:
@@ -211,39 +257,24 @@ final class CloudSyncMonitor: Sendable {
                 Self.logger.error("Failed to read the iCloud account status: \(String(reflecting: error), privacy: .public)")
                 problem = nil
             }
-            state.withValue { $0.accountProblem = problem }
-            publishStatus()
-            publishChange()
-        }
-    }
+            let isLatest = state.withValue { state in
+                guard state.accountGeneration == read.generation else { return false }
 
-    private func currentStatus() -> CloudSyncStatus {
-        state.withValue { state in
-            let isRequested = state.decision?.isRequested ?? false
-            let problem: CloudSyncProblem?
-            if isRequested, state.decision?.container == nil || state.isMirroring == false {
-                problem = .syncFailed
-            } else if state.isMirroring == true {
-                let events = Set(state.eventProblems.values)
-                problem = state.accountProblem
-                    ?? (events.contains(.quotaExceeded) ? .quotaExceeded : events.isEmpty ? nil : .syncFailed)
-            } else {
-                problem = nil
+                state.accountProblem = problem
+                state.publishStatus()
+                return true
             }
-            return CloudSyncStatus(isRequested: isRequested, isMirroring: state.isMirroring, problem: problem)
-        }
-    }
-
-    private func publishStatus() {
-        let status = currentStatus()
-        for subscriber in state.value.statusSubscribers.values {
-            subscriber.yield(status)
+            if isLatest, announcesChange {
+                publishChange()
+            }
         }
     }
 
     private func publishChange() {
-        for subscriber in state.value.changeSubscribers.values {
-            subscriber.yield()
+        state.withValue { state in
+            for subscriber in state.changeSubscribers.values {
+                subscriber.yield()
+            }
         }
     }
 }

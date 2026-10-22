@@ -10,6 +10,9 @@ enum CloudSyncClassification {
         case recheckAccount
         /// The network or the service holds the operation back; CloudKit retries it on its own.
         case transient
+        /// The operation was cancelled, which is no failure.
+        case cancelled
+        /// Anything else: the user is told that workouts do not sync.
         case failed
     }
 
@@ -21,24 +24,34 @@ enum CloudSyncClassification {
     /// 134419: the system deferred the history analysis. 134417: an export gave way to one already pending.
     private static let transientCocoaCodes: Set<Int> = [134_419, 134_417]
 
+    /// Core Data resolves a changed server record itself when it retries the export.
     private static let transientCodes: Set<CKError.Code> = [
-        .networkUnavailable, .networkFailure, .serviceUnavailable, .requestRateLimited, .zoneBusy, .operationCancelled,
+        .networkUnavailable, .networkFailure, .serviceUnavailable, .requestRateLimited, .zoneBusy, .serverRecordChanged,
     ]
 
     static func verdict(for error: (any Error)?) -> Verdict {
         guard let error else { return .failed }
 
-        let codes = cloudKitCodes(in: error as NSError)
+        let nsError = error as NSError
+        // A partial failure only wraps the errors of its items, and items that merely shared a failed batch carry
+        // `.batchRequestFailed`: what the user should hear is in the others.
+        let codes = cloudKitCodes(in: nsError).filter { $0 != .partialFailure && $0 != .batchRequestFailed }
         if codes.contains(.quotaExceeded) {
             return .quotaExceeded
         }
         if codes.contains(.notAuthenticated) || codes.contains(.accountTemporarilyUnavailable) {
             return .recheckAccount
         }
-        if !codes.isEmpty, codes.allSatisfy(transientCodes.contains) {
+        if !codes.isEmpty, codes.allSatisfy({ $0 == .operationCancelled }) {
+            return .cancelled
+        }
+        if !codes.isEmpty, codes.allSatisfy({ transientCodes.contains($0) || $0 == .operationCancelled }) {
             return .transient
         }
-        let nsError = error as NSError
+        if codes.isEmpty, nsError.domain == CKError.errorDomain {
+            // Nothing but batch failures inside a partial failure: the item that broke the batch is retried.
+            return .transient
+        }
         if codes.isEmpty, nsError.domain == NSCocoaErrorDomain {
             if accountCocoaCodes.contains(nsError.code) {
                 return .recheckAccount

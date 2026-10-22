@@ -4,10 +4,11 @@ import DependenciesMacros
 import Foundation
 import Sharing
 
-/// Whether this launch syncs workouts through iCloud, and how that goes. The decision is the one point where a
-/// purchase can later lock sync.
+/// Whether this launch syncs workouts through iCloud, and how that goes.
 @DependencyClient
 public struct CloudSyncClient: Sendable {
+    // The defaults are what the unimplemented `testValue` returns after reporting the call.
+
     /// The CloudKit container the store mirrors to in this launch, or `nil` to keep it on the device. The first call
     /// decides; the same answer follows until the app is launched again.
     public var mirroredContainer: @Sendable () -> String? = { nil }
