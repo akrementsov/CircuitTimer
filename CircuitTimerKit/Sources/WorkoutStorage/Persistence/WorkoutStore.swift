@@ -6,7 +6,7 @@ import WorkoutDomain
 
 /// Serializes the store's operations. Each runs in a context of its own, so it reads what CloudKit imported
 /// after the previous one instead of objects an older context still holds. Every write either saves completely
-/// or rolls back.
+/// or leaves the store as it was.
 @ModelActor
 actor WorkoutStore {
     private static let sampleSeedKey = "sample-workout-v1"
@@ -159,16 +159,14 @@ actor WorkoutStore {
         guard Set(stageIDs).count == stageIDs.count else { throw .repeatedStageIDs }
     }
 
+    /// A failed operation leaves its context unsaved and drops it. It is never rolled back: SwiftData traps when a
+    /// rollback restores a deleted workout whose stages were never read.
     private func write<Value>(_ body: (ModelContext) throws -> Value) throws -> Value {
         let context = ModelContext(modelContainer)
-        do {
-            let result = try body(context)
-            try saveContext(context)
-            return result
-        } catch {
-            context.rollback()
-            throw error
-        }
+        context.autosaveEnabled = false
+        let result = try body(context)
+        try saveContext(context)
+        return result
     }
 
     /// Checked on every read: signing out of iCloud can remove the synced marker together with the sample, and the

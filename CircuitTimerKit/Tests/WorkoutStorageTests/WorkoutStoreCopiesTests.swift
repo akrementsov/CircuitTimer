@@ -103,6 +103,29 @@ struct WorkoutStoreCopiesTests {
         #expect(try storedNames(in: container) == ["Workout 2"])
     }
 
+    @Test
+    func test_fetchAll_removingDeletedCopyFails_readsAndRetriesOnNextRead() async throws {
+        let saveSwitch = SaveSwitch()
+        let (store, container) = try await makeEmptyStore(saveContext: saveSwitch.save)
+        _ = try await store.save(makeWorkout(1))
+        _ = try await store.save(makeWorkout(2))
+        _ = try await store.delete(UUID(fixture: 1))
+        // Its stages are never read before the removal, which a failed save must survive.
+        try insertRecord(makeWorkout(1, name: "Late"), order: 5, in: container) { $0.copyID = UUID(fixture: 10) }
+        saveSwitch.fails = true
+
+        let failedRead = try await store.fetchAll()
+
+        #expect(failedRead == StoredWorkouts(workouts: [makeWorkout(2)]))
+        #expect(try storedNames(in: container) == ["Workout 2", "Late"])
+
+        saveSwitch.fails = false
+        let retriedRead = try await store.fetchAll()
+
+        #expect(retriedRead == failedRead)
+        #expect(try storedNames(in: container) == ["Workout 2"])
+    }
+
     // Above every fixture identifier, so the copy that gets it still loses once it has one.
     @Test(.dependency(\.uuid, .constant(UUID(0xFFFF_FFFF_FFFF))))
     func test_fetchAll_assigningCopyIDFails_readsAndRetriesOnNextRead() async throws {

@@ -334,7 +334,7 @@ struct WorkoutStoreWritingTests {
     }
 
     @Test(arguments: Operation.allCases)
-    func test_write_saveFails_rollsBackToPreviousState(operation: Operation) async throws {
+    func test_write_saveFails_leavesPreviousState(operation: Operation) async throws {
         let saveSwitch = SaveSwitch()
         let (store, container) = try await makeEmptyStore(saveContext: saveSwitch.save)
         _ = try await store.save(makeWorkout(1, name: "A"))
