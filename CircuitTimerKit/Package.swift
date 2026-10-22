@@ -141,6 +141,7 @@ let package = Package(
             name: "SettingsFeature",
             dependencies: [
                 "BackgroundNotifications",
+                "CloudSync",
                 "TimerPreferences",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -230,6 +231,7 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "BackgroundNotifications",
+                "CloudSync",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
