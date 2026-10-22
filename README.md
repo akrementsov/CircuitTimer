@@ -64,10 +64,10 @@ flowchart TD
     SettingsFeature --> TimerPreferences
     SettingsFeature --> BackgroundNotifications
     SettingsFeature --> CloudSync
-    WorkoutStorage --> CloudSync
     WorkoutTimerFeature --> BackgroundNotifications
     WorkoutTimerFeature --> WorkoutActivity
     WorkoutStorage --> WorkoutDomain
+    WorkoutStorage --> CloudSync
     WorkoutActivity --> WorkoutDomain
 
     Widgets["CircuitTimerWidgets extension"] --> WorkoutActivity

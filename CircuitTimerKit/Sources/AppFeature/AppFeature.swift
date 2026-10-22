@@ -199,7 +199,7 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
-                case .path(.element(id: _, action: .editor(.delegate(.workoutDeleted)))):
+                case .path(.element(id: _, action: .editor(.delegate(.deletedElsewhere)))):
                     outsideChange(&state)
                 case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
                     startWorkout(workout, &state)

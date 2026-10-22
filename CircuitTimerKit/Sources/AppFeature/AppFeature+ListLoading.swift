@@ -55,17 +55,15 @@ extension AppFeature {
         .cancellable(id: CancelID.remoteChanges)
     }
 
-    /// Shows the stored version on a read-only workout screen, or closes it when the workout is gone. A draft, a
-    /// screen with an alert or one starting the timer stays as it is: replacing it would lose what the user is doing.
+    /// Shows the stored version on a read-only workout screen, or closes it when the workout is gone. A screen the
+    /// user is doing something on stays as it is: replacing it would lose that.
     func refreshOpenWorkout(_ state: inout State) -> Effect<Action> {
         guard
             state.startIntent == nil,
             case let .loaded(workouts) = state.workouts,
             let id = state.path.ids.last,
             let editor = state.path[id: id, case: \.editor],
-            editor.phase == .viewing,
-            editor.destination == nil,
-            !editor.isStarting
+            editor.acceptsStoredVersion
         else { return .none }
 
         guard let stored = workouts[id: editor.workout.id] else {

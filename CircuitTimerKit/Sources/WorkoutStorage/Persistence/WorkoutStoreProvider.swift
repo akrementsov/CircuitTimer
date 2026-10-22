@@ -17,12 +17,17 @@ actor WorkoutStoreProvider {
 
     /// The app's store on disk, mirrored to iCloud when this launch syncs. A store that fails to open with CloudKit
     /// opens on the device instead, so the list keeps working; only a store that fails both ways reports an error.
-    static func live() -> WorkoutStoreProvider {
+    /// `open` takes the CloudKit container, or `nil` for a local store, and lets tests replace the file.
+    static func live(
+        open: @escaping @Sendable (_ cloudKitContainer: String?) throws -> ModelContainer = {
+            try .workouts(isStoredInMemoryOnly: false, cloudKitContainer: $0)
+        }
+    ) -> WorkoutStoreProvider {
         WorkoutStoreProvider {
             @Dependency(\.cloudSync) var cloudSync
             if let container = cloudSync.mirroredContainer() {
                 do {
-                    let mirrored = try ModelContainer.workouts(isStoredInMemoryOnly: false, cloudKitContainer: container)
+                    let mirrored = try open(container)
                     cloudSync.storeOpened(true)
                     return mirrored
                 } catch {
@@ -31,7 +36,7 @@ actor WorkoutStoreProvider {
                     )
                 }
             }
-            let local = try ModelContainer.workouts(isStoredInMemoryOnly: false)
+            let local = try open(nil)
             cloudSync.storeOpened(false)
             return local
         }

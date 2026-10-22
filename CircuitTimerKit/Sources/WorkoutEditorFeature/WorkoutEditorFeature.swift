@@ -20,14 +20,14 @@ public struct WorkoutEditorFeature: Sendable {
         @ReducerCaseIgnored
         case discardConfirmation(AlertState<DiscardConfirmation>)
         @ReducerCaseIgnored
-        case workoutDeletedAlert(AlertState<DeletedWorkoutChoice>)
+        case deletedElsewhereAlert(AlertState<DeletedElsewhereChoice>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case saveFailedAlert(Never)
             case saveBlockedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
-            case workoutDeletedAlert(DeletedWorkoutChoice)
+            case deletedElsewhereAlert(DeletedElsewhereChoice)
         }
     }
 
@@ -36,7 +36,7 @@ public struct WorkoutEditorFeature: Sendable {
     }
 
     /// What becomes of a draft whose workout was deleted on another device.
-    public enum DeletedWorkoutChoice: Equatable, Sendable {
+    public enum DeletedElsewhereChoice: Equatable, Sendable {
         case saveAsNew
         case dontSave
     }
@@ -92,18 +92,23 @@ public struct WorkoutEditorFeature: Sendable {
             draft = editable
         }
 
-        /// Lifting a stored 0 to the editor's minimum in both the base and the draft keeps an untouched workout
-        /// unchanged; `workout` keeps the stored value, which is what plays.
-        /// Takes the stored version of the workout a read-only screen shows, keeping the screen's own state; a draft,
-        /// a presented alert or a Start on its way keeps what it has.
+        /// A read-only screen with nothing presented and no Start on its way, which a newer stored version may replace
+        /// or close; a draft, an alert or a Start keeps what it has.
+        public var acceptsStoredVersion: Bool {
+            phase == .viewing && destination == nil && !isStarting
+        }
+
+        /// Takes the stored version of the workout, keeping the screen's own state.
         public mutating func showStored(_ stored: Workout) {
-            guard phase == .viewing, destination == nil, !isStarting, stored != workout else { return }
+            guard acceptsStoredVersion, stored != workout else { return }
 
             workout = stored
-            original = State.editable(stored)
+            original = Self.editable(stored)
             draft = original
         }
 
+        /// Lifting a stored 0 to the editor's minimum in both the base and the draft keeps an untouched workout
+        /// unchanged; `workout` keeps the stored value, which is what plays.
         static func editable(_ workout: Workout) -> Workout {
             var workout = workout
             let rounds = WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
@@ -330,7 +335,7 @@ public struct WorkoutEditorFeature: Sendable {
         public enum Internal: Equatable, Sendable {
             case saveFailed
             /// Storage wrote nothing: the workout was deleted on another device.
-            case saveFoundWorkoutDeleted
+            case saveFoundDeletedElsewhere
             case saveSucceeded(Workout)
             case editingEnded
             case settled(generation: Int)
@@ -343,7 +348,7 @@ public struct WorkoutEditorFeature: Sendable {
             /// The workout exactly as it is stored, to play in the timer.
             case startRequested(Workout)
             /// A save found the workout deleted on another device, so the list the container shows is stale.
-            case workoutDeleted(Workout.ID)
+            case deletedElsewhere
         }
     }
 
@@ -374,9 +379,9 @@ public struct WorkoutEditorFeature: Sendable {
                     reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
                     discardChanges(&state)
-                case .destination(.presented(.workoutDeletedAlert(.saveAsNew))):
+                case .destination(.presented(.deletedElsewhereAlert(.saveAsNew))):
                     saveAsNew(&state)
-                case .destination(.presented(.workoutDeletedAlert(.dontSave))):
+                case .destination(.presented(.deletedElsewhereAlert(.dontSave))):
                     leave(&state)
                 case .delegate, .destination:
                     .none
@@ -481,10 +486,10 @@ public struct WorkoutEditorFeature: Sendable {
                 state.isSaving = false
                 state.destination = .saveFailedAlert(.saveFailed)
                 return .none
-            case .saveFoundWorkoutDeleted:
+            case .saveFoundDeletedElsewhere:
                 state.isSaving = false
-                state.destination = .workoutDeletedAlert(.workoutDeleted)
-                return .send(.delegate(.workoutDeleted(state.workout.id)))
+                state.destination = .deletedElsewhereAlert(.deletedElsewhere)
+                return .send(.delegate(.deletedElsewhere))
             case let .saveSucceeded(workout):
                 state.isSaving = false
                 state.workout = workout
@@ -564,7 +569,7 @@ public struct WorkoutEditorFeature: Sendable {
                         // The cells turn read-only in place, so the change animates like the pencil's.
                         await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
                     case .deletedElsewhere:
-                        await send(.internal(.saveFoundWorkoutDeleted))
+                        await send(.internal(.saveFoundDeletedElsewhere))
                 }
             } catch is CancellationError {
                 return
@@ -653,8 +658,8 @@ extension AlertState where Action == Never {
     }
 }
 
-extension AlertState where Action == WorkoutEditorFeature.DeletedWorkoutChoice {
-    static var workoutDeleted: Self {
+extension AlertState where Action == WorkoutEditorFeature.DeletedElsewhereChoice {
+    static var deletedElsewhere: Self {
         AlertState {
             TextState("editor.deletedElsewhere.title", bundle: .module)
         } actions: {

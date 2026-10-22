@@ -1,4 +1,3 @@
-#if DEBUG
 import CloudSync
 import CoreData
 import Dependencies
@@ -6,6 +5,7 @@ import Foundation
 import os
 import SwiftData
 
+#if DEBUG
 /// Creates every record type and field of the workouts schema in the container's Development environment, which
 /// Production is then deployed from. Mirroring would create them only for the data it happens to upload, and the call
 /// also checks that the model suits CloudKit. Debug only: a developer runs it once per schema change.

@@ -15,7 +15,6 @@ actor WorkoutStore {
 
     @Dependency(\.uuid) private var uuid
 
-    private var isSampleSeedChecked = false
     private var saveContext: @Sendable (ModelContext) throws -> Void = { try $0.save() }
 
     /// Replaces the save point, so tests can make a write fail; the app uses the generated
@@ -172,13 +171,15 @@ actor WorkoutStore {
         }
     }
 
+    /// Checked on every read: signing out of iCloud can remove the synced marker together with the sample, and the
+    /// sample then comes back once, as on a new device.
     private func seedSampleIfNeeded() throws {
-        guard !isSampleSeedChecked else { return }
+        let key = Self.sampleSeedKey
+        let marker = FetchDescriptor<SeedMarkerModel>(predicate: #Predicate { $0.key == key })
+        guard try ModelContext(modelContainer).fetchCount(marker) == 0 else { return }
 
         try write { context in
-            let key = Self.sampleSeedKey
-            let markers = try context.fetchCount(FetchDescriptor<SeedMarkerModel>(predicate: #Predicate { $0.key == key }))
-            guard markers == 0 else { return }
+            guard try context.fetchCount(marker) == 0 else { return }
 
             let sample = Workout.sample
             guard try !deletedIDs(in: context).contains(sample.id) else { return }
@@ -192,7 +193,6 @@ actor WorkoutStore {
             }
             context.insert(SeedMarkerModel(key: key))
         }
-        isSampleSeedChecked = true
     }
 
     /// Workouts deleted on some device. Markers are few, so they are filtered here rather than by a predicate.

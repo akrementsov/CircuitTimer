@@ -14,7 +14,8 @@ enum WorkoutSchemaV2: VersionedSchema {
     final class WorkoutModel {
         var workoutID: UUID?
         /// Tells apart copies of one workout that devices wrote independently, the same way on every device.
-        /// Never changes once set; records from before V2 get one on the next read.
+        /// A device sets it once; records from before V2 get one on the next read, and when two devices give one record
+        /// different values, CloudKit keeps one of them.
         var copyID: UUID?
         /// A sample this device seeded and nobody has changed yet, so any other copy of it wins.
         var isFreshSample: Bool = false
@@ -46,7 +47,9 @@ enum WorkoutSchemaV2: VersionedSchema {
         }
     }
 
-    /// Records that the sample workout was seeded, so deleting it never brings it back.
+    /// A synced fact keyed by `key`: `sample-workout-v1` says the sample was seeded, so deleting it never brings it
+    /// back; `deleted:<id>` says a workout was deleted on some device, so no copy of it shows again. The model keeps its
+    /// name because the CloudKit schema has it.
     @Model
     final class SeedMarkerModel {
         var key: String = ""
