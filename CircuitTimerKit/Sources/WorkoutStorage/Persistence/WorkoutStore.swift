@@ -267,7 +267,7 @@ actor WorkoutStore {
     /// Stored order, the same on every device: equal `order` values, as two devices can write, are broken by
     /// identifiers that sync, and `persistentModelID`, which differs per device, only settles what they leave equal.
     private func allSorted(in context: ModelContext) throws -> [WorkoutModel] {
-        try context.fetch(FetchDescriptor<WorkoutModel>()).sorted { $0.storedRank < $1.storedRank }
+        try context.fetch(FetchDescriptor<WorkoutModel>()).sorted(by: WorkoutModel.precedesInStoredOrder)
     }
 
     /// Picks the visible record of every workout: of its readable copies, the one with the lowest copy rank, which every
@@ -317,8 +317,18 @@ actor WorkoutStore {
 }
 
 private extension WorkoutModel {
-    var storedRank: (Int, String, Int, String, PersistentIdentifier) {
-        (order, workoutID?.uuidString ?? "", copyRank.0, copyRank.1, persistentModelID)
+    static func precedesInStoredOrder(_ lhs: WorkoutModel, _ rhs: WorkoutModel) -> Bool {
+        if lhs.order != rhs.order {
+            return lhs.order < rhs.order
+        }
+        let (lhsID, rhsID) = (lhs.workoutID?.uuidString ?? "", rhs.workoutID?.uuidString ?? "")
+        if lhsID != rhsID {
+            return lhsID < rhsID
+        }
+        if lhs.copyRank != rhs.copyRank {
+            return lhs.copyRank < rhs.copyRank
+        }
+        return lhs.persistentModelID < rhs.persistentModelID
     }
 
     /// Which copy of a workout shows: one a device seeded and nobody changed loses to any other, then the lower
