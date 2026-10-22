@@ -194,6 +194,8 @@ public struct AppFeature: Sendable {
                     reduce(into: &state, action)
                 case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
                     workoutSaved(workout, &state)
+                case .path(.element(id: _, action: .editor(.delegate(.workoutDeleted)))):
+                    outsideChange(&state)
                 case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
                     startWorkout(workout, &state)
                 case let .destination(.presented(.resumeRun(choice))):
@@ -344,7 +346,7 @@ public struct AppFeature: Sendable {
                     state.needsReload = true
                     return .none
                 }
-                // Defensive: the write that overtook this read normally cancels it with a newer load.
+                // A save or a change from outside arrived during this read, so it may be stale.
                 if state.needsReload {
                     state.needsReload = false
                     return loadWorkouts(&state)
@@ -594,7 +596,30 @@ public struct AppFeature: Sendable {
 
         workouts[id: workout.id] = workout
         state.workouts = .loaded(workouts)
+        // A reload in flight may have read before this save; read again once it lands.
+        if state.isReloading {
+            state.needsReload = true
+        }
         return .none
+    }
+
+    /// Storage changed without a write of this list: read it again, but never over a write still in the queue, a
+    /// reload already running or the first load, which each read again once they finish.
+    private func outsideChange(_ state: inout State) -> Effect<Action> {
+        switch state.workouts {
+            case .loading:
+                state.needsReload = true
+                return .none
+            case .loaded:
+                guard state.pendingMutations.isEmpty, !state.isReloading else {
+                    state.needsReload = true
+                    return .none
+                }
+                return loadWorkouts(&state)
+            case .idle, .failed:
+                // Nothing is shown yet, or the list offers Retry.
+                return .none
+        }
     }
 
     func loadWorkouts(_ state: inout State) -> Effect<Action> {

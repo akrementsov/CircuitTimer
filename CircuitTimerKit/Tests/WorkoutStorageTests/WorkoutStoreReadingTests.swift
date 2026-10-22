@@ -41,7 +41,7 @@ struct WorkoutStoreReadingTests {
             pauseAfterTraining: true
         )
 
-        try await store.save(workout)
+        _ = try await store.save(workout)
 
         #expect(try await store.fetchAll().workouts == [workout])
     }

@@ -19,17 +19,26 @@ public struct WorkoutEditorFeature: Sendable {
         case saveBlockedAlert(AlertState<Never>)
         @ReducerCaseIgnored
         case discardConfirmation(AlertState<DiscardConfirmation>)
+        @ReducerCaseIgnored
+        case workoutDeletedAlert(AlertState<DeletedWorkoutChoice>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case saveFailedAlert(Never)
             case saveBlockedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
+            case workoutDeletedAlert(DeletedWorkoutChoice)
         }
     }
 
     public enum DiscardConfirmation: Equatable, Sendable {
         case discard
+    }
+
+    /// What becomes of a draft whose workout was deleted on another device.
+    public enum DeletedWorkoutChoice: Equatable, Sendable {
+        case saveAsNew
+        case dontSave
     }
 
     @ObservableState
@@ -310,6 +319,8 @@ public struct WorkoutEditorFeature: Sendable {
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case saveFailed
+            /// Storage wrote nothing: the workout was deleted on another device.
+            case saveFoundWorkoutDeleted
             case saveSucceeded(Workout)
             case editingEnded
             case settled(generation: Int)
@@ -321,6 +332,8 @@ public struct WorkoutEditorFeature: Sendable {
             case saved(Workout)
             /// The workout exactly as it is stored, to play in the timer.
             case startRequested(Workout)
+            /// A save found the workout deleted on another device, so the list the container shows is stale.
+            case workoutDeleted(Workout.ID)
         }
     }
 
@@ -351,6 +364,10 @@ public struct WorkoutEditorFeature: Sendable {
                     reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
                     discardChanges(&state)
+                case .destination(.presented(.workoutDeletedAlert(.saveAsNew))):
+                    saveAsNew(&state)
+                case .destination(.presented(.workoutDeletedAlert(.dontSave))):
+                    leave(&state)
                 case .delegate, .destination:
                     .none
             }
@@ -454,6 +471,10 @@ public struct WorkoutEditorFeature: Sendable {
                 state.isSaving = false
                 state.destination = .saveFailedAlert(.saveFailed)
                 return .none
+            case .saveFoundWorkoutDeleted:
+                state.isSaving = false
+                state.destination = .workoutDeletedAlert(.workoutDeleted)
+                return .send(.delegate(.workoutDeleted(state.workout.id)))
             case let .saveSucceeded(workout):
                 state.isSaving = false
                 state.workout = workout
@@ -528,9 +549,13 @@ public struct WorkoutEditorFeature: Sendable {
         state.isSaving = true
         return .run { [workoutStorage] send in
             do {
-                try await workoutStorage.save(workout: workout)
-                // The cells turn read-only in place, so the change animates like the pencil's.
-                await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
+                switch try await workoutStorage.save(workout: workout) {
+                    case .saved:
+                        // The cells turn read-only in place, so the change animates like the pencil's.
+                        await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
+                    case .deletedElsewhere:
+                        await send(.internal(.saveFoundWorkoutDeleted))
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -538,6 +563,22 @@ public struct WorkoutEditorFeature: Sendable {
                 await send(.internal(.saveFailed))
             }
         }
+    }
+
+    /// Keeps the user's edits as a new workout, which storage appends to the list.
+    private func saveAsNew(_ state: inout State) -> Effect<Action> {
+        let draft = state.draft
+        state.draft = Workout(
+            id: uuid(),
+            name: draft.name,
+            warmUp: draft.warmUp,
+            training: draft.training,
+            trainingRounds: draft.trainingRounds,
+            coolDown: draft.coolDown,
+            pauseAfterWarmUp: draft.pauseAfterWarmUp,
+            pauseAfterTraining: draft.pauseAfterTraining
+        )
+        return save(&state)
     }
 
     private func updateStage(
@@ -598,6 +639,21 @@ extension AlertState where Action == Never {
             TextState("editor.saveBlocked.title", bundle: .module)
         } message: {
             TextState(blocker.messageKey, bundle: .module)
+        }
+    }
+}
+
+extension AlertState where Action == WorkoutEditorFeature.DeletedWorkoutChoice {
+    static var workoutDeleted: Self {
+        AlertState {
+            TextState("editor.deletedElsewhere.title", bundle: .module)
+        } actions: {
+            ButtonState(action: .saveAsNew) {
+                TextState("editor.deletedElsewhere.saveAsNew", bundle: .module)
+            }
+            ButtonState(role: .destructive, action: .dontSave) {
+                TextState("editor.deletedElsewhere.dontSave", bundle: .module)
+            }
         }
     }
 }

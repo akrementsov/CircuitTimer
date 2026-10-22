@@ -17,7 +17,7 @@ struct WorkoutStoreWritingTests {
         try insertRecord(makeWorkout(1), order: 5, in: container)
         try insertRecord(makeWorkout(2), order: 7, in: container)
 
-        try await store.save(makeWorkout(3))
+        _ = try await store.save(makeWorkout(3))
 
         let records = try storedRecords(in: ModelContext(container))
         #expect(records.map(\.name) == ["Workout 1", "Workout 2", "Workout 3"])
@@ -28,7 +28,7 @@ struct WorkoutStoreWritingTests {
     func test_save_emptyStore_startsOrderAtZero() async throws {
         let (store, container) = try await makeEmptyStore()
 
-        try await store.save(makeWorkout(1))
+        _ = try await store.save(makeWorkout(1))
 
         #expect(try storedRecords(in: ModelContext(container)).map(\.order) == [0])
     }
@@ -39,7 +39,7 @@ struct WorkoutStoreWritingTests {
         try insertRecord(makeWorkout(1), order: .max, in: container)
         try insertRecord(makeWorkout(2), order: 3, in: container)
 
-        try await store.save(makeWorkout(3))
+        _ = try await store.save(makeWorkout(3))
 
         let records = try storedRecords(in: ModelContext(container))
         #expect(records.map(\.name) == ["Workout 2", "Workout 1", "Workout 3"])
@@ -55,7 +55,7 @@ struct WorkoutStoreWritingTests {
             warmUp: [makeStage(1)],
             training: [makeStage(2), makeStage(3)]
         )
-        try await store.save(original)
+        _ = try await store.save(original)
         let keptStageID = try stageModelID(UUID(fixture: 1), in: container)
         var edited = original
         edited.name = "After"
@@ -65,7 +65,7 @@ struct WorkoutStoreWritingTests {
         edited.training = [makeStage(4)]
         edited.coolDown = [makeStage(3, .rest)]
 
-        try await store.save(edited)
+        _ = try await store.save(edited)
 
         #expect(try await store.fetchAll().workouts == [edited])
         #expect(try count(WorkoutModel.self, in: container) == 1)
@@ -80,7 +80,7 @@ struct WorkoutStoreWritingTests {
         var workout = makeWorkout(1, training: [makeStage(900, seconds: 0)] + tooMany)
         workout.trainingRounds = WorkoutLimits.maxTrainingRounds + 50
 
-        try await store.save(workout)
+        _ = try await store.save(workout)
 
         let stored = try #require(try await store.fetchAll().workouts.first)
         #expect(stored.training == Array(tooMany.prefix(WorkoutLimits.maxStagesPerSection)))
@@ -117,7 +117,7 @@ struct WorkoutStoreWritingTests {
         var edited = makeWorkout(1, name: "Edited", training: [shared])
         edited.training[0].name = "Renamed"
 
-        try await store.save(edited)
+        _ = try await store.save(edited)
 
         let records = try storedRecords(in: ModelContext(container))
         #expect(records.map(\.name) == ["Edited", "Copy", "Other"])
@@ -129,7 +129,7 @@ struct WorkoutStoreWritingTests {
         let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "Damaged"), order: 0, in: container, damage: bogusSection)
 
-        try await store.save(makeWorkout(1, name: "Fresh"))
+        _ = try await store.save(makeWorkout(1, name: "Fresh"))
 
         let stored = try await store.fetchAll()
         #expect(stored.workouts.map(\.name) == ["Fresh"])
@@ -140,7 +140,7 @@ struct WorkoutStoreWritingTests {
     @Test
     func test_saveAndInsert_repeatedStageIDs_rejectWithoutWriting() async throws {
         let (store, container) = try await makeEmptyStore()
-        try await store.save(makeWorkout(1))
+        _ = try await store.save(makeWorkout(1))
         let sameSection = makeWorkout(2, training: [makeStage(5), makeStage(5)])
         let acrossSections = Workout(id: UUID(fixture: 3), warmUp: [makeStage(6)], training: [makeStage(6)])
 
@@ -200,8 +200,8 @@ struct WorkoutStoreWritingTests {
     @Test
     func test_delete_visibleWorkoutWithoutCopies_removesItAndItsStages() async throws {
         let (store, container) = try await makeEmptyStore()
-        try await store.save(makeWorkout(1, training: [makeStage(1), makeStage(2)]))
-        try await store.save(makeWorkout(2))
+        _ = try await store.save(makeWorkout(1, training: [makeStage(1), makeStage(2)]))
+        _ = try await store.save(makeWorkout(2))
 
         let outcome = try await store.delete(UUID(fixture: 1))
 
@@ -221,15 +221,16 @@ struct WorkoutStoreWritingTests {
     }
 
     @Test
-    func test_delete_visibleWorkoutWithCopy_deletesVisibleOnlyAndReportsDivergence() async throws {
+    func test_delete_visibleWorkoutWithCopy_deletesEveryCopy() async throws {
         let (store, container) = try await makeEmptyStore()
         try insertRecord(makeWorkout(1, name: "Visible"), order: 0, in: container)
         try insertRecord(makeWorkout(1, name: "Copy"), order: 1, in: container)
 
         let outcome = try await store.delete(UUID(fixture: 1))
 
-        #expect(outcome == .storeDiverged)
-        #expect(try await store.fetchAll().workouts.map(\.name) == ["Copy"])
+        #expect(outcome == .applied)
+        #expect(try await store.fetchAll().workouts.isEmpty)
+        #expect(try count(WorkoutModel.self, in: container) == 0)
     }
 
     @Test
@@ -297,15 +298,15 @@ struct WorkoutStoreWritingTests {
     func test_write_saveFails_rollsBackToPreviousState(operation: Operation) async throws {
         let saveSwitch = SaveSwitch()
         let (store, container) = try await makeEmptyStore(saveContext: saveSwitch.save)
-        try await store.save(makeWorkout(1, name: "A"))
-        try await store.save(makeWorkout(2, name: "B"))
+        _ = try await store.save(makeWorkout(1, name: "A"))
+        _ = try await store.save(makeWorkout(2, name: "B"))
         let before = try await store.fetchAll()
         saveSwitch.fails = true
 
         await #expect(throws: SaveFailure.self) {
             switch operation {
-                case .saveNew: try await store.save(makeWorkout(3))
-                case .saveExisting: try await store.save(makeWorkout(1, name: "Renamed"))
+                case .saveNew: _ = try await store.save(makeWorkout(3))
+                case .saveExisting: _ = try await store.save(makeWorkout(1, name: "Renamed"))
                 case .insert: _ = try await store.insert(makeWorkout(3), after: UUID(fixture: 1))
                 case .delete: _ = try await store.delete(UUID(fixture: 1))
                 case .reorder: _ = try await store.reorder([UUID(fixture: 2), UUID(fixture: 1)])
