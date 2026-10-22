@@ -4,7 +4,7 @@
 
 An interval and circuit training timer for iPhone, in active development. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between.
 
-The app has a workout list and editor backed by SwiftData, a full-screen timer and persistent Settings. Workouts keep their progress across backgrounding and relaunches. Foreground tones, haptics, spoken stage names and background notifications follow the Settings switches. A Live Activity shows the workout on the Lock Screen and in the Dynamic Island, with Pause/Resume controls on the card and expanded Island. See the [roadmap](#roadmap) for delivered features and remaining work.
+The app has a workout list and editor backed by SwiftData, synced between the user's devices through iCloud, a full-screen timer and persistent Settings. Workouts keep their progress across backgrounding and relaunches. Foreground tones, haptics, spoken stage names and background notifications follow the Settings switches. A Live Activity shows the workout on the Lock Screen and in the Dynamic Island, with Pause/Resume controls on the card and expanded Island. See the [roadmap](#roadmap) for delivered features and remaining work.
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green.
 
@@ -46,6 +46,7 @@ flowchart TD
         BackgroundExecution
         BackgroundNotifications
         WorkoutActivity
+        CloudSync
     end
 
     subgraph Domain
@@ -62,6 +63,8 @@ flowchart TD
     SettingsFeature --> DesignSystem
     SettingsFeature --> TimerPreferences
     SettingsFeature --> BackgroundNotifications
+    SettingsFeature --> CloudSync
+    WorkoutStorage --> CloudSync
     WorkoutTimerFeature --> BackgroundNotifications
     WorkoutTimerFeature --> WorkoutActivity
     WorkoutStorage --> WorkoutDomain
@@ -71,16 +74,17 @@ flowchart TD
     Widgets --> DesignSystem
 ```
 
-Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. Also left out are `UITestContract`, which the features and the UI tests share, and the Debug-only `AppScenarios` above the features (see [UI tests](#ui-tests)). `CircuitTimerKit/Package.swift` is the exact list.
+Not drawn, to keep the picture readable: `AppFeature`, the composition root, also imports `DesignSystem`, `WorkoutStorage`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`, `TimerPreferences`, `WorkoutActivity` and `WorkoutDomain`; the editor and the timer also import `WorkoutDomain`. Also left out are `UITestContract`, which the features and the UI tests share, and the Debug-only `AppScenarios` above the features (see [UI tests](#ui-tests)). `CircuitTimerKit/Package.swift` is the exact list.
 
 | Module | Layer | Responsibility |
 |---|---|---|
-| `AppFeature` | App | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. Before the first Start it requests notification permission. At launch it offers to continue or finish a saved run while separately cleaning notifications and ending Live Activities left by the previous process. |
+| `AppFeature` | App | The root TCA feature: the tab bar with Workouts and Settings; the workout list with loading, empty and retryable error states; pushes the workout screen onto the Workouts stack, and on Start presents the timer full screen and returns the stack to the list under it. Before the first Start it requests notification permission. At launch it offers to continue or finish a saved run while separately cleaning notifications and ending Live Activities left by the previous process. It reads the list again when iCloud brings changes from another device. |
 | `WorkoutEditorFeature` | Features | The workout screen in the original app's cards: a saved workout opens read-only with Start workout at the bottom; the pencil edits a draft that the bottom Save workout button saves, back to read-only, or Back discards; a new workout starts with an empty stage in every section; stage durations typed as MM:SS on the number pad, and a dimmed Save that explains itself; stage editing within `WorkoutLimits`. |
 | `WorkoutTimerFeature` | Features | The full-screen timer of the original app: a 3-2-1 countdown, the stage clock in League Gothic, progress by round, and the workout's stages on a screen of its own, opened from the timer while it pauses. Its clock loops catch wall-clock jumps against a monotonic clock, and the screen stays awake while it runs when Keep screen on is enabled. It plays generated cue tones, vibrates, and speaks stage names in the app language only while active and visible. It schedules stage-start and finish notifications for the background, in a bounded rolling window. It saves its run on every change of state; after the app was closed or killed, the list asks whether to continue it. It shows the run as a Live Activity and handles its Pause/Resume commands, with a footnote when iOS refuses an activity. |
-| `SettingsFeature` | Features | The Settings tab with persistent Sound, Vibration and Speak stage names, Background notifications and Keep screen on switches; notification permission status and a route to iOS Settings; its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
+| `SettingsFeature` | Features | The Settings tab with persistent Sound, Vibration and Speak stage names, Background notifications, Keep screen on and iCloud sync switches, with a footnote when sync is off, waits for a relaunch or does not work; notification permission status and a route to iOS Settings; its own navigation stack: About with the app version from an `AppVersionClient` dependency, and the legal pages. |
 | `DesignSystem` | Core | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows, the caption plate and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll; the tab bar kept to the stacks' roots; the Live Activity's typography. Lint rejects literal styles anywhere else. |
-| `WorkoutStorage` | Core | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData; in memory for previews. `WorkoutRunRecordClient`, the saved run as one JSON file. |
+| `WorkoutStorage` | Core | `WorkoutStorageClient`, a struct-of-closures dependency backed by SwiftData and mirrored to iCloud when sync is on: one copy per workout shows, the same on every device, and a deletion stays a deletion everywhere; in memory for previews. `WorkoutRunRecordClient`, the saved run as one JSON file. |
+| `CloudSync` | Core | The iCloud sync switch, the launch's decision whether the store mirrors, and `CloudSyncClient`: the status of the iCloud account and of imports and exports, and the changes other devices bring. |
 | `TimerPreferences` | Core | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles as `@Shared(.appStorage)` keys, shared by Settings and the timer. |
 | `BackgroundExecution` | Core | `BackgroundTaskClient`: a background-task assertion around the run record writes of the timer and `AppFeature`. |
 | `BackgroundNotifications` | Core | Injected local notification client, owner-scoped scheduling and cleanup, permission access, foreground suppression. |
@@ -93,7 +97,7 @@ Outside these layers, `SnapshotCapture`, in the separate package `CircuitTimerSn
 
 Features never import each other, Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full set of conventions is in [AGENTS.md](AGENTS.md).
 
-Foreground and background signal policy and the device checklist: [Timer signals](docs/timer-signals.md).
+Foreground and background signal policy and the device checklist: [Timer signals](docs/timer-signals.md). How sync decides, resolves copies and deletions, what it accepts and what is checked on devices: [iCloud sync](docs/icloud-sync.md).
 
 ## The timer engine
 
@@ -245,8 +249,9 @@ The timer's full-screen cover does not draw in the first frame, so the host fail
 ## Releasing
 
 1. For a new version, bump `MARKETING_VERSION` through a pull request. Wait for CI on `main` to pass.
-2. Tag the commit `vX.Y.Z`, or `vX.Y.Z-rc.N` for another build of the same version, and push the tag.
-3. The TestFlight workflow archives the app, signs it in the cloud with an App Store Connect API key and uploads it. The build is available once App Store Connect finishes processing it.
+2. If the CloudKit schema changed, create it in Development and deploy it to Production first ([iCloud sync](docs/icloud-sync.md#signing-and-delivery)).
+3. Tag the commit `vX.Y.Z`, or `vX.Y.Z-rc.N` for another build of the same version, and push the tag.
+4. The TestFlight workflow archives the app, signs it in the cloud with an App Store Connect API key and uploads it. The build is available once App Store Connect finishes processing it.
 
 ## Roadmap
 
@@ -278,7 +283,7 @@ Next: finish the two remaining CT-QA smoke flows, then move on to CT-5. Checked 
 - [x] **CT-4** — Live Activity and Dynamic Island, in slices (remaining system checks are listed [above](#live-activity-controls)):
   - [x] **CT-4-1** — the running workout on the Lock Screen and in the Dynamic Island, and signing checks of both bundles on TestFlight
   - [x] **CT-4-2** — pause and resume from the Live Activity
-- [ ] **CT-5** — iCloud sync
+- [ ] **CT-5** — iCloud sync of workouts, with a Settings switch and a footnote when iCloud is unavailable; checked once the [device checklist](docs/icloud-sync.md#device-checklist) passes
 - [ ] **CT-6** — in-app purchase with StoreKit 2
 - [ ] **CT-7** — App Store release
   - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
