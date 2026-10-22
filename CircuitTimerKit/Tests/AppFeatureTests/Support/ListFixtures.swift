@@ -3,6 +3,7 @@
 
 import BackgroundExecution
 import BackgroundNotifications
+import CloudSync
 import ComposableArchitecture
 import Foundation
 import WorkoutActivity
@@ -27,6 +28,7 @@ func makeStore(
     } withDependencies: {
         $0.liveActivity = .previewValue
         $0.cues = .previewValue
+        $0.cloudSync = .previewValue
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }
         $0.uuid = .incrementing

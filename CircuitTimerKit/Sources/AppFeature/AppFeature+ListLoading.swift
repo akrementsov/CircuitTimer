@@ -44,4 +44,34 @@ extension AppFeature {
         }
         .cancellable(id: CancelID.load, cancelInFlight: true)
     }
+
+    /// Reads the list again whenever iCloud may have changed the store, for as long as the app runs.
+    func observeRemoteChanges() -> Effect<Action> {
+        .run { [cloudSync] send in
+            for await _ in await cloudSync.remoteChanges() {
+                await send(.internal(.workoutsChangedRemotely))
+            }
+        }
+        .cancellable(id: CancelID.remoteChanges)
+    }
+
+    /// Shows the stored version on a read-only workout screen, or closes it when the workout is gone. A draft, a
+    /// screen with an alert or one starting the timer stays as it is: replacing it would lose what the user is doing.
+    func refreshOpenWorkout(_ state: inout State) -> Effect<Action> {
+        guard
+            state.startIntent == nil,
+            case let .loaded(workouts) = state.workouts,
+            let id = state.path.ids.last,
+            let editor = state.path[id: id, case: \.editor],
+            editor.phase == .viewing,
+            editor.destination == nil,
+            !editor.isStarting
+        else { return .none }
+
+        guard let stored = workouts[id: editor.workout.id] else {
+            return .send(.path(.element(id: id, action: .editor(.view(.backButtonTapped)))))
+        }
+        state.path[id: id, case: \.editor]?.showStored(stored)
+        return .none
+    }
 }

@@ -1,5 +1,6 @@
 import BackgroundExecution
 import BackgroundNotifications
+import CloudSync
 import ComposableArchitecture
 import Foundation
 import os
@@ -140,6 +141,8 @@ public struct AppFeature: Sendable {
         public enum Internal: Equatable, Sendable {
             case workoutsLoaded(StoredWorkouts)
             case workoutsLoadingFailed
+            /// Storage may hold what another device wrote, or have lost what an iCloud account change removed.
+            case workoutsChangedRemotely
             case mutationFinished(WorkoutWriteOutcome)
             case mutationFailed
             case runRecordLoaded(StoredRunRecord?)
@@ -160,6 +163,7 @@ public struct AppFeature: Sendable {
 
     enum CancelID {
         case load
+        case remoteChanges
         case readRunRecord
         case readRunRecordTimeout
         case notificationPermission
@@ -171,6 +175,7 @@ public struct AppFeature: Sendable {
 
     @Dependency(\.backgroundNotifications) var backgroundNotifications
     @Dependency(\.backgroundTask) var backgroundTask
+    @Dependency(\.cloudSync) var cloudSync
     @Dependency(\.continuousClock) var clock
     @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
@@ -226,7 +231,7 @@ public struct AppFeature: Sendable {
 
                 // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
-                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans())
+                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans(), observeRemoteChanges())
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -354,9 +359,12 @@ public struct AppFeature: Sendable {
                 // Storage already returns unique identifiers; uniquing keeps a contract slip from crashing the list.
                 state.workouts = .loaded(IdentifiedArray(stored.workouts, uniquingIDsWith: { first, _ in first }))
                 state.hiddenRecordCount = stored.hiddenRecordCount
+                let openWorkout = refreshOpenWorkout(&state)
                 // A continuation prompt takes precedence over any deferred screen.
                 let restore = resolveRestore(&state)
-                return .merge(restore, presentDeferredScreen(&state))
+                return .merge(openWorkout, restore, presentDeferredScreen(&state))
+            case .workoutsChangedRemotely:
+                return outsideChange(&state)
             case .workoutsLoadingFailed:
                 state.isReloading = false
                 state.workouts = .failed

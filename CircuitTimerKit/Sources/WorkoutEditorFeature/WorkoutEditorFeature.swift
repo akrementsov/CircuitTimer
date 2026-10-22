@@ -94,6 +94,16 @@ public struct WorkoutEditorFeature: Sendable {
 
         /// Lifting a stored 0 to the editor's minimum in both the base and the draft keeps an untouched workout
         /// unchanged; `workout` keeps the stored value, which is what plays.
+        /// Takes the stored version of the workout a read-only screen shows, keeping the screen's own state; a draft,
+        /// a presented alert or a Start on its way keeps what it has.
+        public mutating func showStored(_ stored: Workout) {
+            guard phase == .viewing, destination == nil, !isStarting, stored != workout else { return }
+
+            workout = stored
+            original = State.editable(stored)
+            draft = original
+        }
+
         static func editable(_ workout: Workout) -> Workout {
             var workout = workout
             let rounds = WorkoutLimits.normalizedTrainingRounds(workout.trainingRounds)
