@@ -23,6 +23,7 @@
 		C7A300000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000068 /* BackgroundNotifications */; };
 		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
+		C7A3000000000000000000A0 /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000A1 /* SettingsFeature */; };
 		C7A400000000000000000060 /* SnapshotCapture in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005D /* SnapshotCapture */; };
 		C7A400000000000000000061 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005E /* AppFeature */; };
 		C7A400000000000000000062 /* WorkoutDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005F /* WorkoutDomain */; };
@@ -204,6 +205,7 @@
 				C7A300000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A300000000000000000090 /* CloudSync in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
+				C7A3000000000000000000A0 /* SettingsFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -385,6 +387,7 @@
 				C7A300000000000000000068 /* BackgroundNotifications */,
 				C7A300000000000000000091 /* CloudSync */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
+				C7A3000000000000000000A1 /* SettingsFeature */,
 			);
 			productName = CircuitTimerSnapshotTests;
 			productReference = C7A300000000000000000041 /* CircuitTimerSnapshotTests.xctest */;
@@ -939,6 +942,7 @@
 			productName = CloudSync;
 		};
 		C7A300000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
+		C7A3000000000000000000A1 /* SettingsFeature */ = {isa = XCSwiftPackageProductDependency; productName = SettingsFeature; };
 		C7A40000000000000000005D /* SnapshotCapture */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C7A300000000000000000070 /* XCLocalSwiftPackageReference "CircuitTimerSnapshotKit" */;
