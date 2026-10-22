@@ -261,15 +261,20 @@ struct WorkoutStoreWritingTests {
         let container = try await makeContainer()
         let store = WorkoutStore(modelContainer: container)
         _ = try await store.fetchAll()
+        _ = try await store.save(makeWorkout(1))
+        _ = try await store.save(makeWorkout(2))
+        // Second, so inserting after the first workout and reordering both rewrite the sample's order.
+        _ = try await store.reorder([UUID(fixture: 1), Workout.sample.id, UUID(fixture: 2)])
 
         switch operation {
             case .save: #expect(try await store.save(.sample) == .saved)
-            case .insert: #expect(try await store.insert(makeWorkout(1), after: Workout.sample.id) == .applied)
-            case .reorder: #expect(try await store.reorder([Workout.sample.id]) == .applied)
+            case .insert: #expect(try await store.insert(makeWorkout(3), after: UUID(fixture: 1)) == .applied)
+            case .reorder: #expect(try await store.reorder([UUID(fixture: 2), UUID(fixture: 1), Workout.sample.id]) == .applied)
         }
 
         let sample = try #require(try storedRecords(of: Workout.sample.id, in: container).first)
         #expect(sample.isFreshSample == (operation != .save))
+        #expect(try storedNames(in: container).firstIndex(of: Workout.sample.name) == (operation == .save ? 1 : 2))
     }
 
     @Test
