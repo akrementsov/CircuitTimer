@@ -195,6 +195,7 @@ let package = Package(
         .target(
             name: "WorkoutStorage",
             dependencies: [
+                "CloudSync",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),

@@ -61,7 +61,7 @@ extension WorkoutStorageClient {
 }
 
 extension WorkoutStorageClient: DependencyKey {
-    public static let liveValue = Self.swiftData(isStoredInMemoryOnly: false)
+    public static let liveValue = Self.swiftData(provider: .live())
     /// In memory, seeded with the sample workout on first read.
     public static let previewValue = Self.swiftData(isStoredInMemoryOnly: true)
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented,
