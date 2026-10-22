@@ -66,7 +66,7 @@ Layering:
 | Command | What it does |
 |---|---|
 | `make lint` | SwiftLint in strict mode (`SWIFTLINT=` to use a specific binary or command line, such as CI's `docker run`), then `scripts/check-scenario-dependencies.sh` |
-| `make test-scripts` | Runs `scripts/tests/test-*.sh`: the scripts and the make targets around xcodebuild against fixtures and stand-ins for xcodebuild and xcrun, and the custom lint rules against Swift fixtures linted with `SWIFTLINT` |
+| `make test-scripts` | Runs `scripts/tests/test-*.sh`: the scripts and the make targets around xcodebuild against fixtures and stand-ins for xcodebuild, xcrun, codesign and, on Linux, plutil and PlistBuddy, and the custom lint rules against Swift fixtures linted with `SWIFTLINT` |
 | `make test` | Builds and tests the package with warnings as errors through `scripts/run-tests.sh`; the result bundle and log go to `.build/TestResults/Package-<run>.{xcresult,log}` and DerivedData to `.build/DerivedData/Package-<run>`, with `<run>` as in `make test-ui`, and a failed local run prints its failures |
 | `make build-app` | Builds the app for the simulator without signing, then checks the compiled Live Activity intent metadata |
 | `make build-ui-tests` | Builds the app with its UI tests for `DESTINATION` exactly as `make test-ui` does, into its DerivedData, then checks the compiled Live Activity intent metadata |
@@ -87,7 +87,7 @@ Layering:
 | `make check-release-app` | Fails if a file of the archived app names a UI test scenario's type, module, launch key or fixture |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 
-`SWIFTLINT` must be an absolute path or a command on `PATH`, optionally with arguments: `verify-clean` runs inside a temporary clone.
+`SWIFTLINT` must be an absolute path or a command on `PATH`, optionally with arguments: `verify-clean` runs inside a temporary clone. `PLISTBUDDY` (`/usr/libexec/PlistBuddy` by default) is the tool `make archive` edits the entitlements with; the script tests replace it.
 
 ## Delivery
 

@@ -1,4 +1,6 @@
 SWIFTLINT ?= swiftlint
+# Edits the archive's entitlements; the script tests replace it, as Linux has none.
+PLISTBUDDY ?= /usr/libexec/PlistBuddy
 DESTINATION ?= platform=iOS Simulator,name=iPhone 17,OS=27.0
 BUILD_DESTINATION := generic/platform=iOS Simulator
 HOST_ARCH := $(shell uname -m)
@@ -318,7 +320,7 @@ archive:
 	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
 	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
 	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
-	/usr/libexec/PlistBuddy -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
+	"$(PLISTBUDDY)" -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
 	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
 	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
 	codesign --verify --deep --strict "$$app"
