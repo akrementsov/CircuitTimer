@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "UITestContract", targets: ["UITestContract"]),
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
+        .library(name: "CloudSync", targets: ["CloudSync"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
         .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
@@ -80,6 +81,7 @@ let package = Package(
             dependencies: [
                 "BackgroundExecution",
                 "BackgroundNotifications",
+                "CloudSync",
                 "SettingsFeature",
                 "UITestContract",
                 "WorkoutActivity",
@@ -142,6 +144,15 @@ let package = Package(
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "CloudSync",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
             swiftSettings: strictSettings
         ),
         .target(

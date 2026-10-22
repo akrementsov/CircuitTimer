@@ -1,5 +1,6 @@
 import BackgroundExecution
 import BackgroundNotifications
+import CloudSync
 import Dependencies
 import Foundation
 import SettingsFeature
@@ -37,6 +38,7 @@ extension AppScenario {
         dependencies.backgroundTask = .previewValue
         dependencies.saveTip = .previewValue
         dependencies.appVersion = .previewValue
+        dependencies.cloudSync = .previewValue
         dependencies.defaultAppStorage = .inMemory
         dependencies.uuid = .incrementing
         // Never advanced: a started timer stands still on its first countdown digit.

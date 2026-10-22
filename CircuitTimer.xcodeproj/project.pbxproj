@@ -20,11 +20,13 @@
 		C7A300000000000000000062 /* WorkoutDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000005F /* WorkoutDomain */; };
 		C7A300000000000000000063 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C7A300000000000000000064 /* Assets.xcassets */; };
 		C7A300000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000068 /* BackgroundNotifications */; };
+		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
 		C7A400000000000000000060 /* SnapshotCapture in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005D /* SnapshotCapture */; };
 		C7A400000000000000000061 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005E /* AppFeature */; };
 		C7A400000000000000000062 /* WorkoutDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005F /* WorkoutDomain */; };
 		C7A400000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000068 /* BackgroundNotifications */; };
+		C7A400000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000091 /* CloudSync */; };
 		C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000072 /* WorkoutEditorFeature */; };
 		C7A100000000000000000064 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 /* End PBXBuildFile section */
@@ -198,6 +200,7 @@
 				C7A300000000000000000061 /* AppFeature in Frameworks */,
 				C7A300000000000000000062 /* WorkoutDomain in Frameworks */,
 				C7A300000000000000000067 /* BackgroundNotifications in Frameworks */,
+				C7A300000000000000000090 /* CloudSync in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -210,6 +213,7 @@
 				C7A400000000000000000061 /* AppFeature in Frameworks */,
 				C7A400000000000000000062 /* WorkoutDomain in Frameworks */,
 				C7A400000000000000000067 /* BackgroundNotifications in Frameworks */,
+				C7A400000000000000000090 /* CloudSync in Frameworks */,
 				C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -376,6 +380,7 @@
 				C7A30000000000000000005E /* AppFeature */,
 				C7A30000000000000000005F /* WorkoutDomain */,
 				C7A300000000000000000068 /* BackgroundNotifications */,
+				C7A300000000000000000091 /* CloudSync */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
 			);
 			productName = CircuitTimerSnapshotTests;
@@ -401,6 +406,7 @@
 				C7A40000000000000000005E /* AppFeature */,
 				C7A40000000000000000005F /* WorkoutDomain */,
 				C7A400000000000000000068 /* BackgroundNotifications */,
+				C7A400000000000000000091 /* CloudSync */,
 				C7A400000000000000000072 /* WorkoutEditorFeature */,
 			);
 			productName = CircuitTimerSnapshotContractTests;
@@ -921,6 +927,10 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = BackgroundNotifications;
 		};
+		C7A300000000000000000091 /* CloudSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CloudSync;
+		};
 		C7A300000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A40000000000000000005D /* SnapshotCapture */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -938,6 +948,10 @@
 		C7A400000000000000000068 /* BackgroundNotifications */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BackgroundNotifications;
+		};
+		C7A400000000000000000091 /* CloudSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CloudSync;
 		};
 		C7A400000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 /* End XCSwiftPackageProductDependency section */
