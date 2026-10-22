@@ -83,7 +83,7 @@ Layering:
 | `make record-snapshot TEST=<function>` | Locally records the selected variant if needed and compares it again; keeps `record-snapshots`' device and clean-reference guards |
 | `make ci` | `lint`, `test-scripts`, `check-resolved`, `test`, `build-ui-tests`, `test-ui`, `build-snapshot-kit`, `test-snapshot-kit`, `build-snapshots`, `test-snapshot-contracts`, `test-snapshots` |
 | `make verify-clean` | Runs `make ci` on a fresh clone of exactly `HEAD` — run before every commit, or at milestones in a squash-merged pull request |
-| `make archive BUILD_NUMBER=…` | Archives the Release app without signing |
+| `make archive BUILD_NUMBER=…` | Archives the Release app unsigned, then signs the widget and the app ad hoc with the app's entitlements, so the export keeps them |
 | `make check-release-app` | Fails if a file of the archived app names a UI test scenario's type, module, launch key or fixture |
 | `make upload ASC_KEY_PATH=… ASC_KEY_ID=… ASC_ISSUER_ID=…` | Signs the archive in the cloud and uploads it to App Store Connect |
 

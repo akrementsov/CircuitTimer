@@ -318,7 +318,7 @@ archive:
 	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
 	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
 	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
-	plutil -replace com.apple.developer.icloud-container-identifiers -json "[\"$$container\"]" "$$entitlements"; \
+	/usr/libexec/PlistBuddy -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
 	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
 	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
 	codesign --verify --deep --strict "$$app"

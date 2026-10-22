@@ -75,7 +75,8 @@ jobs:
             *) echo "::error::Tag $GITHUB_REF_NAME does not match MARKETING_VERSION $version"; exit 1 ;;
           esac
 
-      # The identities the export must sign: the team from App.xcconfig, the bundle IDs from the archive.
+      # The identities the export must sign: the team from App.xcconfig, the bundle IDs and the CloudKit container from
+      # the archive.
       - name: Check the archive
         id: archive
         run: |
