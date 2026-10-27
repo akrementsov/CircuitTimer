@@ -367,6 +367,10 @@ public struct AppFeature: Sendable {
                 return outsideChange(&state)
             case .workoutsLoadingFailed:
                 state.isReloading = false
+                // Retry reads anyway; a write still in the queue keeps the flag and reads once it lands.
+                if state.pendingMutations.isEmpty {
+                    state.needsReload = false
+                }
                 state.workouts = .failed
                 state.deferredScreen = nil
                 return .none

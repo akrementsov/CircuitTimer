@@ -96,6 +96,29 @@ struct AppFeatureRemoteChangeTests {
     }
 
     @Test
+    func test_workoutsChangedRemotely_firstLoadFails_retryReadsOnce() async {
+        var state = AppFeature.State()
+        state.workouts = .loading
+        let fetches = LockIsolated(0)
+        let store = makeStore(state) {
+            $0.workoutStorage.fetchAll = {
+                fetches.withValue { $0 += 1 }
+                return StoredWorkouts(workouts: [self.first])
+            }
+        }
+
+        await store.send(.internal(.workoutsChangedRemotely)) { $0.needsReload = true }
+        await store.send(.internal(.workoutsLoadingFailed)) {
+            $0.needsReload = false
+            $0.workouts = .failed
+        }
+        await store.send(.view(.retryButtonTapped)) { $0.workouts = .loading }
+        await store.receive(\.internal.workoutsLoaded) { $0.workouts = .loaded([self.first]) }
+
+        #expect(fetches.value == 1)
+    }
+
+    @Test
     func test_workoutsChangedRemotely_writesQueued_readsAfterTheLastWrite() async {
         var state = loaded([second])
         // The first delete is in flight; the second waits for it.
