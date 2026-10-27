@@ -24,8 +24,11 @@ extension WorkoutModel {
 
         var sections: [WorkoutSectionKind: [Stage]] = [:]
         var stageIDs: Set<UUID> = []
-        // The relationship keeps no order; `persistentModelID` breaks ties between equal `order` values.
-        let models = (stages ?? []).sorted { ($0.order, $0.persistentModelID) < ($1.order, $1.persistentModelID) }
+        // The relationship keeps no order. Equal `order` values, as two devices can write, are broken by the stage
+        // identifier, the same on every device; `persistentModelID` only settles records without one.
+        let models = (stages ?? []).sorted {
+            ($0.order, $0.stageID?.uuidString ?? "", $0.persistentModelID) < ($1.order, $1.stageID?.uuidString ?? "", $1.persistentModelID)
+        }
         for model in models {
             guard let stageID = model.stageID else { throw .missingStageID }
             guard stageIDs.insert(stageID).inserted else { throw .duplicateStageID(stageID) }

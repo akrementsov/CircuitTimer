@@ -61,6 +61,7 @@ public struct WorkoutEditorView: View {
         .alert($store.scope(\.$destination, action: \.destination).saveFailedAlert)
         .alert($store.scope(\.$destination, action: \.destination).saveBlockedAlert)
         .alert($store.scope(\.$destination, action: \.destination).discardConfirmation)
+        .alert($store.scope(\.$destination, action: \.destination).deletedElsewhereAlert)
     }
 
     // Native fields stay outside FocusState. UIKit ends the previous name's focus when one begins editing;

@@ -15,6 +15,13 @@ public struct StoredWorkouts: Equatable, Sendable {
     }
 }
 
+/// Whether a save was written.
+public enum WorkoutSaveOutcome: Equatable, Sendable {
+    case saved
+    /// The workout was deleted on a device, so nothing was written; the caller's copy no longer exists.
+    case deletedElsewhere
+}
+
 /// Whether the store still matches the list the caller derived the write from.
 public enum WorkoutWriteOutcome: Equatable, Sendable {
     case applied
@@ -24,13 +31,15 @@ public enum WorkoutWriteOutcome: Equatable, Sendable {
 
 @DependencyClient
 public struct WorkoutStorageClient: Sendable {
-    /// Seeds the sample workout once, then reads all workouts.
+    /// Seeds the sample workout unless its marker exists, gives older records their copy identifiers, removes late copies of deleted
+    /// workouts, then reads all workouts.
     public var fetchAll: @Sendable () async throws -> StoredWorkouts
-    /// Updates the workout, or appends it when it is new.
-    public var save: @Sendable (_ workout: Workout) async throws -> Void
+    /// Updates the workout, or appends it when it is new; reports `.deletedElsewhere` and writes nothing for a
+    /// workout deleted on a device.
+    public var save: @Sendable (_ workout: Workout) async throws -> WorkoutSaveOutcome
     /// Inserts a new workout right after `after`; appends it and reports `.storeDiverged` when `after` is not shown.
     public var insert: @Sendable (_ workout: Workout, _ after: Workout.ID) async throws -> WorkoutWriteOutcome
-    /// Deletes the shown record; reports `.storeDiverged` when it is not shown or hidden copies remain.
+    /// Deletes every copy of the shown workout for all devices; reports `.storeDiverged` when it is not shown.
     public var delete: @Sendable (_ id: Workout.ID) async throws -> WorkoutWriteOutcome
     /// Orders the shown workouts; reports `.storeDiverged` unless `ids` are exactly the shown workouts.
     public var reorder: @Sendable (_ ids: [Workout.ID]) async throws -> WorkoutWriteOutcome
@@ -53,7 +62,7 @@ extension WorkoutStorageClient {
 }
 
 extension WorkoutStorageClient: DependencyKey {
-    public static let liveValue = Self.swiftData(isStoredInMemoryOnly: false)
+    public static let liveValue = Self.swiftData(provider: .live())
     /// In memory, seeded with the sample workout on first read.
     public static let previewValue = Self.swiftData(isStoredInMemoryOnly: true)
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented,

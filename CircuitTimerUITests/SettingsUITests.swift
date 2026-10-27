@@ -15,6 +15,7 @@ final class SettingsUITests: XCTestCase {
             .setPreference(.speech, to: false)
             .setPreference(.backgroundNotifications, to: false)
             .setPreference(.keepScreenOn, to: false)
+            .setPreference(.iCloudSync, to: false)
             .tapWorkouts()
             .assertIsEmpty()
             .tapSettings()
@@ -24,6 +25,7 @@ final class SettingsUITests: XCTestCase {
             .setPreference(.speech, to: true)
             .setPreference(.backgroundNotifications, to: true)
             .setPreference(.keepScreenOn, to: true)
+            .setPreference(.iCloudSync, to: true)
             .assertAllPreferences(areOn: true)
     }
 

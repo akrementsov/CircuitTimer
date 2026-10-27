@@ -19,17 +19,26 @@ public struct WorkoutEditorFeature: Sendable {
         case saveBlockedAlert(AlertState<Never>)
         @ReducerCaseIgnored
         case discardConfirmation(AlertState<DiscardConfirmation>)
+        @ReducerCaseIgnored
+        case deletedElsewhereAlert(AlertState<DeletedElsewhereChoice>)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
             case saveFailedAlert(Never)
             case saveBlockedAlert(Never)
             case discardConfirmation(DiscardConfirmation)
+            case deletedElsewhereAlert(DeletedElsewhereChoice)
         }
     }
 
     public enum DiscardConfirmation: Equatable, Sendable {
         case discard
+    }
+
+    /// What becomes of a draft whose workout was deleted on another device.
+    public enum DeletedElsewhereChoice: Equatable, Sendable {
+        case saveAsNew
+        case dontSave
     }
 
     @ObservableState
@@ -81,6 +90,21 @@ public struct WorkoutEditorFeature: Sendable {
             let editable = Self.editable(workout)
             original = editable
             draft = editable
+        }
+
+        /// A read-only screen with nothing presented and no Start on its way, which a newer stored version may replace
+        /// or close; a draft, an alert or a Start keeps what it has.
+        public var acceptsStoredVersion: Bool {
+            phase == .viewing && destination == nil && !isStarting
+        }
+
+        /// Takes the stored version of the workout, keeping the screen's own state.
+        public mutating func showStored(_ stored: Workout) {
+            guard acceptsStoredVersion, stored != workout else { return }
+
+            workout = stored
+            original = Self.editable(stored)
+            draft = original
         }
 
         /// Lifting a stored 0 to the editor's minimum in both the base and the draft keeps an untouched workout
@@ -310,6 +334,8 @@ public struct WorkoutEditorFeature: Sendable {
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case saveFailed
+            /// Storage wrote nothing: the workout was deleted on another device.
+            case saveFoundDeletedElsewhere
             case saveSucceeded(Workout)
             case editingEnded
             case settled(generation: Int)
@@ -321,6 +347,8 @@ public struct WorkoutEditorFeature: Sendable {
             case saved(Workout)
             /// The workout exactly as it is stored, to play in the timer.
             case startRequested(Workout)
+            /// A save found the workout deleted on another device, so the list the container shows is stale.
+            case deletedElsewhere
         }
     }
 
@@ -351,6 +379,10 @@ public struct WorkoutEditorFeature: Sendable {
                     reduce(into: &state, action)
                 case .destination(.presented(.discardConfirmation(.discard))):
                     discardChanges(&state)
+                case .destination(.presented(.deletedElsewhereAlert(.saveAsNew))):
+                    saveAsNew(&state)
+                case .destination(.presented(.deletedElsewhereAlert(.dontSave))):
+                    leave(&state)
                 case .delegate, .destination:
                     .none
             }
@@ -454,6 +486,10 @@ public struct WorkoutEditorFeature: Sendable {
                 state.isSaving = false
                 state.destination = .saveFailedAlert(.saveFailed)
                 return .none
+            case .saveFoundDeletedElsewhere:
+                state.isSaving = false
+                state.destination = .deletedElsewhereAlert(.deletedElsewhere)
+                return .send(.delegate(.deletedElsewhere))
             case let .saveSucceeded(workout):
                 state.isSaving = false
                 state.workout = workout
@@ -528,9 +564,13 @@ public struct WorkoutEditorFeature: Sendable {
         state.isSaving = true
         return .run { [workoutStorage] send in
             do {
-                try await workoutStorage.save(workout: workout)
-                // The cells turn read-only in place, so the change animates like the pencil's.
-                await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
+                switch try await workoutStorage.save(workout: workout) {
+                    case .saved:
+                        // The cells turn read-only in place, so the change animates like the pencil's.
+                        await send(.internal(.saveSucceeded(workout)), animation: Self.phaseChangeAnimation)
+                    case .deletedElsewhere:
+                        await send(.internal(.saveFoundDeletedElsewhere))
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -538,6 +578,22 @@ public struct WorkoutEditorFeature: Sendable {
                 await send(.internal(.saveFailed))
             }
         }
+    }
+
+    /// Keeps the user's edits as a new workout, which storage appends to the list.
+    private func saveAsNew(_ state: inout State) -> Effect<Action> {
+        let draft = state.draft
+        state.draft = Workout(
+            id: uuid(),
+            name: draft.name,
+            warmUp: draft.warmUp,
+            training: draft.training,
+            trainingRounds: draft.trainingRounds,
+            coolDown: draft.coolDown,
+            pauseAfterWarmUp: draft.pauseAfterWarmUp,
+            pauseAfterTraining: draft.pauseAfterTraining
+        )
+        return save(&state)
     }
 
     private func updateStage(
@@ -598,6 +654,21 @@ extension AlertState where Action == Never {
             TextState("editor.saveBlocked.title", bundle: .module)
         } message: {
             TextState(blocker.messageKey, bundle: .module)
+        }
+    }
+}
+
+extension AlertState where Action == WorkoutEditorFeature.DeletedElsewhereChoice {
+    static var deletedElsewhere: Self {
+        AlertState {
+            TextState("editor.deletedElsewhere.title", bundle: .module)
+        } actions: {
+            ButtonState(action: .saveAsNew) {
+                TextState("editor.deletedElsewhere.saveAsNew", bundle: .module)
+            }
+            ButtonState(role: .destructive, action: .dontSave) {
+                TextState("editor.deletedElsewhere.dontSave", bundle: .module)
+            }
         }
     }
 }

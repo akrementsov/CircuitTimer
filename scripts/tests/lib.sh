@@ -76,6 +76,15 @@ expect_equal() {
 	fi
 }
 
+# expect_line FILE LINE: the file has a line that is exactly LINE.
+expect_line() {
+	checks=$((checks + 1))
+	if ! grep -qxF -- "$2" "$1"; then
+		fail "$(basename "$1") has no line: $2"
+		sed 's/^/    /' "$1" >&2
+	fi
+}
+
 expect_exists() {
 	checks=$((checks + 1))
 	if [ ! -e "$1" ]; then
@@ -88,6 +97,15 @@ expect_missing() {
 	if [ -e "$1" ]; then
 		fail "$1 exists"
 	fi
+}
+
+# write_plist FILE JSON: an XML property list of the JSON value, written with the standard library like the scripts
+# read it.
+write_plist() {
+	mkdir -p "$(dirname "$1")"
+	python3 -I -c 'import json, plistlib, sys
+with open(sys.argv[1], "wb") as file:
+    plistlib.dump(json.loads(sys.argv[2]), file)' "$1" "$2"
 }
 
 finish() {

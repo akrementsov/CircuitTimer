@@ -96,7 +96,10 @@ struct AppFeatureTabTests {
         var renamed = first
         renamed.name = "Renamed"
         let store = makeStore(loaded([first, second])) {
-            $0.workoutStorage.save = { _ in await gate.wait() }
+            $0.workoutStorage.save = { _ in
+                await gate.wait()
+                return .saved
+            }
         }
         await store.send(.view(.workoutTapped(first.id))) {
             $0.path[id: 0] = .editor(WorkoutEditorFeature.State(viewing: self.first))

@@ -22,7 +22,7 @@ struct ScenarioStorageTests {
         let storage = WorkoutStorageClient.scenario([makeWorkout(1), makeWorkout(2), makeWorkout(3)])
         let renamed = makeWorkout(2, name: "Renamed")
 
-        try await storage.save(renamed)
+        _ = try await storage.save(renamed)
 
         #expect(try await storage.fetchAll().workouts == [makeWorkout(1), renamed, makeWorkout(3)])
     }
@@ -31,7 +31,7 @@ struct ScenarioStorageTests {
     func test_save_newID_appends() async throws {
         let storage = WorkoutStorageClient.scenario([makeWorkout(1)])
 
-        try await storage.save(makeWorkout(2))
+        _ = try await storage.save(makeWorkout(2))
 
         #expect(try await storage.fetchAll().workouts == [makeWorkout(1), makeWorkout(2)])
     }
@@ -40,7 +40,7 @@ struct ScenarioStorageTests {
     func test_save_emptyList_storesFirstWorkout() async throws {
         let storage = WorkoutStorageClient.scenario([])
 
-        try await storage.save(makeWorkout(1))
+        _ = try await storage.save(makeWorkout(1))
 
         #expect(try await storage.fetchAll().workouts == [makeWorkout(1)])
     }
@@ -50,7 +50,7 @@ struct ScenarioStorageTests {
         let one = WorkoutStorageClient.scenario([makeWorkout(1)])
         let another = WorkoutStorageClient.scenario([makeWorkout(1)])
 
-        try await one.save(makeWorkout(2))
+        _ = try await one.save(makeWorkout(2))
 
         #expect(try await another.fetchAll().workouts == [makeWorkout(1)])
     }
@@ -62,7 +62,7 @@ struct ScenarioStorageTests {
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             for workout in workouts {
-                group.addTask { try await storage.save(workout) }
+                group.addTask { _ = try await storage.save(workout) }
             }
             try await group.waitForAll()
         }
@@ -79,7 +79,7 @@ struct ScenarioStorageTests {
 
         try await withThrowingTaskGroup(of: Void.self) { group in
             for version in versions {
-                group.addTask { try await storage.save(version) }
+                group.addTask { _ = try await storage.save(version) }
             }
             try await group.waitForAll()
         }

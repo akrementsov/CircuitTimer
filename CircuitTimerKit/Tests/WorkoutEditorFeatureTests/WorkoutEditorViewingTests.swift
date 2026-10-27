@@ -143,6 +143,7 @@ struct WorkoutEditorViewingTests {
                 if calls.value == 1 {
                     throw SaveFailure()
                 }
+                return .saved
             }
         }
         await store.send(.view(.nameChanged("  Morning  "))) { $0.draft.name = "  Morning  " }

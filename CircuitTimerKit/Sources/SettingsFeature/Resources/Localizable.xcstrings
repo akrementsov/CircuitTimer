@@ -81,6 +81,134 @@
         }
       }
     },
+    "settings.iCloud.failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't sync workouts. They stay on this device."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось синхронизировать тренировки. Они остаются на устройстве."
+          }
+        }
+      }
+    },
+    "settings.iCloud.localOnly" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workouts are stored only on this device."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировки хранятся только на этом устройстве."
+          }
+        }
+      }
+    },
+    "settings.iCloud.noAccount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in to iCloud to sync workouts."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войдите в iCloud, чтобы синхронизировать тренировки."
+          }
+        }
+      }
+    },
+    "settings.iCloud.quotaExceeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud storage is full, so workouts don't sync."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Хранилище iCloud заполнено, тренировки не синхронизируются."
+          }
+        }
+      }
+    },
+    "settings.iCloud.relaunch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close and reopen the app to apply this change."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы изменение вступило в силу, закройте и снова откройте приложение."
+          }
+        }
+      }
+    },
+    "settings.iCloud.restricted" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud access is restricted."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступ к iCloud ограничен."
+          }
+        }
+      }
+    },
+    "settings.iCloud.toggle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация с iCloud"
+          }
+        }
+      }
+    },
+    "settings.iCloud.unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud is temporarily unavailable."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud временно недоступен."
+          }
+        }
+      }
+    },
     "settings.notifications.alertsOff" : {
       "localizations" : {
         "en" : {

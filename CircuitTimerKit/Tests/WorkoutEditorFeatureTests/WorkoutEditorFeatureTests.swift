@@ -260,6 +260,7 @@ struct WorkoutEditorFeatureTests {
             $0.workoutStorage.save = { workout in
                 saved.setValue(workout)
                 events.withValue { $0.append("save") }
+                return .saved
             }
             $0.dismiss = DismissEffect { events.withValue { $0.append("dismiss") } }
         }
@@ -321,7 +322,7 @@ struct WorkoutEditorFeatureTests {
     @Test
     func test_save_whileDiscardDialogShown_closesDialogAndSaves() async {
         let store = makeStore {
-            $0.workoutStorage.save = { _ in }
+            $0.workoutStorage.save = { _ in .saved }
             $0.dismiss = DismissEffect {}
         }
         await store.send(.view(.nameChanged("Renamed"))) { $0.draft.name = "Renamed" }
@@ -343,6 +344,7 @@ struct WorkoutEditorFeatureTests {
                 if failing.value {
                     throw SaveFailure()
                 }
+                return .saved
             }
             $0.dismiss = DismissEffect {}
         }
