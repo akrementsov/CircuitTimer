@@ -8,7 +8,7 @@ Workouts, their stages and the list order sync through the user's private CloudK
 - `WorkoutStoreProvider.live()` opens the same file `Workouts.store` with `.private(container)` or `.none`. If opening with CloudKit throws, it logs a fault and opens the file on the device; only a store that fails both ways is a list error. It then reports `storeOpened(isMirroring:)`.
 - An open `ModelContainer` cannot change its mirroring, so a change of the switch applies at the next launch. Until then Settings asks to close and reopen the app.
 - Without an iCloud account the store still opens with `.private` and works on the device; signing in later should start syncing without a relaunch (a device check below).
-- Unsigned builds (`make build-app`, UI tests, snapshots) pass `CT_CLOUDKIT_CONTAINER=`: they carry no entitlement, and creating a `CKContainer` without it traps the process. Their store stays on the device.
+- Unsigned builds (`make build-app`, UI tests, snapshots) pass `CT_CLOUDKIT_CONTAINER=`: they carry no entitlement, and creating a `CKContainer` without it traps the process. Their store stays on the device. With the switch on, a run of such a build logs a fault and Settings says sync does not work: expected there, and in a signed build the same footnote means the container is missing.
 
 ## What CloudSync reports
 
@@ -75,6 +75,7 @@ On the owner's iPhones on iOS 17 and 26.5, one Apple ID, builds of the same kind
 
 - [ ] An update from a CT-2 store: the sample shows once and no hidden-records footnote appears; the store migrates on iOS 17 too.
 - [ ] Create, edit, reorder and delete on one device appear on the other while its list stays open and active (E3b). If an import arrives without its event, the list needs a bounded refresh while active; if no import arrives at all, the owner decides.
+- [ ] An import that reorders or removes rows while a row of the open list is being dragged or swiped: the gesture ends on the right workout. Rows read the items their list captured, and the reducer does not know about the gesture.
 - [ ] An open read-only workout updates or closes; a draft does not.
 - [ ] Concurrent reorders with one device offline end in the same order on both; saving in the editor while an import lands does not fail.
 - [ ] Switch off and relaunch, then on and relaunch, with the footnotes; changes made while off arrive (E4 on iOS 17).

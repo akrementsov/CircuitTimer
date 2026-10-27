@@ -9,6 +9,7 @@ struct SettingsScreen: Screen {
         case speech = "Speak stage names"
         case backgroundNotifications = "Background notifications"
         case keepScreenOn = "Keep screen on"
+        case iCloudSync = "iCloud sync"
 
         var identifier: String {
             switch self {
@@ -17,6 +18,7 @@ struct SettingsScreen: Screen {
                 case .speech: AccessibilityID.Settings.speech
                 case .backgroundNotifications: AccessibilityID.Settings.backgroundNotifications
                 case .keepScreenOn: AccessibilityID.Settings.keepScreenOn
+                case .iCloudSync: AccessibilityID.Settings.iCloudSync
             }
         }
     }

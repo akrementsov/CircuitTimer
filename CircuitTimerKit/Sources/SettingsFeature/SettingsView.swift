@@ -50,6 +50,7 @@ public struct SettingsView: View {
                     title: Text("settings.iCloud.toggle", bundle: .module),
                     isOn: Binding(get: { store.isICloudSyncOn }, set: { send(.iCloudSyncToggled($0)) })
                 )
+                .accessibilityIdentifier(AccessibilityID.Settings.iCloudSync)
                 if let footnote = store.cloudSyncFootnote {
                     Text(LocalizedStringKey(footnote), bundle: .module)
                         .font(.token(.footnote))
