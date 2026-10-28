@@ -1,24 +1,9 @@
 import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
-import SwiftUI
 import WorkoutDomain
 
 extension AppFeature {
-    /// A Start waiting for permissions before the timer opens: notifications first, then Health.
-    struct StartIntent: Equatable, Sendable {
-        enum Stage: Equatable, Sendable {
-            case notifications
-            case health
-        }
-
-        let generation: Int
-        let editorID: StackElementID
-        let workout: Workout
-        var stage = Stage.notifications
-        var isAwaitingAuthorization = false
-    }
-
     public enum PermissionStallChoice: Equatable, Sendable {
         case startNow
         case wait
@@ -117,7 +102,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .notifications else {
             return .none
         }
-        guard state.destination == nil, isCurrentStartIntent(intent, state) else {
+        guard state.destination == nil, isCurrentStart(intent.workout, editorID: intent.editorID, state) else {
             return cancelStartIntent(&state)
         }
         // An outstanding system prompt may still answer after Start now; it can update the cache,
@@ -128,70 +113,10 @@ extension AppFeature {
         )
     }
 
-    func isCurrentStartIntent(_ intent: StartIntent, _ state: State) -> Bool {
-        isCurrentStart(intent.workout, editorID: intent.editorID, state)
-    }
-
-    func isCurrentStart(_ workout: Workout, editorID: StackElementID, _ state: State) -> Bool {
-        guard state.selectedTab == .workouts, state.path.ids.last == editorID,
-              let editor = state.path[id: editorID, case: \.editor] else { return false }
-        return editor.phase == .viewing && editor.workout == workout
-    }
-
-    /// The one way to the timer after a Start. A Start that is no longer current is released, so its button works
-    /// again even when no intent is left to cancel.
-    func presentTimer(_ workout: Workout, editorID: StackElementID, _ state: inout State) -> Bool {
-        guard state.destination == nil, isCurrentStart(workout, editorID: editorID, state) else {
-            Self.logger.notice("A Start was no longer current when its timer was about to open")
-            state.path[id: editorID, case: \.editor]?.cancelStart()
-            return false
-        }
-        state.destination = .timer(timerState(for: workout))
-        return true
-    }
-
-    /// Opens the timer and ends the Start's intent, if it has one, either way.
-    func openTimer(_ workout: Workout, editorID: StackElementID, _ state: inout State) -> Effect<Action> {
-        guard presentTimer(workout, editorID: editorID, &state) else { return cancelStartIntent(&state) }
-
-        state.startIntent = nil
-        return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthRequestStall))
-    }
-
-    func cancelStartIntent(_ state: inout State) -> Effect<Action> {
-        guard let intent = state.startIntent else { return .none }
-        state.path[id: intent.editorID, case: \.editor]?.cancelStart()
-        return discardStartIntent(&state)
-    }
-
-    /// Drops the intent without touching its Start: a new tap already holds it.
-    func discardStartIntent(_ state: inout State) -> Effect<Action> {
-        state.startIntent = nil
-        state.startGeneration += 1
-        return .merge(
-            .cancel(id: CancelID.notificationPermission),
-            .cancel(id: CancelID.notificationPermissionStall),
-            .cancel(id: CancelID.healthPermission),
-            .cancel(id: CancelID.healthRequestStall)
-        )
-    }
-
     func waitForNotificationPermission(_ state: State) -> Effect<Action> {
         guard let intent = state.startIntent, intent.stage == .notifications else { return .none }
         // A failed query has no live authorization callback to wait for.
         return intent.isAwaitingAuthorization ? permissionStallTimer(state) : readStartAccess(intent.generation)
-    }
-
-    func notificationSceneChanged(_ phase: ScenePhase, _ state: inout State) -> Effect<Action> {
-        state.isSceneActive = phase == .active
-        guard phase == .active else {
-            return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthRequestStall))
-        }
-        return .merge(
-            permissionStallTimer(state),
-            healthSceneActivated(&state),
-            state.isNotificationCleanupStalled ? cleanupNotifications(reportSuccess: true) : .none
-        )
     }
 
     func cleanupNotifications(reportSuccess: Bool = false) -> Effect<Action> {

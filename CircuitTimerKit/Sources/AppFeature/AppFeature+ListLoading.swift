@@ -56,10 +56,11 @@ extension AppFeature {
     }
 
     /// Shows the stored version on a read-only workout screen, or closes it when the workout is gone. A screen the
-    /// user is doing something on stays as it is: replacing it would lose that.
+    /// user is doing something on stays as it is: replacing it would lose that. A Health stage that stalled has freed
+    /// Start; the new version makes its late answer stale, so it no longer opens the timer.
     func refreshOpenWorkout(_ state: inout State) -> Effect<Action> {
         guard
-            state.startIntent == nil,
+            state.startIntent?.hasStalled ?? true,
             case let .loaded(workouts) = state.workouts,
             let id = state.path.ids.last,
             let editor = state.path[id: id, case: \.editor],

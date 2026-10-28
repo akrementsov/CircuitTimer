@@ -192,8 +192,8 @@ public struct AppFeature: Sendable {
     @Dependency(\.liveActivity) private var liveActivity
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) var uuid
-    @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.workoutHealth) var workoutHealth
+    @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.workoutStorage) var workoutStorage
 
     public init() {}
@@ -228,7 +228,7 @@ public struct AppFeature: Sendable {
         .forEach(\.path, action: \.path)
         Reduce { state, _ in
             guard let intent = state.startIntent else { return .none }
-            guard isCurrentStartIntent(intent, state),
+            guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
                   state.destination == nil || state.destination?.is(\.permissionStalled) == true
             else { return cancelStartIntent(&state) }
             return .none
@@ -331,7 +331,7 @@ public struct AppFeature: Sendable {
                 workouts.swapAt(index, index + 1)
                 return reorder(workouts, &state)
             case let .scenePhaseChanged(phase):
-                return notificationSceneChanged(phase, &state)
+                return sceneChanged(phase, &state)
             case .notificationCleanupRetryTapped:
                 return cleanupNotifications(reportSuccess: true)
             case .timerCoverAppeared:

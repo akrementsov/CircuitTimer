@@ -11,14 +11,13 @@ extension AppFeature {
         guard !state.isHealthRequestOutstanding, state.healthAccess != .unavailable, state.healthAccess != .determined
         else { return openTimer(workout, editorID: editorID, &state) }
 
-        if state.startIntent == nil {
-            state.startGeneration += 1
-            state.startIntent = StartIntent(generation: state.startGeneration, editorID: editorID, workout: workout)
-        }
-        state.startIntent?.stage = .health
+        var intent = state.startIntent ?? StartIntent(generation: state.startGeneration + 1, editorID: editorID, workout: workout)
+        intent.stage = .health
+        state.startGeneration = intent.generation
+        state.startIntent = intent
         // A cached `notDetermined` may have been answered in Settings since.
         state.healthAccess = nil
-        return readHealthAccess(state.startGeneration)
+        return .merge(readHealthAccess(intent.generation), healthStallTimer(state))
     }
 
     private func readHealthAccess(_ generation: Int) -> Effect<Action> {
@@ -50,7 +49,8 @@ extension AppFeature {
     }
 
     /// Asks only an active scene: from the background the sheet would wait unseen. The request has no cancel ID:
-    /// once the sheet shows, only its answer clears `isHealthRequestOutstanding`.
+    /// once the sheet shows, only its answer clears `isHealthRequestOutstanding`. The stall timer starts again with
+    /// the sheet.
     private func requestHealthAccess(_ state: inout State) -> Effect<Action> {
         guard state.isSceneActive, !state.isHealthRequestOutstanding, state.healthAccess == .notDetermined,
               let intent = state.startIntent, intent.stage == .health else { return .none }
@@ -69,15 +69,17 @@ extension AppFeature {
                     await send(.internal(.healthPermissionAnswered(generation: generation, succeeded: false)))
                 }
             },
-            healthRequestStallTimer(state)
+            healthStallTimer(state)
         )
     }
 
-    /// A sheet that does not answer within 10 seconds frees Start; the intent stays, so a late answer still opens
-    /// the timer, and a new Start opens it without Health.
-    private func healthRequestStallTimer(_ state: State) -> Effect<Action> {
-        guard state.isSceneActive, state.isHealthRequestOutstanding, let intent = state.startIntent,
-              intent.stage == .health else { return .none }
+    /// A Health stage that does not finish within 10 seconds of an active scene, reading the access or waiting for
+    /// the sheet, frees Start; the intent stays, so a late answer still opens the timer, and a new Start opens it
+    /// without Health.
+    private func healthStallTimer(_ state: State) -> Effect<Action> {
+        guard state.isSceneActive, let intent = state.startIntent, intent.stage == .health, !intent.hasStalled else {
+            return .none
+        }
 
         return .run { [clock] send in
             try await clock.sleep(for: .seconds(10))
@@ -90,6 +92,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .health else {
             return .none
         }
+        state.startIntent?.hasStalled = true
         state.path[id: intent.editorID, case: \.editor]?.cancelStart()
         return .none
     }
@@ -105,8 +108,11 @@ extension AppFeature {
         return openTimer(intent.workout, editorID: intent.editorID, &state)
     }
 
-    /// A Start that reached Health while the scene was inactive asks once it is active again.
+    /// A Start that reached Health while the scene was inactive asks once it is active again; a sheet already showing,
+    /// or a read still under way, gets a new stall timer.
     func healthSceneActivated(_ state: inout State) -> Effect<Action> {
-        state.isHealthRequestOutstanding ? healthRequestStallTimer(state) : requestHealthAccess(&state)
+        guard !state.isHealthRequestOutstanding, state.healthAccess == .notDetermined else { return healthStallTimer(state) }
+
+        return requestHealthAccess(&state)
     }
 }

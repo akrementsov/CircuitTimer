@@ -16,16 +16,17 @@ func loaded(_ workouts: [Workout]) -> AppFeature.State {
     return state
 }
 
+/// `healthAccess` starts as already read, so a Start opens the timer without the Health stage; a test of that stage
+/// passes `nil`.
 @MainActor
-/// `healthAccess` starts as already read, so a Start opens the timer without the Health stage; its tests pass `nil`.
 func makeStore(
     _ state: AppFeature.State,
     notificationsEnabled: Bool = false,
     healthAccess: HealthAccess? = .unavailable,
     dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<AppFeature> {
-    state.settings.$isBackgroundNotificationsOn.withLock { $0 = notificationsEnabled }
     var state = state
+    state.settings.$isBackgroundNotificationsOn.withLock { $0 = notificationsEnabled }
     state.healthAccess = healthAccess
     let revisions = LockIsolated(0)
     return TestStore(initialState: state) {
