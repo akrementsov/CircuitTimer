@@ -23,7 +23,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 - **The timer engine.** `WorkoutRun` derives the position from time instead of counting ticks: [The timer engine](#the-timer-engine) and [Timer engine contract](docs/timer-engine.md).
 - **Feature boundaries.** TCA features that never import each other, composed in one root: [Architecture](#architecture) and [AGENTS.md](AGENTS.md).
-- **The Live Activity.** Pause/Resume on the Lock Screen card, which ignores commands from an outdated card: [Live Activity](docs/live-activity.md).
+- **The Live Activity.** Pause/Resume from the Lock Screen and the Dynamic Island; a command from an outdated card is ignored: [Live Activity](docs/live-activity.md).
 - **iCloud sync.** One visible copy per workout on every device, deletions that stay deleted: [iCloud sync](docs/icloud-sync.md).
 - **Tests.** Unit, UI and snapshot tests, and `make verify-clean` before every merge: [Testing](#testing).
 
@@ -150,7 +150,7 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | Module | Responsibility |
 |---|---|
 | `AppFeature` | Tab bar, the workout list (loading, empty, retryable error), navigation, restoring a saved run |
-| `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; MM:SS on the number pad |
+| `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; stage durations as MM:SS on the number pad |
 | `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
 | `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder |
