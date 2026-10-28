@@ -1,7 +1,6 @@
 @testable import AppFeature
 @testable import SettingsFeature
 
-import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
 import SnapshotCapture
@@ -17,7 +16,6 @@ extension SnapshotTests {
             try await assertAppSnapshot(textSize: textSize) { _ in
                 var state = AppFeature.State.list([])
                 state.selectedTab = .settings
-                state.settings.notificationAccess = .authorized
                 state.settings.$isICloudSyncOn.withLock { $0 = false }
                 state.settings.cloudSyncStatus = CloudSyncStatus(isRequested: false, isMirroring: false, problem: nil)
                 return state

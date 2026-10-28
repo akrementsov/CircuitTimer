@@ -18,7 +18,6 @@ struct TimerPreferencesTests {
         #expect(store.state.isBackgroundNotificationsOn)
         await store.send(.view(.backgroundNotificationsToggled(false))) {
             $0.$isBackgroundNotificationsOn.withLock { $0 = false }
-            $0.notificationAccessGeneration = 1
         }
         let reloaded = withDependencies {
             $0.defaultAppStorage = defaults
@@ -26,6 +25,21 @@ struct TimerPreferencesTests {
         #expect(!reloaded.isBackgroundNotificationsOn)
         #expect(reloaded.isSoundOn && reloaded.isVibrationOn && reloaded.isSpeechOn && reloaded.isKeepScreenOn)
         #expect(defaults.object(forKey: "signalBackgroundNotifications") as? Bool == false)
+    }
+
+    @Test
+    func test_backgroundNotificationsToggled_on_persistsWithoutEffects() async {
+        let defaults = UserDefaults.inMemory
+        defaults.set(false, forKey: "signalBackgroundNotifications")
+        let store = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            TestStore(initialState: SettingsFeature.State()) { SettingsFeature() }
+        }
+        await store.send(.view(.backgroundNotificationsToggled(true))) {
+            $0.$isBackgroundNotificationsOn.withLock { $0 = true }
+        }
+        #expect(defaults.object(forKey: "signalBackgroundNotifications") as? Bool == true)
     }
 
     @Test

@@ -140,7 +140,6 @@ let package = Package(
         .target(
             name: "SettingsFeature",
             dependencies: [
-                "BackgroundNotifications",
                 "CloudSync",
                 "TimerPreferences",
                 "DesignSystem",
@@ -239,7 +238,6 @@ let package = Package(
         .testTarget(
             name: "SettingsFeatureTests",
             dependencies: [
-                "BackgroundNotifications",
                 "CloudSync",
                 "TimerPreferences",
                 "SettingsFeature",

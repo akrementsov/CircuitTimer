@@ -1,9 +1,5 @@
-import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
-import Foundation
-import os
-import SwiftUI
 import TimerPreferences
 
 /// The Settings tab: its own navigation stack with About and the legal pages.
@@ -28,9 +24,6 @@ public struct SettingsFeature: Sendable {
         /// Read when the app launches; a change shows a footnote until the next launch applies it.
         @Shared(.iCloudSync) public var isICloudSyncOn = true
         var cloudSyncStatus: CloudSyncStatus?
-        var notificationAccess: NotificationAccess?
-        var notificationAccessGeneration = 0
-        var openSettingsFailed = false
         public internal(set) var path = StackState<Path.State>()
 
         public init() {}
@@ -49,10 +42,7 @@ public struct SettingsFeature: Sendable {
         @CasePathable
         public enum View: Equatable, Sendable {
             case task
-            case appeared
-            case scenePhaseChanged(ScenePhase)
             case backgroundNotificationsToggled(Bool)
-            case openNotificationSettingsTapped
             case keepScreenOnToggled(Bool)
             case soundToggled(Bool)
             case vibrationToggled(Bool)
@@ -64,21 +54,14 @@ public struct SettingsFeature: Sendable {
 
         @CasePathable
         public enum Internal: Equatable, Sendable {
-            case notificationAccessLoaded(generation: Int, NotificationAccess?)
-            case notificationSettingsOpened(Bool)
             case cloudSyncStatusChanged(CloudSyncStatus)
         }
     }
 
     enum CancelID: Hashable, Sendable {
-        case notificationAccess
-        case openSettings
         case cloudSyncStatus
     }
 
-    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "Settings")
-
-    @Dependency(\.backgroundNotifications) var backgroundNotifications
     @Dependency(\.cloudSync) var cloudSync
     @Dependency(\.appVersion) private var appVersion
 
@@ -89,13 +72,6 @@ public struct SettingsFeature: Sendable {
             switch action {
                 case let .view(action):
                     return reduce(into: &state, action)
-                case let .internal(.notificationAccessLoaded(generation, access)):
-                    guard generation == state.notificationAccessGeneration, state.isBackgroundNotificationsOn else { return .none }
-                    state.notificationAccess = access
-                    return .none
-                case let .internal(.notificationSettingsOpened(succeeded)):
-                    state.openSettingsFailed = !succeeded
-                    return .none
                 case let .internal(.cloudSyncStatusChanged(status)):
                     state.cloudSyncStatus = status
                     return .none
@@ -109,25 +85,10 @@ public struct SettingsFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         switch action {
             case .task:
-                return .merge(readNotificationAccess(&state), observeCloudSyncStatus())
-            case .appeared, .scenePhaseChanged(.active):
-                return readNotificationAccess(&state)
-            case .scenePhaseChanged:
-                return .none
+                return observeCloudSyncStatus()
             case let .backgroundNotificationsToggled(value):
                 state.$isBackgroundNotificationsOn.withLock { $0 = value }
-                state.notificationAccess = nil
-                if value { return readNotificationAccess(&state) }
-
-                state.notificationAccessGeneration += 1
-                return .cancel(id: CancelID.notificationAccess)
-            case .openNotificationSettingsTapped:
-                return .run { [backgroundNotifications] send in
-                    let succeeded = await backgroundNotifications.openSystemSettings()
-                    if !succeeded { Self.logger.error("Opening notification settings failed") }
-                    await send(.internal(.notificationSettingsOpened(succeeded)))
-                }
-                .cancellable(id: CancelID.openSettings, cancelInFlight: true)
+                return .none
             case let .keepScreenOnToggled(value):
                 state.$isKeepScreenOn.withLock { $0 = value }
                 return .none
