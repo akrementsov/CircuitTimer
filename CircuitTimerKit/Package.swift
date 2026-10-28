@@ -20,6 +20,7 @@ let package = Package(
         .library(name: "CloudSync", targets: ["CloudSync"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
+        .library(name: "WorkoutHealth", targets: ["WorkoutHealth"]),
         .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
@@ -89,6 +90,7 @@ let package = Package(
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -189,6 +191,14 @@ let package = Package(
         ),
         .target(
             name: "WorkoutDomain",
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "WorkoutHealth",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
             swiftSettings: strictSettings
         ),
         .target(
