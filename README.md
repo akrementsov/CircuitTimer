@@ -58,7 +58,8 @@ make build-app
 ```sh
 (
   set -e
-  if udid=$(xcrun simctl list devices available -j | jq -er \
+  devices=$(xcrun simctl list devices available -j)
+  if udid=$(printf '%s\n' "$devices" | jq -er \
     'first(.devices["com.apple.CoreSimulator.SimRuntime.iOS-27-0"][]? | select(.name == "iPhone 17") | .udid)'); then
     xcrun simctl bootstatus "$udid" -b
     open "$(xcode-select -p)/../Applications/DeviceHub.app"
@@ -66,6 +67,7 @@ make build-app
     xcrun simctl launch --terminate-running-process "$udid" com.akrementsov.circuittimer
   else
     echo "No iPhone 17 simulator on iOS 27.0: add one in Device Hub." >&2
+    exit 1
   fi
 )
 ```
@@ -91,7 +93,7 @@ Test commands for one area or one snapshot: [Testing guide › Commands](docs/te
 
 The app's code lives in one local Swift package, `CircuitTimerKit`; a second one, `CircuitTimerSnapshotKit`, holds only `SnapshotCapture` for the snapshot tests. The app and its widget extension are thin targets over the package's modules.
 
-The modules form four layers. A module imports only from its own layer or the layers below. The screen features never import each other; `AppFeature` composes them.
+The modules form four layers. A module imports only from its own layer or the layers below, except that the screen features never import each other; `AppFeature` composes them.
 
 ```mermaid
 flowchart TD
@@ -145,7 +147,7 @@ flowchart TD
     Widgets --> DesignSystem
 ```
 
-Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out (see the table). The exact lists are `CircuitTimerKit/Package.swift` and, for the app and the widget, [AGENTS.md › Module map](AGENTS.md#module-map).
+Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. The exact lists are `CircuitTimerKit/Package.swift` and, for the app and the widget, [AGENTS.md › Module map](AGENTS.md#module-map).
 
 | Module | Responsibility |
 |---|---|
@@ -160,11 +162,11 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | `BackgroundExecution` | Background-task assertions around the saved run's writes |
 | `BackgroundNotifications` | Owner-scoped local notifications, permission access, foreground suppression |
 | `WorkoutActivity` | The Live Activity's state, its Lock Screen and Island content, Pause/Resume intents; drawn by `CircuitTimerWidgets` |
-| `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only, so the widget can use it |
+| `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only, so `WorkoutActivity` and the widget can link it |
 | `UITestContract` | Below the features, no dependencies: accessibility identifiers and the UI tests' launch names |
 | `AppScenarios` | Debug only, above the features: each UI test scenario's data and non-live dependencies |
 
-`SnapshotCapture` is the only code of ours that depends on SnapshotTesting; it imports none of our modules, and the app and the widget never link it. Core imports no feature, the domain imports none of our modules, and `WorkoutDomain`, `WorkoutStorage` and `WorkoutActivity` never import TCA or SwiftUI. The full rules and the module map are in [AGENTS.md](AGENTS.md).
+`SnapshotCapture` is the only code of ours that depends on SnapshotTesting; it imports none of our modules, and the app and the widget never link it. Core imports no feature, the domain imports none of our modules, and `WorkoutDomain`, `WorkoutStorage` and `WorkoutActivity` never import TCA or SwiftUI. Full rules: [AGENTS.md](AGENTS.md).
 
 Foreground and background signal policy and the device checklist: [Timer signals](docs/timer-signals.md). How sync decides, resolves copies and deletions, what it accepts and what is checked on devices: [iCloud sync](docs/icloud-sync.md).
 
