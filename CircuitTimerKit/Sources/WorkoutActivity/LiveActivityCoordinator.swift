@@ -63,14 +63,16 @@ actor LiveActivityCoordinator {
 
     private let transport: ActivityTransport
     private let isAppProcess: Bool
+    private let gate: TerminationGate
     private var owners: [UUID: Owner] = [:]
     private var controlSerial = 0
     private var subscriptionSerial = 0
     private var orphanEnds: [String: [CompletionSignal]] = [:]
 
-    init(transport: ActivityTransport, isAppProcess: Bool = true) {
+    init(transport: ActivityTransport, isAppProcess: Bool = true, gate: TerminationGate = TerminationGate()) {
         self.transport = transport
         self.isAppProcess = isAppProcess
+        self.gate = gate
     }
 
     func sync(
@@ -90,6 +92,8 @@ actor LiveActivityCoordinator {
         content: WorkoutActivityAttributes.ContentState,
         clock: any Clock<Duration>
     ) async -> LiveActivitySyncResult {
+        guard !gate.isClosed else { return .init(outcome: .superseded) }
+
         var owner = owners[id] ?? Owner()
         guard !owner.isEnding, revision > owner.acceptedRevision else { return .init(outcome: .superseded) }
 
@@ -103,6 +107,43 @@ actor LiveActivityCoordinator {
     }
 
     func end(owner id: UUID, clock: any Clock<Duration>) async {
+        let signal = beginEnding(id, clock: clock)
+        // A cancelled caller stops waiting too, which is no slow end.
+        if await !signal.wait(timeout: Self.endTimeout, clock: clock), !Task.isCancelled {
+            Logger.liveActivity.notice("Ending a live activity took over \(Self.endTimeout, privacy: .public); it ends in the background")
+        }
+    }
+
+    /// Ends every owner, then every activity twice with the immediate dismissal: at once, and again after the drains
+    /// already under way, so a finished card that a drain was ending with the standard dismissal goes too. The passes
+    /// outlive a cancelled caller, which stops waiting at once.
+    func endAll(clock: any Clock<Duration>) async {
+        let signals = owners.keys.map { beginEnding($0, clock: clock) }
+        let done = CompletionSignal()
+        // The second pass must not depend on the caller, whom termination cancels within its budget.
+        // swiftlint:disable:next no_unstructured_task
+        Task { [transport] in
+            await transport.endEvery {
+                for signal in signals {
+                    _ = await signal.wait(timeout: Self.endTimeout, clock: clock)
+                }
+            }
+            done.complete()
+        }
+        await done.wait()
+    }
+
+    func endOrphans() async {
+        let known = Set(owners.values.compactMap(\.activityID))
+        for activityID in transport.allIDs() where !known.contains(activityID) {
+            await transport.end(activityID, nil, .immediate)
+        }
+    }
+
+    // MARK: - The owner's loop
+
+    /// Sets the owner's tombstone; the signal completes once its drain has removed the activity.
+    private func beginEnding(_ id: UUID, clock: any Clock<Duration>) -> CompletionSignal {
         var owner = owners[id] ?? Owner()
         if !owner.isEnding {
             owner.isEnding = true
@@ -118,21 +159,8 @@ actor LiveActivityCoordinator {
         owner.endSignals.append(signal)
         owners[id] = owner
         startDraining(id, clock: clock)
-
-        // A cancelled caller stops waiting too, which is no slow end.
-        if await !signal.wait(timeout: Self.endTimeout, clock: clock), !Task.isCancelled {
-            Logger.liveActivity.notice("Ending a live activity took over \(Self.endTimeout, privacy: .public); it ends in the background")
-        }
+        return signal
     }
-
-    func endOrphans() async {
-        let known = Set(owners.values.compactMap(\.activityID))
-        for activityID in transport.allIDs() where !known.contains(activityID) {
-            await transport.end(activityID, nil, .immediate)
-        }
-    }
-
-    // MARK: - The owner's loop
 
     private func startDraining(_ id: UUID, clock: any Clock<Duration>) {
         guard owners[id]?.isDraining == false else { return }
@@ -179,6 +207,7 @@ actor LiveActivityCoordinator {
     }
 
     private func apply(_ id: UUID, _ request: Request, clock: any Clock<Duration>) async -> Outcome {
+        guard !gate.isClosed else { return .superseded }
         guard let owner = owners[id], !owner.isEnding else { return .superseded }
         guard !owner.isBroken else { return .failed }
         guard !owner.isGone else { return .unavailable }
@@ -236,6 +265,8 @@ actor LiveActivityCoordinator {
                 case let .transient(reason):
                     log(id, .request, "Starting a live activity failed: \(reason)")
                     return .failed
+                case .terminating:
+                    return .superseded
             }
         }
         owners[id]?.activityID = activityID

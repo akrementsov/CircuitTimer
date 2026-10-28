@@ -34,6 +34,8 @@ final class NotificationScheduler: Sendable {
         var serial = 0
         var sweep: OrphanSweep?
         var maySweep: @Sendable () -> Bool = { true }
+        /// Set when iOS terminates the process: no owner registers again.
+        var isTerminating = false
     }
     let state = OSAllocatedUnfairLock(initialState: State())
     let transport: NotificationTransport
@@ -128,7 +130,7 @@ final class NotificationScheduler: Sendable {
 
     private func register(_ owner: UUID, revision: Int) -> Bool {
         state.withLock { state in
-            guard !state.ended.contains(owner) else { return false }
+            guard !state.isTerminating, !state.ended.contains(owner) else { return false }
             if let current = state.owners[owner], revision < current.revision { return false }
             if state.owners[owner] == nil { state.owners[owner] = Owner(revision: revision) }
             state.owners[owner]?.revision = revision

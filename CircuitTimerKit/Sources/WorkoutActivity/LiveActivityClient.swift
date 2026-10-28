@@ -38,6 +38,11 @@ public struct LiveActivityClient: Sendable {
     public var end: @Sendable (_ owner: UUID) async -> Void
     /// Removes the activities of earlier processes.
     public var endOrphans: @Sendable () async -> Void
+    /// Synchronous, so the app delegate refuses every later request and update before it returns from termination.
+    public var beginTermination: @Sendable () -> Void
+    /// Ends every owner and removes every activity of the app. Has no timeout of its own; cancelling stops the wait
+    /// at once, and the removal goes on without it.
+    public var endAll: @Sendable () async -> Void
     /// Subscribes the live timer before its first card is published; replaces its previous stream.
     public var requests: @Sendable (_ owner: UUID) async -> AsyncStream<LiveActivityControlRequest> = { _ in
         AsyncStream { $0.finish() }
@@ -57,9 +62,11 @@ public struct LiveActivityClient: Sendable {
 
 extension LiveActivityClient: DependencyKey {
     public static let liveValue: Self = {
+        let gate = TerminationGate()
         let coordinator = LiveActivityCoordinator(
-            transport: .live(),
-            isAppProcess: Bundle.main.bundleURL.pathExtension == "app"
+            transport: .live(gate: gate),
+            isAppProcess: Bundle.main.bundleURL.pathExtension == "app",
+            gate: gate
         )
         let revision = LockIsolated(0)
         return Self(
@@ -84,6 +91,11 @@ extension LiveActivityClient: DependencyKey {
                 await coordinator.end(owner: owner, clock: clock)
             },
             endOrphans: { await coordinator.endOrphans() },
+            beginTermination: { gate.close() },
+            endAll: {
+                @Dependency(\.continuousClock) var clock
+                await coordinator.endAll(clock: clock)
+            },
             requests: { await coordinator.requests(owner: $0) },
             deliver: { activityID, command, generation in
                 @Dependency(\.continuousClock) var clock
@@ -100,6 +112,8 @@ extension LiveActivityClient: DependencyKey {
         syncWithResult: { _, _, _, _ in .init(outcome: .unavailable) },
         end: { _ in },
         endOrphans: {},
+        beginTermination: {},
+        endAll: {},
         requests: { _ in AsyncStream { $0.finish() } },
         deliver: { _, _, _ in .unavailable },
         requestHandled: { _, _, _ in }

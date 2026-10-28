@@ -52,6 +52,7 @@ final class FakeTransport: Sendable {
                 await self.endGate.value?.pass()
                 self.calls.withValue { $0.append(.end(id, state, dismissal)) }
             },
+            endEvery: { between in await between() },
             forget: { id in
                 self.calls.withValue { $0.append(.forget(id)) }
             },
