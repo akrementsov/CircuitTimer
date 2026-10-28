@@ -22,13 +22,13 @@ public struct WorkoutHealthClient: Sendable {
     /// Shows the Health sheet when iOS has not asked yet; returns once it is answered.
     public var requestAuthorization: @Sendable () async throws -> Void
     /// Starts the owner's session. Repeating it, or starting an owner that has ended, does nothing. While `endOrphans`
-    /// is recovering an earlier session it waits at most `WorkoutSessions.recoveryTimeout` for it.
+    /// is recovering an earlier session it waits at most 2 seconds for it.
     public var start: @Sendable (_ owner: UUID, _ date: Date) async -> Void
     /// Ends the owner's session and discards what it recorded; the owner never starts again.
     public var end: @Sendable (_ owner: UUID, _ date: Date) async -> Void
     /// Synchronous, so the app delegate refuses every later start before it returns from termination.
     public var beginTermination: @Sendable () -> Void
-    /// Ends every session.
+    /// Ends every session and waits until HealthKit reports each one ended.
     public var endAll: @Sendable (_ date: Date) async -> Void
     /// Ends a session an earlier process left running, once per process.
     public var endOrphans: @Sendable () async -> Void
@@ -42,7 +42,10 @@ extension WorkoutHealthClient: DependencyKey {
     public static let liveValue: Self = {
         let store = HKHealthStore()
         let gate = TerminationGate()
-        let sessions = WorkoutSessions(store: store, gate: gate)
+        let sessions = WorkoutSessions(transport: .live(store: store), gate: gate) {
+            @Dependency(\.date) var date
+            return date.now
+        }
         return Self(
             access: {
                 guard #available(iOS 26, *), HKHealthStore.isHealthDataAvailable() else { return .unavailable }

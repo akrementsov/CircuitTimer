@@ -8,7 +8,7 @@ enum SessionEvent: Sendable {
 }
 
 /// Hands a session's delegate callbacks, which arrive on an anonymous serial queue, to the actor that owns the session.
-/// The session holds its delegate weakly, so the owner keeps this object as long as it reads `stream`.
+/// The session holds its delegate weakly; its `SessionHandle` keeps this object.
 final class SessionEvents: NSObject, HKWorkoutSessionDelegate, Sendable {
     let stream: AsyncStream<SessionEvent>
     private let continuation: AsyncStream<SessionEvent>.Continuation

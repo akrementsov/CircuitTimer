@@ -2,16 +2,16 @@ import Foundation
 import HealthKit
 import os
 
-/// One workout session per timer owner. The actor exists on every iOS version; only creating and recovering a session
-/// needs iOS 26, so everything else stays callable and does nothing without a session.
+/// One workout session per timer owner. The actor exists on every iOS version; without iOS 26 and Health access its
+/// transport holds no session, so everything stays callable and does nothing.
 actor WorkoutSessions {
     /// How long a start waits for the recovery of an earlier process's session, and recovery for that session to end.
     static let recoveryTimeout: Duration = .seconds(2)
 
-    private struct Session {
-        let session: HKWorkoutSession
-        let builder: HKWorkoutBuilder
-        let events: SessionEvents
+    private struct HeldSession {
+        let handle: SessionHandle
+        /// Tells the events of an owner's later session from a released one's.
+        let number: Int
         let watch: Task<Void, Never>
         let startDate: Date
     }
@@ -20,37 +20,49 @@ actor WorkoutSessions {
         /// Waiting for recovery before the session is created.
         case reserved
         /// Created and asked to start; HealthKit reports `running` or a failure asynchronously.
-        case starting(Session)
-        case running(Session)
+        case starting(HeldSession)
+        case running(HeldSession)
+        /// Asked to end and kept until HealthKit reports it ended: one that was still starting may run first, and is
+        /// ended again then.
+        case ending(HeldSession)
         /// Stopped by HealthKit after it ran. Not started again: from the background it cannot start, and a start on
         /// return would split the workout.
         case lost
 
-        var session: Session? {
+        var held: HeldSession? {
             switch self {
-                case let .starting(session), let .running(session): session
+                case let .starting(held), let .running(held), let .ending(held): held
                 case .reserved, .lost: nil
             }
         }
+
+        var isEnding: Bool {
+            if case .ending = self { true } else { false }
+        }
     }
 
-    private let store: HKHealthStore
+    private let transport: SessionTransport
     private let gate: TerminationGate
+    private let now: @Sendable () -> Date
     private var slots: [UUID: Slot] = [:]
     /// Owners that have ended: a late or repeated start must not bring their session back.
     private var ended: Set<UUID> = []
+    private var sessionCount = 0
     private var hasRecovered = false
     private var isRecovering = false
     private var hasEndedOrphan = false
     private var recoveryWaiters: [AsyncStream<Void>.Continuation] = []
+    /// `endAll` callers waiting for the ending sessions to report their end.
+    private var endingWaiters: [AsyncStream<Void>.Continuation] = []
     /// Starts that failed because recovery had not yet ended an earlier session; each runs once more after recovery.
-    private var retryAfterRecovery: [UUID: Date] = [:]
+    private var retryAfterRecovery: Set<UUID> = []
     /// Owners already started once more, so a session that keeps failing is not retried in a loop.
     private var retried: Set<UUID> = []
 
-    init(store: HKHealthStore, gate: TerminationGate) {
-        self.store = store
+    init(transport: SessionTransport, gate: TerminationGate, now: @escaping @Sendable () -> Date) {
+        self.transport = transport
         self.gate = gate
+        self.now = now
     }
 
     func start(owner: UUID, at date: Date, clock: any Clock<Duration>) async {
@@ -63,7 +75,7 @@ actor WorkoutSessions {
             let isRecovered = await Self.finishes(within: Self.recoveryTimeout, clock: clock) {
                 for await _ in stream {}
             }
-            if !isRecovered {
+            if !isRecovered, !Task.isCancelled {
                 Logger.workoutHealth.notice("Starting a workout session before recovery of an earlier one finished")
             }
             // `end` may have run during the wait and removed the reservation.
@@ -77,25 +89,33 @@ actor WorkoutSessions {
 
     func end(owner: UUID, at date: Date) {
         ended.insert(owner)
-        retryAfterRecovery[owner] = nil
-        guard let slot = slots.removeValue(forKey: owner) else { return }
-
-        switch slot {
-            case let .running(session):
-                session.session.stopActivity(with: date)
-                session.session.end()
-                release(session)
-            case let .starting(session):
-                session.session.end()
-                release(session)
+        retryAfterRecovery.remove(owner)
+        switch slots[owner] {
+            case let .running(held):
+                // A wall clock moved back must not end the session before it started.
+                held.handle.stop(max(date, held.startDate))
+                held.handle.end()
+                slots[owner] = .ending(held)
+            case let .starting(held):
+                held.handle.end()
+                slots[owner] = .ending(held)
             case .reserved, .lost:
+                slots[owner] = nil
+            case .ending, nil:
                 break
         }
     }
 
-    func endAll(at date: Date) {
+    /// Ends every session and waits until HealthKit reports each one ended, so one that was still starting is ended
+    /// again once it runs. Termination's deadline bounds the wait.
+    func endAll(at date: Date) async {
         for owner in slots.keys {
             end(owner: owner, at: date)
+        }
+        while slots.values.contains(where: \.isEnding), !Task.isCancelled {
+            let (stream, waiter) = AsyncStream<Void>.makeStream()
+            endingWaiters.append(waiter)
+            for await _ in stream {}
         }
     }
 
@@ -104,15 +124,15 @@ actor WorkoutSessions {
         guard !hasRecovered else { return }
 
         hasRecovered = true
-        guard #available(iOS 26, *),
-              HKHealthStore.isHealthDataAvailable(),
-              store.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { return }
+        guard transport.canHoldSessions() else { return }
 
         isRecovering = true
         do {
-            if let recovered = try await store.recoverActiveWorkoutSession() {
+            if let recovered = try await transport.recover() {
                 await endIfOrphan(recovered, clock: clock)
             }
+        } catch is CancellationError {
+            // Not a failure; the blocked starts below still go on.
         } catch {
             Logger.workoutHealth.error("Recovering a workout session failed: \(String(reflecting: error), privacy: .public)")
         }
@@ -123,10 +143,10 @@ actor WorkoutSessions {
         recoveryWaiters = []
 
         let retries = retryAfterRecovery
-        retryAfterRecovery = [:]
-        for (owner, date) in retries where canStart(owner) {
+        retryAfterRecovery = []
+        for owner in retries where canStart(owner) {
             retried.insert(owner)
-            admit(owner, at: date)
+            admit(owner, at: now())
         }
     }
 
@@ -135,72 +155,81 @@ actor WorkoutSessions {
     }
 
     private func admit(_ owner: UUID, at date: Date) {
-        guard #available(iOS 26, *),
-              store.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { return }
+        guard transport.canHoldSessions() else { return }
 
-        let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .highIntensityIntervalTraining
-        configuration.locationType = .indoor
-        let session: HKWorkoutSession
+        let handle: SessionHandle
         do {
-            session = try HKWorkoutSession(healthStore: store, configuration: configuration)
+            handle = try transport.create()
         } catch {
             Logger.workoutHealth.error("Creating a workout session failed: \(String(reflecting: error), privacy: .public)")
             return
         }
 
-        let events = SessionEvents()
-        session.delegate = events
+        sessionCount += 1
+        let number = sessionCount
+        let events = handle.observe()
         // Delegate callbacks arrive for as long as the session lives, outside any caller of this actor.
         // swiftlint:disable:next no_unstructured_task
         let watch = Task { [weak self] in
-            for await event in events.stream {
-                await self?.handle(event, of: session, owner: owner)
+            for await event in events {
+                await self?.handle(event, of: number, owner: owner)
             }
         }
-        slots[owner] = .starting(
-            Session(session: session, builder: session.associatedWorkoutBuilder(), events: events, watch: watch, startDate: date)
-        )
-        session.startActivity(with: date)
+        slots[owner] = .starting(HeldSession(handle: handle, number: number, watch: watch, startDate: date))
+        handle.start(date)
     }
 
-    private func handle(_ event: SessionEvent, of session: HKWorkoutSession, owner: UUID) {
-        guard let slot = slots[owner], let current = slot.session, current.session === session else { return }
+    private func handle(_ event: SessionEvent, of number: Int, owner: UUID) {
+        guard let slot = slots[owner], let held = slot.held, held.number == number else { return }
 
         switch (event, slot) {
             case (.changed(.running), .starting):
-                slots[owner] = .running(current)
+                slots[owner] = .running(held)
+            case (.changed(.running), .ending):
+                Logger.workoutHealth.notice("A workout session asked to end while starting ran; ending it again")
+                held.handle.stop(max(now(), held.startDate))
+                held.handle.end()
+            case (.changed(.ended), .ending):
+                slots[owner] = nil
+                release(held)
             case (.changed(.ended), .starting):
                 Logger.workoutHealth.notice("A workout session ended before it ran")
                 slots[owner] = nil
-                release(current)
+                release(held)
             case (.changed(.ended), .running):
                 Logger.workoutHealth.error("HealthKit ended a running workout session")
                 slots[owner] = .lost
-                release(current)
+                release(held)
             case let (.failed(error), .starting):
+                // A failed session may still be running; ending it leaves nothing behind.
+                held.handle.end()
                 slots[owner] = nil
-                release(current)
-                startFailed(owner, startDate: current.startDate, error: error)
+                release(held)
+                startFailed(owner, error: error)
             case let (.failed(error), .running):
                 Logger.workoutHealth.error("A running workout session failed: \(String(reflecting: error), privacy: .public)")
+                held.handle.end()
                 slots[owner] = .lost
-                release(current)
+                release(held)
+            case let (.failed(error), .ending):
+                Logger.workoutHealth.error("A workout session failed while ending: \(String(reflecting: error), privacy: .public)")
+                slots[owner] = nil
+                release(held)
             case (.changed, _), (.failed, _):
                 break
         }
     }
 
     /// The next start, on the next active scene or after recovery, tries again.
-    private func startFailed(_ owner: UUID, startDate: Date, error: any Error) {
+    private func startFailed(_ owner: UUID, error: any Error) {
         switch (error as? HKError)?.code {
             case .errorAnotherWorkoutSessionStarted:
                 Logger.workoutHealth.notice("Another workout session is running")
                 if isRecovering {
-                    retryAfterRecovery[owner] = startDate
+                    retryAfterRecovery.insert(owner)
                 } else if hasEndedOrphan, retried.insert(owner).inserted {
                     // Recovery has ended the other session, which may still have been ending when this one started.
-                    admit(owner, at: startDate)
+                    admit(owner, at: now())
                 }
             case .errorBackgroundWorkoutSessionNotAllowed:
                 Logger.workoutHealth.notice("A workout session cannot start in the background")
@@ -210,41 +239,39 @@ actor WorkoutSessions {
     }
 
     /// Nothing is saved to Health in this release: whatever the session recorded is discarded.
-    private func release(_ session: Session) {
-        session.builder.discardWorkout()
-        session.events.finish()
-        session.watch.cancel()
+    private func release(_ held: HeldSession) {
+        held.handle.release()
+        held.watch.cancel()
+        if !slots.values.contains(where: \.isEnding) {
+            for waiter in endingWaiters {
+                waiter.finish()
+            }
+            endingWaiters = []
+        }
     }
 
-    @available(iOS 26, *)
-    private func endIfOrphan(_ recovered: HKWorkoutSession, clock: any Clock<Duration>) async {
+    private func endIfOrphan(_ recovered: SessionHandle, clock: any Clock<Duration>) async {
         // A start that stopped waiting for recovery may own the very session recovery returns, possibly as another
         // object; only another process's session is ended.
-        let isOwn = slots.values.contains { slot in
-            guard let own = slot.session?.session else { return false }
-
-            return own === recovered || own.currentActivity.uuid == recovered.currentActivity.uuid
-        }
-        guard !isOwn else {
+        let activityID = recovered.activityID()
+        guard !slots.values.contains(where: { $0.held?.handle.activityID() == activityID }) else {
             Logger.workoutHealth.notice("Recovery returned a workout session of this process")
             return
         }
 
-        let events = SessionEvents()
-        recovered.delegate = events
+        let events = recovered.observe()
         recovered.end()
-        recovered.associatedWorkoutBuilder().discardWorkout()
         hasEndedOrphan = true
         Logger.workoutHealth.notice("Ended a workout session left by an earlier process")
         let didEnd = await Self.finishes(within: Self.recoveryTimeout, clock: clock) {
-            for await event in events.stream {
+            for await event in events {
                 if case .changed(.ended) = event { return }
             }
         }
         if !didEnd {
             Logger.workoutHealth.notice("A workout session left by an earlier process did not report its end in time")
         }
-        events.finish()
+        recovered.release()
     }
 
     /// `false` when `timeout` passed first. `work` must return promptly once cancelled, so the wait never outlives
