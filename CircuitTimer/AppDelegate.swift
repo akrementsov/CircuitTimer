@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         teardown.begin()
         let now = date.now
         let finished = DispatchSemaphore(value: 0)
+        // Detached: the main actor stays blocked on the semaphore below until the teardown ends.
         Task.detached {
             await teardown.run(at: now)
             finished.signal()

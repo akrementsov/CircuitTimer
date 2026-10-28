@@ -41,8 +41,8 @@ struct ActivityTransport: Sendable {
     var request: @Sendable (WorkoutActivityAttributes, WorkoutActivityAttributes.ContentState) throws(ActivityRequestFailure) -> String
     var update: @Sendable (String, WorkoutActivityAttributes.ContentState) async -> Void
     var end: @Sendable (String, WorkoutActivityAttributes.ContentState?, ActivityDismissal) async -> Void
-    /// Ends every activity at once, waits for `between`, then ends the same activities again with any that appeared
-    /// meanwhile, so an end that was still under way with the standard dismissal is overridden.
+    /// Ends every activity immediately, one after another, waits for `between`, then ends the same activities again
+    /// with any that appeared meanwhile, so an end that was still under way with the standard dismissal is overridden.
     var endEvery: @Sendable (_ between: @Sendable () async -> Void) async -> Void
     /// Drops an activity that went while it showed, removed by the user or ended by iOS; no later call reaches it.
     var forget: @Sendable (String) -> Void

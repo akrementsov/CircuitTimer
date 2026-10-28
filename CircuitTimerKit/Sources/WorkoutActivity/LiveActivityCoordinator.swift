@@ -114,9 +114,9 @@ actor LiveActivityCoordinator {
         }
     }
 
-    /// Ends every owner, then every activity twice with the immediate dismissal: at once, and again after the drains
-    /// already under way, so a finished card that a drain was ending with the standard dismissal goes too. The passes
-    /// outlive a cancelled caller, which stops waiting at once.
+    /// Ends every owner, then every activity twice with the immediate dismissal: at once, and again once the drains
+    /// already under way have finished, however long they take, so a finished card that a drain was ending with the
+    /// standard dismissal goes too. The passes outlive a cancelled caller, which stops waiting at once.
     func endAll(clock: any Clock<Duration>) async {
         let signals = owners.keys.map { beginEnding($0, clock: clock) }
         let done = CompletionSignal()
@@ -125,7 +125,7 @@ actor LiveActivityCoordinator {
         Task { [transport] in
             await transport.endEvery {
                 for signal in signals {
-                    _ = await signal.wait(timeout: Self.endTimeout, clock: clock)
+                    await signal.wait()
                 }
             }
             done.complete()

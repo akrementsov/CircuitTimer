@@ -62,25 +62,36 @@ public struct ProcessTeardown: Sendable {
         await health.endAll(date)
     }
 
-    /// `false` when `limit` passed first. `work` returns promptly once cancelled, so the wait never outlives `limit`.
+    /// `false` when `limit` passed first. The side that loses is cancelled, never awaited: `work` may be queued on an
+    /// actor busy with a call that cancellation cannot interrupt.
     private func finishes(within limit: Duration, _ work: @escaping @Sendable () async -> Void) async -> Bool {
-        await withTaskGroup(of: Bool.self) { [clock] group in
-            group.addTask {
-                await work()
-                return true
-            }
-            group.addTask {
-                do {
-                    try await clock.sleep(for: limit)
-                } catch is CancellationError {
-                    return true
-                } catch {
-                    Self.logger.error("A teardown wait failed: \(String(reflecting: error), privacy: .public)")
-                }
-                return false
-            }
-            defer { group.cancelAll() }
-            return await group.next() ?? false
+        let (outcome, continuation) = AsyncStream<Bool>.makeStream()
+        // Unstructured, unlike a task group, which would await both sides before it returns.
+        // swiftlint:disable:next no_unstructured_task
+        let worker = Task {
+            await work()
+            continuation.yield(true)
         }
+        // The deadline's side, unstructured for the same reason.
+        // swiftlint:disable:next no_unstructured_task
+        let timer = Task { [clock] in
+            do {
+                try await clock.sleep(for: limit)
+            } catch is CancellationError {
+                return
+            } catch {
+                Self.logger.error("A teardown wait failed: \(String(reflecting: error), privacy: .public)")
+            }
+            continuation.yield(false)
+        }
+        defer {
+            worker.cancel()
+            timer.cancel()
+            continuation.finish()
+        }
+        for await finished in outcome {
+            return finished
+        }
+        return false
     }
 }
