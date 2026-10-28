@@ -69,3 +69,4 @@ Additional device checks on iOS 17.5 and 26.x before release:
 - [ ] Kill and relaunch while requests remain: old owners are cleaned and the restored owner survives late callbacks.
 - [ ] A workout beyond the 32-event window, clock changes, Focus and the silent switch show the documented limits.
 - [ ] Swipe the app away in the App Switcher while a timer runs in the background: on iOS 26.x its pending and delivered notifications and its card go at once; on iOS 17.5 they stay once iOS has suspended the app.
+- [ ] On iOS 26.x, stop the app from Xcode while a timer runs: note whether iOS relaunches it in the background to recover the workout session; the next launch ends that session and asks to continue the run.
