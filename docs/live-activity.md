@@ -1,6 +1,6 @@
 # Live Activity
 
-The running workout shows on the Lock Screen and in the Dynamic Island, with Pause/Resume controls on the card and the expanded Island. `WorkoutActivity` keeps a compact state of the run within iOS's 4 KB limit, and the `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. The implementation rules are in [AGENTS.md](../AGENTS.md) › Live Activity (CT-4); change both places together.
+The running workout shows on the Lock Screen and in the Dynamic Island, with Pause/Resume controls on the card and the expanded Island. `WorkoutActivity` keeps a compact state of the run within iOS's 4 KB limit, and the `CircuitTimerWidgets` extension draws it in the app's dark palette, with clocks that keep counting while the app sleeps. The implementation rules are in [AGENTS.md › Live Activity (CT-4)](../AGENTS.md#live-activity-ct-4); change this file and that section together.
 
 ## Controls
 
@@ -14,10 +14,10 @@ App and UI-test builds check the compiled intent metadata in both hosts, includi
 
 Check these before release (CT-7):
 
-- [ ] protected Lock Screen delivery and system error presentation on a physical device;
-- [ ] real process suspension at the five-second wait bound;
-- [ ] runtime absence from Shortcuts and Spotlight;
-- [ ] Release runtime on a physical device;
-- [ ] complete system coverage of all card states, maximum text sizes, English labels and RTL.
+- [ ] Protected Lock Screen delivery and system error presentation on a physical device.
+- [ ] Real process suspension at the five-second wait bound.
+- [ ] Runtime absence from Shortcuts and Spotlight.
+- [ ] Release runtime on a physical device.
+- [ ] Complete system coverage of all card states, maximum text sizes, English labels and RTL.
 
 Release simulator probes exercised card and expanded-Island Pause/Resume on iOS 17.5 and 27.0. They do not establish the physical-device checks above.

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. Internal builds go out through TestFlight; the App Store release is CT-7.
+An interval and circuit training timer for iPhone. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. Internal builds go out through TestFlight; the App Store release is planned in the [roadmap](docs/roadmap.md).
 
 <p>
   <img src="docs/images/list.png" width="200" alt="The workout list">
@@ -21,17 +21,17 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 ## Where to look
 
-- **The timer engine.** `WorkoutRun` derives the position from time instead of counting ticks: [The timer engine](#the-timer-engine) and [docs/timer-engine.md](docs/timer-engine.md).
+- **The timer engine.** `WorkoutRun` derives the position from time instead of counting ticks: [The timer engine](#the-timer-engine) and [Timer engine contract](docs/timer-engine.md).
 - **Feature boundaries.** TCA features that never import each other, composed in one root: [Architecture](#architecture) and [AGENTS.md](AGENTS.md).
-- **The Live Activity.** Controls fenced against stale cards: [docs/live-activity.md](docs/live-activity.md).
-- **iCloud sync.** One visible copy per workout on every device, deletions that stay deleted: [docs/icloud-sync.md](docs/icloud-sync.md).
+- **The Live Activity.** Pause/Resume on the card that an outdated card cannot replay: [Live Activity](docs/live-activity.md).
+- **iCloud sync.** One visible copy per workout on every device, deletions that stay deleted: [iCloud sync](docs/icloud-sync.md).
 - **Tests.** Unit, UI and snapshot tests, and `make verify-clean` before every merge: [Testing](#testing).
 
 ## Stack
 
 - Swift 6 language mode with complete strict concurrency, iOS 17+
 - SwiftUI and [The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) 1.26 with the 2.0 deprecations trait enabled
-- [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect, swift-sharing for preferences
+- [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect, [swift-sharing](https://github.com/pointfreeco/swift-sharing) for preferences
 - SwiftData mirrored to CloudKit; ActivityKit and App Intents for the Live Activity; TipKit
 - Swift Testing for unit and snapshot tests, [SnapshotTesting](https://github.com/pointfreeco/swift-snapshot-testing) for the images; XCTest for the UI tests
 - SwiftLint, GitHub Actions
@@ -41,13 +41,13 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 ### Requirements
 
-- Xcode 27.1 and an `iPhone 17` simulator on iOS 27.0, the tests' destination.
+- Xcode 27.1. The tests and the run block below use an `iPhone 17` simulator on iOS 27.0.
 - [SwiftLint](https://github.com/realm/SwiftLint) for `make lint`; CI runs 0.65.1. Pass `SWIFTLINT=<path>` if it is not on `PATH`.
-- `jq` and `python3`: the test, snapshot and build targets use them, and so does the run block below.
+- `jq` and `python3`: the test, snapshot and build targets use them; the run block below uses `jq`.
 
 ### Run the app
 
-The `CircuitTimer` scheme signs with the owner's team and iCloud container (`Configs/App.xcconfig`, `Configs/CircuitTimer.entitlements`), so running it from Xcode works only for that team.
+Open `CircuitTimer.xcodeproj` to read the code. The `CircuitTimer` scheme signs with the owner's team and iCloud container (`Configs/App.xcconfig`, `Configs/CircuitTimer.entitlements`), so running it from Xcode is set up for that team only.
 
 Anyone can build the app unsigned for the simulator. Such a build has no CloudKit container, so workouts stay on the device and Settings reports under the iCloud switch that sync failed. From the repository root, build, then run the block; it is safe to repeat and stops at the first error:
 
@@ -65,12 +65,12 @@ make build-app
     xcrun simctl install "$udid" .build/DerivedData/App/Build/Products/Debug-iphonesimulator/CircuitTimer.app
     xcrun simctl launch --terminate-running-process "$udid" com.akrementsov.circuittimer
   else
-    echo "No iPhone 17 simulator on iOS 27.0: add one in Device Hub, which replaced Simulator.app in Xcode 27." >&2
+    echo "No iPhone 17 simulator on iOS 27.0: add one in Device Hub." >&2
   fi
 )
 ```
 
-The block is pinned to iOS 27.0, the tests' runtime; a fresh Xcode 27.1 may need to download it in Xcode › Settings › Components. Any simulator on iOS 17 or later also runs the app: change the runtime key and the device name in the block.
+Device Hub, which takes the place of Simulator.app in Xcode 27.1, shows the booted simulators; if several are booted, choose `iPhone 17` in it. The block is pinned to iOS 27.0, the tests' runtime; a fresh Xcode 27.1 may need to download it in Xcode › Settings › Components. Any simulator on iOS 17 or later also runs the app: change the runtime key and the device name in the block.
 
 ### Commands
 
@@ -85,7 +85,7 @@ The block is pinned to iOS 27.0, the tests' runtime; a fresh Xcode 27.1 may need
 | `make ci` | Everything CI runs |
 | `make verify-clean` | Runs `make ci` on a fresh clone of `HEAD` |
 
-Test commands for one area or one snapshot: [Testing](docs/testing.md#commands). Every target: [AGENTS.md](AGENTS.md) › Essential commands.
+Test commands for one area or one snapshot: [Testing guide › Commands](docs/testing.md#commands). The full command reference: [AGENTS.md › Essential commands](AGENTS.md#essential-commands).
 
 ## Architecture
 
@@ -150,17 +150,17 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | Module | Responsibility |
 |---|---|
 | `AppFeature` | Tab bar, the workout list with loading, empty and retryable error states, navigation, restoring a saved run |
-| `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole |
-| `WorkoutTimerFeature` | The full-screen timer: countdowns, cues, background notifications, the saved run, the Live Activity |
-| `SettingsFeature` | Signal, Keep screen on and iCloud sync switches; About and the legal pages |
-| `DesignSystem` | Tokens, the League Gothic stage clock, cards, swipe plaques and drag reorder |
-| `WorkoutStorage` | Workouts in SwiftData, mirrored to iCloud when sync is on; the saved run file |
+| `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; a new workout starts with an empty stage in every section; durations typed as MM:SS on the number pad |
+| `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity |
+| `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the app version from `AppVersionClient`, and the legal pages |
+| `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder |
+| `WorkoutStorage` | `WorkoutStorageClient`, a struct-of-closures dependency: workouts in SwiftData, mirrored to iCloud when sync is on, in memory for previews; the saved run file |
 | `CloudSync` | The sync switch, the launch's mirroring decision, account and import/export status |
 | `TimerPreferences` | The signal and Keep screen on switches, shared by Settings and the timer |
 | `BackgroundExecution` | Background-task assertions around the saved run's writes |
 | `BackgroundNotifications` | Owner-scoped local notifications, permission access, foreground suppression |
-| `WorkoutActivity` | The Live Activity's state, views and Pause/Resume intents; drawn by `CircuitTimerWidgets` |
-| `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only |
+| `WorkoutActivity` | The Live Activity's state, what the Lock Screen and the Dynamic Island show, and Pause/Resume intents; drawn by `CircuitTimerWidgets` |
+| `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only, so the widget can use it |
 | `UITestContract` | Below the features, no dependencies: accessibility identifiers and the UI tests' launch names |
 | `AppScenarios` | Debug only, above the features: each UI test scenario's data and non-live dependencies |
 
@@ -188,7 +188,7 @@ The running workout shows on the Lock Screen and in the Dynamic Island: the curr
 
 ## Testing
 
-Unit tests use Swift Testing, with `TestStore` and `TestClock` for the features. UI tests use XCTest and run the app in scenarios with no live dependencies.
+Unit tests use Swift Testing, with `TestStore` and `TestClock` for the features; UI tests use XCTest; snapshot tests use Swift Testing with SnapshotTesting. How to add each, and the commands for one area: [Testing guide](docs/testing.md).
 
 ### UI tests
 
@@ -221,13 +221,13 @@ How to add one, step by step: [How to add a UI test](docs/testing.md#how-to-add-
 
 `CircuitTimerSnapshotTests` compares screens of the app with reference PNGs. A test describes a screen by its state — the stack, the editor's phase, the data — not by the taps that lead there. The host draws the whole app in that state in a window of iPhone 17's size and compares its first frame with a reference PNG.
 
-Six states — the workout list, the workout screen and Settings — are compared in English and in Russian; three of them also at the largest accessibility text size, 18 references in all. Two images match when RGB channels differ by at most 2/255 on at most 1.25% of the pixels. The timer's cover and alerts are not drawn. The example, how to add a snapshot and how to work on one: [Snapshot tests](docs/testing.md#snapshot-tests).
+Six states — the workout list, the workout screen and Settings — are compared in English and in Russian; three of them also at the largest accessibility text size, 18 references in all. Two images match when their size and alpha are the same and RGB channels differ by at most 2/255 on at most 1.25% of the pixels. The timer's cover, alerts and dialogs are not drawn yet. The example, how to add a snapshot and how to work on one: [Snapshot tests](docs/testing.md#snapshot-tests).
 
 ## Releasing
 
 1. For a new version, bump `MARKETING_VERSION` in `Configs/App.xcconfig` through a pull request. Wait for CI on `main` to pass.
 2. After every CloudKit schema change, create the schema in Development, then deploy it to Production ([iCloud sync](docs/icloud-sync.md#signing-and-delivery)).
-3. Tag the commit `v<MARKETING_VERSION>`, or `v<MARKETING_VERSION>-<suffix>` such as `-rc.1` for another build of the same version, and push the tag. The workflow checks that the tag matches the version.
+3. Tag the commit `v<MARKETING_VERSION>`, or `v<MARKETING_VERSION>-<suffix>` such as `-rc.1` for another build of the same version, and push the tag. The workflow checks that the tag is on a commit of `main` whose CI passed and that it matches the version.
 4. The TestFlight workflow archives the app, signs it in the cloud with an App Store Connect API key and uploads it. The build is available once App Store Connect finishes processing it.
 
 ## License

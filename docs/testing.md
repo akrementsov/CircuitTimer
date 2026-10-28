@@ -1,10 +1,12 @@
 # Testing
 
-How the tests are run and extended. The overview is in the [README](../README.md#testing); the rules are in [AGENTS.md](../AGENTS.md) › Tests, UI tests and Snapshot tests.
+How the tests are run and extended. The overview is in the [README](../README.md#testing); the rules are in AGENTS.md › [Tests](../AGENTS.md#tests), [UI tests](../AGENTS.md#ui-tests) and [Snapshot tests](../AGENTS.md#snapshot-tests).
 
 Paths in this file: `Screens/` and `Support/` in UI tests are folders of `CircuitTimerUITests/`; `Support/` and `__Snapshots__/` in snapshot tests are folders of `CircuitTimerSnapshotTests/`.
 
 ## Commands
+
+The main commands, `make test`, `make test-ui` and `make test-snapshots`, are in [README › Commands](../README.md#commands). These build or run one part:
 
 | Command | What it does |
 |---|---|
@@ -32,6 +34,8 @@ Paths in this file: `Screens/` and `Support/` in UI tests are folders of `Circui
 
 ### Snapshot test example
 
+The test names a state of the app, here the editor in its editing phase, and the harness draws it and compares it with the references:
+
 ```swift
 extension SnapshotTests {
     @MainActor
@@ -53,9 +57,8 @@ Both images are normalized to 8-bit sRGB for comparison. Their dimensions and al
 
 ### Harness tests
 
-The capture harness has its own tests: `make test-snapshot-kit` runs the package tests, and
-`make test-snapshot-contracts` runs `CircuitTimerSnapshotContractTests` inside the empty snapshot host.
-Contract tests use temporary synthetic references and do not change the screen references in `CircuitTimerSnapshotTests/__Snapshots__`. Serialize these two commands manually per checkout, including across simulator destinations: temporary reference directories are shared between those processes. Generated contract PNGs are ignored if a process is interrupted. The dedicated ru/de runs must execute their selected language test without skipping it.
+The capture harness has its own tests: `make test-snapshot-kit` runs the package tests, and `make test-snapshot-contracts` runs `CircuitTimerSnapshotContractTests` inside the empty snapshot host. Contract tests use temporary synthetic references and do not change the screen references in `CircuitTimerSnapshotTests/__Snapshots__`. Serialize these two commands manually per checkout, including across simulator destinations: temporary reference directories are shared between those processes. Generated contract PNGs are ignored if a process is interrupted. Each command also runs one language check in a process of its own, `make test-snapshot-kit` in Russian and `make test-snapshot-contracts` in German, a language the app does not support; that check must run and pass, not skip.
+
 `make test-scripts` also checks the snapshot runner and make targets using fixture result bundles.
 
 ### How to add a snapshot
@@ -83,4 +86,4 @@ These commands are local only. Comparison accepts the same simulators as `make t
 
 ### Limits
 
-The timer's full-screen cover does not draw in the first frame, so the host fails a state that presents it. Drawing `WorkoutTimerStack` as the window's root, with the timer's reducer replaced by `EmptyReducer`, was measured to match the presented cover in every variant; with the real reducer it has not been measured. Alerts and dialogs are not supported yet. Snapshots run only on iOS 27.0 with iPhone 17's screen. They do not cover how the tab bar leaves on a push (`TabBarRidesWithRoot`).
+The timer's full-screen cover does not draw in the first frame, so the host fails a state that presents it. The timer snapshots will describe a `WorkoutTimerFeature.State` and draw `WorkoutTimerStack` as the window's root: with the timer's reducer replaced by `EmptyReducer`, that root was measured to match the presented cover in every variant; with the real reducer it is not measured yet. Alerts and dialogs are not supported yet. Snapshots run only on iOS 27.0 with iPhone 17's screen. They do not cover how the tab bar leaves on a push (`TabBarRidesWithRoot`).

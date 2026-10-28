@@ -256,6 +256,8 @@ Sorted, grouped by attributes: `@testable import` first, an empty line, then pla
 - Comments are English and explain constraints that the code cannot. No history, no commented-out code.
 - `// MARK:` only to group five or more related members.
 - `TODO` and `FIXME` carry a ticket: `// TODO: [CT-123] …` or `// TODO: [CT-UI-2] …`.
+- The roadmap lives in `docs/roadmap.md`; the README only links to it.
+- The README's screenshots in `docs/images/` are taken by hand (`docs/images/README.md`): retake them in the same pull request as a change to the list, the workout screen, the timer or the Live Activity.
 
 ## Lint exceptions
 
@@ -281,7 +283,6 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 - One logical change per commit, and every commit passes `make verify-clean` (at milestones only in a squash-merged pull request, see core rule 6).
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
-- The roadmap lives in `docs/roadmap.md`; the README only links to it.
 
 ## Signals
 
@@ -307,6 +308,8 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 - Already scheduled requests may fire after suspension or process death. The app cannot refill the window or repair clock changes until it runs again. Delivery time, Focus, silence, system sound and vibration follow iOS settings. Notification failures never stop a workout or hide record/audio/voice failures.
 
 ## Live Activity (CT-4)
+
+The reader's view of the controls and the device checklist are in `docs/live-activity.md`; change it together with this section.
 
 - The timer syncs its Live Activity after every action once its clock has started and its owner-scoped control subscription is ready, not only on a clock sync: a stage that ends on a tick reaches the Lock Screen without a record write or a new loop. `ContentState(run:at:)` ticks a copy and reads its snapshot and `outlook(at:)`. The start countdown reads as `getReady`, the resume countdown as `paused`.
 - The content is the running stage with its boundary dates and the next stage with its end. `staleDate` is the stage end. The display counts the stage down by itself, and the next stage counts from the stage end by itself. Once iOS marks the content stale it shows the next stage and asks to open the app for anything after it. iOS redraws stale content no earlier than about two minutes after the last update (measured on iOS 17.5 and 26.5). A held stage shows a fixed time: `Text(timerInterval:pauseTime:)` with a future `pauseTime` does not hold, so there is no workout total.
