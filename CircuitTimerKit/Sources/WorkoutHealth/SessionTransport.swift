@@ -5,8 +5,8 @@ import HealthKit
 struct SessionHandle: Sendable {
     /// The main activity's identifier: the same when recovery returns this session as another object.
     var activityID: @Sendable () -> UUID
-    /// Becomes the session's delegate and returns what it reports, until `release`. Only a session this process owns
-    /// is observed: observing the session recovery returned would take its delegate from its owner.
+    /// Becomes the session's delegate and returns what it reports, until `release`. A recovered session of this
+    /// process is never observed: that would take the delegate from its owner.
     var observe: @Sendable () -> AsyncStream<SessionEvent>
     var start: @Sendable (Date) -> Void
     var stop: @Sendable (Date) -> Void

@@ -7,6 +7,8 @@ import os
 actor WorkoutSessions {
     /// How long a start waits for the recovery of an earlier process's session, and recovery for that session to end.
     static let recoveryTimeout: Duration = .seconds(2)
+    /// A session that has not reported its end by then is logged; it stays held.
+    static let endTimeout: Duration = .seconds(2)
 
     private struct HeldSession {
         let handle: SessionHandle
@@ -87,7 +89,7 @@ actor WorkoutSessions {
         admit(owner, at: date)
     }
 
-    func end(owner: UUID, at date: Date) {
+    func end(owner: UUID, at date: Date, clock: any Clock<Duration>) {
         ended.insert(owner)
         retryAfterRecovery.remove(owner)
         switch slots[owner] {
@@ -96,9 +98,11 @@ actor WorkoutSessions {
                 held.handle.stop(max(date, held.startDate))
                 held.handle.end()
                 slots[owner] = .ending(held)
+                watchEnd(of: held.number, owner: owner, clock: clock)
             case let .starting(held):
                 held.handle.end()
                 slots[owner] = .ending(held)
+                watchEnd(of: held.number, owner: owner, clock: clock)
             case .reserved, .lost:
                 slots[owner] = nil
             case .ending, nil:
@@ -108,9 +112,13 @@ actor WorkoutSessions {
 
     /// Ends every session and waits until HealthKit reports each one ended, so one that was still starting is ended
     /// again once it runs. Termination's deadline bounds the wait.
-    func endAll(at date: Date) async {
+    func endAll(at date: Date, clock: any Clock<Duration>) async {
         for owner in slots.keys {
-            end(owner: owner, at: date)
+            end(owner: owner, at: date, clock: clock)
+        }
+        let ending = slots.values.count(where: \.isEnding)
+        if ending > 0 {
+            Logger.workoutHealth.notice("Waiting for \(ending, privacy: .public) workout sessions to report their end")
         }
         while slots.values.contains(where: \.isEnding), !Task.isCancelled {
             let (stream, waiter) = AsyncStream<Void>.makeStream()
@@ -236,6 +244,29 @@ actor WorkoutSessions {
             default:
                 Logger.workoutHealth.error("Starting a workout session failed: \(String(reflecting: error), privacy: .public)")
         }
+    }
+
+    /// A session HealthKit never reports ended stays held; the log is the only sign of it.
+    private func watchEnd(of number: Int, owner: UUID, clock: any Clock<Duration>) {
+        // The check must outlive the caller, which returns as soon as it has asked the session to end.
+        // swiftlint:disable:next no_unstructured_task
+        Task { [weak self] in
+            do {
+                try await clock.sleep(for: Self.endTimeout)
+            } catch is CancellationError {
+                return
+            } catch {
+                Logger.workoutHealth.error("Waiting for a workout session's end failed: \(String(reflecting: error), privacy: .public)")
+                return
+            }
+            await self?.reportUnfinishedEnd(of: number, owner: owner)
+        }
+    }
+
+    private func reportUnfinishedEnd(of number: Int, owner: UUID) {
+        guard case let .ending(held) = slots[owner], held.number == number else { return }
+
+        Logger.workoutHealth.notice("A workout session did not report its end within \(Self.endTimeout, privacy: .public)")
     }
 
     /// Nothing is saved to Health in this release: whatever the session recorded is discarded.

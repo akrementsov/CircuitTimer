@@ -66,9 +66,15 @@ extension WorkoutHealthClient: DependencyKey {
                 @Dependency(\.continuousClock) var clock
                 await sessions.start(owner: owner, at: date, clock: clock)
             },
-            end: { await sessions.end(owner: $0, at: $1) },
+            end: { owner, date in
+                @Dependency(\.continuousClock) var clock
+                await sessions.end(owner: owner, at: date, clock: clock)
+            },
             beginTermination: { gate.close() },
-            endAll: { await sessions.endAll(at: $0) },
+            endAll: { date in
+                @Dependency(\.continuousClock) var clock
+                await sessions.endAll(at: date, clock: clock)
+            },
             endOrphans: {
                 @Dependency(\.continuousClock) var clock
                 await sessions.endOrphans(clock: clock)
