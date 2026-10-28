@@ -56,7 +56,7 @@ Layering:
 - `CloudSync` imports no feature, TCA or workout module: `WorkoutStorage` asks it how to open the store, `AppFeature` reads its remote changes and Settings its status and switch.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
-- `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
+- `WorkoutDomain`, `WorkoutStorage` and `WorkoutActivity` never import TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - `WorkoutActivity` imports `WorkoutDomain` and no feature, TCA or SwiftUI. iOS limits an activity's attributes and state to 4 KB together, so `ContentState` carries a stage, its boundary dates and the next stage plus an ephemeral `controlGeneration`, never a whole `WorkoutRun`. App and widget declare `AppIntentsPackage` roots. `WorkoutActivity` is linked statically, so the build merges its metadata into each host; do not re-export it through `includedPackages`: on iOS 17.5 that caused action lookup to return no metadata (checked with Xcode 27.1). The timer syncs it, `AppFeature` ends what earlier processes left, and `CircuitTimerWidgets` draws it and routes buttons through its intents.
 
 - `SnapshotCapture` imports none of our modules; only `CircuitTimerSnapshotTests` links it. Of our code only `SnapshotCapture` imports SnapshotTesting.

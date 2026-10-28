@@ -164,7 +164,7 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | `UITestContract` | Below the features, no dependencies: accessibility identifiers and the UI tests' launch names |
 | `AppScenarios` | Debug only, above the features: each UI test scenario's data and non-live dependencies |
 
-`SnapshotCapture` is the only code of ours that depends on SnapshotTesting; it imports none of our modules, and the app and the widget never link it. Core imports no feature, the domain imports none of our modules, and `Workout*` modules never import TCA or SwiftUI. The full rules and the module map are in [AGENTS.md](AGENTS.md).
+`SnapshotCapture` is the only code of ours that depends on SnapshotTesting; it imports none of our modules, and the app and the widget never link it. Core imports no feature, the domain imports none of our modules, and `WorkoutDomain`, `WorkoutStorage` and `WorkoutActivity` never import TCA or SwiftUI. The full rules and the module map are in [AGENTS.md](AGENTS.md).
 
 Foreground and background signal policy and the device checklist: [Timer signals](docs/timer-signals.md). How sync decides, resolves copies and deletions, what it accepts and what is checked on devices: [iCloud sync](docs/icloud-sync.md).
 
