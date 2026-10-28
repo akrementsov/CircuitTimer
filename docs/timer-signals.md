@@ -57,14 +57,15 @@ On launch, pending and delivered requests from older process owners are cleaned 
 
 The client uses unique physical identifiers and revision fences. It verifies future requests against pending IDs using a fresh date after the query. Imminent missing events remain unconfirmed rather than being counted as expired; they are not replayed near the deadline. Scheduling failures retry through regular ticks after ten monotonic seconds or upon becoming active; no result action immediately retries itself. A blocked-delivery report does not trigger scheduling-failure retries. If the timer lacks permission status, it adopts the scheduler's full status rather than inferring denial from a delivery boolean; a late failed read cannot erase that recovered status. A millisecond key change can produce a revision without a system API call.
 
-Suspension, force quit or another process death stops window refilling. Existing requests may still arrive. Clock changes cannot be repaired until the app runs again. iOS controls timing, Focus, silent mode, sound and vibration; scheduling is not proof of exact delivery.
+Suspension, force quit or another process death stops window refilling. Existing requests may still arrive, unless iOS reports the termination: then the app removes them (see `AGENTS.md` › Apple Health). Clock changes cannot be repaired until the app runs again. iOS controls timing, Focus, silent mode, sound and vibration; scheduling is not proof of exact delivery.
 
 Additional device checks on iOS 17.5 and 26.x before release:
 
 - [ ] First Start: allow, refuse, read the prompt slowly, and recover through Start now / Wait.
+- [ ] First Start on iOS 26.x: the Health sheet follows the notification prompt; allow, refuse, and leave it open for 10 s, then tap Start again.
 - [ ] Lock during short stages; check stage/finish titles and that foreground presentation does not duplicate cues.
 - [ ] Manual pause stops the forecast; continue schedules only the remaining stages.
 - [ ] Change permission in iOS Settings, return to a running timer, and check its footnote and recovery.
 - [ ] Kill and relaunch while requests remain: old owners are cleaned and the restored owner survives late callbacks.
 - [ ] A workout beyond the 32-event window, clock changes, Focus and the silent switch show the documented limits.
-- [ ] Swipe the app away in the App Switcher while a timer runs in the background: on iOS 26.x its pending notifications and its card go at once; on iOS 17.5 they stay once iOS has suspended the app.
+- [ ] Swipe the app away in the App Switcher while a timer runs in the background: on iOS 26.x its pending and delivered notifications and its card go at once; on iOS 17.5 they stay once iOS has suspended the app.

@@ -14,7 +14,7 @@ An interval and circuit training timer for iPhone. A workout is a warm-up, a tra
 - A workout list and editor, stored with SwiftData and synced between the user's devices through iCloud.
 - A full-screen timer that keeps its progress across backgrounding and relaunches.
 - Tones, haptics, spoken stage names and background notifications, each with its own switch in Settings.
-- A Live Activity on the Lock Screen and in the Dynamic Island, with Pause/Resume on the card.
+- A Live Activity on the Lock Screen and in the Dynamic Island, with Pause/Resume on the card. On iOS 26 and later a Health workout session keeps a running timer alive, so closing the app removes its card and notifications.
 - A swipe on a tab's root switches tabs; the interface is in English and Russian.
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green. Delivered milestones, what comes next and the release checklist are in the [roadmap](docs/roadmap.md).
