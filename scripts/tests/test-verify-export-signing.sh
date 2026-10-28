@@ -49,17 +49,23 @@ archive_fixture() {
 	rm -rf "$work/archive"
 	app="$archive/Products/Applications/CircuitTimer.app"
 	write_plist "$app/Info.plist" "{\"CFBundleIdentifier\": \"$app_id\", \"NSSupportsLiveActivities\": true,
-		\"UIBackgroundModes\": [\"remote-notification\"], \"CTCloudKitContainerIdentifier\": \"$container\"}"
+		\"UIBackgroundModes\": [\"remote-notification\", \"workout-processing\"],
+		\"CTCloudKitContainerIdentifier\": \"$container\",
+		\"NSHealthShareUsageDescription\": \"Reads nothing.\", \"NSHealthUpdateUsageDescription\": \"Runs a workout.\"}"
+	write_plist "$app/ru.lproj/InfoPlist.strings" '{"NSHealthShareUsageDescription": "Ничего не читает.",
+		"NSHealthUpdateUsageDescription": "Ведёт тренировку."}'
 	write_plist "$app/_CodeSignature/signed-entitlements.plist" "{\"aps-environment\": \"development\",
 		\"com.apple.developer.icloud-container-identifiers\": [\"$container\"],
-		\"com.apple.developer.icloud-services\": [\"CloudKit\"]}"
+		\"com.apple.developer.icloud-services\": [\"CloudKit\"], \"com.apple.developer.healthkit\": true}"
 	write_plist "$app/PlugIns/CircuitTimerWidgets.appex/Info.plist" \
 		'{"NSExtension": {"NSExtensionPointIdentifier": "com.apple.widgetkit-extension"}}'
 	info="$app/Info.plist"
+	russian="$app/ru.lproj/InfoPlist.strings"
 	signature="$app/_CodeSignature/signed-entitlements.plist"
 }
 
-# ipa_fixture: the payload of an export that passes; `zip_ipa` packs it. The widget has no iCloud entitlement.
+# ipa_fixture: the payload of an export that passes; `zip_ipa` packs it. The widget has no iCloud or HealthKit
+# entitlement.
 ipa_fixture() {
 	rm -rf "$work/export"
 	app="$work/export/Payload/CircuitTimer.app"
@@ -70,9 +76,11 @@ ipa_fixture() {
 		\"com.apple.developer.team-identifier\": \"$team\", \"get-task-allow\": false,
 		\"com.apple.developer.icloud-container-identifiers\": [\"$container\"],
 		\"com.apple.developer.icloud-services\": [\"CloudKit\"],
-		\"com.apple.developer.icloud-container-environment\": \"Production\", \"aps-environment\": \"production\"}"
+		\"com.apple.developer.icloud-container-environment\": \"Production\", \"aps-environment\": \"production\",
+		\"com.apple.developer.healthkit\": true}"
 	write_plist "$profile" "{\"Name\": \"App Store app\", \"TeamIdentifier\": [\"$team\"],
-		\"Entitlements\": {\"com.apple.developer.icloud-container-identifiers\": [\"$container\"]}}"
+		\"Entitlements\": {\"com.apple.developer.icloud-container-identifiers\": [\"$container\"],
+		\"com.apple.developer.healthkit\": true}}"
 	write_plist "$widget/_CodeSignature/signed-entitlements.plist" "{\"application-identifier\": \"$team.$widgets_id\",
 		\"com.apple.developer.team-identifier\": \"$team\", \"get-task-allow\": false}"
 	write_plist "$widget/embedded.mobileprovision" "{\"Name\": \"App Store widgets\", \"TeamIdentifier\": [\"$team\"]}"
@@ -92,19 +100,23 @@ check_ipa() {
 	run python3 -I "$script" ipa "$ipa" "$team" "$app_id" "$widgets_id" "$container" < /dev/null
 }
 
-describe "archive: the app with remote notifications and its container in Info.plist and in the signature"
+describe "archive: the app with its background modes, Health texts and container in Info.plist and HealthKit signed"
 archive_fixture
 check_archive
 expect_status 0
-expect_in "$work/out" "CircuitTimer.app declares Live Activities and $container, carries its entitlements and embeds CircuitTimerWidgets.appex"
+expect_in "$work/out" "CircuitTimer.app declares Live Activities, workout processing and $container, carries its entitlements and embeds CircuitTimerWidgets.appex"
 expect_not_in "$work/out" "::error::"
 
-# Each row changes one key of the passing archive: Info.plist (info) or the ad hoc signature (signature); null
-# removes the key.
+# Each row changes one key of the passing archive: Info.plist (info), its Russian strings (russian) or the ad hoc
+# signature (signature); null removes the key.
 while IFS='|' read -r description file key value message; do
 	describe "archive: $description"
 	archive_fixture
-	case "$file" in info) edit_plist "$info" "$key" "$value" ;; signature) edit_plist "$signature" "$key" "$value" ;; esac
+	case "$file" in
+		info) edit_plist "$info" "$key" "$value" ;;
+		russian) edit_plist "$russian" "$key" "$value" ;;
+		signature) edit_plist "$signature" "$key" "$value" ;;
+	esac
 	check_archive
 	expect_status 1
 	expect_in "$work/out" "::error::$message"
@@ -112,6 +124,11 @@ while IFS='|' read -r description file key value message; do
 done <<EOF
 no remote-notification background mode|info|UIBackgroundModes|["audio"]|CircuitTimer.app: UIBackgroundModes ['audio'] lack remote-notification
 no background modes|info|UIBackgroundModes|null|CircuitTimer.app: UIBackgroundModes None lack remote-notification
+no workout-processing background mode|info|UIBackgroundModes|["remote-notification"]|CircuitTimer.app: UIBackgroundModes ['remote-notification'] lack workout-processing
+a blank Health share text|info|NSHealthShareUsageDescription|" "|CircuitTimer.app: NSHealthShareUsageDescription is ' ', not a text
+no Health update text|info|NSHealthUpdateUsageDescription|null|CircuitTimer.app: NSHealthUpdateUsageDescription is None, not a text
+no Russian Health share text|russian|NSHealthShareUsageDescription|null|CircuitTimer.app/ru.lproj/InfoPlist.strings: NSHealthShareUsageDescription is None, not a text
+an empty Russian Health update text|russian|NSHealthUpdateUsageDescription|""|CircuitTimer.app/ru.lproj/InfoPlist.strings: NSHealthUpdateUsageDescription is '', not a text
 a container other than iCloud.<bundle id>|info|CTCloudKitContainerIdentifier|"iCloud.com.example.other"|CircuitTimer.app: the CloudKit container is 'iCloud.com.example.other', not $container
 the empty container of an unsigned build|info|CTCloudKitContainerIdentifier|""|CircuitTimer.app: the CloudKit container is '', not $container
 no container in Info.plist|info|CTCloudKitContainerIdentifier|null|CircuitTimer.app: the CloudKit container is None, not $container
@@ -119,7 +136,17 @@ no container in the signature|signature|com.apple.developer.icloud-container-ide
 another container in the signature|signature|com.apple.developer.icloud-container-identifiers|["iCloud.com.example.other"]|CircuitTimer.app: iCloud containers are ['iCloud.com.example.other'], not ['$container']
 no CloudKit in the signature|signature|com.apple.developer.icloud-services|["CloudDocuments"]|CircuitTimer.app: iCloud services ['CloudDocuments'] lack CloudKit
 no aps-environment in the signature|signature|aps-environment|null|CircuitTimer.app: the archived signature has no aps-environment
+no HealthKit in the signature|signature|com.apple.developer.healthkit|null|CircuitTimer.app: the archived signature has com.apple.developer.healthkit None, not True
 EOF
+
+describe "archive: no Russian strings"
+archive_fixture
+rm "$russian"
+check_archive
+expect_status 1
+expect_in "$work/out" "::error::"
+expect_in "$work/out" "ru.lproj/InfoPlist.strings"
+expect_not_in "$work/out" "carries its entitlements"
 
 describe "archive: an unsigned app"
 archive_fixture
@@ -129,7 +156,7 @@ expect_status 1
 expect_in "$work/out" "::error::CircuitTimer.app: codesign failed: "
 expect_in "$work/out" "CircuitTimer.app: code object is not signed at all"
 
-describe "ipa: both bundles signed for the App Store, the widget without iCloud"
+describe "ipa: both bundles signed for the App Store, the widget without iCloud and HealthKit"
 ipa_fixture
 zip_ipa
 check_ipa
@@ -158,7 +185,18 @@ development push|signature|aps-environment|"development"|CircuitTimer.app: the p
 no push|signature|aps-environment|null|CircuitTimer.app: the push environment is None, not 'production'
 a profile without the container|profile|Entitlements|{}|CircuitTimer.app: the profile allows the iCloud containers [], not '$container'
 a profile with another container|profile|Entitlements|{"com.apple.developer.icloud-container-identifiers": ["iCloud.com.example.other"]}|CircuitTimer.app: the profile allows the iCloud containers ['iCloud.com.example.other'], not '$container'
+no HealthKit|signature|com.apple.developer.healthkit|null|CircuitTimer.app: the signature has com.apple.developer.healthkit None, not True
+a profile without HealthKit|profile|Entitlements|{"com.apple.developer.icloud-container-identifiers": ["$container"]}|CircuitTimer.app: the profile does not allow HealthKit
 EOF
+
+describe "ipa: a widget signed with HealthKit"
+ipa_fixture
+edit_plist "$widget/_CodeSignature/signed-entitlements.plist" com.apple.developer.healthkit true
+zip_ipa
+check_ipa
+expect_status 1
+expect_in "$work/out" "::error::CircuitTimerWidgets.appex: the signature has HealthKit, which only the app needs"
+expect_not_in "$work/out" "CircuitTimerWidgets.appex: signed for"
 
 describe "ipa: five arguments, without the container, print the usage"
 ipa_fixture
