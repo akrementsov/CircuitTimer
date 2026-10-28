@@ -7,6 +7,7 @@ import SwiftUI
 import TimerPreferences
 import WorkoutActivity
 import WorkoutDomain
+import WorkoutHealth
 import WorkoutStorage
 
 /// Plays one workout: a 3-2-1 countdown, then its stages over a `WorkoutRun`.
@@ -186,11 +187,12 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.cues) var cues
     @Dependency(\.continuousClock) var clock
-    @Dependency(\.date) private var date
-    @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.date) var date
+    @Dependency(\.dismiss) var dismiss
     @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.preferredLocales) var preferredLocales
     @Dependency(\.timerSession) var timerSession
+    @Dependency(\.workoutHealth) var workoutHealth
     @Dependency(\.workoutRunRecord) var workoutRunRecord
 
     public init() {}
@@ -225,7 +227,8 @@ public struct WorkoutTimerFeature: Sendable {
             let awake = syncScreenAwake(&state)
             let notifications = syncNotifications(&state, after: action, at: now)
             let activity = syncLiveActivity(&state, after: action, at: now)
-            return .merge(signals, awake, notifications, activity, finishActivityControl(&state))
+            let health = startHealthSession(state, after: action, at: now)
+            return .merge(signals, awake, notifications, activity, health, finishActivityControl(&state))
         }
     }
 
@@ -415,84 +418,6 @@ public struct WorkoutTimerFeature: Sendable {
         }
         state.path.append(.stageList(state.outline))
         return mustSync ? syncClock(&state, at: now) : .none
-    }
-
-    private func close(_ state: inout State, at now: Date) -> Effect<Action> {
-        var mustSync = advance(&state, at: now)
-        let restart: Countdown.Purpose?
-        if let countdown = state.countdown {
-            state.countdown = nil
-            restart = countdown.purpose
-            mustSync = true
-        } else {
-            switch state.snapshot.status {
-                case .running:
-                    state.run.pause(at: now)
-                    restart = .resume
-                    mustSync = true
-                case .idle, .paused, .awaitingUser:
-                    restart = nil
-                case .finished:
-                    let stop = syncClock(&state, at: now)
-                    return .merge(stop, closeScreen(&state))
-            }
-        }
-        state.destination = .closeConfirmation(.closeConfirmation(restart: restart))
-        return mustSync ? syncClock(&state, at: now) : .none
-    }
-
-    private func closeConfirmed(_ choice: CloseConfirmation, _ state: inout State) -> Effect<Action> {
-        switch choice {
-            case .finish:
-                return closeScreen(&state)
-            case let .stay(restart):
-                let now = date()
-                let mustSync = advance(&state, at: now)
-                // The alert was shown for this phase; anything else has nothing to restart.
-                switch (restart, state.snapshot.status) {
-                    case (.start, .idle):
-                        state.countdown = Countdown(.start)
-                    case (.resume, .paused):
-                        state.countdown = Countdown(.resume)
-                    default:
-                        return mustSync ? syncClock(&state, at: now) : .none
-                }
-                return syncClock(&state, at: now)
-        }
-    }
-
-    /// The only way the timer closes; its clock must have stopped already.
-    private func closeScreen(_ state: inout State) -> Effect<Action> {
-        state.activityControls?.isEnding = true
-        assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
-        let revision = workoutRunRecord.nextRevision()
-        let token = backgroundTask.begin("Clear the closed workout run")
-        let id = state.id
-        let notifications = backgroundNotifications
-        let activity = liveActivity
-        // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
-        // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
-        // session ended and returns before it sleeps.
-        let close = Effect<Action>.run { [timerSession, cues, notifications, activity, dismiss, workoutRunRecord, backgroundTask] _ in
-            await timerSession.end(owner: id)
-            await cues.end(id)
-            await notifications.end(id)
-            // The client bounds the wait; the activity goes in the background after that.
-            await activity.end(id)
-            await dismiss()
-            // After the dismissal, so a slow disk never holds the screen. The teardown cancels this effect, but the
-            // write does not stop for that, so a cancellation is no failure.
-            do {
-                try await workoutRunRecord.write(nil, revision)
-            } catch is CancellationError {
-                await backgroundTask.end(token)
-                return
-            } catch {
-                Self.logger.error("Clearing the closed run's record failed: \(String(reflecting: error), privacy: .public)")
-            }
-            await backgroundTask.end(token)
-        }
-        return .merge(.cancel(id: CancelID.cues), close)
     }
 
     /// Handles a clock jump, commits the progress made by `now` and returns whether the clock must follow:

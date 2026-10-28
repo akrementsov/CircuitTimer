@@ -7,6 +7,7 @@ import ComposableArchitecture
 import Foundation
 import Testing
 import WorkoutActivity
+import WorkoutHealth
 import WorkoutStorage
 
 /// A fixed date of the current epoch, so `Date` arithmetic has production precision.
@@ -253,6 +254,7 @@ final class TimerHarness {
             WorkoutTimerFeature()
         } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.workoutHealth = .previewValue
             $0.backgroundNotifications.end = { _ in }
             $0.backgroundNotifications.sync = { _, _, _ in NotificationSyncReport() }
             $0.backgroundNotifications.access = { .authorized }

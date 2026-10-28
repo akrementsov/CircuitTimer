@@ -38,6 +38,8 @@ func makeStore(
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }
         $0.uuid = .incrementing
+        // Read when a closed timer ends its Health session.
+        $0.date = .constant(Date(timeIntervalSince1970: 0))
         $0.continuousClock = TestClock<Duration>()
         $0.backgroundTask = BackgroundTaskClient(begin: { _ in .invalid }, end: { _ in })
         $0.workoutRunRecord.load = { nil }

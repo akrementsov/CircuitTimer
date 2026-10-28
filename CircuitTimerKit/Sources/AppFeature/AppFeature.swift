@@ -554,8 +554,11 @@ public struct AppFeature: Sendable {
                 // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
-                let end = Effect<Action>.run { [timerSession, cues, backgroundNotifications, liveActivity, id = timer.id] _ in
+                let id = timer.id
+                let now = date()
+                let end = Effect<Action>.run { [timerSession, workoutHealth, cues, backgroundNotifications, liveActivity] _ in
                     await timerSession.end(owner: id)
+                    await workoutHealth.end(id, now)
                     await cues.end(id)
                     await backgroundNotifications.end(id)
                     await liveActivity.end(id)
