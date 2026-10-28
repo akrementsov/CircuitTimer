@@ -1,0 +1,41 @@
+# Roadmap
+
+Next: CT-11, a HealthKit workout session. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+
+- [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
+- [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
+- [x] **CT-2** — workout list and editor, SwiftData persistence
+- [x] **CT-UI** — dark design of the original app, in slices:
+  - [x] **CT-UI-1** — dark design tokens and the launch screen
+  - [x] **CT-UI-2** — workout list after the original screen; the system navigation bar, Liquid Glass on iOS 26
+  - [x] **CT-UI-3** — tab bar and the Settings tab with About and legal-page navigation; legal texts remain in CT-7
+  - [x] **CT-UI-4** — the editor pushed onto the Workouts stack, with its own back button and no back gestures
+  - [x] **CT-UI-5** — editor layout of the original app
+  - [x] **CT-UI-6** — stage durations typed as MM:SS
+  - [x] Swipe actions of the original app: the delete plaque on editor stages and on the list, duplicate on the list; own drag reorder (delivered with CT-3-2)
+- [x] **CT-10** — a horizontal swipe on a tab's root switches to the neighbouring tab, as a tap on it would
+- [x] **CT-QA** — tests through the UI, in slices:
+  - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
+  - [x] UI smoke tests: empty list, creating and saving a workout, workout and stage reorder, starting and closing the timer
+  - [x] UI smoke test: edit an existing workout, save it and verify the changes in the list and reopened editor
+  - [x] UI smoke tests: all five Settings switches in both directions and after returning to the tab; About version and navigation to both legal pages
+  - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
+- [x] **CT-3** — the workout timer, in slices:
+  - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
+  - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button
+  - [x] **CT-3-3** — background and restore
+  - [x] **CT-3-4** — sound, haptics, spoken stage names and the Settings toggles
+  - [x] **CT-3-5** — cues in the background through local notifications
+- [x] **CT-4** — Live Activity and Dynamic Island, in slices (remaining system checks are listed in [Live Activity](live-activity.md#device-checklist)):
+  - [x] **CT-4-1** — the running workout on the Lock Screen and in the Dynamic Island, and signing checks of both bundles on TestFlight
+  - [x] **CT-4-2** — pause and resume from the Live Activity
+- [x] **CT-5** — iCloud sync of workouts, with a Settings switch and a footnote when iCloud is unavailable (its [device checklist](icloud-sync.md#device-checklist) is listed under CT-7)
+- [ ] **CT-6** — in-app purchase with StoreKit 2
+- [ ] **CT-7** — App Store release
+  - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
+  - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
+  - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
+  - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
+  - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
+- [ ] **CT-9** — Apple Watch app
+- [ ] **CT-11** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications; finished workouts saved to Health

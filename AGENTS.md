@@ -177,7 +177,7 @@ New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:p
 
 ## UI tests
 
-How to add one, step by step: README › UI tests.
+How to add one, step by step: `docs/testing.md` › How to add a UI test.
 
 - Accessibility identifiers come from `UITestContract`'s `AccessibilityID`, named `<screen>.<element>`; lint rejects any other argument of `.accessibilityIdentifier`. An element repeated in a list is named by its section and position, never by user data. Text the user typed and system elements are found by their text.
 - A scenario is a case of `AppScenario` that the launch selects with `CT_APP_SCENARIO`. In Debug, `CircuitTimerApp` builds its store with `AppScenario.prepare`, which sets every client and key the app reads to a value that is not live. It stops the app on an unknown name, and outside the `preview` dependency context (`SWIFT_DEPENDENCIES_CONTEXT=preview`): `init` reads its clients from the process's context, not from the store. Release has no scenarios; `make check-release-app` checks the archive.
@@ -189,7 +189,7 @@ How to add one, step by step: README › UI tests.
 
 - Harness regression tests run separately from the 18-PNG screen matrix: the package's `SnapshotCaptureTests` and the app-hosted `CircuitTimerSnapshotContractTests`. The latter shares only the screen tests' `Support` sources and uses synthetic references it removes after every case. Keep contract tests out of `CircuitTimerSnapshots`, whose run checker requires every case to correspond to a screen reference. Environment overrides are scoped and restored; the contract suite is serialized because UIKit windows and process environment belong to the process. Serialize these two commands manually per checkout, including across simulator destinations: temporary reference directories are shared between those processes. Their generated PNGs are ignored if a process is interrupted. Dedicated ru/de processes fail unless their selected language test passes without a skip.
 
-How to add one, step by step: README › Snapshot tests.
+How to add one, step by step: `docs/testing.md` › How to add a snapshot.
 
 - A snapshot is a state plus a text size. A test builds the `AppFeature.State` the screen shows after its transitions — the Workouts stack's `path` and the editor's `phase` set directly through `@testable import`, never reached by `send`s — and passes it to `assertAppSnapshot(textSize:)`. One test function per state, named `test_<screen>_<state>_matchesReference` and unique across the snapshot tests; it always takes text sizes, and only text sizes, as its arguments. Keep its `@Test` declaration on one line, using `SnapshotTextSize.currentCases()` or `SnapshotTextSize.currentCases(in: [.large])`, so the run check can enumerate the expected sizes.
 - Variants: the language comes from the test process, and `make test-snapshots` runs four processes (`en`/`ru` × `large`/`ax5`), because language and UIKit's preferred font size are process settings; the text size is `large` or `ax5` (`accessibility5`); dark only. The scheme supplies `-UIPreferredContentSizeCategoryName` from `SNAPSHOT_CONTENT_SIZE_CATEGORY`. `SnapshotTextSize.currentCases()` selects that process's arguments through `SNAPSHOT_TEXT_SIZE`; use `currentCases(in: [.large])` for large-only states, which have no AX5 arguments. Every applicable case still has to compare; an unexpected skip fails the run. The capture validates the actual process category against its argument before creating the screen, and the journal records it for the run check. The full-matrix commands narrow a run only by language: the committed references and the test functions are the list of expected cases, so a narrower or repeated run would misreport them. References are `CircuitTimerSnapshotTests/__Snapshots__/<test file>/<test function>.<language>-<size>.png`, 1206×2622 px, recorded only on `iPhone 17` / iOS 27.0; the run check reads the device's platform, model and OS from the result bundle.
@@ -281,6 +281,7 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 - One logical change per commit, and every commit passes `make verify-clean` (at milestones only in a squash-merged pull request, see core rule 6).
 - Amend only the last commit before moving on; fix older commits with a separate `CT-<n>: Fix …` commit.
 - `main` changes only through pull requests, which are squash-merged once `lint` and `build-test` pass. The PR title becomes the commit subject, so it follows the same `CT-<n>: Imperative description` format.
+- The roadmap lives in `docs/roadmap.md`; the README only links to it.
 
 ## Signals
 
