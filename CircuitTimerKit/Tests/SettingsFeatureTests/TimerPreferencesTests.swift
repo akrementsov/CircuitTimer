@@ -28,7 +28,7 @@ struct TimerPreferencesTests {
     }
 
     @Test
-    func test_backgroundNotificationsToggled_on_persistsWithoutAskingForPermission() async {
+    func test_backgroundNotificationsToggled_on_persistsWithoutEffects() async {
         let defaults = UserDefaults.inMemory
         defaults.set(false, forKey: "signalBackgroundNotifications")
         let store = withDependencies {

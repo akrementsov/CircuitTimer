@@ -73,7 +73,6 @@ public struct SettingsView: View {
         .tint(.text(.primary))
         .task { send(.task) }
     }
-
 }
 
 /// Previews name screens through this enum: a `#Preview` body cannot see the `Path.State` cases the macro generates.
