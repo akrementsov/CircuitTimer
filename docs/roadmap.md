@@ -33,6 +33,7 @@ Next: CT-11, a HealthKit workout session. Checked milestones record delivered fu
 - [ ] **CT-6** — in-app purchase with StoreKit 2
 - [ ] **CT-7** — App Store release
   - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
+  - [ ] Fill App Privacy for Apple Health, add the App Review note on HealthKit and the workout session, and mention Apple Health in the Description
   - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
   - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
