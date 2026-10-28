@@ -10,6 +10,7 @@ import TimerPreferences
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutEditorFeature
+import WorkoutHealth
 import WorkoutStorage
 import WorkoutTimerFeature
 
@@ -93,8 +94,12 @@ public struct AppFeature: Sendable {
         var isTimerCoverUp = false
         @SharedReader(.backgroundNotifications) var isBackgroundNotificationsOn = true
         var notificationAccess: NotificationAccess?
+        /// `nil` until read; a failed read stays `nil`, so the next Start reads again.
+        var healthAccess: HealthAccess?
+        /// The Health sheet is up, or was, and has not answered.
+        var isHealthRequestOutstanding = false
         var startIntent: StartIntent?
-        var notificationPermissionGeneration = 0
+        var startGeneration = 0
         var isSceneActive = true
         var isNotificationCleanupStalled = false
 
@@ -158,6 +163,9 @@ public struct AppFeature: Sendable {
             case notificationPermissionStalled(generation: Int)
             case startIntentConfirmed(generation: Int)
             case notificationPermissionWait
+            case healthAccessQueried(generation: Int, HealthAccess?)
+            case healthPermissionAnswered(generation: Int, succeeded: Bool)
+            case healthRequestStalled(generation: Int)
         }
     }
 
@@ -169,6 +177,8 @@ public struct AppFeature: Sendable {
         case notificationPermission
         case notificationPermissionStall
         case notificationCleanup
+        case healthPermission
+        case healthRequestStall
     }
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
@@ -181,8 +191,9 @@ public struct AppFeature: Sendable {
     @Dependency(\.date) var date
     @Dependency(\.liveActivity) private var liveActivity
     @Dependency(\.timerSession) private var timerSession
-    @Dependency(\.uuid) private var uuid
+    @Dependency(\.uuid) var uuid
     @Dependency(\.workoutRunRecord) var workoutRunRecord
+    @Dependency(\.workoutHealth) var workoutHealth
     @Dependency(\.workoutStorage) var workoutStorage
 
     public init() {}
@@ -336,13 +347,20 @@ public struct AppFeature: Sendable {
             case let .notificationPermissionAnswered(generation, access):
                 return notificationPermissionAnswered(access, generation: generation, &state)
             case let .notificationPermissionStalled(generation):
-                guard state.startIntent?.generation == generation, state.destination == nil else { return .none }
+                guard state.startIntent?.generation == generation, state.startIntent?.stage == .notifications,
+                      state.destination == nil else { return .none }
                 state.destination = .permissionStalled(.permissionStalled)
                 return .none
             case let .startIntentConfirmed(generation):
                 return confirmStartIntent(generation, &state)
             case .notificationPermissionWait:
                 return waitForNotificationPermission(state)
+            case let .healthAccessQueried(generation, access):
+                return healthAccessQueried(access, generation: generation, &state)
+            case let .healthPermissionAnswered(generation, succeeded):
+                return healthPermissionAnswered(succeeded: succeeded, generation: generation, &state)
+            case let .healthRequestStalled(generation):
+                return healthRequestStalled(generation: generation, &state)
             case let .workoutsLoaded(stored):
                 state.isReloading = false
                 // A write made on the shown list during the reload may be missing from what was read: read again once
@@ -470,44 +488,6 @@ public struct AppFeature: Sendable {
                 state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
         }
         return .none
-    }
-
-    /// Presents the timer over the tab bar; the Workouts stack returns to the list once the cover is up.
-    private func startWorkout(_ workout: Workout, _ state: inout State) -> Effect<Action> {
-        // The workout's screen offers Start only for a playable workout and never under a presentation.
-        guard state.destination == nil else {
-            Self.logger.error("Refused to start a workout while something is presented")
-            return .none
-        }
-        guard workout.isPlayable else {
-            Self.logger.error("Refused to start a workout with nothing to play")
-            return .none
-        }
-        return prepareNotificationPermission(workout, &state)
-    }
-
-    // A timer's state is built only here and in `restoredTimerState`, so both get the same identifiers and title.
-
-    func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: uuid(),
-            workoutID: workout.id,
-            title: workout.displayName,
-            workoutName: workout.name,
-            schedule: WorkoutSchedule(workout: workout)
-        )
-    }
-
-    /// A timer over a saved run already settled at `now`.
-    func restoredTimerState(for workout: Workout, run: WorkoutRun, at now: Date) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: uuid(),
-            workoutID: workout.id,
-            title: workout.displayName,
-            workoutName: workout.name,
-            restoring: run,
-            at: now
-        )
     }
 
     /// Activities of an earlier process show a run this launch has not continued; a continued run starts its own.
