@@ -37,7 +37,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots; the swipe between tabs on a stack's root; the Live Activity's typography and 44 pt control target |
 | `WorkoutStorage` | `CloudSync`, `WorkoutDomain`, Dependencies, SwiftData, CoreData | `WorkoutStorageClient` and its SwiftData store, mirrored to iCloud when the launch syncs, with one visible copy per workout and deletion markers; the Debug CloudKit schema initializer; `WorkoutRunRecordClient` and the run record file |
 | `UITestContract` | — | Accessibility identifiers shared by the app and its UI tests; in Debug also the scenario names, the launch keys and the fixture names the tests read |
-| `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `Workout*`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
+| `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
 | `WorkoutTimerFeature` | `BackgroundNotifications`, `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `UITestContract`, `WorkoutActivity`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; syncing its Live Activity; its own stack with the stage list |
 | `TimerPreferences` | Sharing | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
 | `SettingsFeature` | `CloudSync`, `DesignSystem`, `TimerPreferences`, `UITestContract`, ComposableArchitecture | The Settings tab: signal toggles, the iCloud sync switch and its footnote, its navigation stack, About with the app version, the legal pages |
@@ -47,7 +47,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 
 Layering:
 
-- `*Feature` → `DesignSystem`, `Workout*`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
+- `*Feature` → `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, `WorkoutActivity`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
 - Features import `UITestContract` only for accessibility identifiers. `AppScenarios` is all under `#if DEBUG`, so Release links it empty; only the app imports it, in Debug, and it imports features only for their clients.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `BackgroundNotifications` imports no feature, TCA or workout module; the app and the timer use only its dependency client.
@@ -56,7 +56,7 @@ Layering:
 - `CloudSync` imports no feature, TCA or workout module: `WorkoutStorage` asks it how to open the store, `AppFeature` reads its remote changes and Settings its status and switch.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
-- `WorkoutDomain`, `WorkoutStorage` and `WorkoutActivity` never import TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
+- `WorkoutDomain` and `WorkoutStorage` never import TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - `WorkoutActivity` imports `WorkoutDomain` and no feature, TCA or SwiftUI. iOS limits an activity's attributes and state to 4 KB together, so `ContentState` carries a stage, its boundary dates and the next stage plus an ephemeral `controlGeneration`, never a whole `WorkoutRun`. App and widget declare `AppIntentsPackage` roots. `WorkoutActivity` is linked statically, so the build merges its metadata into each host; do not re-export it through `includedPackages`: on iOS 17.5 that caused action lookup to return no metadata (checked with Xcode 27.1). The timer syncs it, `AppFeature` ends what earlier processes left, and `CircuitTimerWidgets` draws it and routes buttons through its intents.
 
 - `SnapshotCapture` imports none of our modules; only `CircuitTimerSnapshotTests` links it. Of our code only `SnapshotCapture` imports SnapshotTesting.
