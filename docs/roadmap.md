@@ -18,7 +18,7 @@ Next: CT-11, a HealthKit workout session. Checked milestones record delivered fu
   - [x] **CT-QA-1** — UI test architecture: Debug-only launch scenarios with no live dependencies, Screens, a shared test harness and CI step, and two tests that prove it
   - [x] UI smoke tests: empty list, creating and saving a workout, workout and stage reorder, starting and closing the timer
   - [x] UI smoke test: edit an existing workout, save it and verify the changes in the list and reopened editor
-  - [x] UI smoke tests: all five Settings switches in both directions and after returning to the tab; About version and navigation to both legal pages
+  - [x] UI smoke tests: all six Settings switches in both directions and after returning to the tab; About version and navigation to both legal pages
   - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
