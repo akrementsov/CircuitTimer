@@ -648,6 +648,8 @@
 				INFOPLIST_FILE = Configs/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CircuitTimer;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "CircuitTimer does not read your Health data.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "CircuitTimer runs your interval workout as a Health workout, so its Lock Screen card and notifications stop when you close the app.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
@@ -679,6 +681,8 @@
 				INFOPLIST_FILE = Configs/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CircuitTimer;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "CircuitTimer does not read your Health data.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "CircuitTimer runs your interval workout as a Health workout, so its Lock Screen card and notifications stop when you close the app.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;

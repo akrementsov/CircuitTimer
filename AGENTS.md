@@ -105,7 +105,7 @@ Layering:
 - Locally, tests and screen checks use only four simulators: `iPhone 17` (`DESTINATION`), `iPhone 17 #2` and `iPhone 17 #3` on iOS 27.0, and `iPhone 15` on iOS 17.5 for checks on the oldest supported iOS. One job runs on a device at a time; a parallel job takes a free one, for example `make test DESTINATION='platform=iOS Simulator,name=iPhone 17 #2,OS=27.0'`, or waits. Create no other simulators; if one of the four is missing, recreate exactly it.
 - Parallel UI test workers (`UI_TEST_WORKERS` above 1) make Xcode clone the simulator, so `make test-ui` allows them only with `CI=true`. Locally, UI tests run in parallel only on different allowed simulators, each `make test-ui` with its own `DESTINATION`, and only after one run on each has finished alone: the first run resolves the shared package checkouts, which later runs only read.
 - A failing UI test runs once more (`-retry-tests-on-failure -test-iterations 2`); one that passes only then is reported as flaky and keeps its result bundle as an artifact. Package tests get no retry. A UI test fails after 60 s, or after its own `executionTimeAllowance` up to 120 s.
-- The launch screen, the `remote-notification` background mode and `CTCloudKitContainerIdentifier` live in `Configs/Info.plist`, which Xcode merges with the generated `INFOPLIST_KEY_*` keys. The file is not a member of any target: Copy Bundle Resources would conflict with the generated plist.
+- The launch screen, the `remote-notification` and `workout-processing` background modes and `CTCloudKitContainerIdentifier` live in `Configs/Info.plist`, which Xcode merges with the generated `INFOPLIST_KEY_*` keys. The file is not a member of any target: Copy Bundle Resources would conflict with the generated plist.
 
 ## TCA
 
