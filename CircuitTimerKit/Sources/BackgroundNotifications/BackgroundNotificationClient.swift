@@ -1,8 +1,6 @@
 import Dependencies
 import DependenciesMacros
 import Foundation
-import os
-import UIKit
 
 @DependencyClient
 public struct BackgroundNotificationClient: Sendable {
@@ -13,7 +11,6 @@ public struct BackgroundNotificationClient: Sendable {
     public var removeOrphans: @Sendable () async throws -> Bool
     public var removeDelivered: @Sendable (UUID) async -> Void
     public var end: @Sendable (UUID) async -> Void
-    public var openSystemSettings: @Sendable () async -> Bool = { false }
 }
 
 extension BackgroundNotificationClient: DependencyKey {
@@ -43,27 +40,7 @@ extension BackgroundNotificationClient: DependencyKey {
                 return try await runtime.scheduler.removeOrphans(clock: clock)
             },
             removeDelivered: { runtime.scheduler.removeDelivered($0) },
-            end: { runtime.scheduler.end($0) },
-            openSystemSettings: {
-                @Dependency(\.continuousClock) var clock
-                let bridge = CallbackBridge<Bool>()
-                await MainActor.run {
-                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else {
-                        bridge.resolve(.success(false))
-                        return
-                    }
-                    UIApplication.shared.open(url, options: [:]) { bridge.resolve(.success($0)) }
-                }
-                do {
-                    return try await bridge.wait(timeout: .seconds(2), clock: clock)
-                } catch is CancellationError {
-                    return false
-                } catch {
-                    Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "BackgroundNotifications")
-                        .error("Opening notification settings failed: \(error.localizedDescription, privacy: .public)")
-                    return false
-                }
-            }
+            end: { runtime.scheduler.end($0) }
         )
     }()
 
@@ -74,8 +51,7 @@ extension BackgroundNotificationClient: DependencyKey {
         sync: { _, _, _ in NotificationSyncReport() },
         removeOrphans: { true },
         removeDelivered: { _ in },
-        end: { _ in },
-        openSystemSettings: { true }
+        end: { _ in }
     )
     public static let testValue = Self()
 }

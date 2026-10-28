@@ -5,7 +5,6 @@ import UITestContract
 
 @ViewAction(for: SettingsFeature.self)
 public struct SettingsView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @Bindable public var store: StoreOf<SettingsFeature>
 
     public init(store: StoreOf<SettingsFeature>) {
@@ -30,17 +29,11 @@ public struct SettingsView: View {
                     isOn: Binding(get: { store.isSpeechOn }, set: { send(.speechToggled($0)) })
                 )
                 .accessibilityIdentifier(AccessibilityID.Settings.speech)
-                Text("settings.signals.footnote", bundle: .module)
-                    .font(.token(.footnote))
-                    .foregroundStyle(.text(.secondary))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, .token(spacing: .m))
                 SettingsSwitchCard(
                     title: Text("settings.notifications.toggle", bundle: .module),
                     isOn: Binding(get: { store.isBackgroundNotificationsOn }, set: { send(.backgroundNotificationsToggled($0)) })
                 )
                 .accessibilityIdentifier(AccessibilityID.Settings.backgroundNotifications)
-                notificationStatus
                 SettingsSwitchCard(
                     title: Text("settings.screen.keepOn", bundle: .module),
                     isOn: Binding(get: { store.isKeepScreenOn }, set: { send(.keepScreenOnToggled($0)) })
@@ -66,7 +59,6 @@ public struct SettingsView: View {
                 .buttonStyle(.settingsCard)
                 .accessibilityIdentifier(AccessibilityID.Settings.about)
             }
-            .onAppear { send(.appeared) }
             .navigationTitle(Text("settings.title", bundle: .module))
             .screenChrome()
         } destination: { pathStore in
@@ -80,27 +72,8 @@ public struct SettingsView: View {
         // The back buttons are white, like the legacy bar; the tab bar keeps the accent.
         .tint(.text(.primary))
         .task { send(.task) }
-        .onChange(of: scenePhase, initial: true) { _, phase in send(.scenePhaseChanged(phase)) }
     }
 
-    private var notificationStatus: some View {
-        VStack(alignment: .leading, spacing: .token(spacing: .s)) {
-            Text(LocalizedStringKey(store.notificationFootnote), bundle: .module)
-            if store.openSettingsFailed {
-                Text("settings.notifications.openFailed", bundle: .module)
-            }
-            Button {
-                send(.openNotificationSettingsTapped)
-            } label: {
-                Text("settings.notifications.openSettings", bundle: .module)
-                    .foregroundStyle(.text(.primary))
-            }
-        }
-        .font(.token(.footnote))
-        .foregroundStyle(.text(.secondary))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, .token(spacing: .m))
-    }
 }
 
 /// Previews name screens through this enum: a `#Preview` body cannot see the `Path.State` cases the macro generates.

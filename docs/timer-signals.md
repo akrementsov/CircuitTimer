@@ -45,7 +45,7 @@ Simulator tests cover signal decisions, preference persistence, revision fences 
 
 ## Background notifications
 
-Background notifications is a separate default-on switch. The first Start asks iOS for alert and sound permission before the timer and its 3-2-1 are created. Turning the switch on in Settings does not prompt; continuing a saved run never prompts. Refusal does not stop a workout. Settings shows permission status and opens the iOS notification settings; an opening failure offers a manual path and retry. The timer shows a notification footnote only for an unknown or blocked permission state or a scheduling failure while the preference is on; healthy coverage and an intentionally disabled preference add no timer text.
+Background notifications is a separate default-on switch. The first Start asks iOS for alert and sound permission before the timer and its 3-2-1 are created. Turning the switch on in Settings does not prompt; continuing a saved run never prompts. Refusal does not stop a workout. Settings shows only the switch, without permission status. The timer shows a notification footnote only for an unknown or blocked permission state or a scheduling failure while the preference is on; healthy coverage and an intentionally disabled preference add no timer text.
 
 A slow authorization callback leaves the request waiting. After ten seconds of active-scene waiting, an alert offers Start now or Wait. The alert never starts the timer automatically. A late permission response may enable notifications, so Start now does not promise a session without notifications.
 
@@ -64,6 +64,6 @@ Additional device checks on iOS 17.5 and 26.x before release:
 - [ ] First Start: allow, refuse, read the prompt slowly, and recover through Start now / Wait.
 - [ ] Lock during short stages; check stage/finish titles and that foreground presentation does not duplicate cues.
 - [ ] Manual pause stops the forecast; continue schedules only the remaining stages.
-- [ ] Change permission in iOS Settings, return, and check visible status and recovery; simulate failure to open Settings.
+- [ ] Change permission in iOS Settings, return to a running timer, and check its footnote and recovery.
 - [ ] Kill and relaunch while requests remain: old owners are cleaned and the restored owner survives late callbacks.
 - [ ] A workout beyond the 32-event window, clock changes, Focus and the silent switch show the documented limits.
