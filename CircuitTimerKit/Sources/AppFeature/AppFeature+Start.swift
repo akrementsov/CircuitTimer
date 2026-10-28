@@ -17,7 +17,7 @@ extension AppFeature {
         let workout: Workout
         var stage = Stage.notifications
         var isAwaitingAuthorization = false
-        /// The Health sheet has not answered in time and Start is free again; a new tap goes on without Health.
+        /// The Health stage has not finished in time and Start is free again; a new tap goes on without Health.
         var hasStalled = false
     }
 
@@ -76,7 +76,7 @@ extension AppFeature {
         guard presentTimer(workout, editorID: editorID, &state) else { return cancelStartIntent(&state) }
 
         state.startIntent = nil
-        return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthRequestStall))
+        return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
     }
 
     func cancelStartIntent(_ state: inout State) -> Effect<Action> {
@@ -93,7 +93,7 @@ extension AppFeature {
             .cancel(id: CancelID.notificationPermission),
             .cancel(id: CancelID.notificationPermissionStall),
             .cancel(id: CancelID.healthPermission),
-            .cancel(id: CancelID.healthRequestStall)
+            .cancel(id: CancelID.healthStall)
         )
     }
 
@@ -101,7 +101,7 @@ extension AppFeature {
     func sceneChanged(_ phase: ScenePhase, _ state: inout State) -> Effect<Action> {
         state.isSceneActive = phase == .active
         guard phase == .active else {
-            return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthRequestStall))
+            return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
         }
         return .merge(
             permissionStallTimer(state),

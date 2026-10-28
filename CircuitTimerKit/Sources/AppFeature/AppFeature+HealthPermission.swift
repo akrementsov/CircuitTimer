@@ -48,12 +48,12 @@ extension AppFeature {
         return requestHealthAccess(&state)
     }
 
-    /// Asks only an active scene: from the background the sheet would wait unseen. The request has no cancel ID:
-    /// once the sheet shows, only its answer clears `isHealthRequestOutstanding`. The stall timer starts again with
-    /// the sheet.
+    /// Asks only an active scene: from the background the sheet would wait unseen. A stalled stage never asks: its
+    /// Start is free again, and a sheet nobody tapped for would show. The request has no cancel ID: once the sheet
+    /// shows, only its answer clears `isHealthRequestOutstanding`. The stall timer starts again with the sheet.
     private func requestHealthAccess(_ state: inout State) -> Effect<Action> {
         guard state.isSceneActive, !state.isHealthRequestOutstanding, state.healthAccess == .notDetermined,
-              let intent = state.startIntent, intent.stage == .health else { return .none }
+              let intent = state.startIntent, intent.stage == .health, !intent.hasStalled else { return .none }
 
         state.isHealthRequestOutstanding = true
         let generation = intent.generation
@@ -83,12 +83,12 @@ extension AppFeature {
 
         return .run { [clock] send in
             try await clock.sleep(for: .seconds(10))
-            await send(.internal(.healthRequestStalled(generation: intent.generation)))
+            await send(.internal(.healthStalled(generation: intent.generation)))
         }
-        .cancellable(id: CancelID.healthRequestStall, cancelInFlight: true)
+        .cancellable(id: CancelID.healthStall, cancelInFlight: true)
     }
 
-    func healthRequestStalled(generation: Int, _ state: inout State) -> Effect<Action> {
+    func healthStalled(generation: Int, _ state: inout State) -> Effect<Action> {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .health else {
             return .none
         }
@@ -111,8 +111,8 @@ extension AppFeature {
     /// A Start that reached Health while the scene was inactive asks once it is active again; a sheet already showing,
     /// or a read still under way, gets a new stall timer.
     func healthSceneActivated(_ state: inout State) -> Effect<Action> {
-        guard !state.isHealthRequestOutstanding, state.healthAccess == .notDetermined else { return healthStallTimer(state) }
-
-        return requestHealthAccess(&state)
+        state.isHealthRequestOutstanding || state.healthAccess != .notDetermined
+            ? healthStallTimer(state)
+            : requestHealthAccess(&state)
     }
 }

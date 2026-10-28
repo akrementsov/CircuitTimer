@@ -165,7 +165,7 @@ public struct AppFeature: Sendable {
             case notificationPermissionWait
             case healthAccessQueried(generation: Int, HealthAccess?)
             case healthPermissionAnswered(generation: Int, succeeded: Bool)
-            case healthRequestStalled(generation: Int)
+            case healthStalled(generation: Int)
         }
     }
 
@@ -178,7 +178,7 @@ public struct AppFeature: Sendable {
         case notificationPermissionStall
         case notificationCleanup
         case healthPermission
-        case healthRequestStall
+        case healthStall
     }
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
@@ -365,8 +365,8 @@ public struct AppFeature: Sendable {
                 return healthAccessQueried(access, generation: generation, &state)
             case let .healthPermissionAnswered(generation, succeeded):
                 return healthPermissionAnswered(succeeded: succeeded, generation: generation, &state)
-            case let .healthRequestStalled(generation):
-                return healthRequestStalled(generation: generation, &state)
+            case let .healthStalled(generation):
+                return healthStalled(generation: generation, &state)
             case let .workoutsLoaded(stored):
                 state.isReloading = false
                 // A write made on the shown list during the reload may be missing from what was read: read again once
