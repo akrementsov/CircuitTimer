@@ -37,7 +37,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 | `DesignSystem` | SwiftUI, UIKit, CoreText | Spacing, radius, size, typography and color tokens; clock text; the stage clock view in the bundled League Gothic; screen chrome; card rows and the bottom action panel; row swipe plaques and drag reorder with edge auto-scroll in `CardScrollView`; the tab bar kept to the stacks' roots; the swipe between tabs on a stack's root; the Live Activity's typography and 44 pt control target |
 | `WorkoutStorage` | `CloudSync`, `WorkoutDomain`, Dependencies, SwiftData, CoreData | `WorkoutStorageClient` and its SwiftData store, mirrored to iCloud when the launch syncs, with one visible copy per workout and deletion markers; the Debug CloudKit schema initializer; `WorkoutRunRecordClient` and the run record file |
 | `UITestContract` | — | Accessibility identifiers shared by the app and its UI tests; in Debug also the scenario names, the launch keys and the fixture names the tests read |
-| `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `Workout*`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
+| `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
 | `WorkoutTimerFeature` | `BackgroundNotifications`, `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `UITestContract`, `WorkoutActivity`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; syncing its Live Activity; its own stack with the stage list |
 | `TimerPreferences` | Sharing | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
 | `SettingsFeature` | `CloudSync`, `DesignSystem`, `TimerPreferences`, `UITestContract`, ComposableArchitecture | The Settings tab: signal toggles, the iCloud sync switch and its footnote, its navigation stack, About with the app version, the legal pages |
@@ -47,7 +47,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 
 Layering:
 
-- `*Feature` → `DesignSystem`, `Workout*`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
+- `*Feature` → `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, `WorkoutActivity`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
 - Features import `UITestContract` only for accessibility identifiers. `AppScenarios` is all under `#if DEBUG`, so Release links it empty; only the app imports it, in Debug, and it imports features only for their clients.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `BackgroundNotifications` imports no feature, TCA or workout module; the app and the timer use only its dependency client.
@@ -56,7 +56,7 @@ Layering:
 - `CloudSync` imports no feature, TCA or workout module: `WorkoutStorage` asks it how to open the store, `AppFeature` reads its remote changes and Settings its status and switch.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
-- `Workout*` never imports TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
+- `WorkoutDomain` and `WorkoutStorage` never import TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
 - `WorkoutActivity` imports `WorkoutDomain` and no feature, TCA or SwiftUI. iOS limits an activity's attributes and state to 4 KB together, so `ContentState` carries a stage, its boundary dates and the next stage plus an ephemeral `controlGeneration`, never a whole `WorkoutRun`. App and widget declare `AppIntentsPackage` roots. `WorkoutActivity` is linked statically, so the build merges its metadata into each host; do not re-export it through `includedPackages`: on iOS 17.5 that caused action lookup to return no metadata (checked with Xcode 27.1). The timer syncs it, `AppFeature` ends what earlier processes left, and `CircuitTimerWidgets` draws it and routes buttons through its intents.
 
 - `SnapshotCapture` imports none of our modules; only `CircuitTimerSnapshotTests` links it. Of our code only `SnapshotCapture` imports SnapshotTesting.
@@ -177,7 +177,7 @@ New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:p
 
 ## UI tests
 
-How to add one, step by step: README › UI tests.
+How to add one, step by step: `docs/testing.md` › How to add a UI test.
 
 - Accessibility identifiers come from `UITestContract`'s `AccessibilityID`, named `<screen>.<element>`; lint rejects any other argument of `.accessibilityIdentifier`. An element repeated in a list is named by its section and position, never by user data. Text the user typed and system elements are found by their text.
 - A scenario is a case of `AppScenario` that the launch selects with `CT_APP_SCENARIO`. In Debug, `CircuitTimerApp` builds its store with `AppScenario.prepare`, which sets every client and key the app reads to a value that is not live. It stops the app on an unknown name, and outside the `preview` dependency context (`SWIFT_DEPENDENCIES_CONTEXT=preview`): `init` reads its clients from the process's context, not from the store. Release has no scenarios; `make check-release-app` checks the archive.
@@ -189,7 +189,7 @@ How to add one, step by step: README › UI tests.
 
 - Harness regression tests run separately from the 18-PNG screen matrix: the package's `SnapshotCaptureTests` and the app-hosted `CircuitTimerSnapshotContractTests`. The latter shares only the screen tests' `Support` sources and uses synthetic references it removes after every case. Keep contract tests out of `CircuitTimerSnapshots`, whose run checker requires every case to correspond to a screen reference. Environment overrides are scoped and restored; the contract suite is serialized because UIKit windows and process environment belong to the process. Serialize these two commands manually per checkout, including across simulator destinations: temporary reference directories are shared between those processes. Their generated PNGs are ignored if a process is interrupted. Dedicated ru/de processes fail unless their selected language test passes without a skip.
 
-How to add one, step by step: README › Snapshot tests.
+How to add one, step by step: `docs/testing.md` › How to add a snapshot.
 
 - A snapshot is a state plus a text size. A test builds the `AppFeature.State` the screen shows after its transitions — the Workouts stack's `path` and the editor's `phase` set directly through `@testable import`, never reached by `send`s — and passes it to `assertAppSnapshot(textSize:)`. One test function per state, named `test_<screen>_<state>_matchesReference` and unique across the snapshot tests; it always takes text sizes, and only text sizes, as its arguments. Keep its `@Test` declaration on one line, using `SnapshotTextSize.currentCases()` or `SnapshotTextSize.currentCases(in: [.large])`, so the run check can enumerate the expected sizes.
 - Variants: the language comes from the test process, and `make test-snapshots` runs four processes (`en`/`ru` × `large`/`ax5`), because language and UIKit's preferred font size are process settings; the text size is `large` or `ax5` (`accessibility5`); dark only. The scheme supplies `-UIPreferredContentSizeCategoryName` from `SNAPSHOT_CONTENT_SIZE_CATEGORY`. `SnapshotTextSize.currentCases()` selects that process's arguments through `SNAPSHOT_TEXT_SIZE`; use `currentCases(in: [.large])` for large-only states, which have no AX5 arguments. Every applicable case still has to compare; an unexpected skip fails the run. The capture validates the actual process category against its argument before creating the screen, and the journal records it for the run check. The full-matrix commands narrow a run only by language: the committed references and the test functions are the list of expected cases, so a narrower or repeated run would misreport them. References are `CircuitTimerSnapshotTests/__Snapshots__/<test file>/<test function>.<language>-<size>.png`, 1206×2622 px, recorded only on `iPhone 17` / iOS 27.0; the run check reads the device's platform, model and OS from the result bundle.
@@ -256,6 +256,8 @@ Sorted, grouped by attributes: `@testable import` first, an empty line, then pla
 - Comments are English and explain constraints that the code cannot. No history, no commented-out code.
 - `// MARK:` only to group five or more related members.
 - `TODO` and `FIXME` carry a ticket: `// TODO: [CT-123] …` or `// TODO: [CT-UI-2] …`.
+- The roadmap lives in `docs/roadmap.md`; the README only links to it.
+- The README's screenshots in `docs/images/` are taken by hand (`docs/images/README.md`): retake them in the same pull request as a change to how the list, the workout screen, the timer or the Live Activity looks.
 
 ## Lint exceptions
 
@@ -306,6 +308,8 @@ DesignSystem has no catalog: a feature passes its own strings into DesignSystem 
 - Already scheduled requests may fire after suspension or process death. The app cannot refill the window or repair clock changes until it runs again. Delivery time, Focus, silence, system sound and vibration follow iOS settings. Notification failures never stop a workout or hide record/audio/voice failures.
 
 ## Live Activity (CT-4)
+
+The reader's view of the controls and the device checklist are in `docs/live-activity.md`; change it together with this section.
 
 - The timer syncs its Live Activity after every action once its clock has started and its owner-scoped control subscription is ready, not only on a clock sync: a stage that ends on a tick reaches the Lock Screen without a record write or a new loop. `ContentState(run:at:)` ticks a copy and reads its snapshot and `outlook(at:)`. The start countdown reads as `getReady`, the resume countdown as `paused`.
 - The content is the running stage with its boundary dates and the next stage with its end. `staleDate` is the stage end. The display counts the stage down by itself, and the next stage counts from the stage end by itself. Once iOS marks the content stale it shows the next stage and asks to open the app for anything after it. iOS redraws stale content no earlier than about two minutes after the last update (measured on iOS 17.5 and 26.5). A held stage shows a fixed time: `Text(timerInterval:pauseTime:)` with a future `pauseTime` does not hold, so there is no workout total.
