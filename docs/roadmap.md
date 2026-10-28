@@ -38,5 +38,7 @@ Next: CT-11, a HealthKit workout session. Checked milestones record delivered fu
   - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
   - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
 - [ ] **CT-9** — Apple Watch app
-- [ ] **CT-11** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications; finished workouts saved to Health
+- [ ] **CT-11** — Apple Health, in slices:
+  - [ ] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
+  - [ ] **CT-11-2** — finished workouts saved to Health
 - [ ] **CT-QA-3** — snapshot tests of the timer: its states drawn with `WorkoutTimerStack` as the window's root, in English and Russian at both text sizes

@@ -67,3 +67,4 @@ Additional device checks on iOS 17.5 and 26.x before release:
 - [ ] Change permission in iOS Settings, return to a running timer, and check its footnote and recovery.
 - [ ] Kill and relaunch while requests remain: old owners are cleaned and the restored owner survives late callbacks.
 - [ ] A workout beyond the 32-event window, clock changes, Focus and the silent switch show the documented limits.
+- [ ] Swipe the app away in the App Switcher while a timer runs in the background: on iOS 26.x its pending notifications and its card go at once; on iOS 17.5 they stay once iOS has suspended the app.

@@ -118,6 +118,7 @@ flowchart TD
         BackgroundExecution
         BackgroundNotifications
         WorkoutActivity
+        WorkoutHealth
         CloudSync
     end
 
@@ -139,6 +140,7 @@ flowchart TD
     SettingsFeature --> CloudSync
     WorkoutTimerFeature --> BackgroundNotifications
     WorkoutTimerFeature --> WorkoutActivity
+    WorkoutTimerFeature --> WorkoutHealth
     WorkoutStorage --> WorkoutDomain
     WorkoutStorage --> CloudSync
     WorkoutActivity --> WorkoutDomain
@@ -151,9 +153,9 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 
 | Module | Responsibility |
 |---|---|
-| `AppFeature` | Tab bar, the workout list (loading, empty, retryable error), navigation, restoring a saved run |
+| `AppFeature` | Tab bar, the workout list (loading, empty, retryable error), navigation, restoring a saved run, the teardown when iOS terminates the app |
 | `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; stage durations as MM:SS on the number pad |
-| `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity |
+| `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity, a Health workout session on iOS 26 and later |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
 | `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder |
 | `WorkoutStorage` | `WorkoutStorageClient` (struct of closures, in memory for previews): SwiftData mirrored to iCloud when sync is on; the saved run file |
@@ -162,6 +164,7 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | `BackgroundExecution` | Background-task assertions around the saved run's writes |
 | `BackgroundNotifications` | Owner-scoped local notifications, permission access, foreground suppression |
 | `WorkoutActivity` | The Live Activity's state, its Lock Screen and Island content, Pause/Resume intents; drawn by `CircuitTimerWidgets` |
+| `WorkoutHealth` | Health access and, on iOS 26 and later, the workout session that keeps a running timer's app alive, so closing it removes the card and notifications |
 | `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only, so `WorkoutActivity` and the widget can link it |
 | `UITestContract` | Below the features, no dependencies: accessibility identifiers and the UI tests' launch names |
 | `AppScenarios` | Debug only, above the features: each UI test scenario's data and non-live dependencies |
