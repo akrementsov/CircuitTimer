@@ -242,7 +242,13 @@ public struct AppFeature: Sendable {
 
                 // Read the saved run before loading the list, where a viable run is offered for continuation.
                 state.workouts = .loading
-                return .merge(readRunRecord(&state), cleanupNotifications(), endLiveActivityOrphans(), observeRemoteChanges())
+                return .merge(
+                    readRunRecord(&state),
+                    cleanupNotifications(),
+                    endLiveActivityOrphans(),
+                    endHealthOrphans(),
+                    observeRemoteChanges()
+                )
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
                     // A tap on the selected tab returns it to its root.
@@ -494,6 +500,13 @@ public struct AppFeature: Sendable {
     private func endLiveActivityOrphans() -> Effect<Action> {
         .run { [liveActivity] _ in
             await liveActivity.endOrphans()
+        }
+    }
+
+    /// A session of an earlier process would keep its workout running in Health; a continued run starts its own.
+    private func endHealthOrphans() -> Effect<Action> {
+        .run { [workoutHealth] _ in
+            await workoutHealth.endOrphans()
         }
     }
 

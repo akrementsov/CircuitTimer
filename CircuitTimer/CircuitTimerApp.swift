@@ -13,6 +13,7 @@ import WorkoutStorage
 
 @main
 struct CircuitTimerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @MainActor private static let store = Store(initialState: AppFeature.State()) {
         AppFeature()
     } withDependencies: { dependencies in
