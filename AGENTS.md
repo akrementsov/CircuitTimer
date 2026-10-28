@@ -257,7 +257,7 @@ Sorted, grouped by attributes: `@testable import` first, an empty line, then pla
 - `// MARK:` only to group five or more related members.
 - `TODO` and `FIXME` carry a ticket: `// TODO: [CT-123] …` or `// TODO: [CT-UI-2] …`.
 - The roadmap lives in `docs/roadmap.md`; the README only links to it.
-- The README's screenshots in `docs/images/` are taken by hand (`docs/images/README.md`): retake them in the same pull request as a change to the list, the workout screen, the timer or the Live Activity.
+- The README's screenshots in `docs/images/` are taken by hand (`docs/images/README.md`): retake them in the same pull request as a change to how the list, the workout screen, the timer or the Live Activity looks.
 
 ## Lint exceptions
 
