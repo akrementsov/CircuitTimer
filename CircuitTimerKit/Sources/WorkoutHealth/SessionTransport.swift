@@ -38,7 +38,7 @@ struct SessionTransport: Sendable {
             create: {
                 guard #available(iOS 26, *) else { throw HKError(.errorHealthDataUnavailable) }
 
-                return handle(try HKWorkoutSession(healthStore: store, configuration: configuration))
+                return handle(try HKWorkoutSession(healthStore: store, configuration: makeConfiguration()))
             },
             recover: {
                 guard #available(iOS 26, *) else { return nil }
@@ -46,7 +46,7 @@ struct SessionTransport: Sendable {
                 return try await store.recoverActiveWorkoutSession().map(handle)
             },
             save: { workout in
-                let builder = HKWorkoutBuilder(healthStore: store, configuration: configuration, device: .local())
+                let builder = HKWorkoutBuilder(healthStore: store, configuration: makeConfiguration(), device: .local())
                 try await builder.beginCollection(at: workout.start)
                 // Pause and resume events take the pauses out of the workout's duration.
                 let events = workout.pauses.flatMap { pause in
@@ -55,19 +55,26 @@ struct SessionTransport: Sendable {
                         HKWorkoutEvent(type: .resume, dateInterval: DateInterval(start: pause.end, duration: 0), metadata: nil),
                     ]
                 }
-                if !events.isEmpty {
-                    try await builder.addWorkoutEvents(events)
-                }
-                try await builder.endCollection(at: workout.end)
-                if try await builder.finishWorkout() == nil {
-                    // Saved; HealthKit only cannot hand the sample back while the device is locked.
-                    Logger.workoutHealth.notice("Saved a workout to Health while the device was locked")
+                do {
+                    if !events.isEmpty {
+                        try await builder.addWorkoutEvents(events)
+                    }
+                    try await builder.endCollection(at: workout.end)
+                    if try await builder.finishWorkout() == nil {
+                        // Saved, but HealthKit cannot hand the sample back while the device is locked.
+                        Logger.workoutHealth.notice("Saved a workout to Health while the device was locked")
+                    }
+                } catch {
+                    // A collecting builder keeps the store until it is finished or discarded.
+                    builder.discardWorkout()
+                    throw error
                 }
             }
         )
     }
 
-    private static var configuration: HKWorkoutConfiguration {
+    /// A new configuration each time: HealthKit's configuration is a mutable class.
+    private static func makeConfiguration() -> HKWorkoutConfiguration {
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .highIntensityIntervalTraining
         configuration.locationType = .indoor

@@ -19,7 +19,7 @@ extension WorkoutTimerFeature {
     }
 
     /// Follows the run into the Health track and sends a changed track, so the session can save the workout up to where
-    /// the run stands whenever it closes. Ticks leave the track as it is: it moves only on a transition.
+    /// the run stands whenever it closes. A tick moves the track only when it rebases the run.
     func syncHealthTrack(_ state: inout State, at now: Date) -> Effect<Action> {
         if let phase = state.healthPhase { state.healthTrack.follow(phase, at: now) }
         guard !state.isClosing, state.healthTrack != state.sentHealthTrack else { return .none }

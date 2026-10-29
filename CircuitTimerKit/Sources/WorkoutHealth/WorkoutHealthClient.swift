@@ -14,8 +14,8 @@ public enum HealthAccess: Equatable, Sendable {
 }
 
 /// A HealthKit workout session for each open timer, so that iOS keeps the app running in the background and lets it
-/// end its Live Activity and notifications when it is closed. A session exists only on iOS 26 and later with Health
-/// access; otherwise starting one does nothing.
+/// end its Live Activity and notifications when it is closed, and its workout saved to Health when the session ends. A
+/// session exists only on iOS 26 and later with Health access; otherwise starting one does nothing and nothing is saved.
 @DependencyClient
 public struct WorkoutHealthClient: Sendable {
     public var access: @Sendable () async throws -> HealthAccess
@@ -25,13 +25,15 @@ public struct WorkoutHealthClient: Sendable {
     /// is recovering an earlier session it waits at most 2 seconds for it.
     public var start: @Sendable (_ owner: UUID, _ date: Date) async -> Void
     /// Keeps the owner's newest track, so the session can save the run up to wherever it stands when it closes. An
-    /// older revision, or an owner that has ended, is ignored.
+    /// older revision, an owner that has ended or one whose session was lost is ignored.
     public var sync: @Sendable (_ owner: UUID, _ revision: Int, _ track: WorkoutHealthTrack) async -> Void
-    /// Ends the owner's session with its final track and discards what it recorded; the owner never starts again.
+    /// Ends the owner's session and saves the workout of its final track up to `date`, if the run ran; the owner never
+    /// starts again.
     public var end: @Sendable (_ owner: UUID, _ track: WorkoutHealthTrack, _ date: Date) async -> Void
     /// Synchronous, so the app delegate refuses every later start before it returns from termination.
     public var beginTermination: @Sendable () -> Void
-    /// Ends every session and waits until HealthKit reports each one ended.
+    /// Ends every session, saving each owner's newest track up to `date`, and waits until HealthKit reports each one
+    /// ended and every workout is saved.
     public var endAll: @Sendable (_ date: Date) async -> Void
     /// Ends a session an earlier process left running, once per process.
     public var endOrphans: @Sendable () async -> Void

@@ -63,7 +63,7 @@ The row is the phase *after* settling.
 
 `outlook(at:)` settles a copy at `now` and returns `nil` unless it is running. Otherwise it gives the dates a Live Activity needs to count on its own while the app sleeps: the running stage's start and end, and the end of the stage after it — `nil` when that stage is a manual pause or the workout ends. Every date is floored to whole milliseconds since 1970, so the outlook stays equal while ticks re-anchor the run.
 
-`automaticStopDate` is the date a running run stops by itself: it enters the next manual pause or finishes. It is `nil` unless the run is running and reads no clock, so it is taken after the reducer's tick and stays equal while ticks re-anchor the run; `rebase`, `skipToNextStage` and `resume` move it. Unlike `upcomingTransitions(at:limit:)` it has no limit and names only that first stop.
+`automaticStopDate` is the date a running run stops by itself: it enters the next manual pause or finishes. It is `nil` unless the run is running. It reads no clock, so it is taken after the reducer's tick and stays equal while ticks re-anchor the run; `start`, `resume`, `skipToNextStage` and `rebase` set or move it, and a pause or the finish clears it. Unlike `upcomingTransitions(at:limit:)` it has no limit and names only that first stop.
 
 ## Time
 

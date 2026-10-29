@@ -37,27 +37,21 @@ public struct WorkoutHealthTrack: Equatable, Sendable {
             case let (.running(stopsAt), .running(next)):
                 guard next != stopsAt else { return }
 
-                shiftBack(toward: now)
-                if case let .running(stopsAt) = position, stopsAt < now {
+                let stop = stopsAt.addingTimeInterval(shiftBack(toward: now))
+                if stop < now {
                     // The run stopped by itself and was resumed before a tick saw the stop.
-                    close(DateInterval(start: stopsAt, end: now))
+                    close(DateInterval(start: stop, end: now))
                 }
                 position = .running(stopsAt: next)
-            case (.running, .halted):
-                shiftBack(toward: now)
-                if case let .running(stopsAt) = position {
-                    position = .halted(since: written(min(stopsAt, now)))
-                }
-            case (.running, .finished):
-                shiftBack(toward: now)
-                if case let .running(stopsAt) = position {
-                    position = .finished(end: written(min(stopsAt, now)))
-                }
-            case let (.halted, .running(next)):
-                shiftBack(toward: now)
-                if case let .halted(since) = position {
-                    close(DateInterval(start: since, end: now))
-                }
+            case let (.running(stopsAt), .halted):
+                let stop = stopsAt.addingTimeInterval(shiftBack(toward: now))
+                position = .halted(since: written(min(stop, now)))
+            case let (.running(stopsAt), .finished):
+                let stop = stopsAt.addingTimeInterval(shiftBack(toward: now))
+                position = .finished(end: written(min(stop, now)))
+            case let (.halted(since), .running(next)):
+                let pauseStart = since.addingTimeInterval(shiftBack(toward: now))
+                close(DateInterval(start: pauseStart, end: now))
                 position = .running(stopsAt: next)
             case let (.halted(since), .finished):
                 position = .finished(end: since)
@@ -106,11 +100,14 @@ public struct WorkoutHealthTrack: Equatable, Sendable {
     }
 
     /// A date before `latest` means the clock went back without the timer measuring it, as in a pause without a clock
-    /// anchor: the whole track moves back with it, so the time it counted is kept.
-    private mutating func shiftBack(toward date: Date) {
-        guard let latest, date < latest else { return }
+    /// anchor: the whole track moves back with it, so the time it counted is kept. Returns how far it moved.
+    @discardableResult
+    private mutating func shiftBack(toward date: Date) -> TimeInterval {
+        guard let latest, date < latest else { return 0 }
 
-        shift(by: date.timeIntervalSince(latest))
+        let interval = date.timeIntervalSince(latest)
+        shift(by: interval)
+        return interval
     }
 
     private mutating func shift(by interval: TimeInterval) {

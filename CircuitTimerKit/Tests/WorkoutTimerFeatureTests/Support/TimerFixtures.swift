@@ -410,8 +410,6 @@ struct RecordWrite: Equatable, Sendable {
 }
 
 extension WorkoutTimerFeature.State {
-    /// The Health track's step after every action, as the second reducer takes it, for the harness to expect alongside
-    /// whatever a test pins. `TimerHealthTests` pins the track itself.
     /// A fixture as a real timer holds it: followed since its run started.
     func followingHealth(at now: Date) -> Self {
         var state = self
@@ -419,6 +417,8 @@ extension WorkoutTimerFeature.State {
         return state
     }
 
+    /// The Health track's step after every action, as the second reducer takes it, for the harness to expect alongside
+    /// whatever a test pins.
     mutating func followHealth(at now: Date) {
         if let healthPhase { healthTrack.follow(healthPhase, at: now) }
         guard !isClosing, healthTrack != sentHealthTrack else { return }

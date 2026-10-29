@@ -39,7 +39,7 @@ struct WorkoutSessionsTests {
     private func running(_ owner: UUID = owner, at date: Date = moment(0)) async -> FakeSession {
         await start(owner, at: date)
         let session = health.created.value.last!
-        session.report(.changed(.running))
+        session.report(.changed(.running, date: moment(0)))
         await settle()
         return session
     }
@@ -61,7 +61,7 @@ struct WorkoutSessionsTests {
         await end(at: moment(10))
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
 
-        session.report(.changed(.ended))
+        session.report(.changed(.ended, date: moment(0)))
         await settle()
         #expect(session.calls.value.last == .release)
     }
@@ -74,7 +74,7 @@ struct WorkoutSessionsTests {
         await end()
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
 
-        session.report(.changed(.ended))
+        session.report(.changed(.ended, date: moment(0)))
         await settle()
         #expect(session.calls.value == [.observe, .start(moment(0)), .end, .release])
     }
@@ -82,7 +82,7 @@ struct WorkoutSessionsTests {
     @Test
     func test_endOrphans_foreignSession_endsAwaitsItsEndAndReleases() async {
         let orphan = FakeSession(activityID: UUID(fixture: 900))
-        orphan.report(.changed(.ended))
+        orphan.report(.changed(.ended, date: moment(0)))
         health.answerRecovery(.success(orphan))
 
         await endOrphans()
@@ -98,7 +98,7 @@ struct WorkoutSessionsTests {
     func test_start_endedOrLostOwner_createsNoSession(isLost: Bool) async {
         let session = await running()
         if isLost {
-            session.report(.changed(.ended))
+            session.report(.changed(.ended, date: moment(0)))
             await settle()
         } else {
             await end()
@@ -247,7 +247,7 @@ struct WorkoutSessionsTests {
     @Test(arguments: [false, true])
     func test_startingSession_anotherSessionStarted_startsNoSessionUntilTheNextStart(duringRecovery: Bool) async {
         let orphan = FakeSession(activityID: UUID(fixture: 900))
-        orphan.report(.changed(.ended))
+        orphan.report(.changed(.ended, date: moment(0)))
         let recovering = Task { await endOrphans() }
         await settle()
         if !duringRecovery {
@@ -289,7 +289,7 @@ struct WorkoutSessionsTests {
         .failed(FakeError()),
         .failed(HKError(.errorBackgroundWorkoutSessionNotAllowed)),
         .failed(HKError(.errorAnotherWorkoutSessionStarted)),
-        .changed(.ended),
+        .changed(.ended, date: moment(0)),
     ]
 
     @Test(arguments: startingFailures)
@@ -306,7 +306,13 @@ struct WorkoutSessionsTests {
         #expect(health.created.value.count == 2)
     }
 
-    @Test(arguments: [SessionEvent.failed(FakeError()), .failed(HKError(.errorAnotherWorkoutSessionStarted)), .changed(.ended)])
+    static let runningLosses: [SessionEvent] = [
+        .failed(FakeError()),
+        .failed(HKError(.errorAnotherWorkoutSessionStarted)),
+        .changed(.ended, date: moment(0)),
+    ]
+
+    @Test(arguments: runningLosses)
     func test_runningSession_failsOrEnds_isLostAndNeverStartsAgain(event: SessionEvent) async {
         let session = await running()
 
@@ -337,7 +343,7 @@ struct WorkoutSessionsTests {
         await start()
         let session = health.session(0)
 
-        session.report(.changed(state))
+        session.report(.changed(state, date: moment(0)))
         await settle()
         await end()
 
@@ -348,8 +354,8 @@ struct WorkoutSessionsTests {
     func test_runningSession_repeatedRunningOrPaused_staysRunning() async {
         let session = await running()
 
-        session.report(.changed(.running))
-        session.report(.changed(.paused))
+        session.report(.changed(.running, date: moment(0)))
+        session.report(.changed(.paused, date: moment(0)))
         await settle()
         await end(at: moment(10))
 
@@ -409,7 +415,7 @@ struct WorkoutSessionsTests {
         starting.cancel()
         await starting.value
         let orphan = FakeSession(activityID: UUID(fixture: 900))
-        orphan.report(.changed(.ended))
+        orphan.report(.changed(.ended, date: moment(0)))
         health.answerRecovery(.success(orphan))
         await recovering.value
 
@@ -452,13 +458,13 @@ struct WorkoutSessionsTests {
         #expect(starting.calls.value == [.observe, .start(moment(0)), .end])
         #expect(runningSession.calls.value == [.observe, .start(moment(1)), .stop(moment(10)), .end])
 
-        starting.report(.changed(.running))
-        runningSession.report(.changed(.ended))
+        starting.report(.changed(.running, date: moment(0)))
+        runningSession.report(.changed(.ended, date: moment(0)))
         await settle()
         #expect(starting.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end])
         #expect(!isDone.value)
 
-        starting.report(.changed(.ended))
+        starting.report(.changed(.ended, date: moment(0)))
         await ending.value
         #expect(starting.calls.value.last == .release)
     }
@@ -474,7 +480,7 @@ struct WorkoutSessionsTests {
         await ending.value
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
 
-        session.report(.changed(.ended))
+        session.report(.changed(.ended, date: moment(0)))
         await settle()
         #expect(session.calls.value.last == .release)
     }
