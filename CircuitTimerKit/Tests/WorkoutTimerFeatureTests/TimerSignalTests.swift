@@ -185,7 +185,7 @@ struct TimerSignalTests {
             #expect(owner == timerID)
             order.withValue { $0.append("cues") }
         }
-        timer.store.dependencies.workoutHealth.end = { owner, date in
+        timer.store.dependencies.workoutHealth.end = { owner, _, date in
             #expect(owner == timerID)
             #expect(date == origin)
             order.withValue { $0.append("health") }

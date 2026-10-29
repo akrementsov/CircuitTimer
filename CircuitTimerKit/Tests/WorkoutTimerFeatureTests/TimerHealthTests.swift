@@ -113,7 +113,7 @@ struct TimerHealthTests {
         state.destination = .closeConfirmation(.closeConfirmation(restart: .start))
         let timer = harness(state)
         let ends = LockIsolated<[UUID]>([])
-        timer.store.dependencies.workoutHealth.end = { owner, _ in ends.withValue { $0.append(owner) } }
+        timer.store.dependencies.workoutHealth.end = { owner, _, _ in ends.withValue { $0.append(owner) } }
 
         await send(.destination(.presented(.closeConfirmation(.finish))), to: timer)
         await timer.store.finish()

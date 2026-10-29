@@ -101,7 +101,7 @@ struct TimerNotificationTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
         state.notifications.needsRetry = true
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -121,7 +121,7 @@ struct TimerNotificationTests {
         state.notifications.hasSchedulingFailed = true
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -139,7 +139,7 @@ struct TimerNotificationTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -165,7 +165,7 @@ struct TimerNotificationTests {
         state.notifications.hasSchedulingFailed = true
         state.notifications.lastAttempt = MonotonicInstant(now: clock)
         let calls = LockIsolated(0)
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -202,7 +202,7 @@ struct TimerNotificationTests {
         state.notifications.access = .authorized
         let previousLanguage = language == "ru" ? "en" : "ru"
         state.notifications.projection = state.notificationProjection(at: origin, language: previousLanguage)
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -228,7 +228,7 @@ struct TimerNotificationTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.revision = 2
         state.notifications.hasSchedulingFailed = true
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -242,7 +242,7 @@ struct TimerNotificationTests {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.revision = 1
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -261,7 +261,7 @@ struct TimerNotificationTests {
         state.notifications.revision = 1
         state.notifications.hasSchedulingFailed = true
         state.notifications.needsRetry = true
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -278,7 +278,7 @@ struct TimerNotificationTests {
         state.notifications.access = .authorized
         state.notifications.accessGeneration = 1
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -295,7 +295,7 @@ struct TimerNotificationTests {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         state.notifications.accessGeneration = 2
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -312,7 +312,7 @@ struct TimerNotificationTests {
         state.notifications.access = .authorized
         state.notifications.accessGeneration = 2
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -360,7 +360,7 @@ struct TimerNotificationTests {
         state.notifications.needsRetry = true
         state.notifications.lastAttempt = MonotonicInstant(now: clock)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -410,7 +410,7 @@ struct TimerNotificationTests {
         let state = WorkoutTimerFeature.State.appearing()
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         let calls = LockIsolated(0)
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)

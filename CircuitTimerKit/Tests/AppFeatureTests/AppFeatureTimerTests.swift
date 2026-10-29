@@ -225,7 +225,7 @@ struct AppFeatureTimerTests {
         let store = makeStore(state) {
             $0.date = .constant(Self.closed)
             $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
-            $0.workoutHealth.end = { id, date in calls.withValue { $0.append(.health(id, date)) } }
+            $0.workoutHealth.end = { id, _, date in calls.withValue { $0.append(.health(id, date)) } }
             $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
             $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
             $0.liveActivity.end = { id in calls.withValue { $0.append(.liveActivity(id)) } }
@@ -274,7 +274,7 @@ struct AppFeatureTimerTests {
         var state = loaded([first])
         state.destination = .alert(.mutationFailed)
         let store = makeStore(state) {
-            $0.workoutHealth.end = { _, _ in Issue.record("An alert's dismissal ended a workout session") }
+            $0.workoutHealth.end = { _, _, _ in Issue.record("An alert's dismissal ended a workout session") }
         }
 
         await store.send(.destination(.dismiss)) { $0.destination = nil }

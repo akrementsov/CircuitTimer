@@ -50,12 +50,15 @@ extension WorkoutTimerFeature {
     /// The only way the timer closes; its clock must have stopped already.
     private func closeScreen(_ state: inout State) -> Effect<Action> {
         state.isClosing = true
+        let now = date()
+        // The second reducer skips the actions that close the screen, so the track takes its last step here.
+        if let phase = state.healthPhase { state.healthTrack.follow(phase, at: now) }
+        let track = state.healthTrack
         state.activityControls?.isEnding = true
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
         let revision = workoutRunRecord.nextRevision()
         let token = backgroundTask.begin("Clear the closed workout run")
         let id = state.id
-        let now = date()
         let notifications = backgroundNotifications
         let activity = liveActivity
         let health = workoutHealth
@@ -65,7 +68,7 @@ extension WorkoutTimerFeature {
         // session ended and returns before it sleeps.
         let close = Effect<Action>.run { [timerSession, health, cues, notifications, activity, dismiss, record, backgroundTask] _ in
             await timerSession.end(owner: id)
-            await health.end(id, now)
+            await health.end(id, track, now)
             await cues.end(id)
             await notifications.end(id)
             // The client bounds the wait; the activity goes in the background after that.

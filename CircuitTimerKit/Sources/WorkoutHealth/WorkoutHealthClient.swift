@@ -24,8 +24,11 @@ public struct WorkoutHealthClient: Sendable {
     /// Starts the owner's session. Repeating it, or starting an owner that has ended, does nothing. While `endOrphans`
     /// is recovering an earlier session it waits at most 2 seconds for it.
     public var start: @Sendable (_ owner: UUID, _ date: Date) async -> Void
-    /// Ends the owner's session and discards what it recorded; the owner never starts again.
-    public var end: @Sendable (_ owner: UUID, _ date: Date) async -> Void
+    /// Keeps the owner's newest track, so the session can save the run up to wherever it stands when it closes. An
+    /// older revision, or an owner that has ended, is ignored.
+    public var sync: @Sendable (_ owner: UUID, _ revision: Int, _ track: WorkoutHealthTrack) async -> Void
+    /// Ends the owner's session with its final track and discards what it recorded; the owner never starts again.
+    public var end: @Sendable (_ owner: UUID, _ track: WorkoutHealthTrack, _ date: Date) async -> Void
     /// Synchronous, so the app delegate refuses every later start before it returns from termination.
     public var beginTermination: @Sendable () -> Void
     /// Ends every session and waits until HealthKit reports each one ended.
@@ -66,9 +69,12 @@ extension WorkoutHealthClient: DependencyKey {
                 @Dependency(\.continuousClock) var clock
                 await sessions.start(owner: owner, at: date, clock: clock)
             },
-            end: { owner, date in
+            sync: { owner, revision, track in
+                await sessions.sync(owner: owner, revision: revision, track: track)
+            },
+            end: { owner, track, date in
                 @Dependency(\.continuousClock) var clock
-                await sessions.end(owner: owner, at: date, clock: clock)
+                await sessions.end(owner: owner, track: track, at: date, clock: clock)
             },
             beginTermination: { gate.close() },
             endAll: { date in
@@ -87,7 +93,8 @@ extension WorkoutHealthClient: DependencyKey {
         access: { .unavailable },
         requestAuthorization: {},
         start: { _, _ in },
-        end: { _, _ in },
+        sync: { _, _, _ in },
+        end: { _, _, _ in },
         beginTermination: {},
         endAll: { _ in },
         endOrphans: {}

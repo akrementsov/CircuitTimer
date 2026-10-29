@@ -24,7 +24,7 @@ struct WorkoutSessionsTests {
     }
 
     private func end(_ owner: UUID = owner, at date: Date = moment(10)) async {
-        await sessions.end(owner: owner, at: date, clock: clock)
+        await sessions.end(owner: owner, track: WorkoutHealthTrack(), at: date, clock: clock)
     }
 
     private func endOrphans() async {

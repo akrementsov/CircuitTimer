@@ -49,6 +49,8 @@ actor WorkoutSessions {
     private var slots: [UUID: Slot] = [:]
     /// Owners that have ended: a late or repeated start must not bring their session back.
     private var ended: Set<UUID> = []
+    /// Each owner's newest track and its revision, kept with or without a session.
+    private var tracks: [UUID: (revision: Int, track: WorkoutHealthTrack)] = [:]
     private var sessionCount = 0
     private var hasRecovered = false
     private var isRecovering = false
@@ -84,8 +86,15 @@ actor WorkoutSessions {
         admit(owner, at: date)
     }
 
-    func end(owner: UUID, at date: Date, clock: any Clock<Duration>) {
+    func sync(owner: UUID, revision: Int, track: WorkoutHealthTrack) {
+        guard !ended.contains(owner), revision > tracks[owner]?.revision ?? .min else { return }
+
+        tracks[owner] = (revision, track)
+    }
+
+    func end(owner: UUID, track: WorkoutHealthTrack, at date: Date, clock: any Clock<Duration>) {
         ended.insert(owner)
+        tracks[owner] = nil
         switch slots[owner] {
             case let .running(held):
                 // A wall clock moved back must not end the session before it started.
@@ -108,7 +117,7 @@ actor WorkoutSessions {
     /// again once it runs. Termination's deadline bounds the wait.
     func endAll(at date: Date, clock: any Clock<Duration>) async {
         for owner in slots.keys {
-            end(owner: owner, at: date, clock: clock)
+            end(owner: owner, track: tracks[owner]?.track ?? WorkoutHealthTrack(), at: date, clock: clock)
         }
         let ending = slots.values.count(where: \.isEnding)
         if ending > 0 {

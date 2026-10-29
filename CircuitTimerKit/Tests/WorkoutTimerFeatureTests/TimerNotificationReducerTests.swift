@@ -19,7 +19,7 @@ struct TimerNotificationReducerTests {
         let reads = LockIsolated(0)
         let removed = LockIsolated<[UUID]>([])
         let syncGate = AsyncStream<Void>.makeStream()
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -63,7 +63,7 @@ struct TimerNotificationReducerTests {
         let state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         let calls = LockIsolated(0)
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -90,7 +90,7 @@ struct TimerNotificationReducerTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.$isSoundOn = SharedReader(value: false)
         let plans = LockIsolated<[[ScheduledNotification]]>([])
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -127,7 +127,7 @@ struct TimerNotificationReducerTests {
         state.notifications.accessGeneration = 1
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let plans = LockIsolated<[[ScheduledNotification]]>([])
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -173,7 +173,7 @@ struct TimerNotificationReducerTests {
         state.notifications.access = .authorized
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let plans = LockIsolated<[[ScheduledNotification]]>([])
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = DateGenerator { wall.value }
@@ -216,7 +216,7 @@ struct TimerNotificationReducerTests {
         let started = AsyncStream<CheckedContinuation<NotificationAccess, Never>>.makeStream()
         let cancelled = AsyncStream<Void>.makeStream()
         let plans = LockIsolated<[[ScheduledNotification]]>([])
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -264,7 +264,7 @@ struct TimerNotificationReducerTests {
     func test_notificationPreferencesChanged_disabledWithoutHistoryDoesNothing() async {
         let state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -280,7 +280,7 @@ struct TimerNotificationReducerTests {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.$isBackgroundNotificationsOn = SharedReader(value: true)
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
@@ -421,6 +421,7 @@ struct TimerNotificationReducerTests {
         await timer.send(.view(.scenePhaseChanged(.active)), saving: true) {
             $0.isInBackground = false
             $0.run.rebase(at: now, keepingTotalElapsed: .seconds(7))
+            $0.healthTrack.rebase(from: moment(4), to: now)
             $0.settle(at: now)
             $0.clockGeneration = 3
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(7))
@@ -452,7 +453,7 @@ struct TimerNotificationReducerTests {
         state.destination = .closeConfirmation(.closeConfirmation(restart: nil))
         let reads = LockIsolated(0)
         let plans = LockIsolated<[[ScheduledNotification]]>([])
-        let store = TestStore(initialState: state) { WorkoutTimerFeature() } withDependencies: {
+        let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
