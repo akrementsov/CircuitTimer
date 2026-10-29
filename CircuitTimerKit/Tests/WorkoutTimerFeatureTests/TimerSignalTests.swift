@@ -4,6 +4,8 @@ import ComposableArchitecture
 import Foundation
 import SwiftUI
 import Testing
+import WorkoutActivity
+import WorkoutHealth
 
 @MainActor
 struct TimerSignalTests {
@@ -183,9 +185,18 @@ struct TimerSignalTests {
             #expect(owner == timerID)
             order.withValue { $0.append("cues") }
         }
+        timer.store.dependencies.workoutHealth.end = { owner, date in
+            #expect(owner == timerID)
+            #expect(date == origin)
+            order.withValue { $0.append("health") }
+        }
         timer.store.dependencies.backgroundNotifications.end = { owner in
             #expect(owner == timerID)
             order.withValue { $0.append("notifications") }
+        }
+        timer.store.dependencies.liveActivity.end = { owner in
+            #expect(owner == timerID)
+            order.withValue { $0.append("activity") }
         }
         timer.store.dependencies.dismiss = DismissEffect { order.withValue { $0.append("dismiss") } }
         if finished {
@@ -194,7 +205,7 @@ struct TimerSignalTests {
             await timer.store.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
         }
         await timer.store.finish()
-        #expect(order.value == ["session", "cues", "notifications", "dismiss"])
+        #expect(order.value == ["session", "health", "cues", "notifications", "activity", "dismiss"])
     }
 
     @Test
