@@ -295,6 +295,14 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WorkoutHealthTests",
+            dependencies: [
+                "WorkoutHealth",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WorkoutTimerFeatureTests",
             dependencies: [
                 "BackgroundNotifications",
