@@ -52,14 +52,9 @@ actor WorkoutSessions {
     private var sessionCount = 0
     private var hasRecovered = false
     private var isRecovering = false
-    private var hasEndedOrphan = false
     private var recoveryWaiters: [AsyncStream<Void>.Continuation] = []
     /// `endAll` callers waiting for the ending sessions to report their end.
     private var endingWaiters: [AsyncStream<Void>.Continuation] = []
-    /// Starts that failed because recovery had not yet ended an earlier session; each runs once more after recovery.
-    private var retryAfterRecovery: Set<UUID> = []
-    /// Owners already started once more, so a session that keeps failing is not retried in a loop.
-    private var retried: Set<UUID> = []
 
     init(transport: SessionTransport, gate: TerminationGate, now: @escaping @Sendable () -> Date) {
         self.transport = transport
@@ -91,7 +86,6 @@ actor WorkoutSessions {
 
     func end(owner: UUID, at date: Date, clock: any Clock<Duration>) {
         ended.insert(owner)
-        retryAfterRecovery.remove(owner)
         switch slots[owner] {
             case let .running(held):
                 // A wall clock moved back must not end the session before it started.
@@ -127,7 +121,8 @@ actor WorkoutSessions {
         }
     }
 
-    /// Ends a session an earlier process left running, then retries the starts it blocked. Runs once per process.
+    /// Ends a session an earlier process left running, then lets the starts that waited for it go on. Runs once per
+    /// process.
     func endOrphans(clock: any Clock<Duration>) async {
         guard !hasRecovered else { return }
 
@@ -140,7 +135,7 @@ actor WorkoutSessions {
                 await endIfOrphan(recovered, clock: clock)
             }
         } catch is CancellationError {
-            // Not a failure; the blocked starts below still go on.
+            // Not a failure; the waiting starts below still go on.
         } catch {
             Logger.workoutHealth.error("Recovering a workout session failed: \(String(reflecting: error), privacy: .public)")
         }
@@ -149,13 +144,6 @@ actor WorkoutSessions {
             waiter.finish()
         }
         recoveryWaiters = []
-
-        let retries = retryAfterRecovery
-        retryAfterRecovery = []
-        for owner in retries where canStart(owner) {
-            retried.insert(owner)
-            admit(owner, at: now())
-        }
     }
 
     private func canStart(_ owner: UUID) -> Bool {
@@ -213,9 +201,13 @@ actor WorkoutSessions {
                 held.handle.end()
                 slots[owner] = nil
                 release(held)
-                startFailed(owner, error: error)
+                startFailed(error)
             case let (.failed(error), .running):
-                Logger.workoutHealth.error("A running workout session failed: \(String(reflecting: error), privacy: .public)")
+                if (error as? HKError)?.code == .errorAnotherWorkoutSessionStarted {
+                    Logger.workoutHealth.notice("Another workout session took over")
+                } else {
+                    Logger.workoutHealth.error("A running workout session failed: \(String(reflecting: error), privacy: .public)")
+                }
                 held.handle.end()
                 slots[owner] = .lost
                 release(held)
@@ -228,17 +220,12 @@ actor WorkoutSessions {
         }
     }
 
-    /// The next start, on the next active scene or after recovery, tries again.
-    private func startFailed(_ owner: UUID, error: any Error) {
+    /// Only the next start, on the next active scene, tries again: a newer session ends the one running, ours or another
+    /// app's, so retrying at once would take it from whoever started it.
+    private func startFailed(_ error: any Error) {
         switch (error as? HKError)?.code {
             case .errorAnotherWorkoutSessionStarted:
-                Logger.workoutHealth.notice("Another workout session is running")
-                if isRecovering {
-                    retryAfterRecovery.insert(owner)
-                } else if hasEndedOrphan, retried.insert(owner).inserted {
-                    // Recovery has ended the other session, which may still have been ending when this one started.
-                    admit(owner, at: now())
-                }
+                Logger.workoutHealth.notice("Another workout session started before this one ran")
             case .errorBackgroundWorkoutSessionNotAllowed:
                 Logger.workoutHealth.notice("A workout session cannot start in the background")
             default:
@@ -292,7 +279,6 @@ actor WorkoutSessions {
 
         let events = recovered.observe()
         recovered.end()
-        hasEndedOrphan = true
         Logger.workoutHealth.notice("Ended a workout session left by an earlier process")
         let didEnd = await Self.finishes(within: Self.recoveryTimeout, clock: clock) {
             for await event in events {

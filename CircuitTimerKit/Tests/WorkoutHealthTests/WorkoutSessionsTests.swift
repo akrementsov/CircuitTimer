@@ -227,16 +227,13 @@ struct WorkoutSessionsTests {
     }
 
     @Test(arguments: [false, true])
-    func test_endOrphans_recoveryThrows_waitingStartsAndRetriesGoOn(isCancellation: Bool) async {
+    func test_endOrphans_recoveryThrows_waitingStartsGoOn(isCancellation: Bool) async {
         let recovering = Task { await endOrphans() }
         await settle()
-        // The first start times out, admits a session that fails behind the earlier one, and waits for a retry.
         let first = Task { await start(at: moment(1)) }
         await settle()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await first.value
-        health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
-        await settle()
         let second = Task { await start(Self.other, at: moment(2)) }
         await settle()
 
@@ -244,59 +241,30 @@ struct WorkoutSessionsTests {
         await recovering.value
         await second.value
 
-        #expect(Set(health.created.value.flatMap(\.calls.value).filter(\.isStart)) == [
-            .start(moment(1)), .start(moment(2)), .start(Self.now),
-        ])
-        #expect(health.created.value.count == 3)
+        #expect(health.created.value.flatMap(\.calls.value).filter(\.isStart) == [.start(moment(1)), .start(moment(2))])
     }
 
-    @Test
-    func test_anotherSession_duringRecovery_retriesOnceAfterItAtNow() async {
+    @Test(arguments: [false, true])
+    func test_startingSession_anotherSessionStarted_startsNoSessionUntilTheNextStart(duringRecovery: Bool) async {
+        let orphan = FakeSession(activityID: UUID(fixture: 900))
+        orphan.report(.changed(.ended))
         let recovering = Task { await endOrphans() }
         await settle()
-        let starting = Task { await start(at: moment(1)) }
+        if !duringRecovery {
+            health.answerRecovery(.success(orphan))
+            await recovering.value
+        }
+        let starting = Task { await start() }
         await settle()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
+
         health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
         await settle()
-        #expect(health.created.value.count == 1)
-
-        health.answerRecovery(.success(nil))
-        await recovering.value
-
-        #expect(health.created.value.count == 2)
-        #expect(health.session(1).calls.value == [.observe, .start(Self.now)])
-    }
-
-    @Test
-    func test_anotherSession_afterTheOrphanEnded_retriesExactlyOnce() async {
-        let orphan = FakeSession(activityID: UUID(fixture: 900))
-        orphan.report(.changed(.ended))
-        health.answerRecovery(.success(orphan))
-        await endOrphans()
-
-        await start()
-        health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
-        await settle()
-        #expect(health.created.value.count == 2)
-        #expect(health.session(1).calls.value == [.observe, .start(Self.now)])
-
-        health.session(1).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
-        await settle()
-        #expect(health.created.value.count == 2)
-    }
-
-    @Test
-    func test_startFailure_otherCode_isNotRetried() async {
-        let orphan = FakeSession(activityID: UUID(fixture: 900))
-        orphan.report(.changed(.ended))
-        health.answerRecovery(.success(orphan))
-        await endOrphans()
-
-        await start()
-        health.session(0).report(.failed(FakeError()))
-        await settle()
+        if duringRecovery {
+            health.answerRecovery(.success(orphan))
+            await recovering.value
+        }
 
         #expect(health.created.value.count == 1)
     }
@@ -320,6 +288,7 @@ struct WorkoutSessionsTests {
     static let startingFailures: [SessionEvent] = [
         .failed(FakeError()),
         .failed(HKError(.errorBackgroundWorkoutSessionNotAllowed)),
+        .failed(HKError(.errorAnotherWorkoutSessionStarted)),
         .changed(.ended),
     ]
 
@@ -337,7 +306,7 @@ struct WorkoutSessionsTests {
         #expect(health.created.value.count == 2)
     }
 
-    @Test(arguments: [SessionEvent.failed(FakeError()), .changed(.ended)])
+    @Test(arguments: [SessionEvent.failed(FakeError()), .failed(HKError(.errorAnotherWorkoutSessionStarted)), .changed(.ended)])
     func test_runningSession_failsOrEnds_isLostAndNeverStartsAgain(event: SessionEvent) async {
         let session = await running()
 
@@ -448,7 +417,7 @@ struct WorkoutSessionsTests {
     }
 
     @Test
-    func test_start_waitAndRetryPaths_neverAdmitTwoSessions() async {
+    func test_start_againAfterAFailureDuringRecovery_admitsOneSession() async {
         let recovering = Task { await endOrphans() }
         await settle()
         let starting = Task { await start() }
