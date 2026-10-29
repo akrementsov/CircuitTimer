@@ -137,6 +137,7 @@ another container in the signature|signature|com.apple.developer.icloud-containe
 no CloudKit in the signature|signature|com.apple.developer.icloud-services|["CloudDocuments"]|CircuitTimer.app: iCloud services ['CloudDocuments'] lack CloudKit
 no aps-environment in the signature|signature|aps-environment|null|CircuitTimer.app: the archived signature has no aps-environment
 no HealthKit in the signature|signature|com.apple.developer.healthkit|null|CircuitTimer.app: the archived signature has com.apple.developer.healthkit None, not True
+HealthKit off in the signature|signature|com.apple.developer.healthkit|false|CircuitTimer.app: the archived signature has com.apple.developer.healthkit False, not True
 EOF
 
 describe "archive: no Russian strings"
@@ -186,7 +187,9 @@ no push|signature|aps-environment|null|CircuitTimer.app: the push environment is
 a profile without the container|profile|Entitlements|{}|CircuitTimer.app: the profile allows the iCloud containers [], not '$container'
 a profile with another container|profile|Entitlements|{"com.apple.developer.icloud-container-identifiers": ["iCloud.com.example.other"]}|CircuitTimer.app: the profile allows the iCloud containers ['iCloud.com.example.other'], not '$container'
 no HealthKit|signature|com.apple.developer.healthkit|null|CircuitTimer.app: the signature has com.apple.developer.healthkit None, not True
+HealthKit off|signature|com.apple.developer.healthkit|false|CircuitTimer.app: the signature has com.apple.developer.healthkit False, not True
 a profile without HealthKit|profile|Entitlements|{"com.apple.developer.icloud-container-identifiers": ["$container"]}|CircuitTimer.app: the profile does not allow HealthKit
+a profile with HealthKit off|profile|Entitlements|{"com.apple.developer.icloud-container-identifiers": ["$container"], "com.apple.developer.healthkit": false}|CircuitTimer.app: the profile does not allow HealthKit
 EOF
 
 describe "ipa: a widget signed with HealthKit"
