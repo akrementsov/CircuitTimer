@@ -118,7 +118,10 @@ struct TimerRecordTests {
             #expect(record == nil)
         }
 
-        await timer.send(.view(.closeButtonTapped), saving: true) { $0.clockGeneration = 2 }
+        await timer.send(.view(.closeButtonTapped), saving: true) {
+            $0.clockGeneration = 2
+            $0.isClosing = true
+        }
         await timer.store.finish()
 
         let order = operations.value

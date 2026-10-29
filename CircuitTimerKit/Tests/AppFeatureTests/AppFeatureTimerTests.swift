@@ -200,6 +200,7 @@ struct AppFeatureTimerTests {
         }
         await store.send(.destination(.presented(.timer(.destination(.presented(.closeConfirmation(.finish))))))) {
             $0.$destination[case: \.timer]?.destination = nil
+            $0.$destination[case: \.timer]?.isClosing = true
         }
         await store.receive(\.destination.dismiss) {
             $0.destination = nil

@@ -136,7 +136,10 @@ struct TimerLifecycleTests {
         await timer.send(.view(.task), saving: true) { $0.clockGeneration = 1 }
         await timer.send(.view(.playPauseButtonTapped))
         await timer.send(.view(.nextButtonTapped))
-        await timer.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
+        await timer.send(.view(.closeButtonTapped)) {
+            $0.clockGeneration = 2
+            $0.isClosing = true
+        }
         await store.finish()
 
         #expect(timer.calls.value == [.end(owner: timerID), .dismiss])

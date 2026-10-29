@@ -49,6 +49,7 @@ struct TimerActivityTeardownTests {
         }
         await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.clockGeneration = 2
+            $0.isClosing = true
             $0.activityControls?.isEnding = true
         }
         await timer.store.finish()

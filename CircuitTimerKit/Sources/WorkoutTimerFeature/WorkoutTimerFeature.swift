@@ -83,6 +83,8 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var liveActivityNotice: LiveActivityNotice?
         /// Exists for the timer stack's control subscription, independently of its clock loops.
         var activityControls: ActivityControlState?
+        /// Set once the screen starts closing, also before the control subscription exists.
+        var isClosing = false
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @SharedReader(.keepScreenOn) var isKeepScreenOn = true

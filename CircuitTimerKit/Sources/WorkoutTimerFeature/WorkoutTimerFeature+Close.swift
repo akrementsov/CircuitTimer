@@ -49,6 +49,7 @@ extension WorkoutTimerFeature {
 
     /// The only way the timer closes; its clock must have stopped already.
     private func closeScreen(_ state: inout State) -> Effect<Action> {
+        state.isClosing = true
         state.activityControls?.isEnding = true
         assert(!state.requestedAwake, "The timer closes only after its clock has stopped")
         let revision = workoutRunRecord.nextRevision()

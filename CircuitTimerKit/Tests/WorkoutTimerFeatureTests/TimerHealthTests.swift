@@ -11,10 +11,14 @@ import WorkoutHealth
 struct TimerHealthTests {
     private let starts = LockIsolated<[Date]>([])
 
-    private func harness(_ state: WorkoutTimerFeature.State, isSceneActive: Bool = true) -> TimerHarness {
+    private func harness(
+        _ state: WorkoutTimerFeature.State,
+        isSceneActive: Bool = true,
+        hasActivityControls: Bool = true
+    ) -> TimerHarness {
         var state = state
         state.isSceneActive = isSceneActive
-        let timer = TimerHarness(state, activity: true)
+        let timer = TimerHarness(state, activity: hasActivityControls)
         timer.store.exhaustivity = .off(showSkippedAssertions: false)
         timer.store.dependencies.workoutHealth.start = { [starts] owner, date in
             #expect(owner == timerID)
@@ -74,9 +78,10 @@ struct TimerHealthTests {
         await timer.cancelClockLoop()
     }
 
-    @Test
-    func test_closing_startsNoSessionOnAnActiveSceneBeforeTheCoverGoes() async {
-        let timer = harness(.fixture(.finished))
+    /// Without the control subscription, as when the screen closes before the timer stack's `.activityTask` ran.
+    @Test(arguments: [true, false])
+    func test_closing_startsNoSessionOnAnActiveSceneBeforeTheCoverGoes(hasActivityControls: Bool) async {
+        let timer = harness(.fixture(.finished), hasActivityControls: hasActivityControls)
         // Holds the close before its dismissal, as a slow teardown would.
         let teardown = AsyncStream<Void>.makeStream()
         timer.store.dependencies.timerSession.end = { _ in for await _ in teardown.stream {} }

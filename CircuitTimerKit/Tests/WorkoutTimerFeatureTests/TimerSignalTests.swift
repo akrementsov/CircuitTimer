@@ -200,9 +200,15 @@ struct TimerSignalTests {
         }
         timer.store.dependencies.dismiss = DismissEffect { order.withValue { $0.append("dismiss") } }
         if finished {
-            await timer.store.send(.view(.closeButtonTapped)) { $0.clockGeneration = 2 }
+            await timer.store.send(.view(.closeButtonTapped)) {
+                $0.clockGeneration = 2
+                $0.isClosing = true
+            }
         } else {
-            await timer.store.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
+            await timer.store.send(.destination(.presented(.closeConfirmation(.finish)))) {
+                $0.destination = nil
+                $0.isClosing = true
+            }
         }
         await timer.store.finish()
         #expect(order.value == ["session", "health", "cues", "notifications", "activity", "dismiss"])

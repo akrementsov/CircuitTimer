@@ -8,7 +8,7 @@ extension WorkoutTimerFeature {
     /// again on the next return to the app.
     func startHealthSession(_ state: State, after action: Action, at now: Date) -> Effect<Action> {
         guard action == .view(.task) || action == .view(.scenePhaseChanged(.active)),
-              state.isSceneActive, state.clockGeneration > 0, state.activityControls?.isEnding != true
+              state.isSceneActive, state.clockGeneration > 0, !state.isClosing
         else { return .none }
 
         return .run { [workoutHealth, id = state.id] _ in
