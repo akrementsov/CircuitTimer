@@ -75,6 +75,12 @@ final class FakeHealth: Sendable {
     /// Every session `create` made, in order; the n-th has activity `UUID(fixture: n)`.
     let created = LockIsolated<[FakeSession]>([])
     let recoveries = LockIsolated(0)
+    /// Every workout `save` received, in order.
+    let saved = LockIsolated<[HealthWorkout]>([])
+    /// Consumed one per `save` before any succeeds.
+    let saveFailures = LockIsolated<[FakeError]>([])
+    /// While set, a save waits until the test finishes it.
+    let saveGate = LockIsolated<AsyncStream<Void>?>(nil)
     private let recovery = AsyncStream<Result<FakeSession?, any Error>>.makeStream()
 
     var transport: SessionTransport {
@@ -96,6 +102,15 @@ final class FakeHealth: Sendable {
                     return try answer.get()?.handle
                 }
                 return nil
+            },
+            save: { workout in
+                self.saved.withValue { $0.append(workout) }
+                if let gate = self.saveGate.value {
+                    for await _ in gate {}
+                }
+                if let failure = self.saveFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
+                    throw failure
+                }
             }
         )
     }

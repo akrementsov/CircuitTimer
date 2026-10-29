@@ -51,11 +51,14 @@ actor WorkoutSessions {
     private var ended: Set<UUID> = []
     /// Each owner's newest track and its revision, kept with or without a session.
     private var tracks: [UUID: (revision: Int, track: WorkoutHealthTrack)] = [:]
+    /// Saves still under way; `endAll` waits for them as for the sessions that are ending.
+    private var saving: Set<Int> = []
+    private var saveCount = 0
     private var sessionCount = 0
     private var hasRecovered = false
     private var isRecovering = false
     private var recoveryWaiters: [AsyncStream<Void>.Continuation] = []
-    /// `endAll` callers waiting for the ending sessions to report their end.
+    /// `endAll` callers waiting for the ending sessions to report their end and the saves to finish.
     private var endingWaiters: [AsyncStream<Void>.Continuation] = []
 
     init(transport: SessionTransport, gate: TerminationGate, now: @escaping @Sendable () -> Date) {
@@ -102,10 +105,13 @@ actor WorkoutSessions {
                 held.handle.end()
                 slots[owner] = .ending(held)
                 watchEnd(of: held.number, owner: owner, clock: clock)
+                save(track.workout(closingAt: date))
             case let .starting(held):
                 held.handle.end()
                 slots[owner] = .ending(held)
                 watchEnd(of: held.number, owner: owner, clock: clock)
+                save(track.workout(closingAt: date))
+            // A lost session saved its workout when it was lost; a reserved one never held a session.
             case .reserved, .lost:
                 slots[owner] = nil
             case .ending, nil:
@@ -114,7 +120,7 @@ actor WorkoutSessions {
     }
 
     /// Ends every session and waits until HealthKit reports each one ended, so one that was still starting is ended
-    /// again once it runs. Termination's deadline bounds the wait.
+    /// again once it runs, and until every workout is saved. Termination's deadline bounds the wait.
     func endAll(at date: Date, clock: any Clock<Duration>) async {
         for owner in slots.keys {
             end(owner: owner, track: tracks[owner]?.track ?? WorkoutHealthTrack(), at: date, clock: clock)
@@ -123,7 +129,7 @@ actor WorkoutSessions {
         if ending > 0 {
             Logger.workoutHealth.notice("Waiting for \(ending, privacy: .public) workout sessions to report their end")
         }
-        while slots.values.contains(where: \.isEnding), !Task.isCancelled {
+        while isWaitedFor, !Task.isCancelled {
             let (stream, waiter) = AsyncStream<Void>.makeStream()
             endingWaiters.append(waiter)
             for await _ in stream {}
@@ -203,8 +209,12 @@ actor WorkoutSessions {
                 release(held)
             case (.changed(.ended), .running):
                 Logger.workoutHealth.error("HealthKit ended a running workout session")
-                slots[owner] = .lost
-                release(held)
+                lose(held, owner: owner)
+            case (.changed(.stopped), .running):
+                // Stopped, the session would keep the process alive until it ends.
+                Logger.workoutHealth.error("HealthKit stopped a running workout session")
+                held.handle.end()
+                lose(held, owner: owner)
             case let (.failed(error), .starting):
                 // A failed session may still be running; ending it leaves nothing behind.
                 held.handle.end()
@@ -218,8 +228,7 @@ actor WorkoutSessions {
                     Logger.workoutHealth.error("A running workout session failed: \(String(reflecting: error), privacy: .public)")
                 }
                 held.handle.end()
-                slots[owner] = .lost
-                release(held)
+                lose(held, owner: owner)
             case let (.failed(error), .ending):
                 Logger.workoutHealth.error("A workout session failed while ending: \(String(reflecting: error), privacy: .public)")
                 slots[owner] = nil
@@ -265,16 +274,58 @@ actor WorkoutSessions {
         Logger.workoutHealth.notice("A workout session did not report its end within \(Self.endTimeout, privacy: .public)")
     }
 
-    /// Nothing is saved to Health in this release: whatever the session recorded is discarded.
     private func release(_ held: HeldSession) {
         held.handle.release()
         held.watch.cancel()
-        if !slots.values.contains(where: \.isEnding) {
-            for waiter in endingWaiters {
-                waiter.finish()
+        wakeEndingWaiters()
+    }
+
+    /// Never started again, so the workout so far is saved now, up to the moment HealthKit reported the loss.
+    private func lose(_ held: HeldSession, owner: UUID) {
+        slots[owner] = .lost
+        save(tracks.removeValue(forKey: owner)?.track.workout(closingAt: now()))
+        release(held)
+    }
+
+    /// Saves beside the session, which the save does not need, so ending the session never waits for Health.
+    private func save(_ workout: HealthWorkout?) {
+        guard let workout else { return }
+
+        saveCount += 1
+        let number = saveCount
+        saving.insert(number)
+        let transport = transport
+        // The save must outlive the caller, which returns as soon as it has asked the session to end.
+        // swiftlint:disable:next no_unstructured_task
+        Task { [weak self] in
+            do {
+                try await transport.save(workout)
+                Logger.workoutHealth.notice("Saved a workout to Health")
+            } catch is CancellationError {
+                // Nothing cancels a save; HealthKit reporting one is not a failure of ours.
+            } catch {
+                Logger.workoutHealth.error("Saving a workout to Health failed: \(String(reflecting: error), privacy: .public)")
             }
-            endingWaiters = []
+            await self?.saveFinished(number)
         }
+    }
+
+    private func saveFinished(_ number: Int) {
+        saving.remove(number)
+        wakeEndingWaiters()
+    }
+
+    private var isWaitedFor: Bool {
+        slots.values.contains(where: \.isEnding) || !saving.isEmpty
+    }
+
+    private func wakeEndingWaiters() {
+        guard !isWaitedFor else { return }
+
+        for waiter in endingWaiters {
+            waiter.finish()
+        }
+        endingWaiters = []
     }
 
     private func endIfOrphan(_ recovered: SessionHandle, clock: any Clock<Duration>) async {
