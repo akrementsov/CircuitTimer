@@ -173,3 +173,16 @@ final class NotificationFake: Sendable {
         }
     }
 }
+
+/// What ends an owner from outside its timer: the timer closing, or iOS terminating the app.
+enum OwnerEnding: CaseIterable, Sendable {
+    case end
+    case termination
+
+    func fire(_ scheduler: NotificationScheduler, owner: UUID) {
+        switch self {
+            case .end: scheduler.end(owner)
+            case .termination: scheduler.beginTermination()
+        }
+    }
+}
