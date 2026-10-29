@@ -48,7 +48,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 
 Layering:
 
-- `*Feature` → `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, `WorkoutActivity`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
+- `*Feature` → `DesignSystem`, `WorkoutDomain`, `WorkoutStorage`, `WorkoutActivity`, `WorkoutHealth`, `TimerPreferences`, `BackgroundExecution`, `BackgroundNotifications`, `CloudSync`. A feature never imports another feature; composition happens in `AppFeature`.
 - Features import `UITestContract` only for accessibility identifiers. `AppScenarios` is all under `#if DEBUG`, so Release links it empty; only the app imports it, in Debug, and it imports features only for their clients.
 - `BackgroundExecution` owns background-task assertions shared by `AppFeature` and `WorkoutTimerFeature`; it imports no feature, TCA, or workout module.
 - `BackgroundNotifications` imports no feature, TCA or workout module; the app and the timer use only its dependency client.
