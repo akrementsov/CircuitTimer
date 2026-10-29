@@ -6,6 +6,7 @@ import ComposableArchitecture
 import Foundation
 import Testing
 import WorkoutDomain
+import WorkoutHealth
 import WorkoutStorage
 
 @MainActor
@@ -48,11 +49,13 @@ struct AppFeatureRunRestoreTests {
         let ends = LockIsolated<[UUID]>([])
         let accesses = LockIsolated(0)
         let requests = LockIsolated(0)
-        let store = offered(saved, notificationsEnabled: true) {
+        let store = offered(saved, notificationsEnabled: true, healthAccess: nil) {
             $0.date = .constant(wall)
             $0.timerSession.end = { id in ends.withValue { $0.append(id) } }
             $0.backgroundNotifications.access = { accesses.withValue { $0 += 1 }; return .authorized }
             $0.backgroundNotifications.requestAuthorization = { requests.withValue { $0 += 1 }; return .authorized }
+            $0.workoutHealth.access = { accesses.withValue { $0 += 1 }; return .notDetermined }
+            $0.workoutHealth.requestAuthorization = { requests.withValue { $0 += 1 } }
         }
 
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
@@ -472,12 +475,18 @@ struct AppFeatureRunRestoreTests {
     private func offered(
         _ saved: StoredRunRecord,
         notificationsEnabled: Bool = false,
+        healthAccess: HealthAccess? = .unavailable,
         dependencies: (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<AppFeature> {
         var state = loaded([workout])
         state.runRestore = .offered(saved)
         state.destination = .resumeRun(.resumeRun(workoutName: workout.name))
-        return makeStore(state, notificationsEnabled: notificationsEnabled, dependencies: dependencies)
+        return makeStore(
+            state,
+            notificationsEnabled: notificationsEnabled,
+            healthAccess: healthAccess,
+            dependencies: dependencies
+        )
     }
 
     private struct SaveFailure: Error {}

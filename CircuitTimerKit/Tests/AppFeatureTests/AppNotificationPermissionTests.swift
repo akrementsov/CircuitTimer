@@ -29,7 +29,7 @@ struct AppNotificationPermissionTests {
         }
 
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.receive(\.internal.notificationAccessQueried) {
@@ -67,7 +67,7 @@ struct AppNotificationPermissionTests {
             }
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.receive(\.internal.notificationAccessQueried) {
@@ -96,7 +96,7 @@ struct AppNotificationPermissionTests {
     @Test
     func test_permissionAnswered_obsoleteGeneration_doesNotOpenTimerOrReplaceCache() async {
         var state = loaded([makeWorkout(1)])
-        state.notificationPermissionGeneration = 2
+        state.startGeneration = 2
         let denied = NotificationAccess(authorization: .denied, showsAlerts: false, playsSound: false)
         state.notificationAccess = denied
         let store = makeStore(state)
@@ -122,7 +122,7 @@ struct AppNotificationPermissionTests {
             }
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.receive(\.internal.notificationAccessQueried) {
@@ -148,7 +148,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         let store = makeStore(state, notificationsEnabled: true)
 
@@ -156,7 +156,7 @@ struct AppNotificationPermissionTests {
             $0.path[id: editorID, case: \.editor]?.phase = .editing
             $0.path[id: editorID, case: \.editor]?.isStarting = false
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
         }
         await store.send(.internal(.notificationPermissionAnswered(generation: 1, .authorized)))
         #expect(store.state.destination == nil)
@@ -170,14 +170,14 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         let store = makeStore(state, notificationsEnabled: true)
 
         await store.send(.view(.tabSelected(.settings))) {
             $0.selectedTab = .settings
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
             $0.path[id: editorID, case: \.editor]?.isStarting = false
         }
         await store.send(.view(.tabSelected(.workouts))) { $0.selectedTab = .workouts }
@@ -225,7 +225,7 @@ struct AppNotificationPermissionTests {
             $0.destination = .timer($0.testTimer(for: workout))
         }
         #expect(store.state.startIntent == nil)
-        #expect(store.state.notificationPermissionGeneration == 0)
+        #expect(store.state.startGeneration == 0)
         await store.send(.destination(.dismiss)) { $0.destination = nil }
         await store.finish()
         #expect(accesses.value == 0)
@@ -249,11 +249,11 @@ struct AppNotificationPermissionTests {
             $0.timerSession.end = { _ in }
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout))))))
-        #expect(store.state.notificationPermissionGeneration == 1)
+        #expect(store.state.startGeneration == 1)
         #expect(store.state.startIntent?.generation == 1)
         gate.open()
         await store.receive(.internal(.notificationAccessQueried(generation: 1, .authorized))) {
@@ -277,13 +277,13 @@ struct AppNotificationPermissionTests {
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         let store = makeStore(state, notificationsEnabled: true)
 
         await store.send(.internal(.notificationPermissionAnswered(generation: 1, .authorized))) {
             $0.notificationAccess = .authorized
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
             $0.path[id: editorID, case: \.editor]?.isStarting = false
         }
         #expect(store.state.destination == nil)
@@ -298,13 +298,13 @@ struct AppNotificationPermissionTests {
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.destination = .resumeRun(.retryTimer)
         let store = makeStore(state, notificationsEnabled: true)
 
         await store.send(.internal(.startIntentConfirmed(generation: 1))) {
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
             $0.path[id: editorID, case: \.editor]?.isStarting = false
         }
         #expect(store.state.destination?.is(\.resumeRun) == true)
@@ -332,7 +332,7 @@ struct AppNotificationPermissionTests {
             $0.timerSession.end = { _ in }
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.receive(\.internal.notificationAccessQueried) { $0.startIntent?.isAwaitingAuthorization = true }
@@ -362,7 +362,7 @@ struct AppNotificationPermissionTests {
             $0.timerSession.end = { _ in }
         }
         await store.send(.path(.element(id: editorID, action: .editor(.delegate(.startRequested(workout)))))) {
-            $0.notificationPermissionGeneration = 1
+            $0.startGeneration = 1
             $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
         }
         await store.receive(\.internal.notificationAccessQueried) { $0.startIntent?.isAwaitingAuthorization = true }
@@ -383,7 +383,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout, isAwaitingAuthorization: true)
         state.destination = .permissionStalled(.permissionStalled)
         let clock = TestClock()
@@ -407,7 +407,7 @@ struct AppNotificationPermissionTests {
         #expect(requests.value == 0)
         await store.send(.internal(.startIntentConfirmed(generation: 1))) {
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
             $0.path[id: editorID, case: \.editor]?.isStarting = false
         }
         await store.send(.destination(.dismiss)) { $0.destination = nil }
@@ -421,7 +421,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout, isAwaitingAuthorization: true)
         state.destination = .permissionStalled(.permissionStalled)
         let store = makeStore(state, notificationsEnabled: true) { $0.timerSession.end = { _ in } }
@@ -444,7 +444,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout, isAwaitingAuthorization: true)
         let clock = TestClock()
         let store = makeStore(state, notificationsEnabled: true) { $0.continuousClock = clock }
@@ -461,7 +461,7 @@ struct AppNotificationPermissionTests {
         }
         await store.send(.internal(.startIntentConfirmed(generation: 1))) {
             $0.startIntent = nil
-            $0.notificationPermissionGeneration = 2
+            $0.startGeneration = 2
         }
         await store.send(.destination(.dismiss)) { $0.destination = nil }
         await store.receive(.internal(.notificationPermissionWait))
@@ -474,7 +474,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 2
+        state.startGeneration = 2
         state.startIntent = AppFeature.StartIntent(generation: 2, editorID: editorID, workout: workout, isAwaitingAuthorization: true)
         state.destination = .permissionStalled(.permissionStalled)
         let clock = TestClock()
@@ -508,7 +508,7 @@ struct AppNotificationPermissionTests {
         var state = loaded([workout])
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
-        state.notificationPermissionGeneration = 1
+        state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout, isAwaitingAuthorization: true)
         let clock = TestClock()
         let store = makeStore(state, notificationsEnabled: true) {
@@ -525,7 +525,7 @@ struct AppNotificationPermissionTests {
             await store.send(.view(.tabSelected(.settings))) {
                 $0.selectedTab = .settings
                 $0.startIntent = nil
-                $0.notificationPermissionGeneration = 2
+                $0.startGeneration = 2
                 $0.path[id: editorID, case: \.editor]?.isStarting = false
             }
         }

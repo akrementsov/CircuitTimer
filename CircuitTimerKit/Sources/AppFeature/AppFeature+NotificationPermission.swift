@@ -1,31 +1,20 @@
 import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
-import SwiftUI
 import WorkoutDomain
 
 extension AppFeature {
-    struct StartIntent: Equatable, Sendable {
-        let generation: Int
-        let editorID: StackElementID
-        let workout: Workout
-        var isAwaitingAuthorization = false
-    }
-
     public enum PermissionStallChoice: Equatable, Sendable {
         case startNow
         case wait
     }
 
-    func prepareNotificationPermission(_ workout: Workout, _ state: inout State) -> Effect<Action> {
+    func prepareNotificationPermission(_ workout: Workout, editorID: StackElementID, _ state: inout State) -> Effect<Action> {
         guard state.isBackgroundNotificationsOn, state.notificationAccess?.isDetermined != true else {
-            state.destination = .timer(timerState(for: workout))
-            return .none
+            return prepareHealthPermission(workout, editorID: editorID, &state)
         }
-        guard state.startIntent == nil, let editorID = state.path.ids.last else { return .none }
-
-        state.notificationPermissionGeneration += 1
-        let generation = state.notificationPermissionGeneration
+        state.startGeneration += 1
+        let generation = state.startGeneration
         state.startIntent = StartIntent(generation: generation, editorID: editorID, workout: workout)
         return readStartAccess(generation)
     }
@@ -46,7 +35,7 @@ extension AppFeature {
     }
 
     func notificationAccessQueried(_ access: NotificationAccess?, generation: Int, _ state: inout State) -> Effect<Action> {
-        guard state.startIntent?.generation == generation else { return .none }
+        guard state.startIntent?.generation == generation, state.startIntent?.stage == .notifications else { return .none }
         guard let access else {
             state.destination = .permissionStalled(.permissionStalled)
             return .none
@@ -74,9 +63,9 @@ extension AppFeature {
     }
 
     func notificationPermissionAnswered(_ access: NotificationAccess?, generation: Int, _ state: inout State) -> Effect<Action> {
-        guard generation == state.notificationPermissionGeneration else { return .none }
+        guard generation == state.startGeneration else { return .none }
         if let access, access.isDetermined { state.notificationAccess = access }
-        guard state.startIntent?.generation == generation else { return .none }
+        guard state.startIntent?.generation == generation, state.startIntent?.stage == .notifications else { return .none }
         if state.destination?.is(\.permissionStalled) == true {
             state.destination = nil
             return .merge(.cancel(id: CancelID.notificationPermissionStall), delayedStart(generation))
@@ -85,7 +74,8 @@ extension AppFeature {
     }
 
     func permissionStallTimer(_ state: State) -> Effect<Action> {
-        guard state.isSceneActive, state.destination == nil, let intent = state.startIntent else { return .none }
+        guard state.isSceneActive, state.destination == nil, let intent = state.startIntent, intent.stage == .notifications
+        else { return .none }
         return .run { [clock] send in
             try await clock.sleep(for: .seconds(10))
             await send(.internal(.notificationPermissionStalled(generation: intent.generation)))
@@ -94,7 +84,7 @@ extension AppFeature {
     }
 
     func permissionStallChosen(_ choice: PermissionStallChoice, _ state: inout State) -> Effect<Action> {
-        guard let intent = state.startIntent else { return .none }
+        guard let intent = state.startIntent, intent.stage == .notifications else { return .none }
         switch choice {
             case .startNow:
                 return delayedStart(intent.generation)
@@ -109,44 +99,24 @@ extension AppFeature {
     }
 
     func confirmStartIntent(_ generation: Int, _ state: inout State) -> Effect<Action> {
-        guard let intent = state.startIntent, intent.generation == generation else { return .none }
-        guard state.destination == nil, isCurrentStartIntent(intent, state) else {
+        guard let intent = state.startIntent, intent.generation == generation, intent.stage == .notifications else {
+            return .none
+        }
+        guard state.destination == nil, isCurrentStart(intent.workout, editorID: intent.editorID, state) else {
             return cancelStartIntent(&state)
         }
-        state.startIntent = nil
-        state.destination = .timer(timerState(for: intent.workout))
         // An outstanding system prompt may still answer after Start now; it can update the cache,
-        // but the absent intent prevents it from creating a second timer.
-        return .cancel(id: CancelID.notificationPermissionStall)
-    }
-
-    func isCurrentStartIntent(_ intent: StartIntent, _ state: State) -> Bool {
-        guard state.selectedTab == .workouts, state.path.ids.last == intent.editorID,
-              let editor = state.path[id: intent.editorID, case: \.editor] else { return false }
-        return editor.phase == .viewing && editor.workout == intent.workout
-    }
-
-    func cancelStartIntent(_ state: inout State) -> Effect<Action> {
-        guard let intent = state.startIntent else { return .none }
-        state.path[id: intent.editorID, case: \.editor]?.cancelStart()
-        state.startIntent = nil
-        state.notificationPermissionGeneration += 1
-        return .merge(.cancel(id: CancelID.notificationPermission), .cancel(id: CancelID.notificationPermissionStall))
+        // but the intent has left this stage, so the answer cannot open a second timer.
+        return .merge(
+            .cancel(id: CancelID.notificationPermissionStall),
+            prepareHealthPermission(intent.workout, editorID: intent.editorID, &state)
+        )
     }
 
     func waitForNotificationPermission(_ state: State) -> Effect<Action> {
-        guard let intent = state.startIntent else { return .none }
+        guard let intent = state.startIntent, intent.stage == .notifications else { return .none }
         // A failed query has no live authorization callback to wait for.
         return intent.isAwaitingAuthorization ? permissionStallTimer(state) : readStartAccess(intent.generation)
-    }
-
-    func notificationSceneChanged(_ phase: ScenePhase, _ state: inout State) -> Effect<Action> {
-        state.isSceneActive = phase == .active
-        guard phase == .active else { return .cancel(id: CancelID.notificationPermissionStall) }
-        return .merge(
-            permissionStallTimer(state),
-            state.isNotificationCleanupStalled ? cleanupNotifications(reportSuccess: true) : .none
-        )
     }
 
     func cleanupNotifications(reportSuccess: Bool = false) -> Effect<Action> {

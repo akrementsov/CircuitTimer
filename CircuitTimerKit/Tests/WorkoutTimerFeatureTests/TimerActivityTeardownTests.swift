@@ -16,6 +16,7 @@ struct TimerActivityTeardownTests {
             request: { _, _ in "rendered" },
             update: { _, _ in Issue.record("Closing must not update a card.") },
             end: { id, _, _ in ended.withValue { $0.append(id) } },
+            endEvery: { _ in Issue.record("Closing must not end every activity.") },
             forget: { _ in },
             presence: { _ in .alive },
             allIDs: { ["rendered"] }
@@ -48,6 +49,7 @@ struct TimerActivityTeardownTests {
         }
         await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.clockGeneration = 2
+            $0.isClosing = true
             $0.activityControls?.isEnding = true
         }
         await timer.store.finish()

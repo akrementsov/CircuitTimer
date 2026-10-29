@@ -18,6 +18,42 @@
           }
         }
       }
+    },
+    "NSHealthShareUsageDescription" : {
+      "comment" : "Health access sheet: why the app asks to read Health data",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer does not read your Health data."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer не читает данные из «Здоровья»."
+          }
+        }
+      }
+    },
+    "NSHealthUpdateUsageDescription" : {
+      "comment" : "Health access sheet: why the app asks to write workouts",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer runs your interval workout as a Health workout, so its Lock Screen card and notifications stop when you close the app."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer ведёт интервальную тренировку через «Здоровье», чтобы карточка на экране блокировки и уведомления исчезали, когда вы закрываете приложение."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

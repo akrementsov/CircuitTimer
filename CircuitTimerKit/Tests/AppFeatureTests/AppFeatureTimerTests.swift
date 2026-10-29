@@ -7,6 +7,7 @@ import ComposableArchitecture
 import Foundation
 import Testing
 import WorkoutDomain
+import WorkoutHealth
 import WorkoutStorage
 
 /// The timer session's endpoints that a test does not override stay unimplemented, so presenting the timer
@@ -17,11 +18,13 @@ struct AppFeatureTimerTests {
     private struct WriteFailure: Error {}
     private enum TeardownCall: Equatable, Sendable {
         case session(UUID)
+        case health(UUID, Date)
         case cues(UUID)
         case notifications(UUID)
         case liveActivity(UUID)
     }
 
+    private static let closed = Date(timeIntervalSince1970: 1_000)
     private let first = makeWorkout(1)
     private let second = makeWorkout(2)
     /// Nothing to play: it has no stages.
@@ -197,6 +200,7 @@ struct AppFeatureTimerTests {
         }
         await store.send(.destination(.presented(.timer(.destination(.presented(.closeConfirmation(.finish))))))) {
             $0.$destination[case: \.timer]?.destination = nil
+            $0.$destination[case: \.timer]?.isClosing = true
         }
         await store.receive(\.destination.dismiss) {
             $0.destination = nil
@@ -219,7 +223,9 @@ struct AppFeatureTimerTests {
         state.isTimerCoverUp = coverUp
         let calls = LockIsolated<[TeardownCall]>([])
         let store = makeStore(state) {
+            $0.date = .constant(Self.closed)
             $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
+            $0.workoutHealth.end = { id, date in calls.withValue { $0.append(.health(id, date)) } }
             $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
             $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
             $0.liveActivity.end = { id in calls.withValue { $0.append(.liveActivity(id)) } }
@@ -230,7 +236,9 @@ struct AppFeatureTimerTests {
             if coverUp { $0.isTimerCoverUp = false }
         }
         await store.finish()
-        #expect(calls.value == [.session(owner), .cues(owner), .notifications(owner), .liveActivity(owner)])
+        #expect(calls.value == [
+            .session(owner), .health(owner, Self.closed), .cues(owner), .notifications(owner), .liveActivity(owner),
+        ])
     }
 
     @Test
@@ -265,7 +273,9 @@ struct AppFeatureTimerTests {
     func test_destinationDismiss_alert_endsNoSession() async {
         var state = loaded([first])
         state.destination = .alert(.mutationFailed)
-        let store = makeStore(state)
+        let store = makeStore(state) {
+            $0.workoutHealth.end = { _, _ in Issue.record("An alert's dismissal ended a workout session") }
+        }
 
         await store.send(.destination(.dismiss)) { $0.destination = nil }
     }

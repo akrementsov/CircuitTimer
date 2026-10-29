@@ -20,6 +20,7 @@ let package = Package(
         .library(name: "CloudSync", targets: ["CloudSync"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
+        .library(name: "WorkoutHealth", targets: ["WorkoutHealth"]),
         .library(name: "TimerPreferences", targets: ["TimerPreferences"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
@@ -52,6 +53,7 @@ let package = Package(
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -70,6 +72,7 @@ let package = Package(
                 "SettingsFeature",
                 "WorkoutActivity",
                 "WorkoutDomain",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
@@ -89,6 +92,7 @@ let package = Package(
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -192,6 +196,14 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .target(
+            name: "WorkoutHealth",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .target(
             name: "WorkoutEditorFeature",
             dependencies: [
                 "DesignSystem",
@@ -224,6 +236,7 @@ let package = Package(
                 "UITestContract",
                 "WorkoutActivity",
                 "WorkoutDomain",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
@@ -282,12 +295,21 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WorkoutHealthTests",
+            dependencies: [
+                "WorkoutHealth",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WorkoutTimerFeatureTests",
             dependencies: [
                 "BackgroundNotifications",
                 "BackgroundExecution",
                 "WorkoutActivity",
                 "WorkoutDomain",
+                "WorkoutHealth",
                 "WorkoutStorage",
                 "WorkoutTimerFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),

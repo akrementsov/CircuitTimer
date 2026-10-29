@@ -111,6 +111,7 @@ struct TimerLiveActivityTests {
 
         await timer.send(.view(.closeButtonTapped), saving: true) {
             $0.clockGeneration = 2
+            $0.isClosing = true
             $0.activityControls?.isEnding = true
         }
         await timer.store.finish()
@@ -138,6 +139,7 @@ struct TimerLiveActivityTests {
         }
         await timer.send(.destination(.presented(.closeConfirmation(.finish)))) {
             $0.destination = nil
+            $0.isClosing = true
             $0.activityControls?.isEnding = true
         }
         await timer.store.finish()

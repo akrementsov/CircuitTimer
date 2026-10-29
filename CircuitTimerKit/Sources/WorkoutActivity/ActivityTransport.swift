@@ -12,6 +12,8 @@ enum ActivityRequestFailure: Error, Equatable {
     case permanent(String)
     /// The next sync may succeed, for example once the user ends another activity.
     case transient(String)
+    /// iOS is terminating the process; nothing is requested any more.
+    case terminating
 }
 
 enum ActivityPresence: Equatable {
@@ -29,6 +31,7 @@ enum ActivityDismissal: Equatable {
 /// ActivityKit behind Sendable closures. `Activity` is not `Sendable`, so only its identifier
 /// leaves a closure, and each call looks the activity up again: first among the activities this
 /// transport requested, because iOS may list a new one a moment after `request` returns.
+/// `endEvery` alone keeps the references it found, within the one closure that ends them.
 struct ActivityTransport: Sendable {
     /// Activities requested and not ended at once yet. `Activity` is not `Sendable`; the lock only
     /// stores and hands out references, and ActivityKit synchronizes the activities themselves.
@@ -38,17 +41,22 @@ struct ActivityTransport: Sendable {
     var request: @Sendable (WorkoutActivityAttributes, WorkoutActivityAttributes.ContentState) throws(ActivityRequestFailure) -> String
     var update: @Sendable (String, WorkoutActivityAttributes.ContentState) async -> Void
     var end: @Sendable (String, WorkoutActivityAttributes.ContentState?, ActivityDismissal) async -> Void
+    /// Ends every activity immediately, one after another, waits for `between`, then ends the same activities again
+    /// with any that appeared meanwhile, so an end that was still under way with the standard dismissal is overridden.
+    var endEvery: @Sendable (_ between: @Sendable () async -> Void) async -> Void
     /// Drops an activity that went while it showed, removed by the user or ended by iOS; no later call reaches it.
     var forget: @Sendable (String) -> Void
     /// `nil` while iOS does not list the activity.
     var presence: @Sendable (String) -> ActivityPresence?
     var allIDs: @Sendable () -> [String]
 
-    static func live() -> Self {
+    static func live(gate: TerminationGate) -> Self {
         let requested = Registry(uncheckedState: [:])
         return Self(
             isEnabled: { ActivityAuthorizationInfo().areActivitiesEnabled },
             request: { attributes, state throws(ActivityRequestFailure) in
+                guard !gate.isClosed else { throw .terminating }
+
                 do {
                     let activity = try Activity.request(attributes: attributes, content: content(state), pushType: nil)
                     requested.withLockUnchecked { $0[activity.id] = activity }
@@ -60,6 +68,8 @@ struct ActivityTransport: Sendable {
                 }
             },
             update: { id, state in
+                guard !gate.isClosed else { return }
+
                 guard let activity = activity(id, in: requested) else {
                     Logger.liveActivity.debug("No live activity \(id, privacy: .public) to update")
                     return
@@ -79,6 +89,14 @@ struct ActivityTransport: Sendable {
                     requested.withLockUnchecked { _ = $0.removeValue(forKey: id) }
                 }
             },
+            endEvery: { between in
+                let first = every(in: requested)
+                await endImmediately(first)
+                await between()
+                let second = every(in: requested)
+                let secondIDs = Set(second.map(\.id))
+                await endImmediately(second + first.filter { !secondIDs.contains($0.id) })
+            },
             forget: { id in
                 requested.withLockUnchecked { _ = $0.removeValue(forKey: id) }
             },
@@ -93,6 +111,21 @@ struct ActivityTransport: Sendable {
 
     private static func activity(_ id: String, in requested: Registry) -> Activity<WorkoutActivityAttributes>? {
         requested.withLockUnchecked { $0[id] } ?? listed(id)
+    }
+
+    /// The requested activities and those iOS lists, each once.
+    private static func every(in requested: Registry) -> [Activity<WorkoutActivityAttributes>] {
+        let held = requested.withLockUnchecked { Array($0.values) }
+        let heldIDs = Set(held.map(\.id))
+        return held + Activity<WorkoutActivityAttributes>.activities.filter { !heldIDs.contains($0.id) }
+    }
+
+    /// One after another: `Activity` is not `Sendable`, so the ends cannot run in child tasks, and there is
+    /// rarely more than one.
+    private static func endImmediately(_ activities: [Activity<WorkoutActivityAttributes>]) async {
+        for activity in activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 
     private static func listed(_ id: String) -> Activity<WorkoutActivityAttributes>? {

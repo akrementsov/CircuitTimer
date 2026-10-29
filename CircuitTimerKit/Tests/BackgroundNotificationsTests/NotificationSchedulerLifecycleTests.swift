@@ -166,13 +166,13 @@ struct NotificationSchedulerLifecycleTests: Sendable {
         }
     }
 
-    @Test
-    func test_end_duringSDKAdmission_removesRequestBeforeCallback() async throws {
+    @Test(arguments: OwnerEnding.allCases)
+    func test_end_duringSDKAdmission_removesRequestBeforeCallback(ending: OwnerEnding) async throws {
         try await withMainSerialExecutor {
             let fake = NotificationFake()
             fake.holdsAdd = true
             let scheduler = NotificationScheduler(transport: fake.transport)
-            fake.beforeAdd = { scheduler.end(owner) }
+            fake.beforeAdd = { ending.fire(scheduler, owner: owner) }
             let operation = Task {
                 try await scheduler.sync(owner, revision: 1, plan: [notification()], now: { now }, clock: TestClock<Duration>())
             }

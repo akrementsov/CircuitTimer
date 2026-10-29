@@ -8,6 +8,7 @@ import Sharing
 import UITestContract
 import WorkoutActivity
 import WorkoutEditorFeature
+import WorkoutHealth
 import WorkoutStorage
 import WorkoutTimerFeature
 
@@ -26,13 +27,14 @@ extension AppScenario {
     }
 
     /// Sets every dependency the app reaches, so a scenario touches neither the device's workouts, run record and
-    /// preferences, nor notifications, Live Activities, audio, background time or the real clock.
+    /// preferences, nor notifications, Live Activities, Health, audio, background time or the real clock.
     /// `make lint` fails when a client, key or storage strategy is added without a line here.
     public func prepare(_ dependencies: inout DependencyValues) {
         dependencies.workoutStorage = .scenario(workouts)
         dependencies.workoutRunRecord = .previewValue
         dependencies.backgroundNotifications = .previewValue
         dependencies.liveActivity = .previewValue
+        dependencies.workoutHealth = .previewValue
         dependencies.cues = .previewValue
         dependencies.timerSession = .previewValue
         dependencies.backgroundTask = .previewValue

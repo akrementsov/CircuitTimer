@@ -65,8 +65,8 @@ struct NotificationSchedulerTests: Sendable {
         #expect(fake.added.count == 1)
     }
 
-    @Test
-    func test_end_lateAddCompletion_removesOnlyEndedPhysicalIdentifier() async throws {
+    @Test(arguments: OwnerEnding.allCases)
+    func test_end_lateAddCompletion_removesOnlyEndedPhysicalIdentifier(ending: OwnerEnding) async throws {
         let fake = NotificationFake()
         fake.holdsAdd = true
         let scheduler = NotificationScheduler(transport: fake.transport)
@@ -74,7 +74,7 @@ struct NotificationSchedulerTests: Sendable {
             try await scheduler.sync(owner, revision: 1, plan: [notification(after: 10)], now: { now }, clock: TestClock<Duration>())
         }
         await fake.waitForAdd()
-        scheduler.end(owner)
+        ending.fire(scheduler, owner: owner)
         let oldID = try #require(fake.added.first)
         fake.completeAdds()
         let report = try await operation.value

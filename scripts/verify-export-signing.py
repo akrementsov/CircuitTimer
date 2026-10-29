@@ -6,10 +6,11 @@ signs it, so the App Store signatures and profiles exist only in what the export
 uses the standard library only.
 
   verify-export-signing.py archive <CircuitTimer.xcarchive>
-      The app declares Live Activities, remote notifications and its CloudKit container, carries the container in
-      its ad hoc signature and embeds the widget extension. Exit 0 or 1.
+      The app declares Live Activities, remote notifications, workout processing, both Health usage texts in English
+      and Russian and its CloudKit container, carries the container and HealthKit in its ad hoc signature and embeds
+      the widget extension. Exit 0 or 1.
   verify-export-signing.py ipa <CircuitTimer.ipa> <team> <app id> <widgets id> <icloud container>
-      Reads the signatures and profiles of an exported IPA. Exit 0 or 1.
+      Reads the signatures and profiles of an exported IPA: only the app has HealthKit. Exit 0 or 1.
 """
 
 import plistlib
@@ -21,6 +22,9 @@ from pathlib import Path
 
 APP = "CircuitTimer.app"
 WIDGETS = "CircuitTimerWidgets.appex"
+HEALTHKIT = "com.apple.developer.healthkit"
+HEALTH_TEXTS = ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription")
+BACKGROUND_MODES = ("remote-notification", "workout-processing")
 
 
 class Mismatch(Exception):
@@ -59,6 +63,24 @@ def check_distribution_cloudkit(name, entitlements, profile, container):
         raise Mismatch(f"{name}: the profile allows the iCloud containers {allowed!r}, not {container!r}")
 
 
+def check_health_texts(name, strings):
+    for key in HEALTH_TEXTS:
+        text = strings.get(key)
+        if not isinstance(text, str) or not text.strip():
+            raise Mismatch(f"{name}: {key} is {text!r}, not a text")
+
+
+def check_healthkit(name, entitlements, profile, expected):
+    if not expected:
+        if HEALTHKIT in entitlements:
+            raise Mismatch(f"{name}: the signature has HealthKit, which only the app needs")
+        return
+    if entitlements.get(HEALTHKIT) is not True:
+        raise Mismatch(f"{name}: the signature has {HEALTHKIT} {entitlements.get(HEALTHKIT)!r}, not True")
+    if profile.get("Entitlements", {}).get(HEALTHKIT) is not True:
+        raise Mismatch(f"{name}: the profile does not allow HealthKit")
+
+
 def run_plist(name, command):
     result = subprocess.run(command, capture_output=True)
     if result.returncode != 0:
@@ -73,7 +95,7 @@ def signed_entitlements(bundle):
     return run_plist(bundle.name, ["codesign", "-d", "--entitlements", "-", "--xml", str(bundle)])
 
 
-def verify_bundle(bundle, team, bundle_id, container=None):
+def verify_bundle(bundle, team, bundle_id, container=None, health=False):
     entitlements = signed_entitlements(bundle)
     check_entitlements(bundle.name, entitlements, team, bundle_id)
     profile = run_plist(bundle.name, ["security", "cms", "-D", "-i", str(bundle / "embedded.mobileprovision")])
@@ -83,6 +105,7 @@ def verify_bundle(bundle, team, bundle_id, container=None):
         raise Mismatch(f"{bundle.name}: the profile lists devices, so it is not an App Store profile")
     if container is not None:
         check_distribution_cloudkit(bundle.name, entitlements, profile, container)
+    check_healthkit(bundle.name, entitlements, profile, health)
     print(f"{bundle.name}: signed for {entitlements['application-identifier']} with profile {profile.get('Name')!r}")
 
 
@@ -91,7 +114,7 @@ def verify_ipa(path, team, app_id, widgets_id, container):
         with zipfile.ZipFile(path) as ipa:
             ipa.extractall(directory)
         app = Path(directory) / "Payload" / APP
-        verify_bundle(app, team, app_id, container)
+        verify_bundle(app, team, app_id, container, health=True)
         verify_bundle(app / "PlugIns" / WIDGETS, team, widgets_id)
     return 0
 
@@ -102,8 +125,12 @@ def verify_archive(path):
         info = plistlib.load(file)
     if info.get("NSSupportsLiveActivities") is not True:
         raise Mismatch(f"{APP}: NSSupportsLiveActivities is not set")
-    if "remote-notification" not in info.get("UIBackgroundModes", []):
-        raise Mismatch(f"{APP}: UIBackgroundModes {info.get('UIBackgroundModes')!r} lack remote-notification")
+    for mode in BACKGROUND_MODES:
+        if mode not in info.get("UIBackgroundModes", []):
+            raise Mismatch(f"{APP}: UIBackgroundModes {info.get('UIBackgroundModes')!r} lack {mode}")
+    check_health_texts(APP, info)
+    with open(app / "ru.lproj" / "InfoPlist.strings", "rb") as file:
+        check_health_texts(f"{APP}/ru.lproj/InfoPlist.strings", plistlib.load(file))
     container = info.get("CTCloudKitContainerIdentifier")
     if container != f"iCloud.{info.get('CFBundleIdentifier')}":
         raise Mismatch(f"{APP}: the CloudKit container is {container!r}, not iCloud.{info.get('CFBundleIdentifier')}")
@@ -111,11 +138,13 @@ def verify_archive(path):
     check_cloudkit(APP, entitlements, container)
     if "aps-environment" not in entitlements:
         raise Mismatch(f"{APP}: the archived signature has no aps-environment")
+    if entitlements.get(HEALTHKIT) is not True:
+        raise Mismatch(f"{APP}: the archived signature has {HEALTHKIT} {entitlements.get(HEALTHKIT)!r}, not True")
     with open(app / "PlugIns" / WIDGETS / "Info.plist", "rb") as file:
         extension = plistlib.load(file).get("NSExtension", {})
     if extension.get("NSExtensionPointIdentifier") != "com.apple.widgetkit-extension":
         raise Mismatch(f"{WIDGETS}: not a WidgetKit extension")
-    print(f"{APP} declares Live Activities and {container}, carries its entitlements and embeds {WIDGETS}")
+    print(f"{APP} declares Live Activities, workout processing and {container}, carries its entitlements and embeds {WIDGETS}")
     return 0
 
 

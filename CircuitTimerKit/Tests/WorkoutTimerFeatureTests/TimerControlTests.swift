@@ -325,7 +325,10 @@ struct TimerControlTests {
         let timer = TimerHarness(.fixture(.finished))
         let store = timer.store
 
-        await timer.send(.view(.closeButtonTapped), saving: true) { $0.clockGeneration = 2 }
+        await timer.send(.view(.closeButtonTapped), saving: true) {
+            $0.clockGeneration = 2
+            $0.isClosing = true
+        }
         await store.finish()
 
         #expect(store.state.destination == nil)
@@ -344,6 +347,7 @@ struct TimerControlTests {
             $0.clockAnchor = nil
             $0.requestedAwake = false
             $0.awakeRevision = 2
+            $0.isClosing = true
         }
         await store.finish()
 
@@ -367,7 +371,10 @@ struct TimerControlTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
         }
-        await timer.send(.destination(.presented(.closeConfirmation(.finish)))) { $0.destination = nil }
+        await timer.send(.destination(.presented(.closeConfirmation(.finish)))) {
+            $0.destination = nil
+            $0.isClosing = true
+        }
         await store.finish()
 
         #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .dismiss])

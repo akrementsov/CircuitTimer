@@ -18,6 +18,7 @@ Check these before release (CT-7):
 - [ ] Real process suspension at the five-second wait bound.
 - [ ] Runtime absence from Shortcuts and Spotlight.
 - [ ] Release runtime on a physical device.
+- [ ] On iOS 26.x, an App Switcher swipe while a timer runs in the background removes its card at once, a finished card included.
 - [ ] Complete system coverage of all card states, maximum text sizes, English labels and RTL.
 
 Release simulator probes exercised card and expanded-Island Pause/Resume on iOS 17.5 and 27.0. They do not establish the physical-device checks above.

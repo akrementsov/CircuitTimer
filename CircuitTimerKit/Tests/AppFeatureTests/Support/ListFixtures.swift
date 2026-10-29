@@ -8,6 +8,7 @@ import ComposableArchitecture
 import Foundation
 import WorkoutActivity
 import WorkoutDomain
+import WorkoutHealth
 
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
     var state = AppFeature.State()
@@ -15,13 +16,18 @@ func loaded(_ workouts: [Workout]) -> AppFeature.State {
     return state
 }
 
+/// `healthAccess` starts as already read, so a Start opens the timer without the Health stage; a test of that stage
+/// passes `nil`.
 @MainActor
 func makeStore(
     _ state: AppFeature.State,
     notificationsEnabled: Bool = false,
+    healthAccess: HealthAccess? = .unavailable,
     dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<AppFeature> {
+    var state = state
     state.settings.$isBackgroundNotificationsOn.withLock { $0 = notificationsEnabled }
+    state.healthAccess = healthAccess
     let revisions = LockIsolated(0)
     return TestStore(initialState: state) {
         AppFeature()
@@ -29,9 +35,12 @@ func makeStore(
         $0.liveActivity = .previewValue
         $0.cues = .previewValue
         $0.cloudSync = .previewValue
+        $0.workoutHealth = .previewValue
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }
         $0.uuid = .incrementing
+        // Read when a closed timer ends its Health session.
+        $0.date = .constant(Date(timeIntervalSince1970: 0))
         $0.continuousClock = TestClock<Duration>()
         $0.backgroundTask = BackgroundTaskClient(begin: { _ in .invalid }, end: { _ in })
         $0.workoutRunRecord.load = { nil }

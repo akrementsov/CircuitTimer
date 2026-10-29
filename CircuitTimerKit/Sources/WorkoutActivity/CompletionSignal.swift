@@ -15,6 +15,13 @@ final class CompletionSignal: Sendable {
         }
     }
 
+    /// Waits for as long as the work takes; a cancelled caller stops waiting at once.
+    func wait() async {
+        for await _ in pair.stream {
+            return
+        }
+    }
+
     /// `false` when `timeout` passed first; a cancelled caller stops waiting at once.
     func wait(timeout: Duration, clock: any Clock<Duration>) async -> Bool {
         await withTaskGroup(of: Bool.self) { group in
