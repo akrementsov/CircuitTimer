@@ -47,7 +47,9 @@ extension Date {
         return .milliseconds(Int64((clamped * 1_000 + 0.001).rounded(.down)))
     }
 
-    func adding(_ duration: Duration) -> Date {
+    /// The date `duration` after this one, for callers outside the domain that shift a wall-clock
+    /// date by an elapsed time without converting `Date` and `Duration` themselves.
+    public func adding(_ duration: Duration) -> Date {
         addingTimeInterval(TimeInterval(duration.inMilliseconds) / 1_000)
     }
 
