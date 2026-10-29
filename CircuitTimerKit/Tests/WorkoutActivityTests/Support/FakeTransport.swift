@@ -10,6 +10,9 @@ final class FakeTransport: Sendable {
         case update(String, Content)
         case end(String, Content?, ActivityDismissal)
         case forget(String)
+        /// The two immediate passes of `endEvery`, before and after `between`.
+        case endEvery
+        case endEveryAgain
     }
 
     let calls = LockIsolated<[Call]>([])
@@ -24,6 +27,8 @@ final class FakeTransport: Sendable {
     /// Holds the next update or end until the test opens it.
     let updateGate = LockIsolated<Gate?>(nil)
     let endGate = LockIsolated<Gate?>(nil)
+    /// Holds `endEvery`'s second pass until the test opens it.
+    let endEveryGate = LockIsolated<Gate?>(nil)
     private let nextID = LockIsolated(0)
 
     var transport: ActivityTransport {
@@ -52,7 +57,12 @@ final class FakeTransport: Sendable {
                 await self.endGate.value?.pass()
                 self.calls.withValue { $0.append(.end(id, state, dismissal)) }
             },
-            endEvery: { between in await between() },
+            endEvery: { between in
+                self.calls.withValue { $0.append(.endEvery) }
+                await between()
+                await self.endEveryGate.value?.pass()
+                self.calls.withValue { $0.append(.endEveryAgain) }
+            },
             forget: { id in
                 self.calls.withValue { $0.append(.forget(id)) }
             },
