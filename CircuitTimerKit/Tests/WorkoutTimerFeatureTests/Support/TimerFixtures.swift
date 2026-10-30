@@ -220,11 +220,18 @@ final class TimerHarness {
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
-    init(_ state: WorkoutTimerFeature.State, signals: Bool = false, notifications: Bool = false, activity: Bool = false) {
+    /// `followsHealth: false` keeps the Health track as the state has it, like that of a run restored after a relaunch.
+    init(
+        _ state: WorkoutTimerFeature.State,
+        signals: Bool = false,
+        notifications: Bool = false,
+        activity: Bool = false,
+        followsHealth: Bool = true
+    ) {
         var state = state
         if activity { state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true) }
         // A fixture that is already running has been followed since it started, as a real timer would be.
-        state = state.followingHealth(at: origin)
+        if followsHealth { state = state.followingHealth(at: origin) }
         state.$isBackgroundNotificationsOn = SharedReader(value: notifications)
         if !signals {
             state.isPreparingCountdown = false
