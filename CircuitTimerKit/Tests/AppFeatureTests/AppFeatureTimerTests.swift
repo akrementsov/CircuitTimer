@@ -18,7 +18,7 @@ struct AppFeatureTimerTests {
     private struct WriteFailure: Error {}
     private enum TeardownCall: Equatable, Sendable {
         case session(UUID)
-        case health(UUID, Date)
+        case health(UUID, WorkoutHealthTrack, Date)
         case cues(UUID)
         case notifications(UUID)
         case liveActivity(UUID)
@@ -218,14 +218,19 @@ struct AppFeatureTimerTests {
     @Test(arguments: [false, true])
     func test_destinationDismiss_timerEndsSessionCuesNotificationsAndActivityInOrder(coverUp: Bool) async {
         let owner = UUID(fixture: 7)
+        var timer = Self.timer(owner, for: first)
+        // The run the timer followed until the dismissal, which the session projects onto it.
+        var track = WorkoutHealthTrack()
+        track.follow(.running(stopsAt: Self.closed.addingTimeInterval(60)), at: Self.closed.addingTimeInterval(-30))
+        timer.healthTrack = track
         var state = loaded([first])
-        state.destination = .timer(Self.timer(owner, for: first))
+        state.destination = .timer(timer)
         state.isTimerCoverUp = coverUp
         let calls = LockIsolated<[TeardownCall]>([])
         let store = makeStore(state) {
             $0.date = .constant(Self.closed)
             $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
-            $0.workoutHealth.end = { id, date in calls.withValue { $0.append(.health(id, date)) } }
+            $0.workoutHealth.end = { id, track, date in calls.withValue { $0.append(.health(id, track, date)) } }
             $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
             $0.backgroundNotifications.end = { id in calls.withValue { $0.append(.notifications(id)) } }
             $0.liveActivity.end = { id in calls.withValue { $0.append(.liveActivity(id)) } }
@@ -237,7 +242,7 @@ struct AppFeatureTimerTests {
         }
         await store.finish()
         #expect(calls.value == [
-            .session(owner), .health(owner, Self.closed), .cues(owner), .notifications(owner), .liveActivity(owner),
+            .session(owner), .health(owner, track, Self.closed), .cues(owner), .notifications(owner), .liveActivity(owner),
         ])
     }
 
@@ -274,7 +279,7 @@ struct AppFeatureTimerTests {
         var state = loaded([first])
         state.destination = .alert(.mutationFailed)
         let store = makeStore(state) {
-            $0.workoutHealth.end = { _, _ in Issue.record("An alert's dismissal ended a workout session") }
+            $0.workoutHealth.end = { _, _, _ in Issue.record("An alert's dismissal ended a workout session") }
         }
 
         await store.send(.destination(.dismiss)) { $0.destination = nil }

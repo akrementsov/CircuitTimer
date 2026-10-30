@@ -17,6 +17,16 @@ extension WorkoutRun {
         public let hasMore: Bool
     }
 
+    /// When a running run stops by itself: on entering the next manual pause or at its end,
+    /// floored to whole milliseconds. `nil` unless running. It reads no clock, so the caller
+    /// ticks the run first, and it stays equal while ticks re-anchor the run.
+    public var automaticStopDate: Date? {
+        guard case let .running(since) = phase else { return nil }
+
+        let pause = schedule.stages.dropFirst(cursor + 1).first { $0.kind == .pause }
+        return since.adding((pause?.start ?? schedule.totalDuration) - position).flooredToMilliseconds()
+    }
+
     public func upcomingTransitions(at now: Date, limit: Int) -> UpcomingTransitions {
         var run = self
         run.tick(at: now)

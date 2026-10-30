@@ -23,6 +23,7 @@ struct TimerReconciliationTests {
             switch milliseconds {
                 case -251:
                     $0.run.rebase(at: now, keepingTotalElapsed: .seconds(4))
+                    $0.healthTrack.rebase(from: moment(1), to: now)
                     $0.settle(at: now)
                     $0.clockGeneration = 2
                 case 251:
@@ -52,6 +53,7 @@ struct TimerReconciliationTests {
 
         await timer.send(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.run.rebase(at: now, keepingTotalElapsed: .seconds(5))
+            $0.healthTrack.rebase(from: moment(2), to: now)
             $0.settle(at: now)
             $0.clockGeneration = 2
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(5))
@@ -69,6 +71,7 @@ struct TimerReconciliationTests {
 
         await timer.send(.view(.playPauseButtonTapped), saving: true) {
             $0.run.rebase(at: moment(0.5), keepingTotalElapsed: .seconds(5))
+            $0.healthTrack.rebase(from: moment(2), to: moment(0.5))
             $0.run.pause(at: moment(0.5))
             $0.settle(at: moment(0.5))
             $0.clockGeneration = 2

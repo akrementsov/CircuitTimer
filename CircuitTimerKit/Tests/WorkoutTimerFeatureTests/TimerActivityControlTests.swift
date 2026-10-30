@@ -89,6 +89,7 @@ struct TimerActivityControlTests {
             $0.activityControls?.generation = 8
             $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {
             $0.activityControls?.pending = nil
@@ -142,6 +143,7 @@ struct TimerActivityControlTests {
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: runningTimer.clock)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: runningTimer.now)
         }
         await runningTimer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {
             $0.activityControls?.pending?.activityResult = .applied
@@ -184,6 +186,7 @@ struct TimerActivityControlTests {
         }
         let subscription = await timer.store.send(.view(.activityTask)) {
             $0.activityControls = WorkoutTimerFeature.ActivityControlState()
+            $0.followHealth(at: timer.now)
         }
         await timer.appearRunning()
         #expect(timer.store.state.clockGeneration == 1)
@@ -193,6 +196,7 @@ struct TimerActivityControlTests {
             $0.clockGeneration = 2
             $0.clockAnchor = timer.anchor(totalElapsed: $0.snapshot.totalElapsed)
             $0.recordSync = .pending(revision: 2, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.recordSaved(revision: 2)
         #expect(activity.syncs.value.isEmpty)
@@ -205,6 +209,7 @@ struct TimerActivityControlTests {
             $0.awakeRevision = 2
             $0.activityControls?.generation = 1
             $0.recordSync = .pending(revision: 3, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.recordSaved(revision: 3)
         #expect(activity.syncs.value.isEmpty)

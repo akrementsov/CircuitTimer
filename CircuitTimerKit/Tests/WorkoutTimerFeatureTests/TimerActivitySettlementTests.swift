@@ -46,7 +46,10 @@ struct TimerActivitySettlementTests {
             await timer.advance(seconds: 2)
         }
         let effect = await timer.store.send(.internal(.activityRequestReceived(.init(id: 17, command: .pause, generation: 6)))) {
-            if backward { $0.run.rebase(at: timer.now, keepingTotalElapsed: .seconds(4)) }
+            if backward {
+                $0.run.rebase(at: timer.now, keepingTotalElapsed: .seconds(4))
+                $0.healthTrack.rebase(from: moment(1), to: timer.now)
+            }
             $0.settle(at: timer.now)
             $0.clockGeneration = 2
             $0.clockAnchor = backward ? timer.anchor(totalElapsed: .seconds(4)) : nil
@@ -62,6 +65,7 @@ struct TimerActivitySettlementTests {
                 $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: 1)
             }
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         if rejection != .notReady {
             await timer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {

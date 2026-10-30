@@ -63,10 +63,12 @@ The row is the phase *after* settling.
 
 `outlook(at:)` settles a copy at `now` and returns `nil` unless it is running. Otherwise it gives the dates a Live Activity needs to count on its own while the app sleeps: the running stage's start and end, and the end of the stage after it — `nil` when that stage is a manual pause or the workout ends. Every date is floored to whole milliseconds since 1970, so the outlook stays equal while ticks re-anchor the run.
 
+`automaticStopDate` is the date a running run stops by itself: it enters the next manual pause or finishes. It is `nil` unless the run is running. It reads no clock, so it is taken after the reducer's tick and stays equal while ticks re-anchor the run; `start`, `resume`, `skipToNextStage` and `rebase` set or move it, and a pause or the finish clears it. Unlike `upcomingTransitions(at:limit:)` it has no limit and names only that first stop.
+
 ## Time
 
 - `TimeMath` is the only place converting between `Date` and `Duration`.
-- `Date.elapsed(since:)` is its public conversion for callers that measure wall-clock time, such as the timer's clock-jump check.
+- `Date.elapsed(since:)` and `Date.adding(_:)` are its public conversions for callers that measure or shift wall-clock time, such as the timer's clock-jump check and its Health track.
 - Elapsed time is truncated to milliseconds with a 1 µs tolerance, so for dates of the current epoch an exact `currentStageEndDate` already shows the next stage, and a moment 2 µs earlier still shows the current one.
 - Accuracy: the position trails real time by up to one millisecond (the truncated remainder) plus a microsecond-level term from date rounding. Measured on dates of the current epoch: at most 1.004 ms after 5 000 updates and 1.009 ms after 50 000 updates (about 14 hours at one update per second). Irregular or missed UI updates do not add error, because nothing is accumulated per tick.
 

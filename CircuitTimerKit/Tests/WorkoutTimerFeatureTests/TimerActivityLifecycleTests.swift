@@ -35,6 +35,7 @@ struct TimerActivityLifecycleTests {
                 id: 17, result: manualPause ? .stale : .applied, activityRevision: 1
             )
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {
             $0.activityControls?.pending = nil
@@ -154,6 +155,7 @@ struct TimerActivityLifecycleTests {
             $0.activityControls?.generation = 8
             $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.receive(.internal(.activitySynchronized(revision: 1, result))) {
             $0.activityControls?.pending = nil
@@ -195,6 +197,7 @@ struct TimerActivityLifecycleTests {
             $0.activityControls?.generation = 8
             $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
+            $0.followHealth(at: timer.now)
         }
         await timer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {
             $0.activityControls?.pending = nil

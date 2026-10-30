@@ -568,10 +568,12 @@ public struct AppFeature: Sendable {
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
                 let id = timer.id
+                // The timer's newest track; the session projects it onto the dismissal.
+                let track = timer.healthTrack
                 let now = date()
                 let end = Effect<Action>.run { [timerSession, workoutHealth, cues, backgroundNotifications, liveActivity] _ in
                     await timerSession.end(owner: id)
-                    await workoutHealth.end(id, now)
+                    await workoutHealth.end(id, track, now)
                     await cues.end(id)
                     await backgroundNotifications.end(id)
                     await liveActivity.end(id)

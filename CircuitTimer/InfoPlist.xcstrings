@@ -44,13 +44,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CircuitTimer runs your interval workout as a Health workout, so its Lock Screen card and notifications stop when you close the app."
+            "value" : "CircuitTimer saves your interval workouts to Apple Health, excluding pauses, and keeps the timer active in the background."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "CircuitTimer ведёт интервальную тренировку через «Здоровье», чтобы карточка на экране блокировки и уведомления исчезали, когда вы закрываете приложение."
+            "value" : "CircuitTimer сохраняет интервальные тренировки в «Здоровье» без времени пауз и поддерживает таймер активным в фоне."
           }
         }
       }

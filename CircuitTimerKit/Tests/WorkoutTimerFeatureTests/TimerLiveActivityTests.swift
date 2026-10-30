@@ -93,6 +93,7 @@ struct TimerLiveActivityTests {
 
         await timer.send(.internal(.ticked(generation: 1, isFinal: false)), saving: true) {
             $0.run.rebase(at: now, keepingTotalElapsed: .seconds(4))
+            $0.healthTrack.rebase(from: moment(1), to: now)
             $0.settle(at: now)
             $0.clockGeneration = 2
             $0.clockAnchor = timer.anchor(totalElapsed: $0.snapshot.totalElapsed)

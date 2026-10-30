@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import os
 
 /// One workout session as `WorkoutSessions` drives it; HealthKit stays inside the closures.
 struct SessionHandle: Sendable {
@@ -23,6 +24,9 @@ struct SessionTransport: Sendable {
     var create: @Sendable () throws -> SessionHandle
     /// The session an earlier process left running, if HealthKit has one.
     var recover: @Sendable () async throws -> SessionHandle?
+    /// Saves a workout with a builder of its own, which needs no session: the session's own builder would have to
+    /// start collecting with the session and stop with it, which neither a late start nor a lost session allows.
+    var save: @Sendable (HealthWorkout) async throws -> Void
 
     static func live(store: HKHealthStore) -> Self {
         Self(
@@ -34,17 +38,47 @@ struct SessionTransport: Sendable {
             create: {
                 guard #available(iOS 26, *) else { throw HKError(.errorHealthDataUnavailable) }
 
-                let configuration = HKWorkoutConfiguration()
-                configuration.activityType = .highIntensityIntervalTraining
-                configuration.locationType = .indoor
-                return handle(try HKWorkoutSession(healthStore: store, configuration: configuration))
+                return handle(try HKWorkoutSession(healthStore: store, configuration: makeConfiguration()))
             },
             recover: {
                 guard #available(iOS 26, *) else { return nil }
 
                 return try await store.recoverActiveWorkoutSession().map(handle)
+            },
+            save: { workout in
+                let builder = HKWorkoutBuilder(healthStore: store, configuration: makeConfiguration(), device: .local())
+                // Pause and resume events take the pauses out of the workout's duration.
+                let events = workout.pauses.flatMap { pause in
+                    [
+                        HKWorkoutEvent(type: .pause, dateInterval: DateInterval(start: pause.start, duration: 0), metadata: nil),
+                        HKWorkoutEvent(type: .resume, dateInterval: DateInterval(start: pause.end, duration: 0), metadata: nil),
+                    ]
+                }
+                do {
+                    try await builder.beginCollection(at: workout.start)
+                    if !events.isEmpty {
+                        try await builder.addWorkoutEvents(events)
+                    }
+                    try await builder.endCollection(at: workout.end)
+                    if try await builder.finishWorkout() == nil {
+                        // Saved, but HealthKit cannot hand the sample back while the device is locked.
+                        Logger.workoutHealth.notice("Saved a workout to Health while the device was locked")
+                    }
+                } catch {
+                    // A builder keeps the store until its workout is saved or discarded.
+                    builder.discardWorkout()
+                    throw error
+                }
             }
         )
+    }
+
+    /// A new configuration each time: HealthKit's configuration is a mutable class.
+    private static func makeConfiguration() -> HKWorkoutConfiguration {
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .highIntensityIntervalTraining
+        configuration.locationType = .indoor
+        return configuration
     }
 
     @available(iOS 26, *)
@@ -61,6 +95,7 @@ struct SessionTransport: Sendable {
             stop: { session.stopActivity(with: $0) },
             end: { session.end() },
             release: {
+                // The session's own builder never saves; `SessionTransport.save` does.
                 builder.discardWorkout()
                 events.finish()
             }

@@ -6,7 +6,7 @@ import WorkoutActivity
 import WorkoutHealth
 
 /// What the app does while iOS terminates it: the card and the notifications of every open timer go, and the workout
-/// session ends last. The run record stays, so the next launch offers to continue.
+/// session ends last, saving its workout. The run record stays, so the next launch offers to continue.
 public struct ProcessTeardown: Sendable {
     /// The whole teardown, counted from before `begin()`; iOS gives `applicationWillTerminate` about five seconds.
     public static let budget: Duration = .seconds(2)
@@ -48,8 +48,8 @@ public struct ProcessTeardown: Sendable {
         health.beginTermination()
     }
 
-    /// The card and the notifications go together, each within its own limit, so the session always gets what is
-    /// left of the budget; ending it lets iOS end the process.
+    /// The card and the notifications go together, each within its own limit, so the session and its save always get
+    /// what is left of the budget; ending it lets iOS end the process.
     public func run(at date: Date) async {
         async let activities = finishes(within: Self.liveActivityLimit, liveActivity.endAll)
         async let barrier = finishes(within: Self.notificationBarrier, notifications.finishTermination)

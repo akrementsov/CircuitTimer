@@ -3,7 +3,8 @@ import HealthKit
 
 /// What a session's delegate reports, in the order HealthKit calls it: a failure always comes before its state change.
 enum SessionEvent: Sendable {
-    case changed(HKWorkoutSessionState)
+    /// `date` is when the session changed, as HealthKit reports it.
+    case changed(HKWorkoutSessionState, date: Date)
     case failed(any Error)
 }
 
@@ -28,7 +29,7 @@ final class SessionEvents: NSObject, HKWorkoutSessionDelegate, Sendable {
         from fromState: HKWorkoutSessionState,
         date: Date
     ) {
-        continuation.yield(.changed(toState))
+        continuation.yield(.changed(toState, date: date))
     }
 
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: any Error) {

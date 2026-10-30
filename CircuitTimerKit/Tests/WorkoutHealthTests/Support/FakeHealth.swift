@@ -75,6 +75,14 @@ final class FakeHealth: Sendable {
     /// Every session `create` made, in order; the n-th has activity `UUID(fixture: n)`.
     let created = LockIsolated<[FakeSession]>([])
     let recoveries = LockIsolated(0)
+    /// Every workout `save` received, in order.
+    let saved = LockIsolated<[HealthWorkout]>([])
+    /// Consumed one per `save` before any succeeds.
+    let saveFailures = LockIsolated<[any Error]>([])
+    /// Saves that returned or threw.
+    let finishedSaves = LockIsolated(0)
+    /// While set, every save waits until `releaseSaves`.
+    private let heldSaves = LockIsolated<[AsyncStream<Void>.Continuation]?>(nil)
     private let recovery = AsyncStream<Result<FakeSession?, any Error>>.makeStream()
 
     var transport: SessionTransport {
@@ -96,8 +104,39 @@ final class FakeHealth: Sendable {
                     return try answer.get()?.handle
                 }
                 return nil
+            },
+            save: { workout in
+                self.saved.withValue { $0.append(workout) }
+                let hold = self.heldSaves.withValue { held -> AsyncStream<Void>? in
+                    guard held != nil else { return nil }
+
+                    let (stream, continuation) = AsyncStream<Void>.makeStream()
+                    held?.append(continuation)
+                    return stream
+                }
+                if let hold {
+                    for await _ in hold {}
+                }
+                defer { self.finishedSaves.withValue { $0 += 1 } }
+                if let failure = self.saveFailures.withValue({ $0.isEmpty ? nil : $0.removeFirst() }) {
+                    throw failure
+                }
             }
         )
+    }
+
+    /// Holds every save from now on until `releaseSaves`.
+    func holdSaves() {
+        heldSaves.withValue { $0 = $0 ?? [] }
+    }
+
+    func releaseSaves() {
+        heldSaves.withValue { held in
+            for continuation in held ?? [] {
+                continuation.finish()
+            }
+            held = nil
+        }
     }
 
     func answerRecovery(_ answer: Result<FakeSession?, any Error>) {

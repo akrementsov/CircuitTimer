@@ -85,6 +85,10 @@ public struct WorkoutTimerFeature: Sendable {
         var activityControls: ActivityControlState?
         /// Set once the screen starts closing, also before the control subscription exists.
         var isClosing = false
+        /// What the run did, for its Health workout; the session saves the newest track it received.
+        public internal(set) var healthTrack = WorkoutHealthTrack()
+        var sentHealthTrack = WorkoutHealthTrack()
+        var healthRevision = 0
         /// Between `.background` and the next `.active`; no countdown runs meanwhile.
         var isInBackground = false
         @SharedReader(.keepScreenOn) var isKeepScreenOn = true
@@ -230,7 +234,8 @@ public struct WorkoutTimerFeature: Sendable {
             let notifications = syncNotifications(&state, after: action, at: now)
             let activity = syncLiveActivity(&state, after: action, at: now)
             let health = startHealthSession(state, after: action, at: now)
-            return .merge(signals, awake, notifications, activity, health, finishActivityControl(&state))
+            let track = syncHealthTrack(&state, at: now)
+            return .merge(signals, awake, notifications, activity, health, track, finishActivityControl(&state))
         }
     }
 
@@ -450,6 +455,7 @@ public struct WorkoutTimerFeature: Sendable {
                 "The wall clock went back by \(jump.inMilliseconds) ms; keeping \(kept.inMilliseconds) ms of the run"
             )
             state.run.rebase(at: now, keepingTotalElapsed: kept)
+            state.healthTrack.rebase(from: anchor.date.adding(monotonic), to: now)
             return true
         }
         if wall > monotonic + Self.jumpTolerance {

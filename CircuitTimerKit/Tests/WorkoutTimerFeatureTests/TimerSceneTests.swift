@@ -106,7 +106,10 @@ struct TimerSceneTests {
 
         await timer.send(.view(.scenePhaseChanged(.active)), saving: true) {
             $0.isInBackground = false
-            if clockWentBack { $0.run.rebase(at: now, keepingTotalElapsed: .seconds(7)) }
+            if clockWentBack {
+                $0.run.rebase(at: now, keepingTotalElapsed: .seconds(7))
+                $0.healthTrack.rebase(from: moment(4), to: now)
+            }
             $0.settle(at: now)
             $0.clockGeneration = 3
             $0.clockAnchor = timer.anchor(totalElapsed: .seconds(7))

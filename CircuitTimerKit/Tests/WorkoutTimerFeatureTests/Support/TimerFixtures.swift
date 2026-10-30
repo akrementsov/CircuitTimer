@@ -220,9 +220,18 @@ final class TimerHarness {
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
-    init(_ state: WorkoutTimerFeature.State, signals: Bool = false, notifications: Bool = false, activity: Bool = false) {
+    /// `followsHealth: false` keeps the Health track as the state has it, like that of a run restored after a relaunch.
+    init(
+        _ state: WorkoutTimerFeature.State,
+        signals: Bool = false,
+        notifications: Bool = false,
+        activity: Bool = false,
+        followsHealth: Bool = true
+    ) {
         var state = state
         if activity { state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true) }
+        // A fixture that is already running has been followed since it started, as a real timer would be.
+        if followsHealth { state = state.followingHealth(at: origin) }
         state.$isBackgroundNotificationsOn = SharedReader(value: notifications)
         if !signals {
             state.isPreparingCountdown = false
@@ -347,6 +356,7 @@ final class TimerHarness {
         await store.send(action) {
             update?(&$0)
             if let isActive { $0.isSceneActive = isActive }
+            $0.followHealth(at: self.now)
             if saving {
                 $0.recordSync = .pending(
                     revision: revision,
@@ -375,6 +385,7 @@ final class TimerHarness {
         await store.receive(action) {
             update?(&$0)
             if let notificationRevision { $0.notifications.completedRevision = notificationRevision }
+            $0.followHealth(at: self.now)
             if saving {
                 $0.recordSync = .pending(
                     revision: revision,
@@ -403,4 +414,23 @@ final class TimerHarness {
 struct RecordWrite: Equatable, Sendable {
     let record: WorkoutRunRecord?
     let revision: Int
+}
+
+extension WorkoutTimerFeature.State {
+    /// A fixture as a real timer holds it: followed since its run started.
+    func followingHealth(at now: Date) -> Self {
+        var state = self
+        state.followHealth(at: now)
+        return state
+    }
+
+    /// The Health track's step after every action, as the second reducer takes it, for the harness to expect alongside
+    /// whatever a test pins.
+    mutating func followHealth(at now: Date) {
+        if let healthPhase { healthTrack.follow(healthPhase, at: now) }
+        guard !isClosing, healthTrack != sentHealthTrack else { return }
+
+        healthRevision += 1
+        sentHealthTrack = healthTrack
+    }
 }

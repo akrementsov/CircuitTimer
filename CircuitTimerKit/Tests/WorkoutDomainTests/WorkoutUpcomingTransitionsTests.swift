@@ -66,4 +66,49 @@ struct WorkoutUpcomingTransitionsTests {
         #expect(run.phase == .finished)
         #expect(run.upcomingTransitions(at: moment(2), limit: 32) == .init(events: [], hasMore: false))
     }
+
+    @Test
+    func test_automaticStopDate_noManualPause_isTheEndOfTheRun() {
+        let workout = Workout(id: UUID(fixture: 991), warmUp: [makeStage(1, .seconds(4)), makeStage(2, .seconds(6))])
+        var run = makeRun(workout)
+        run.start(at: origin)
+
+        #expect(run.automaticStopDate == moment(10))
+    }
+
+    @Test
+    func test_automaticStopDate_manualPauseAhead_isItsStartUntilTheRunResumesPastIt() {
+        var run = makePausedRun()
+        run.start(at: origin)
+        #expect(run.automaticStopDate == moment(15))
+
+        run.tick(at: moment(12))
+        #expect(run.automaticStopDate == moment(15))
+
+        run.tick(at: moment(15))
+        #expect(run.automaticStopDate == nil)
+        run.resume(at: moment(40))
+        #expect(run.automaticStopDate == moment(50))
+    }
+
+    @Test
+    func test_automaticStopDate_ticksReanchoring_staysInWholeMillisecondsUntilARebase() {
+        var run = makePausedRun()
+        run.start(at: moment(0.0004))
+        #expect(run.automaticStopDate == moment(15))
+
+        for second in [3.2507, 9.9999, 12.0001] {
+            run.tick(at: moment(second))
+            #expect(run.automaticStopDate == moment(15))
+        }
+
+        var rebased = makePausedRun()
+        rebased.start(at: origin)
+        rebased.rebase(at: moment(5), keepingTotalElapsed: .seconds(8))
+        #expect(rebased.automaticStopDate == moment(12))
+    }
+
+    private func makePausedRun() -> WorkoutRun {
+        makeRun(makePausedWorkout())
+    }
 }
