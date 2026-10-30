@@ -47,7 +47,6 @@ struct SessionTransport: Sendable {
             },
             save: { workout in
                 let builder = HKWorkoutBuilder(healthStore: store, configuration: makeConfiguration(), device: .local())
-                try await builder.beginCollection(at: workout.start)
                 // Pause and resume events take the pauses out of the workout's duration.
                 let events = workout.pauses.flatMap { pause in
                     [
@@ -56,6 +55,7 @@ struct SessionTransport: Sendable {
                     ]
                 }
                 do {
+                    try await builder.beginCollection(at: workout.start)
                     if !events.isEmpty {
                         try await builder.addWorkoutEvents(events)
                     }
@@ -65,7 +65,7 @@ struct SessionTransport: Sendable {
                         Logger.workoutHealth.notice("Saved a workout to Health while the device was locked")
                     }
                 } catch {
-                    // A collecting builder keeps the store until it is finished or discarded.
+                    // A builder keeps the store until its workout is saved or discarded.
                     builder.discardWorkout()
                     throw error
                 }

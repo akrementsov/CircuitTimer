@@ -21,7 +21,7 @@ Check these on iOS 26 or later before release (CT-7):
 
 - [ ] Finish after a manual pause, a schedule pause, the stage list and Stay with its countdown: one workout, starting at the end of the start countdown, whose duration is the running time.
 - [ ] Close from a pause: the workout ends at the pause's start.
-- [ ] An App Switcher swipe after more than 3 minutes in the background: the workout ends at the swipe, its save fits the termination deadline (the log's «Saved a workout to Health in … ms»), and the card and notifications still go.
+- [ ] An App Switcher swipe after more than 3 minutes in the background: the workout ends at the swipe, its save fits the termination deadline (the log's «Saved a workout to Health in …»), and the card and notifications still go.
 - [ ] Finish, then a swipe at once: the workout is saved and the session ends within 2 s.
 - [ ] Continue after a swipe, then Finish: a second workout.
 - [ ] Another app's workout session takes over: the workout up to the takeover is saved, also with a swipe right after it.

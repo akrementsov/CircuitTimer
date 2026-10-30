@@ -65,13 +65,14 @@ public struct WorkoutHealthTrack: Equatable, Sendable {
         shift(by: now.timeIntervalSince(oldNow))
     }
 
-    /// The workout this track describes when its session closes at `date`, or `nil` when the run never counted.
-    func workout(closingAt date: Date) -> HealthWorkout? {
+    /// The workout this track describes when its session closes at `date`, or `nil` when the run never counted. A
+    /// session lost earlier than the track's newest date ends it at `limit` without moving the track.
+    func workout(closingAt date: Date, endingBy limit: Date = .distantFuture) -> HealthWorkout? {
         var track = self
         track.shiftBack(toward: date)
         guard let start = track.start else { return nil }
 
-        let end: Date
+        var end: Date
         switch track.position {
             case .idle: return nil
             case let .running(stopsAt): end = min(stopsAt, date)
@@ -79,6 +80,7 @@ public struct WorkoutHealthTrack: Equatable, Sendable {
             case let .halted(since): end = min(since, date)
             case let .finished(finish): end = min(finish, date)
         }
+        end = min(end, limit)
         guard end > start else { return nil }
 
         let pauses = track.pauses.compactMap { pause -> DateInterval? in
