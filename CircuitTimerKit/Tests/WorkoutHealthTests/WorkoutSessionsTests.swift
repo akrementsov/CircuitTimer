@@ -7,41 +7,71 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkoutSessionsTests {
-    private let health = FakeHealth()
-    private let gate = TerminationGate()
-    private let clock = TestClock<Duration>()
-    private let sessions: WorkoutSessions
-    private static let owner = UUID(fixture: 501)
-    private static let other = UUID(fixture: 502)
-    private static let now = moment(1_000)
+    let health = FakeHealth()
+    let gate = TerminationGate()
+    let clock = TestClock<Duration>()
+    let sessions: WorkoutSessions
+    static let owner = UUID(fixture: 501)
+    static let other = UUID(fixture: 502)
+    static let now = moment(1_000)
 
     init() {
         sessions = WorkoutSessions(transport: health.transport, gate: gate) { Self.now }
     }
 
-    private func start(_ owner: UUID = owner, at date: Date = moment(0)) async {
+    func start(_ owner: UUID = owner, at date: Date = moment(0)) async {
         await sessions.start(owner: owner, at: date, clock: clock)
     }
 
-    private func end(_ owner: UUID = owner, at date: Date = moment(10)) async {
-        await sessions.end(owner: owner, track: WorkoutHealthTrack(), at: date, clock: clock)
+    func end(_ owner: UUID = owner, track: WorkoutHealthTrack = WorkoutHealthTrack(), at date: Date = moment(10)) async {
+        await sessions.end(owner: owner, track: track, at: date, clock: clock)
     }
 
-    private func endOrphans() async {
+    func sync(_ track: WorkoutHealthTrack, owner: UUID = owner, revision: Int = 1) async {
+        await sessions.sync(owner: owner, revision: revision, track: track)
+    }
+
+    func endAll(at date: Date = moment(10)) async {
+        await sessions.endAll(at: date, clock: clock)
+    }
+
+    /// `endAll` in a task of its own, which sets `isDone` once it returns.
+    func endAllInTheBackground(at date: Date = moment(10)) -> (task: Task<Void, Never>, isDone: LockIsolated<Bool>) {
+        let isDone = LockIsolated(false)
+        let task = Task {
+            await endAll(at: date)
+            isDone.setValue(true)
+        }
+        return (task, isDone)
+    }
+
+    func endOrphans() async {
         await sessions.endOrphans(clock: clock)
     }
 
     /// Lets the session's watch task hand its events to the actor.
-    private func settle() async {
+    func settle() async {
         await Task.megaYield()
     }
 
-    private func running(_ owner: UUID = owner, at date: Date = moment(0)) async -> FakeSession {
+    @discardableResult
+    func running(_ owner: UUID = owner, at date: Date = moment(0)) async -> FakeSession {
         await start(owner, at: date)
         let session = health.created.value.last!
         session.report(.changed(.running, date: moment(0)))
         await settle()
         return session
+    }
+
+    /// A track that started running at `start` seconds, stopping by itself at `stopsAt`.
+    func track(from start: Double = 0, stopsAt: Double = 100) -> WorkoutHealthTrack {
+        var track = WorkoutHealthTrack()
+        track.follow(.running(stopsAt: moment(stopsAt)), at: moment(start))
+        return track
+    }
+
+    func workout(_ start: Double, _ end: Double) -> HealthWorkout {
+        HealthWorkout(start: moment(start), end: moment(end), pauses: [])
     }
 
     // MARK: - The main path
@@ -55,11 +85,13 @@ struct WorkoutSessionsTests {
     }
 
     @Test
-    func test_end_running_stopsEndsAndReleasesOnceEnded() async {
+    func test_end_running_stopsEndsSavesItsTrackAndReleasesOnceEnded() async {
         let session = await running()
 
-        await end(at: moment(10))
+        await end(track: track(stopsAt: 100), at: moment(10))
+        await settle()
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
+        #expect(health.saved.value == [workout(0, 10)])
 
         session.report(.changed(.ended, date: moment(0)))
         await settle()
@@ -67,16 +99,23 @@ struct WorkoutSessionsTests {
     }
 
     @Test
-    func test_end_starting_endsWithoutStopUntilEnded() async {
+    func test_end_starting_endsWithoutStopSavesAtOnceAndEndsAgainIfItRuns() async {
         await start()
         let session = health.session(0)
 
-        await end()
+        await end(track: track(), at: moment(10))
+        await settle()
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
+        #expect(health.saved.value == [workout(0, 10)])
+
+        session.report(.changed(.running, date: moment(1)))
+        await settle()
+        #expect(session.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end])
 
         session.report(.changed(.ended, date: moment(0)))
         await settle()
-        #expect(session.calls.value == [.observe, .start(moment(0)), .end, .release])
+        #expect(session.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end, .release])
+        #expect(health.saved.value == [workout(0, 10)])
     }
 
     @Test
@@ -110,16 +149,18 @@ struct WorkoutSessionsTests {
     }
 
     @Test
-    func test_end_twiceOrWithoutSlot_endsTheHandleOnceAndTombstones() async {
+    func test_end_twiceOrWithoutSlot_endsTheHandleAndSavesOnceAndTombstones() async {
         let session = await running()
 
-        await end(at: moment(10))
-        await end(at: moment(11))
-        await end(Self.other)
+        await end(track: track(), at: moment(10))
+        await end(track: track(), at: moment(11))
+        await end(Self.other, track: track())
         await start(Self.other)
+        await settle()
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
         #expect(health.created.value.count == 1)
+        #expect(health.saved.value == [workout(0, 10)])
     }
 
     @Test
@@ -156,16 +197,19 @@ struct WorkoutSessionsTests {
     }
 
     @Test
-    func test_canHoldSessionsFalse_createsAndRecoversNothing() async {
+    func test_canHoldSessionsFalse_createsRecoversAndSavesNothing() async {
         health.canHoldSessions.setValue(false)
 
         await start()
+        await sync(track())
         await endOrphans()
-        await end()
-        await sessions.endAll(at: moment(20), clock: clock)
+        await endAll(at: moment(20))
+        await end(track: track())
+        await settle()
 
         #expect(health.created.value.isEmpty)
         #expect(health.recoveries.value == 0)
+        #expect(health.saved.value.isEmpty)
     }
 
     // MARK: - Recovery
@@ -200,19 +244,42 @@ struct WorkoutSessionsTests {
         #expect(health.session(0).calls.value == [.observe, .start(moment(0))])
     }
 
-    @Test
-    func test_end_reservedStart_createsNoSessionAfterRecovery() async {
+    @Test(arguments: [false, true])
+    func test_end_reservedStart_createsAndSavesNothing(byEndAll: Bool) async {
         let recovering = Task { await endOrphans() }
         await settle()
         let starting = Task { await start() }
         await settle()
 
-        await end()
+        await sync(track())
+        if byEndAll {
+            await endAll()
+        } else {
+            await end(track: track())
+        }
         health.answerRecovery(.success(nil))
         await recovering.value
         await starting.value
+        await settle()
 
         #expect(health.created.value.isEmpty)
+        #expect(health.saved.value.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func test_start_createThrew_endOrEndAllSavesNothing(byEndAll: Bool) async {
+        health.createFailures.setValue([FakeError()])
+        await start()
+
+        await sync(track())
+        if byEndAll {
+            await endAll()
+        } else {
+            await end(track: track())
+        }
+        await settle()
+
+        #expect(health.saved.value.isEmpty)
     }
 
     @Test
@@ -304,6 +371,19 @@ struct WorkoutSessionsTests {
         let ended: [FakeSession.Call] = if case .failed = event { [.end, .release] } else { [.release] }
         #expect(session.calls.value == [.observe, .start(moment(0))] + ended)
         #expect(health.created.value.count == 2)
+    }
+
+    @Test(arguments: startingFailures)
+    func test_startingSession_failsOrEnds_savesNothing(event: SessionEvent) async {
+        await start()
+        health.session(0).report(event)
+        await settle()
+
+        await sync(track())
+        await end(track: track())
+        await settle()
+
+        #expect(health.saved.value.isEmpty)
     }
 
     static let runningLosses: [SessionEvent] = [
