@@ -4,7 +4,7 @@ On iOS 26 and later a running timer holds a Health workout session, which keeps 
 
 ## What is saved
 
-One High Intensity Interval Training workout, indoors, per timer, with no samples such as heart rate or energy. It starts when the run first runs, at the end of the start countdown, and ends when the timer closes: at Finish, at a close from a pause (the start of that pause), where a finished run stopped, or when iOS terminates the app. Pauses by the user or the schedule, the resume countdown, the stage list and the close dialog are pauses of the workout, so its duration is the time the run counted. A clock moved back while the app measures time shifts the whole workout, so that time is kept.
+One High Intensity Interval Training workout, indoors, per timer, with no samples such as heart rate or energy. It starts when the run first runs, at the end of the start countdown, and ends when the timer closes: at the start of the pause it closes from, which for a running run is the tap on the close button, where a finished run stopped, or when iOS terminates the app. Pauses by the user or the schedule, the resume countdown, the stage list and the close dialog are pauses of the workout, so its duration is the time the run counted. A clock moved back while the app measures time shifts the whole workout, so that time is kept.
 
 Nothing is saved on iOS 17–25, when writing workouts is not allowed, when the session failed to start before the timer closed or for a workout of zero length; the app never says so. A session another app takes over, or HealthKit stops, saves the workout up to then. Continue after a relaunch saves a second workout; the time between the process's death and Continue is in neither.
 
@@ -20,7 +20,7 @@ Nothing is saved on iOS 17–25, when writing workouts is not allowed, when the 
 Check these on iOS 26 or later before release (CT-7):
 
 - [ ] Finish after a manual pause, a schedule pause, the stage list and Stay with its countdown: one High Intensity Interval Training workout, indoors, with no samples, starting at the end of the start countdown, whose duration is the running time.
-- [ ] Close from a pause: the workout ends at the pause's start.
+- [ ] Close from a pause: the workout ends at the pause's start. Close from a running run: it ends at the tap on the close button, not at Finish.
 - [ ] An App Switcher swipe after more than 3 minutes in the background: the workout ends at the swipe, its save fits the termination deadline (the log's «Saved a workout to Health in …»), and the card and notifications still go.
 - [ ] Finish, then a swipe at once: the workout is saved and the session ends within 2 s.
 - [ ] Continue after a swipe, then Finish: a second workout.

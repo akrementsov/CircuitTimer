@@ -26,7 +26,7 @@ public struct WorkoutHealthClient: Sendable {
     public var start: @Sendable (_ owner: UUID, _ date: Date) async -> Void
     /// Keeps the owner's newest track, so the session can save the run up to wherever it stands when it closes. An
     /// older revision, an owner that has ended or one whose session was lost is ignored, except that the first track
-    /// of an owner lost before any track arrived is saved up to the loss.
+    /// of an owner lost before any track arrived is saved up to the loss, whatever its revision.
     public var sync: @Sendable (_ owner: UUID, _ revision: Int, _ track: WorkoutHealthTrack) async -> Void
     /// Ends the owner's session and saves the workout of its final track up to `date`, if the run ran; the owner never
     /// starts again.
