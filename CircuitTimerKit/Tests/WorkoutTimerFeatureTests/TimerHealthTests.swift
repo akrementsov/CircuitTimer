@@ -359,6 +359,24 @@ struct TimerHealthTests {
     }
 
     @Test
+    func test_closeAfterAMeasuredBackwardJump_endsWithTheRunningTimeKept() async {
+        let timer = harness(.fixture(.running))
+        await timer.advance(seconds: 2)
+        // The monotonic clock vouches for 2 s since `origin`, while the wall clock now reads 3 s before it.
+        timer.moveWall(seconds: -5)
+
+        await send(.view(.closeButtonTapped), to: timer)
+        #expect(syncs.value.map(\.revision) == [2])
+        #expect(workout(of: syncs.value.last?.track) == workout(-5, -3))
+
+        await send(.destination(.presented(.closeConfirmation(.finish))), to: timer)
+        await timer.store.finish()
+
+        #expect(ends.value.map(\.date) == [moment(-3)])
+        #expect(ends.value.first?.track.workout(closingAt: moment(-3)) == workout(-5, -3))
+    }
+
+    @Test
     func test_closeOfARunThatEndedUnseen_endsWithTheTrackFinishedAtItsStop() async {
         let timer = harness(.fixture(.running))
         timer.moveWall(seconds: 20)
