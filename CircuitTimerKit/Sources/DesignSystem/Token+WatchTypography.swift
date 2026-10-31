@@ -2,24 +2,25 @@ import SwiftUI
 
 extension DesignSystem.Token {
     /// The watch app's text. Clocks use League Gothic at fixed sizes, as on the Live Activity, so the digits fill the
-    /// small screen; text uses SF on Dynamic Type styles, because League Gothic has no Cyrillic.
+    /// small screen; text uses SF on Dynamic Type styles, because League Gothic has no Cyrillic. Case names differ
+    /// from those of the other typography enums, so `.token(_:)` stays unambiguous.
     public enum WatchTypography: Sendable, CaseIterable {
         /// The running stage's clock.
         case stageClock
         /// The next stage's duration.
-        case nextClock
+        case nextStageClock
         /// The running stage's name.
         case stageName
         /// The next stage's name.
-        case nextName
+        case nextStageName
         /// A screen's title and the workout's name.
-        case title
+        case screenTitle
         /// A workout in the list.
         case rowTitle
         /// The line under a workout in the list.
         case rowDetail
         /// Explanations and states.
-        case footnote
+        case note
         /// Start, Pause and Resume.
         case control
     }
@@ -31,17 +32,17 @@ extension Font {
         switch style {
             case .stageClock:
                 StageClockText.Face.current.font(size: 56)
-            case .nextClock:
+            case .nextStageClock:
                 StageClockText.Face.current.font(size: 22)
             case .stageName:
                 .system(.headline, weight: .heavy)
-            case .nextName:
+            case .nextStageName:
                 .system(.footnote, weight: .bold)
-            case .title:
+            case .screenTitle:
                 .system(.headline, weight: .semibold)
             case .rowTitle:
                 .system(.body, weight: .semibold)
-            case .rowDetail, .footnote:
+            case .rowDetail, .note:
                 .system(.footnote)
             case .control:
                 .system(.body, weight: .semibold)
