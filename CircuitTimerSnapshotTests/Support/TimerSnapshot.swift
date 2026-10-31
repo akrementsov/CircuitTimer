@@ -64,19 +64,24 @@ func assertTimerSnapshot(
             guard timerState.hasAppearedForSnapshot else {
                 throw TimerSnapshotFailure.notAppeared
             }
-            let store = Store(initialState: timerState) { WorkoutTimerFeature() }
-            let controller = UIHostingController(
-                rootView: WorkoutTimerStack(store: store)
-                    // Pinned: the host's own phase sequence could reset the signal baseline or restart the countdown's
-                    // audio preparation, and either changes the frame.
-                    .environment(\.scenePhase, .active)
-                    .environment(\.locale, variant.locale)
-                    .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
-                    .preferredColorScheme(.dark)
-            )
-            return SnapshotRoot(controller: controller, tabBar: .none)
+            return timerSnapshotRoot(Store(initialState: timerState) { WorkoutTimerFeature() }, variant: variant)
         }
     }
+}
+
+/// The root `assertTimerSnapshot` mounts for a store built inside the snapshot's dependencies.
+@MainActor
+func timerSnapshotRoot(_ store: StoreOf<WorkoutTimerFeature>, variant: SnapshotVariant) -> SnapshotRoot {
+    let controller = UIHostingController(
+        rootView: WorkoutTimerStack(store: store)
+            // Pinned: outside the host's `WindowGroup` SwiftUI reports `.background`, which would reset the signal
+            // baseline or restart the countdown's audio preparation, and either changes the frame.
+            .environment(\.scenePhase, .active)
+            .environment(\.locale, variant.locale)
+            .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
+            .preferredColorScheme(.dark)
+    )
+    return SnapshotRoot(controller: controller, tabBar: .none)
 }
 
 private enum TimerSnapshotFailure: Error, CustomStringConvertible {
