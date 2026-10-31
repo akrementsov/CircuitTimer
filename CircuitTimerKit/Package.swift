@@ -26,6 +26,7 @@ let package = Package(
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
+        .library(name: "WatchRemoteFeature", targets: ["WatchRemoteFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
         .library(name: "AppScenarios", targets: ["AppScenarios"]),
@@ -223,6 +224,13 @@ let package = Package(
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
+        .target(
+            name: "WatchRemoteFeature",
+            dependencies: ["DesignSystem"],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),

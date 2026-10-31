@@ -40,6 +40,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 | `UITestContract` | — | Accessibility identifiers shared by the app and its UI tests; in Debug also the scenario names, the launch keys and the fixture names the tests read |
 | `WorkoutEditorFeature` | `DesignSystem`, `UITestContract`, `WorkoutDomain`, `WorkoutStorage`, ComposableArchitecture, TipKit | The workout screen: a saved workout read-only with Start, and the editor of a draft saved or discarded as a whole; stage durations typed as MM:SS; a dimmed Save explained by an alert, VoiceOver and a one-time tip with its `SaveTipClient` |
 | `WorkoutTimerFeature` | `BackgroundNotifications`, `BackgroundExecution`, `DesignSystem`, `TimerPreferences`, `UITestContract`, `WorkoutActivity`, `WorkoutDomain`, `WorkoutHealth`, `WorkoutStorage`, ComposableArchitecture, UIKit | The timer screen: foreground tones, haptics and spoken stage names; countdowns, the clock loops over a `WorkoutRun`, `TimerSessionClient`, saving its run under `BackgroundTaskClient`; syncing its Live Activity; holding its workout session and reporting its run's track to it; its own stack with the stage list |
+| `WatchRemoteFeature` | `DesignSystem` | The Apple Watch app's screens (CT-9): so far the state before the iPhone has sent its workouts. Builds for iOS and watchOS |
 | `TimerPreferences` | Sharing | The Sound, Vibration, Speak names, Background notifications and Keep screen on toggles: `@Shared(.appStorage)` keys, on by default |
 | `SettingsFeature` | `CloudSync`, `DesignSystem`, `TimerPreferences`, `UITestContract`, ComposableArchitecture | The Settings tab: signal toggles, the iCloud sync switch and its footnote, its navigation stack, About with the app version, the legal pages |
 | `AppFeature` | all of the above, ComposableArchitecture | Root feature: the tab bar, the workout list, pushing the workout screen onto the Workouts stack, presenting the timer full screen on its Start, or after a relaunch when the user continues a saved run; composes Settings; `ProcessTeardown` for termination |
@@ -54,6 +55,7 @@ Layering:
 - `BackgroundNotifications` imports no feature, TCA or workout module; the app and the timer use only its dependency client.
 - `AppFeature` reads `TimerPreferences` to gate the first Start permission request.
 - `SettingsFeature` needs no workout module and imports none.
+- `WatchRemoteFeature` is the watch app's feature: no iPhone feature imports it, and it imports none.
 - `CloudSync` imports no feature, TCA or workout module: `WorkoutStorage` asks it how to open the store, `AppFeature` reads its remote changes and Settings its status and switch.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.

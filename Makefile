@@ -101,7 +101,7 @@ build-snapshot-kit:
 # The modules the watch app links, strictly, for watchOS. No watchOS simulator runtime is needed: a generic destination
 # only needs the SDK.
 build-watch-package:
-	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme DesignSystem \
+	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme WatchRemoteFeature \
 		-destination 'generic/platform=watchOS Simulator' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/WatchPackage" $(XCODEBUILD_FLAGS)
 
