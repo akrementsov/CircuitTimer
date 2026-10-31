@@ -7,7 +7,10 @@ import WorkoutDomain
 /// Timer states as the screen shows them once it has appeared, built from the state Start creates.
 ///
 /// Every factory ends with `markAppeared()`, after the run and the path are set: the timer's appearance then changes
-/// nothing on screen, whenever its actions arrive.
+/// nothing on screen, whenever its actions arrive. That holds because `.task` starts the clock only while
+/// `clockGeneration` is 0, so no clock runs in a snapshot; `TimerSnapshotStatesContractTests` drives the real appearance
+/// from the state Start creates, `pausedRun` and `finishedRun`, and checks that the reducer settles them as
+/// `markAppeared()` does.
 extension WorkoutTimerFeature.State {
     /// The start 3-2-1 on its first digit.
     static func startCountdown(_ workout: Workout) -> Self {
@@ -24,14 +27,7 @@ extension WorkoutTimerFeature.State {
     }
 
     static func finished(_ workout: Workout) -> Self {
-        let now = TimerSnapshotDependencies.now
-        var state = AppFeature().timerState(for: workout)
-        state.countdown = nil
-        state.run.start(at: now)
-        for _ in state.run.schedule.stages {
-            state.run.skipToNextStage(at: now)
-        }
-        state.settle(at: now)
+        var state = finishedRun(workout)
         state.markAppeared()
         return state
     }
@@ -51,7 +47,8 @@ extension WorkoutTimerFeature.State {
         return appeared == self
     }
 
-    private static func pausedRun(_ workout: Workout) -> Self {
+    /// The paused run before the screen appeared.
+    static func pausedRun(_ workout: Workout) -> Self {
         let now = TimerSnapshotDependencies.now
         let stageStart = now.adding(.seconds(-20))
         var state = AppFeature().timerState(for: workout)
@@ -62,6 +59,19 @@ extension WorkoutTimerFeature.State {
             state.run.skipToNextStage(at: stageStart)
         }
         state.run.pause(at: now)
+        state.settle(at: now)
+        return state
+    }
+
+    /// The finished run before the screen appeared.
+    static func finishedRun(_ workout: Workout) -> Self {
+        let now = TimerSnapshotDependencies.now
+        var state = AppFeature().timerState(for: workout)
+        state.countdown = nil
+        state.run.start(at: now)
+        for _ in state.run.schedule.stages {
+            state.run.skipToNextStage(at: now)
+        }
         state.settle(at: now)
         return state
     }

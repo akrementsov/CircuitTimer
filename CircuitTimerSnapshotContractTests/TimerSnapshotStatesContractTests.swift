@@ -25,6 +25,16 @@ struct TimerSnapshotStatesContractTests {
                 case .stageList: .stageList(workout)
             }
         }
+
+        /// The state before the screen appeared; the stage list is then opened with the Stages button.
+        func stateBeforeAppearance() -> WorkoutTimerFeature.State {
+            let workout = SnapshotFixtures.editorWorkout(language: .english)
+            return switch self {
+                case .startCountdown: AppFeature().timerState(for: workout)
+                case .paused, .stageList: .pausedRun(workout)
+                case .finished: .finishedRun(workout)
+            }
+        }
     }
 
     enum Change: String, CaseIterable, CustomTestStringConvertible {
@@ -111,22 +121,87 @@ struct TimerSnapshotStatesContractTests {
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.send(.view(.task))
         await store.send(.view(.activityTask))
+        // The control subscription got ready, the path that can sync the clock; its empty stream then ends.
+        await store.receive(\.internal.activityRequestsReady)
         await store.finish(timeout: .seconds(5))
         #expect(Screen(store.state) == Screen(state))
         #expect(store.state.haptic == nil)
         #expect(store.state.hasAppearedForSnapshot)
     }
 
+    /// Ties `markAppeared()` to the reducer: the real appearance of the state before it, then the Stages button for
+    /// the list, leaves what the factory draws.
+    @Test(arguments: Factory.allCases)
+    func test_appearance_beforeAppearing_settlesAsTheFactory(factory: Factory) async {
+        let store = TestStore(initialState: build { factory.stateBeforeAppearance() }) {
+            WorkoutTimerFeature()
+        } withDependencies: {
+            TimerSnapshotDependencies.prepare(&$0, locale: Locale(identifier: "en"))
+        }
+        store.exhaustivity = .off
+        await store.send(.view(.scenePhaseChanged(.active)))
+        await store.send(.view(.task))
+        await store.send(.view(.activityTask))
+        await store.receive(\.internal.activityRequestsReady)
+        await waitForAppearance(store)
+        if factory == .stageList {
+            await store.send(.view(.stagesButtonTapped))
+        }
+        await store.skipReceivedActions(strict: false)
+        // The start 3-2-1 keeps its loop waiting on the clock that nothing advances.
+        await store.skipInFlightEffects(strict: false)
+
+        var appeared = store.state
+        // A pending haptic draws nothing: `.sensoryFeedback` consumes it, and the factory leaves none so the mount fires none.
+        appeared.haptic = nil
+        let expected = build(factory)
+        #expect(Screen(appeared) == Screen(expected))
+        #expect(Appearance(appeared) == Appearance(expected))
+        #expect(appeared.hasAppearedForSnapshot)
+    }
+
     private func build(_ factory: Factory) -> WorkoutTimerFeature.State {
+        build { factory.state() }
+    }
+
+    private func build(_ state: () -> WorkoutTimerFeature.State) -> WorkoutTimerFeature.State {
         withDependencies {
             TimerSnapshotDependencies.prepare(&$0, locale: Locale(identifier: "en"))
         } operation: {
-            factory.state()
+            state()
+        }
+    }
+
+    /// Waits for the other answers to the appear actions, in whatever order they come: the clock started, the
+    /// countdown's audio prepared and notification access read. The suite's time limit bounds the wait.
+    private func waitForAppearance(_ store: TestStoreOf<WorkoutTimerFeature>) async {
+        while !(store.state.clockGeneration > 0 && !store.state.isPreparingCountdown && store.state.notifications.access != nil) {
+            await Task.yield()
         }
     }
 }
 
-/// Everything the timer's views read.
+/// What `markAppeared()` sets.
+private struct Appearance: Equatable {
+    let clockGeneration: Int
+    let isPreparingCountdown: Bool
+    let isInBackground: Bool
+    let isSceneActive: Bool
+    let access: NotificationAccess?
+    let signalBaseline: SignalMoment?
+
+    init(_ state: WorkoutTimerFeature.State) {
+        clockGeneration = state.clockGeneration
+        isPreparingCountdown = state.isPreparingCountdown
+        isInBackground = state.isInBackground
+        isSceneActive = state.isSceneActive
+        access = state.notifications.access
+        signalBaseline = state.signals.last
+    }
+}
+
+/// Everything the timer's views read; extend it together with `WorkoutTimerView` and `TimerStageListView`, as a property
+/// it leaves out is never compared. Stack element ids come from the context that appends, so the path is its elements.
 private struct Screen: Equatable {
     let currentCard: WorkoutTimerFeature.State.CurrentCard
     let nextStageName: String?
@@ -142,7 +217,7 @@ private struct Screen: Equatable {
     let showsAudioFailure: Bool
     let showsVoiceFailure: Bool
     let title: String
-    let path: StackState<WorkoutTimerFeature.Path.State>
+    let path: [WorkoutTimerFeature.Path.State]
     let destination: WorkoutTimerFeature.Destination.State?
 
     init(_ state: WorkoutTimerFeature.State) {
@@ -160,7 +235,7 @@ private struct Screen: Equatable {
         showsAudioFailure = state.showsAudioFailure
         showsVoiceFailure = state.showsVoiceFailure
         title = state.title
-        path = state.path
+        path = Array(state.path)
         destination = state.destination
     }
 }
