@@ -227,7 +227,8 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
-        // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
+        // The watch app's screens. Builds for iOS too, so the tests it gets in later slices run in `make test` on the iPhone
+        // simulator.
         .target(
             name: "WatchRemoteFeature",
             dependencies: ["DesignSystem"],

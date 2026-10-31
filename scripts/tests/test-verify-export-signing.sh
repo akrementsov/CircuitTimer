@@ -232,6 +232,15 @@ expect_status 1
 expect_in "$work/out" "::error::CircuitTimerWidgets.appex: the signature has HealthKit, which only the app needs"
 expect_not_in "$work/out" "CircuitTimerWidgets.appex: signed for"
 
+describe "ipa: a widget signed with iCloud"
+ipa_fixture
+edit_plist "$widget/_CodeSignature/signed-entitlements.plist" com.apple.developer.icloud-services '["CloudKit"]'
+zip_ipa
+check_ipa
+expect_status 1
+expect_in "$work/out" "::error::CircuitTimerWidgets.appex: the signature has iCloud (com.apple.developer.icloud-services), which only the app needs"
+expect_not_in "$work/out" "CircuitTimerWidgets.appex: signed for"
+
 # watch_ipa KEY JSON: the passing IPA with KEY of the watch app's signature set to JSON.
 watch_ipa() {
 	ipa_fixture
