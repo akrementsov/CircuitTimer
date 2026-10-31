@@ -1,5 +1,8 @@
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// Numeric groups are not words: tapping between two digits must keep the insertion point there.
 final class NativeNumericField: UITextField {
     private var characterTokenizer: NumericTokenizer?
@@ -104,3 +107,4 @@ private final class NumericTokenizer: NSObject, UITextInputTokenizer {
             || direction.rawValue == UITextLayoutDirection.left.rawValue
     }
 }
+#endif

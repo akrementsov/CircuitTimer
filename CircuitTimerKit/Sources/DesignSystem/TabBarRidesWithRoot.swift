@@ -2,6 +2,9 @@ import os
 import SwiftUI
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// On iOS 26 the tab bar leaves with the stack's root screen, as a UIKit push carries it away. A zero-size child of
 /// the root screen pins a picture of the bar to the root's view when a push starts, so it slides out with the root and
 /// back in on the pop, and hides the real bar through UIKit. The glass bar glows when it shows and settles for a moment
@@ -119,3 +122,4 @@ struct TabBarRidesWithRoot: UIViewControllerRepresentable {
         }
     }
 }
+#endif

@@ -51,7 +51,7 @@ SNAPSHOT_KIT_RESOLVED := CircuitTimerSnapshotKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
+.PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit build-watch-package test build-app build-ui-tests test-ui archive \
 	build-snapshots test-snapshots test-snapshot record-snapshot test-snapshot-kit test-snapshot-contracts record-snapshots check-release-app upload ci verify-clean
 
 lint:
@@ -97,6 +97,13 @@ build-snapshot-kit:
 	cd CircuitTimerSnapshotKit && $(STRICT) xcodebuild build -scheme CircuitTimerSnapshotKit \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
+
+# The modules the watch app links, strictly, for watchOS. No watchOS simulator runtime is needed: a generic destination
+# only needs the SDK.
+build-watch-package:
+	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme WatchRemoteFeature \
+		-destination 'generic/platform=watchOS Simulator' ARCHS=$(HOST_ARCH) \
+		-derivedDataPath "$(DERIVED_DATA)/WatchPackage" $(XCODEBUILD_FLAGS)
 
 test-snapshot-kit:
 	@set -eu; \
@@ -307,7 +314,8 @@ record-snapshot:
 
 # Built unsigned: an App Store Connect API key can sign only at export, so `upload` signs. The export keeps the
 # entitlements of the archived signature and an unsigned app has none, so the archived bundles are then signed ad hoc,
-# the widget before the app that contains it, and the app with Configs/CircuitTimer.entitlements for its container.
+# the widget and the watch app before the app that contains them, the watch app without entitlements, and the app
+# with Configs/CircuitTimer.entitlements for its container.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
 	xcodebuild archive -project CircuitTimer.xcodeproj -scheme CircuitTimer -configuration Release \
@@ -318,10 +326,13 @@ archive:
 	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
 	container=$$(plutil -extract CTCloudKitContainerIdentifier raw "$$app/Info.plist"); \
 	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
+	watch="$$app/Watch/CircuitTimerWatch.app"; \
+	test -d "$$watch" || { echo "archive: the app embeds no watch app at $$watch" >&2; exit 1; }; \
 	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
 	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
 	"$(PLISTBUDDY)" -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
 	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
+	codesign --force --sign - --timestamp=none "$$watch"; \
 	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
 	codesign --verify --deep --strict "$$app"
 
@@ -348,7 +359,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint test-scripts check-resolved test build-ui-tests test-ui build-snapshot-kit test-snapshot-kit build-snapshots test-snapshot-contracts test-snapshots
+ci: lint test-scripts check-resolved test build-ui-tests test-ui build-snapshot-kit test-snapshot-kit build-watch-package build-snapshots test-snapshot-contracts test-snapshots
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

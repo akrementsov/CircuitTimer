@@ -4,6 +4,9 @@ import os
 import SwiftUI
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// A centered numeric field with character-level insertion points. The callback accepts, formats or rejects an edit
 /// synchronously, including the caret's UTF-16 offset in the formatted text.
 public struct NumericTextField: UIViewRepresentable {
@@ -113,3 +116,4 @@ public struct NumericTextField: UIViewRepresentable {
         }
     }
 }
+#endif

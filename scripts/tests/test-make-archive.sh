@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests `make archive` after xcodebuild, which a stand-in replaces with an archived app of two extensions: the ad hoc
-# signatures, the app's entitlements with the container of the archived Info.plist, and where it stops. A stand-in
-# records codesign. On a Mac the recipe uses the real plutil and PlistBuddy; Linux has neither, so stand-ins that edit
-# property lists the same way take their place. Make exits 2 when the recipe fails.
+# Tests `make archive` after xcodebuild, which a stand-in replaces with an archived app of two extensions and a watch
+# app: the ad hoc signatures, the app's entitlements with the container of the archived Info.plist, and where it stops.
+# A stand-in records codesign. On a Mac the recipe uses the real plutil and PlistBuddy; Linux has neither, so stand-ins
+# that edit property lists the same way take their place. Make exits 2 when the recipe fails.
 . "$(dirname "$0")/lib.sh"
 
 repo="$work/repo"
@@ -21,6 +21,7 @@ done
 mkdir -p "$derived"
 app="$archive/Products/Applications/CircuitTimer.app"
 for extension in CircuitTimerWidgets Second; do mkdir -p "$app/PlugIns/$extension.appex"; done
+if [ "${WITHOUT_WATCH:-}" != 1 ]; then mkdir -p "$app/Watch/CircuitTimerWatch.app"; fi
 printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict><key>CTCloudKitContainerIdentifier</key><string>%s</string></dict></plist>\n' \
 	"$ARCHIVED_CONTAINER" > "$app/Info.plist"
 EOF
@@ -96,10 +97,11 @@ with open(sys.argv[1], "rb") as file:
 
 signing="codesign --force --sign - --timestamp=none $app/PlugIns/CircuitTimerWidgets.appex
 codesign --force --sign - --timestamp=none $app/PlugIns/Second.appex
+codesign --force --sign - --timestamp=none $app/Watch/CircuitTimerWatch.app
 codesign --force --sign - --timestamp=none --entitlements $entitlements $app
 codesign --verify --deep --strict $app"
 
-describe "every extension is signed before the app, the app with the archived container, then verified"
+describe "every extension and the watch app are signed before the app, the app with the archived container, then verified"
 archive iCloud.com.example.archived
 expect_status 0
 expect_equal "$(cat "$TRACE/calls")" "$signing"
@@ -125,6 +127,12 @@ describe "an app without a container stops before any signature"
 archive ""
 expect_status 2
 expect_in "$work/out" "archive: the app names no CloudKit container"
+expect_equal "$(cat "$TRACE/calls")" ""
+
+describe "an app without the watch app stops before any signature"
+WITHOUT_WATCH=1 archive iCloud.com.example.archived
+expect_status 2
+expect_in "$work/out" "archive: the app embeds no watch app at $app/Watch/CircuitTimerWatch.app"
 expect_equal "$(cat "$TRACE/calls")" ""
 
 describe "a failed verification fails the archive"

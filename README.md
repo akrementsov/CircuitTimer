@@ -157,7 +157,8 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; stage durations as MM:SS on the number pad |
 | `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity, a Health workout session on iOS 26 and later and the run's track for the workout it saves |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
-| `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder |
+| `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder; builds for watchOS too |
+| `WatchRemoteFeature` | The Apple Watch app's screens; the `CircuitTimerWatch` target embedded in the iPhone app shows them ([Apple Watch](docs/apple-watch.md)) |
 | `WorkoutStorage` | `WorkoutStorageClient` (struct of closures, in memory for previews): SwiftData mirrored to iCloud when sync is on; the saved run file |
 | `CloudSync` | The sync switch, the launch's mirroring decision, account and import/export status |
 | `TimerPreferences` | The signal and Keep screen on switches, shared by Settings and the timer |

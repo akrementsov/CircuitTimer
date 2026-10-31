@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS screens only: the watch app has its own screen chrome.
+#if os(iOS)
+
 extension View {
     /// Fills the whole screen, centered content included, with the screen color and uses an inline title.
     /// The navigation bar stays the system one: Liquid Glass with the scroll edge effect on iOS 26,
@@ -25,3 +28,4 @@ private struct ChevronOnlyBackButton: ViewModifier {
         }
     }
 }
+#endif

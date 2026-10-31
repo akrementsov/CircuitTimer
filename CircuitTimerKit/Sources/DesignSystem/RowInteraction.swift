@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// The row interactions of one screen of cards: the swiped row, the lifted row and the scroll geometry they read. A
 /// screen owns one and hands it to its `CardScrollView`, which passes it down to `ReorderableRows`.
 @MainActor
@@ -42,3 +45,4 @@ public final class RowInteraction<ID: Hashable> {
         withAnimation(.snappy(duration: 0.25)) { swipedID = nil }
     }
 }
+#endif
