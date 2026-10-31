@@ -1,9 +1,10 @@
-// The single place for the app's identifiers and version, shared by the app and its widget extension, which must
-// match; Configs/ExportOptions.plist repeats DEVELOPMENT_TEAM for export.
+// The single place for the app's identifiers and version, shared by the app, its widget extension and its watch app,
+// which must match; Configs/ExportOptions.plist repeats DEVELOPMENT_TEAM for export.
 // An app group, when a later change needs one, is APP_GROUP_ID = group.$(APP_BUNDLE_ID).
 
 APP_BUNDLE_ID = com.akrementsov.circuittimer
 WIDGETS_BUNDLE_ID = $(APP_BUNDLE_ID).widgets
+WATCH_BUNDLE_ID = $(APP_BUNDLE_ID).watchkitapp
 // The app's CloudKit container. CT_CLOUDKIT_CONTAINER is what Configs/Info.plist hands the code; a build can empty it
 // to keep the store local without touching the entitlements.
 ICLOUD_CONTAINER_ID = iCloud.$(APP_BUNDLE_ID)
