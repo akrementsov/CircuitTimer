@@ -137,6 +137,13 @@ jobs:
         timeout-minutes: 10
         run: make test-snapshot-kit
 
+      # The modules the watch app links, strictly, for a generic watchOS destination: the image's watchOS SDK suffices.
+      - name: Build the watch package
+        id: build-watch-package
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 10
+        run: make build-watch-package
+
       # Into the next step's DerivedData, so compilation errors are reported separately from image differences.
       - name: Build the snapshot tests
         id: build-snapshots

@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// What a swipe plaque does, which sets its fill.
 public enum SwipePlaqueRole: Sendable {
     /// A red plaque, as the original app's delete.
@@ -412,3 +415,4 @@ struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
     .background(.surface(.screen))
     .preferredColorScheme(.dark)
 }
+#endif

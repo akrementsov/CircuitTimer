@@ -51,7 +51,7 @@ SNAPSHOT_KIT_RESOLVED := CircuitTimerSnapshotKit/Package.resolved
 PROJECT_RESOLVED := CircuitTimer.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 PINS := [.pins[] | {identity, version: .state.version, revision: .state.revision}] | sort_by(.identity)
 
-.PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit test build-app build-ui-tests test-ui archive \
+.PHONY: lint test-scripts check-resolved resolve build-package build-snapshot-kit build-watch-package test build-app build-ui-tests test-ui archive \
 	build-snapshots test-snapshots test-snapshot record-snapshot test-snapshot-kit test-snapshot-contracts record-snapshots check-release-app upload ci verify-clean
 
 lint:
@@ -97,6 +97,13 @@ build-snapshot-kit:
 	cd CircuitTimerSnapshotKit && $(STRICT) xcodebuild build -scheme CircuitTimerSnapshotKit \
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
+
+# The modules the watch app links, strictly, for watchOS. No watchOS simulator runtime is needed: a generic destination
+# only needs the SDK.
+build-watch-package:
+	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme DesignSystem \
+		-destination 'generic/platform=watchOS Simulator' \
+		-derivedDataPath "$(DERIVED_DATA)/WatchPackage" $(XCODEBUILD_FLAGS)
 
 test-snapshot-kit:
 	@set -eu; \
@@ -348,7 +355,7 @@ upload:
 		-allowProvisioningUpdates -authenticationKeyPath "$(ASC_KEY_PATH)" \
 		-authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
 
-ci: lint test-scripts check-resolved test build-ui-tests test-ui build-snapshot-kit test-snapshot-kit build-snapshots test-snapshot-contracts test-snapshots
+ci: lint test-scripts check-resolved test build-ui-tests test-ui build-snapshot-kit test-snapshot-kit build-watch-package build-snapshots test-snapshot-contracts test-snapshots
 
 # Runs `make ci` on a fresh clone of exactly HEAD, so uncommitted files cannot make it pass.
 verify-clean:

@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// An optional hint and a full-width action button floating over a screen's content:
 /// Liquid Glass on iOS 26, the solid brand button with the original shadow before.
 /// Place it with `bottomActionPanel(_:)`.
@@ -151,3 +154,4 @@ private extension View {
         }
     }
 }
+#endif

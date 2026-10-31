@@ -12,7 +12,7 @@ let strictSettings: [SwiftSetting] = Context.environment["CIRCUITTIMER_STRICT_WA
 let package = Package(
     name: "CircuitTimerKit",
     defaultLocalization: "en",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v17), .watchOS(.v10)],
     products: [
         .library(name: "UITestContract", targets: ["UITestContract"]),
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),

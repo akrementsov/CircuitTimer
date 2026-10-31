@@ -2,6 +2,9 @@ import os
 import SwiftUI
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 extension View {
     /// On a tab's navigation stack: a horizontal swipe on the stack's root turns to the next tab (`forward`, the finger
     /// moving left) or the previous one (`backward`), as a tap on it would. Pushed screens keep their own gestures. The
@@ -196,3 +199,4 @@ struct PageSwipeProbe: UIViewRepresentable {
         }
     }
 }
+#endif

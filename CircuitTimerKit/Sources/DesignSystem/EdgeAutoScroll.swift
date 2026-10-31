@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 /// How fast the screen scrolls while a lifted row is held near the top or the bottom of the visible area, in points
 /// per frame: negative scrolls up, positive down.
 enum EdgeAutoScroll {
@@ -124,3 +127,4 @@ struct AutoScrollDriver: UIViewRepresentable {
         }
     }
 }
+#endif
