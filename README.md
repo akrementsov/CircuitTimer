@@ -224,9 +224,9 @@ How to add one, step by step: [How to add a UI test](docs/testing.md#how-to-add-
 
 ### Snapshot tests
 
-`CircuitTimerSnapshotTests` describes a screen by its state — the stack, the editor's phase, the data — not by the taps that lead there. The host draws the whole app in that state in a window of iPhone 17's size and compares its first frame with a reference PNG.
+`CircuitTimerSnapshotTests` describes a screen by its state — the stack, the editor's phase, the data — not by the taps that lead there. The host draws the whole app in that state, or the timer as the window's root, in a window of iPhone 17's size and compares its first frame with a reference PNG.
 
-Six states — the workout list, the workout screen and Settings — are compared in English and in Russian; three of them also at the largest accessibility text size, 18 references in all. Two images match when their size and alpha are the same and RGB channels differ by at most 2/255 on at most 1.25% of the pixels. The timer's cover, alerts and dialogs are not drawn yet. The example, how to add a snapshot and how to work on one: [Snapshot tests](docs/testing.md#snapshot-tests).
+Ten states — the workout list, the workout screen, Settings and the timer — are compared in English and in Russian; seven of them also at the largest accessibility text size, 34 references in all. Two images match when their size and alpha are the same and RGB channels differ by at most 2/255 on at most 1.25% of the pixels. Alerts and dialogs, including the timer's close dialog, are not drawn yet. The example, how to add a snapshot and how to work on one: [Snapshot tests](docs/testing.md#snapshot-tests).
 
 ## Releasing
 
