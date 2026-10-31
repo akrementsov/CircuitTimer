@@ -44,4 +44,4 @@ Next: CT-6, in-app purchase with StoreKit 2; then CT-7, the App Store release wi
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
-- [ ] The timer's stage list at the largest text size (AX5): a stage's name beside its time is cut to a few letters, as the Russian references of CT-QA-3 show; let the name wrap
+- [x] **CT-13** — the timer's stage list at accessibility text sizes: a stage's name wraps, with its time under it, instead of being cut to a few letters
