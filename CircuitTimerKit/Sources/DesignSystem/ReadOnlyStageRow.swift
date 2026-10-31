@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// A stage that cannot be changed: its intensity marker and name in one field and its duration in another,
-/// laid out like the editor's stage row.
+/// laid out like the editor's stage row except at accessibility sizes, where the duration goes under the name.
 public struct ReadOnlyStageRow: View {
     private let name: Text?
     private let intensityName: Text
@@ -29,7 +29,8 @@ public struct ReadOnlyStageRow: View {
                     timeField
                 }
             } else {
-                HStack(spacing: .token(spacing: .xs)) {
+                // Beside a wrapped name the time stays level with its first line.
+                HStack(alignment: .top, spacing: .token(spacing: .xs)) {
                     nameField
                     timeField
                 }
