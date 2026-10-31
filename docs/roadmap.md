@@ -40,7 +40,13 @@ Next: CT-6, in-app purchase with StoreKit 2; then CT-7, the App Store release wi
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
   - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
   - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
-- [ ] **CT-9** — Apple Watch app
+  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
+- [ ] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
+  - [ ] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
+  - [ ] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
+  - [ ] **CT-9-3** — the running stage and its time on the watch, shown only while the iPhone confirms them
+  - [ ] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules
+  - [ ] **CT-9-5** — Start from the watch through the iPhone's usual Start
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
