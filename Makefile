@@ -314,7 +314,8 @@ record-snapshot:
 
 # Built unsigned: an App Store Connect API key can sign only at export, so `upload` signs. The export keeps the
 # entitlements of the archived signature and an unsigned app has none, so the archived bundles are then signed ad hoc,
-# the widget before the app that contains it, and the app with Configs/CircuitTimer.entitlements for its container.
+# the widget and the watch app before the app that contains them, the watch app without entitlements, and the app
+# with Configs/CircuitTimer.entitlements for its container.
 archive:
 	@test -n "$(BUILD_NUMBER)" || { echo "archive: BUILD_NUMBER is required" >&2; exit 1; }
 	xcodebuild archive -project CircuitTimer.xcodeproj -scheme CircuitTimer -configuration Release \
@@ -325,10 +326,13 @@ archive:
 	app="$(ARCHIVE_PATH)/Products/Applications/CircuitTimer.app"; \
 	container=$$(plutil -extract CTCloudKitContainerIdentifier raw "$$app/Info.plist"); \
 	test -n "$$container" || { echo "archive: the app names no CloudKit container" >&2; exit 1; }; \
+	watch="$$app/Watch/CircuitTimerWatch.app"; \
+	test -d "$$watch" || { echo "archive: the app embeds no watch app at $$watch" >&2; exit 1; }; \
 	entitlements="$(DERIVED_DATA)/Archive/CircuitTimer.entitlements"; \
 	cp Configs/CircuitTimer.entitlements "$$entitlements"; \
 	"$(PLISTBUDDY)" -c "Set :com.apple.developer.icloud-container-identifiers:0 $$container" "$$entitlements"; \
 	for extension in "$$app"/PlugIns/*.appex; do codesign --force --sign - --timestamp=none "$$extension"; done; \
+	codesign --force --sign - --timestamp=none "$$watch"; \
 	codesign --force --sign - --timestamp=none --entitlements "$$entitlements" "$$app"; \
 	codesign --verify --deep --strict "$$app"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks that a TestFlight build ships the app and its widget extension signed for App Store distribution.
+"""Checks that a TestFlight build ships the app, its widget extension and its watch app signed for App Store distribution.
 
 The archive is signed only ad hoc, to carry the app's entitlements to the export, where an App Store Connect API key
 signs it, so the App Store signatures and profiles exist only in what the export produced. Run with `python3 -I`; it
@@ -8,9 +8,9 @@ uses the standard library only.
   verify-export-signing.py archive <CircuitTimer.xcarchive>
       The app declares Live Activities, remote notifications, workout processing, both Health usage texts in English
       and Russian and its CloudKit container, carries the container and HealthKit in its ad hoc signature and embeds
-      the widget extension. Exit 0 or 1.
-  verify-export-signing.py ipa <CircuitTimer.ipa> <team> <app id> <widgets id> <icloud container>
-      Reads the signatures and profiles of an exported IPA: only the app has HealthKit. Exit 0 or 1.
+      the widget extension and the watch app, whose companion is the app and whose version is the app's. Exit 0 or 1.
+  verify-export-signing.py ipa <CircuitTimer.ipa> <team> <app id> <widgets id> <watch id> <icloud container>
+      Reads the signatures and profiles of an exported IPA: only the app has HealthKit and iCloud. Exit 0 or 1.
 """
 
 import plistlib
@@ -22,6 +22,9 @@ from pathlib import Path
 
 APP = "CircuitTimer.app"
 WIDGETS = "CircuitTimerWidgets.appex"
+WATCH = "CircuitTimerWatch.app"
+ICLOUD_CONTAINERS = "com.apple.developer.icloud-container-identifiers"
+VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
 HEALTHKIT = "com.apple.developer.healthkit"
 HEALTH_TEXTS = ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription")
 BACKGROUND_MODES = ("remote-notification", "workout-processing")
@@ -105,17 +108,20 @@ def verify_bundle(bundle, team, bundle_id, container=None, health=False):
         raise Mismatch(f"{bundle.name}: the profile lists devices, so it is not an App Store profile")
     if container is not None:
         check_distribution_cloudkit(bundle.name, entitlements, profile, container)
+    elif ICLOUD_CONTAINERS in entitlements:
+        raise Mismatch(f"{bundle.name}: the signature has iCloud, which only the app needs")
     check_healthkit(bundle.name, entitlements, profile, health)
     print(f"{bundle.name}: signed for {entitlements['application-identifier']} with profile {profile.get('Name')!r}")
 
 
-def verify_ipa(path, team, app_id, widgets_id, container):
+def verify_ipa(path, team, app_id, widgets_id, watch_id, container):
     with tempfile.TemporaryDirectory() as directory:
         with zipfile.ZipFile(path) as ipa:
             ipa.extractall(directory)
         app = Path(directory) / "Payload" / APP
         verify_bundle(app, team, app_id, container, health=True)
         verify_bundle(app / "PlugIns" / WIDGETS, team, widgets_id)
+        verify_bundle(app / "Watch" / WATCH, team, watch_id)
     return 0
 
 
@@ -144,15 +150,30 @@ def verify_archive(path):
         extension = plistlib.load(file).get("NSExtension", {})
     if extension.get("NSExtensionPointIdentifier") != "com.apple.widgetkit-extension":
         raise Mismatch(f"{WIDGETS}: not a WidgetKit extension")
-    print(f"{APP} declares Live Activities, workout processing and {container}, carries its entitlements and embeds {WIDGETS}")
+    check_watch(app, info)
+    print(f"{APP} declares Live Activities, workout processing and {container}, carries its entitlements and embeds "
+          f"{WIDGETS} and {WATCH}")
     return 0
+
+
+def check_watch(app, info):
+    with open(app / "Watch" / WATCH / "Info.plist", "rb") as file:
+        watch = plistlib.load(file)
+    if watch.get("WKApplication") is not True:
+        raise Mismatch(f"{WATCH}: WKApplication is {watch.get('WKApplication')!r}, not True")
+    if watch.get("WKCompanionAppBundleIdentifier") != info.get("CFBundleIdentifier"):
+        raise Mismatch(f"{WATCH}: the companion is {watch.get('WKCompanionAppBundleIdentifier')!r}, "
+                       f"not {info.get('CFBundleIdentifier')!r}")
+    for key in VERSION_KEYS:
+        if watch.get(key) != info.get(key):
+            raise Mismatch(f"{WATCH}: {key} is {watch.get(key)!r}, not the app's {info.get(key)!r}")
 
 
 def main(arguments):
     try:
         if len(arguments) == 2 and arguments[0] == "archive":
             return verify_archive(arguments[1])
-        if len(arguments) == 6 and arguments[0] == "ipa":
+        if len(arguments) == 7 and arguments[0] == "ipa":
             return verify_ipa(*arguments[1:])
     except Mismatch as mismatch:
         print(f"::error::{mismatch}")
