@@ -89,7 +89,7 @@ private enum TimerSnapshotFailure: Error, CustomStringConvertible {
                 "The timer's close dialog does not draw in the first frame; alerts and dialogs are not supported yet."
             case .notAppeared:
                 "Build the timer state with the factories in Support/WorkoutTimerFeature+SnapshotStates.swift, which "
-                    + "settle it as it stands once it has appeared; otherwise its appearance changes the first frame."
+                    + "settle it as the screen shows it once it has appeared; otherwise its appearance changes the first frame."
         }
     }
 }

@@ -24,22 +24,22 @@
 		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
 		C7A3000000000000000000A0 /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000A1 /* SettingsFeature */; };
-		C7A30000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000000B1 /* WorkoutTimerFeature */; };
-		C7A30000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000000B3 /* WorkoutActivity */; };
-		C7A30000000000000000000B4 /* WorkoutHealth in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000000B5 /* WorkoutHealth */; };
-		C7A30000000000000000000B6 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000000B7 /* WorkoutStorage */; };
-		C7A30000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A30000000000000000000B9 /* BackgroundExecution */; };
+		C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B1 /* WorkoutTimerFeature */; };
+		C7A3000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B3 /* WorkoutActivity */; };
+		C7A3000000000000000000B4 /* WorkoutHealth in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B5 /* WorkoutHealth */; };
+		C7A3000000000000000000B6 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B7 /* WorkoutStorage */; };
+		C7A3000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B9 /* BackgroundExecution */; };
 		C7A400000000000000000060 /* SnapshotCapture in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005D /* SnapshotCapture */; };
 		C7A400000000000000000061 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005E /* AppFeature */; };
 		C7A400000000000000000062 /* WorkoutDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005F /* WorkoutDomain */; };
 		C7A400000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000068 /* BackgroundNotifications */; };
 		C7A400000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000091 /* CloudSync */; };
 		C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000072 /* WorkoutEditorFeature */; };
-		C7A40000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000000B1 /* WorkoutTimerFeature */; };
-		C7A40000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000000B3 /* WorkoutActivity */; };
-		C7A40000000000000000000B4 /* WorkoutHealth in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000000B5 /* WorkoutHealth */; };
-		C7A40000000000000000000B6 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000000B7 /* WorkoutStorage */; };
-		C7A40000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000000B9 /* BackgroundExecution */; };
+		C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B1 /* WorkoutTimerFeature */; };
+		C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B3 /* WorkoutActivity */; };
+		C7A4000000000000000000B4 /* WorkoutHealth in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B5 /* WorkoutHealth */; };
+		C7A4000000000000000000B6 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B7 /* WorkoutStorage */; };
+		C7A4000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B9 /* BackgroundExecution */; };
 		C7A100000000000000000064 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 /* End PBXBuildFile section */
 
@@ -216,11 +216,11 @@
 				C7A300000000000000000090 /* CloudSync in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A3000000000000000000A0 /* SettingsFeature in Frameworks */,
-				C7A30000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
-				C7A30000000000000000000B2 /* WorkoutActivity in Frameworks */,
-				C7A30000000000000000000B4 /* WorkoutHealth in Frameworks */,
-				C7A30000000000000000000B6 /* WorkoutStorage in Frameworks */,
-				C7A30000000000000000000B8 /* BackgroundExecution in Frameworks */,
+				C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
+				C7A3000000000000000000B2 /* WorkoutActivity in Frameworks */,
+				C7A3000000000000000000B4 /* WorkoutHealth in Frameworks */,
+				C7A3000000000000000000B6 /* WorkoutStorage in Frameworks */,
+				C7A3000000000000000000B8 /* BackgroundExecution in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -234,11 +234,11 @@
 				C7A400000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A400000000000000000090 /* CloudSync in Frameworks */,
 				C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */,
-				C7A40000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
-				C7A40000000000000000000B2 /* WorkoutActivity in Frameworks */,
-				C7A40000000000000000000B4 /* WorkoutHealth in Frameworks */,
-				C7A40000000000000000000B6 /* WorkoutStorage in Frameworks */,
-				C7A40000000000000000000B8 /* BackgroundExecution in Frameworks */,
+				C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
+				C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */,
+				C7A4000000000000000000B4 /* WorkoutHealth in Frameworks */,
+				C7A4000000000000000000B6 /* WorkoutStorage in Frameworks */,
+				C7A4000000000000000000B8 /* BackgroundExecution in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -408,11 +408,11 @@
 				C7A300000000000000000091 /* CloudSync */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
 				C7A3000000000000000000A1 /* SettingsFeature */,
-				C7A30000000000000000000B1 /* WorkoutTimerFeature */,
-				C7A30000000000000000000B3 /* WorkoutActivity */,
-				C7A30000000000000000000B5 /* WorkoutHealth */,
-				C7A30000000000000000000B7 /* WorkoutStorage */,
-				C7A30000000000000000000B9 /* BackgroundExecution */,
+				C7A3000000000000000000B1 /* WorkoutTimerFeature */,
+				C7A3000000000000000000B3 /* WorkoutActivity */,
+				C7A3000000000000000000B5 /* WorkoutHealth */,
+				C7A3000000000000000000B7 /* WorkoutStorage */,
+				C7A3000000000000000000B9 /* BackgroundExecution */,
 			);
 			productName = CircuitTimerSnapshotTests;
 			productReference = C7A300000000000000000041 /* CircuitTimerSnapshotTests.xctest */;
@@ -439,11 +439,11 @@
 				C7A400000000000000000068 /* BackgroundNotifications */,
 				C7A400000000000000000091 /* CloudSync */,
 				C7A400000000000000000072 /* WorkoutEditorFeature */,
-				C7A40000000000000000000B1 /* WorkoutTimerFeature */,
-				C7A40000000000000000000B3 /* WorkoutActivity */,
-				C7A40000000000000000000B5 /* WorkoutHealth */,
-				C7A40000000000000000000B7 /* WorkoutStorage */,
-				C7A40000000000000000000B9 /* BackgroundExecution */,
+				C7A4000000000000000000B1 /* WorkoutTimerFeature */,
+				C7A4000000000000000000B3 /* WorkoutActivity */,
+				C7A4000000000000000000B5 /* WorkoutHealth */,
+				C7A4000000000000000000B7 /* WorkoutStorage */,
+				C7A4000000000000000000B9 /* BackgroundExecution */,
 			);
 			productName = CircuitTimerSnapshotContractTests;
 			productReference = C7A400000000000000000041 /* CircuitTimerSnapshotContractTests.xctest */;
@@ -999,16 +999,16 @@
 			productName = CloudSync;
 		};
 		C7A400000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
-		C7A30000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
-		C7A30000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };
-		C7A30000000000000000000B5 /* WorkoutHealth */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutHealth; };
-		C7A30000000000000000000B7 /* WorkoutStorage */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutStorage; };
-		C7A30000000000000000000B9 /* BackgroundExecution */ = {isa = XCSwiftPackageProductDependency; productName = BackgroundExecution; };
-		C7A40000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
-		C7A40000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };
-		C7A40000000000000000000B5 /* WorkoutHealth */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutHealth; };
-		C7A40000000000000000000B7 /* WorkoutStorage */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutStorage; };
-		C7A40000000000000000000B9 /* BackgroundExecution */ = {isa = XCSwiftPackageProductDependency; productName = BackgroundExecution; };
+		C7A3000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
+		C7A3000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };
+		C7A3000000000000000000B5 /* WorkoutHealth */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutHealth; };
+		C7A3000000000000000000B7 /* WorkoutStorage */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutStorage; };
+		C7A3000000000000000000B9 /* BackgroundExecution */ = {isa = XCSwiftPackageProductDependency; productName = BackgroundExecution; };
+		C7A4000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
+		C7A4000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };
+		C7A4000000000000000000B5 /* WorkoutHealth */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutHealth; };
+		C7A4000000000000000000B7 /* WorkoutStorage */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutStorage; };
+		C7A4000000000000000000B9 /* BackgroundExecution */ = {isa = XCSwiftPackageProductDependency; productName = BackgroundExecution; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C7A100000000000000000001 /* Project object */;

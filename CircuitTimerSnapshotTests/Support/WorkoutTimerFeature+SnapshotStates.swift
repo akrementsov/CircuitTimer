@@ -44,15 +44,11 @@ extension WorkoutTimerFeature.State {
         return state
     }
 
-    /// Whether the state is a fixed point of the timer's appearance: its first frame is then what the cover settles on.
+    /// Whether the state is a fixed point of the timer's appearance, so its appear actions leave the first frame as it is.
     var hasAppearedForSnapshot: Bool {
-        clockGeneration > 0
-            && !isPreparingCountdown
-            && !isInBackground
-            && isSceneActive
-            && haptic == nil
-            && (!isBackgroundNotificationsOn || notifications.access == .authorized)
-            && (path.isEmpty ? signals.last == SignalMoment(self) : signals.last == nil)
+        var appeared = self
+        appeared.markAppeared()
+        return appeared == self
     }
 
     private static func pausedRun(_ workout: Workout) -> Self {
@@ -75,10 +71,11 @@ extension WorkoutTimerFeature.State {
         snapshot = run.snapshot(at: now)
     }
 
-    /// What the timer's first `.task`, notification access and active scene leave behind; the clock never runs.
+    /// What the timer's first `.task`, notification access and active scene leave on screen; the clock never runs.
     private mutating func markAppeared() {
-        clockGeneration = 1
+        clockGeneration = max(clockGeneration, 1)
         isPreparingCountdown = false
+        isInBackground = false
         isSceneActive = true
         notifications.access = .authorized
         haptic = nil
