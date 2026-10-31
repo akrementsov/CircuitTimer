@@ -4,7 +4,7 @@ extension DesignSystem.Token {
     /// The watch app's text. Clocks use League Gothic at fixed sizes, as on the Live Activity, so the digits fill the
     /// small screen; text uses SF on Dynamic Type styles, because League Gothic has no Cyrillic. Case names differ
     /// from those of the other typography enums, so `.token(_:)` stays unambiguous.
-    public enum WatchTypography: Sendable, CaseIterable {
+    public enum WatchTypography: Sendable {
         /// The running stage's clock.
         case stageClock
         /// The next stage's duration.

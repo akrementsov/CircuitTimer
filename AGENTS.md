@@ -4,7 +4,7 @@ Rules for anyone — human or AI agent — changing CircuitTimer. `CLAUDE.md` on
 
 ## Core rules
 
-1. **Platform:** iOS 17+ (the package also builds for watchOS 10+), Swift 6 language mode with complete strict concurrency, Xcode 27.1.
+1. **Platform:** iOS 17+, Swift 6 language mode with complete strict concurrency, Xcode 27.1. The package declares watchOS 10 for the watch app; only the modules it links build for watchOS (`make build-watch-package`).
 2. **Versions:** read them from `CircuitTimerKit/Package.resolved` and, for the snapshot tests' SnapshotTesting, `CircuitTimerSnapshotKit/Package.resolved`; never assume an API exists.
 3. **Design system:** UI uses `DesignSystem` tokens only. The app is dark only (`UIUserInterfaceStyle = Dark`): color tokens carry the original app's palette, one universal value each, and every package `#Preview` sets `.preferredColorScheme(.dark)`; the Live Activity keeps the same dark palette whatever the system theme. Literal or system colors and fonts (`Color.red`, `.foregroundStyle(.secondary)`, `.font(.headline)`, `UIColor`) fail lint outside `Sources/DesignSystem/`. The app's `AccentColor` asset and the fill of `LaunchLogo.svg` mirror the `Brand` token, and `LaunchBackground` mirrors `.surface(.screen)`; change them together.
    - Fonts ship in `Sources/DesignSystem/Resources/Fonts/` with their license and are registered at runtime from `Bundle.module`; `Font.custom` lives only in `DesignSystem`.

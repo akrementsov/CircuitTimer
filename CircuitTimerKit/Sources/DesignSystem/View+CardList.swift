@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+#if os(iOS)
+
 extension View {
     /// A plain `List` of card rows on the screen color, inset from the screen's edges. Rows set their own heights
     /// and backgrounds with `cardRow(_:endsList:)` and `screenRow()`.
@@ -17,3 +20,4 @@ extension View {
             .background { Rectangle().fill(.surface(.screen)).ignoresSafeArea() }
     }
 }
+#endif

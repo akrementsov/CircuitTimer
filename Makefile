@@ -102,7 +102,7 @@ build-snapshot-kit:
 # only needs the SDK.
 build-watch-package:
 	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme DesignSystem \
-		-destination 'generic/platform=watchOS Simulator' \
+		-destination 'generic/platform=watchOS Simulator' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/WatchPackage" $(XCODEBUILD_FLAGS)
 
 test-snapshot-kit:

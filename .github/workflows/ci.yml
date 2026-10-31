@@ -50,7 +50,7 @@ jobs:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 185
+    timeout-minutes: 200
     steps:
       - uses: actions/checkout@v7
 
