@@ -306,8 +306,9 @@ check_strategies "$tmp/prepare.swift" "$SCENARIOS_DIR"
 
 # (f) The timer's snapshots draw its real reducer in the test context, where a key nobody sets keeps its test value:
 # every key the timer's module reads, and every default store, needs a value that is not live from a `prepare` of the
-# snapshot tests' `Support`, which `TimerSnapshotDependencies.prepare` calls or is. The timer's other modules read
-# keys only inside live clients, which the preview values it sets replace.
+# snapshot tests' `Support`, which `TimerSnapshotDependencies.prepare` calls or is. Any `prepare` there counts, also
+# one the timer's entry never calls: `Support` keeps only the shared one and the timer's. The timer's other modules
+# read keys only inside live clients, which the preview values it sets replace.
 timer="$tmp/$TIMER_DIR"
 if [ -z "$(find "$timer" -name '*.swift' 2>/dev/null)" ]; then
 	fail "$TIMER_DIR has no Swift file; point TIMER_DIR at the timer's module"

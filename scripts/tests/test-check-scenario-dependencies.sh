@@ -335,6 +335,27 @@ run "$dir/scripts/check-scenario-dependencies.sh"
 expect_status 0
 expect_equal "$(cat "$work/out")" ""
 
+# The check does not follow calls: a `prepare` the timer's entry never calls still counts (see check (f)).
+describe "timer key set by an uncalled prepare"
+tree timer-key-set-by-an-uncalled-prepare
+cat > "$dir/CircuitTimerSnapshotTests/Support/TimerSnapshot.swift" <<'EOF'
+enum TimerSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues, locale: Locale) {
+        SnapshotDependencies.prepare(&dependencies)
+    }
+}
+EOF
+cat > "$dir/CircuitTimerSnapshotTests/Support/OtherSnapshot.swift" <<'EOF'
+enum OtherSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues) {
+        dependencies.probe = .previewValue
+    }
+}
+EOF
+run "$dir/scripts/check-scenario-dependencies.sh"
+expect_status 0
+expect_equal "$(cat "$work/out")" ""
+
 # A key read elsewhere in the package is the scenarios' to set, not the timer snapshots'.
 passing key-read-outside-the-timer "$kit/Case.swift" <<'EOF'
 struct ProbeElsewhere {
