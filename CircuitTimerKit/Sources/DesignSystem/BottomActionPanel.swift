@@ -1,6 +1,6 @@
 import SwiftUI
 
-// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
 #if os(iOS)
 
 /// An optional hint and a full-width action button floating over a screen's content:

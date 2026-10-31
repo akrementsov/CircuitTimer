@@ -2,7 +2,7 @@ import os
 import SwiftUI
 import UIKit
 
-// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
 #if os(iOS)
 
 extension View {

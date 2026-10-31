@@ -2,7 +2,7 @@ import os
 import SwiftUI
 import UIKit
 
-// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
 #if os(iOS)
 
 /// On iOS 26 the tab bar leaves with the stack's root screen, as a UIKit push carries it away. A zero-size child of

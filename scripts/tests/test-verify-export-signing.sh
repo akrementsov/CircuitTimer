@@ -118,7 +118,7 @@ expect_in "$work/out" "CircuitTimer.app declares Live Activities, workout proces
 expect_not_in "$work/out" "::error::"
 
 # Each row changes one key of the passing archive: Info.plist (info), its Russian strings (russian), the ad hoc
-# signature (signature) or the watch app's Info.plist (watch); null removes the key.
+# signature (signature), the watch app's Info.plist (watch) or both Info.plist files (both); null removes the key.
 while IFS='|' read -r description file key value message; do
 	describe "archive: $description"
 	archive_fixture
@@ -127,6 +127,7 @@ while IFS='|' read -r description file key value message; do
 		russian) edit_plist "$russian" "$key" "$value" ;;
 		signature) edit_plist "$signature" "$key" "$value" ;;
 		watch) edit_plist "$watch_info" "$key" "$value" ;;
+		both) edit_plist "$info" "$key" "$value" && edit_plist "$watch_info" "$key" "$value" ;;
 	esac
 	check_archive
 	expect_status 1
@@ -154,6 +155,10 @@ a watch app with another companion|watch|WKCompanionAppBundleIdentifier|"com.exa
 a watch app without a companion|watch|WKCompanionAppBundleIdentifier|null|CircuitTimerWatch.app: the companion is None, not '$app_id'
 a watch app of another version|watch|CFBundleShortVersionString|"1.2.4"|CircuitTimerWatch.app: CFBundleShortVersionString is '1.2.4', not the app's '1.2.3'
 a watch app of another build|watch|CFBundleVersion|"1"|CircuitTimerWatch.app: CFBundleVersion is '1', not the app's '261031.120000'
+a watch app of the app's bundle ID|watch|CFBundleIdentifier|"$app_id"|CircuitTimerWatch.app: the bundle ID is '$app_id', not '$watch_id'
+a watch app of another bundle ID|watch|CFBundleIdentifier|"$app_id.watch"|CircuitTimerWatch.app: the bundle ID is '$app_id.watch', not '$watch_id'
+a watch app and an app without a version|both|CFBundleShortVersionString|null|CircuitTimer.app: CFBundleShortVersionString is None, not a version
+a watch app and an app without a build|both|CFBundleVersion|null|CircuitTimer.app: CFBundleVersion is None, not a version
 EOF
 
 describe "archive: no Russian strings"
@@ -241,9 +246,17 @@ describe "ipa: a watch app signed with HealthKit"
 watch_ipa com.apple.developer.healthkit true
 expect_in "$work/out" "::error::CircuitTimerWatch.app: the signature has HealthKit, which only the app needs"
 
-describe "ipa: a watch app signed with iCloud"
-watch_ipa com.apple.developer.icloud-container-identifiers "[\"$container\"]"
-expect_in "$work/out" "::error::CircuitTimerWatch.app: the signature has iCloud, which only the app needs"
+# Each row adds one iCloud key to the watch app's signature.
+while IFS='|' read -r key value; do
+	describe "ipa: a watch app signed with $key"
+	watch_ipa "$key" "$value"
+	expect_in "$work/out" "::error::CircuitTimerWatch.app: the signature has iCloud ($key), which only the app needs"
+done <<EOF
+com.apple.developer.icloud-container-identifiers|["$container"]
+com.apple.developer.icloud-services|["CloudKit"]
+com.apple.developer.ubiquity-container-identifiers|["$container"]
+com.apple.developer.ubiquity-kvstore-identifier|"$team.$app_id"
+EOF
 
 describe "ipa: a watch app signed for another bundle"
 watch_ipa application-identifier "\"$team.$app_id.other\""

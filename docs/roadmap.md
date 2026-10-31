@@ -43,6 +43,7 @@ Next: CT-6, in-app purchase with StoreKit 2; then CT-7, the App Store release wi
   - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
 - [ ] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [ ] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
+  - [ ] A [probe tag](apple-watch.md#probe-tag) after CT-9-1: TestFlight accepts the build with the watch app
   - [ ] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
   - [ ] **CT-9-3** — the running stage and its time on the watch, shown only while the iPhone confirms them
   - [ ] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules

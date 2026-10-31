@@ -8,7 +8,8 @@ uses the standard library only.
   verify-export-signing.py archive <CircuitTimer.xcarchive>
       The app declares Live Activities, remote notifications, workout processing, both Health usage texts in English
       and Russian and its CloudKit container, carries the container and HealthKit in its ad hoc signature and embeds
-      the widget extension and the watch app, whose companion is the app and whose version is the app's. Exit 0 or 1.
+      the widget extension and the watch app, whose bundle ID is the app's with .watchkitapp, whose companion is the
+      app and whose version is the app's. Exit 0 or 1.
   verify-export-signing.py ipa <CircuitTimer.ipa> <team> <app id> <widgets id> <watch id> <icloud container>
       Reads the signatures and profiles of an exported IPA: only the app has HealthKit and iCloud. Exit 0 or 1.
 """
@@ -23,7 +24,10 @@ from pathlib import Path
 APP = "CircuitTimer.app"
 WIDGETS = "CircuitTimerWidgets.appex"
 WATCH = "CircuitTimerWatch.app"
-ICLOUD_CONTAINERS = "com.apple.developer.icloud-container-identifiers"
+# Every iCloud entitlement: containers, services and environment, and the older ubiquity keys of documents and
+# key-value storage.
+ICLOUD_PREFIXES = ("com.apple.developer.icloud-", "com.apple.developer.ubiquity-")
+WATCH_SUFFIX = ".watchkitapp"
 VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
 HEALTHKIT = "com.apple.developer.healthkit"
 HEALTH_TEXTS = ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription")
@@ -108,8 +112,10 @@ def verify_bundle(bundle, team, bundle_id, container=None, health=False):
         raise Mismatch(f"{bundle.name}: the profile lists devices, so it is not an App Store profile")
     if container is not None:
         check_distribution_cloudkit(bundle.name, entitlements, profile, container)
-    elif ICLOUD_CONTAINERS in entitlements:
-        raise Mismatch(f"{bundle.name}: the signature has iCloud, which only the app needs")
+    else:
+        icloud = sorted(key for key in entitlements if key.startswith(ICLOUD_PREFIXES))
+        if icloud:
+            raise Mismatch(f"{bundle.name}: the signature has iCloud ({', '.join(icloud)}), which only the app needs")
     check_healthkit(bundle.name, entitlements, profile, health)
     print(f"{bundle.name}: signed for {entitlements['application-identifier']} with profile {profile.get('Name')!r}")
 
@@ -159,12 +165,17 @@ def verify_archive(path):
 def check_watch(app, info):
     with open(app / "Watch" / WATCH / "Info.plist", "rb") as file:
         watch = plistlib.load(file)
+    expected = f"{info.get('CFBundleIdentifier')}{WATCH_SUFFIX}"
+    if watch.get("CFBundleIdentifier") != expected:
+        raise Mismatch(f"{WATCH}: the bundle ID is {watch.get('CFBundleIdentifier')!r}, not {expected!r}")
     if watch.get("WKApplication") is not True:
         raise Mismatch(f"{WATCH}: WKApplication is {watch.get('WKApplication')!r}, not True")
     if watch.get("WKCompanionAppBundleIdentifier") != info.get("CFBundleIdentifier"):
         raise Mismatch(f"{WATCH}: the companion is {watch.get('WKCompanionAppBundleIdentifier')!r}, "
                        f"not {info.get('CFBundleIdentifier')!r}")
     for key in VERSION_KEYS:
+        if not isinstance(info.get(key), str) or not info.get(key):
+            raise Mismatch(f"{APP}: {key} is {info.get(key)!r}, not a version")
         if watch.get(key) != info.get(key):
             raise Mismatch(f"{WATCH}: {key} is {watch.get(key)!r}, not the app's {info.get(key)!r}")
 

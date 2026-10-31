@@ -1,6 +1,6 @@
 import SwiftUI
 
-// iOS screens only: the watch app has no lists, fields, gestures or tab bar of this kind.
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
 #if os(iOS)
 
 /// A scroll view of cards whose rows swipe and reorder: it measures where the content and the visible area are, scrolls
