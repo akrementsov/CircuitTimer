@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Fails when a UI test scenario could reach the outside world: a client whose preview value is its live one, a
 # client or key that `AppScenario.prepare` does not set, a dependency looked up by type, or a storage strategy whose
-# default store `prepare` does not replace. It reads the code with comments removed, keeping string literals, and
-# knows nothing about our own `SharedKey`s or keys only a library reads. A key's declaration, up to its
-# `DependencyKey` conformance, must fit on one line.
+# default store `prepare` does not replace. It fails the same way when the timer's snapshots could: a key the timer
+# reads, or a storage strategy's default store, that no `prepare` of the snapshot tests' `Support` sets. It reads the
+# code with comments removed, keeping string literals, and knows nothing about our own `SharedKey`s or keys only a
+# library reads. A key's declaration, up to its `DependencyKey` conformance, must fit on one line.
 # Runs with bash 3.2 and with BSD, GNU or mawk awk, so on a Mac and on CI's Linux lint job alike.
 set -euo pipefail
 
@@ -11,6 +12,8 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 # Keys the library answers by itself in every context, without reaching the outside world.
 LIBRARY_DEFAULTS="context dismiss preferredLocales"
 SCENARIOS_DIR="CircuitTimerKit/Sources/AppScenarios"
+TIMER_DIR="CircuitTimerKit/Sources/WorkoutTimerFeature"
+SNAPSHOT_SUPPORT_DIR="CircuitTimerSnapshotTests/Support"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/check-scenario-dependencies.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
@@ -93,11 +96,18 @@ kit="$tmp/CircuitTimerKit/Sources"
 app="$tmp/CircuitTimer"
 strip_comments "$root/CircuitTimerKit/Sources" "$kit"
 strip_comments "$root/CircuitTimer" "$app"
+mkdir -p "$tmp/$SNAPSHOT_SUPPORT_DIR"
+if [ -d "$root/$SNAPSHOT_SUPPORT_DIR" ]; then
+	strip_comments "$root/$SNAPSHOT_SUPPORT_DIR" "$tmp/$SNAPSHOT_SUPPORT_DIR"
+fi
 # Out of the package copy, so the checks below read only the code a scenario replaces.
 mv "$kit/AppScenarios" "$tmp/AppScenarios"
 scenarios="$tmp/AppScenarios"
-# Only the body of `prepare` sets a scenario's dependencies: an assignment anywhere else in the module sets none.
-find "$scenarios" -name '*.swift' -exec awk '
+
+# prepare_bodies DIR OUT: the bodies of the `prepare` functions in the Swift files under DIR, into OUT. Only they set
+# dependencies: an assignment anywhere else sets none.
+prepare_bodies() {
+	find "$1" -name '*.swift' -exec awk '
 	function braces(s, ch,   t) {
 		t = s
 		return gsub(ch, "", t)
@@ -121,10 +131,31 @@ find "$scenarios" -name '*.swift' -exec awk '
 			inprepare = 0
 		}
 	}
-' {} + > "$tmp/prepare.swift"
+' {} + > "$2"
+}
+prepare_bodies "$scenarios" "$tmp/prepare.swift"
+prepare_bodies "$tmp/$SNAPSHOT_SUPPORT_DIR" "$tmp/snapshot-prepare.swift"
+
+# is_set_in FILE NAME: FILE assigns the dependency NAME.
+is_set_in() {
+	grep -qE "\\.$2[[:space:]]*=[^=]" "$1"
+}
 
 is_set_in_prepare() {
-	grep -qE "\\.$1[[:space:]]*=[^=]" "$tmp/prepare.swift"
+	is_set_in "$tmp/prepare.swift" "$1"
+}
+
+# keys_read DIR...: the keys `@Dependency(\.name)` reads under DIR, once each.
+keys_read() {
+	grep -rhoE '@Dependency\(\\(DependencyValues)?\.[A-Za-z_][A-Za-z0-9_.]*\)' "$@" \
+		| sed -e 's/^@Dependency(\\\(DependencyValues\)\{0,1\}\.//' -e 's/[.)].*$//' | sort -u || true
+}
+
+is_library_default() {
+	case " $LIBRARY_DEFAULTS " in
+		*" $1 "*) return 0 ;;
+	esac
+	return 1
 }
 
 # (a) A key's preview value must exist and must not be its live value: swift-dependencies falls back to the live
@@ -238,12 +269,11 @@ for name in $clients; do
 done
 
 # (c) Every key the app or the package reads must be set by `prepare` or be one the library answers by itself.
-used=$(grep -rhoE '@Dependency\(\\(DependencyValues)?\.[A-Za-z_][A-Za-z0-9_.]*\)' "$kit" "$app" \
-	| sed -e 's/^@Dependency(\\\(DependencyValues\)\{0,1\}\.//' -e 's/[.)].*$//' | sort -u || true)
+used=$(keys_read "$kit" "$app")
 for name in $used; do
-	case " $LIBRARY_DEFAULTS " in
-		*" $name "*) continue ;;
-	esac
+	if is_library_default "$name"; then
+		continue
+	fi
 	if ! is_set_in_prepare "$name"; then
 		fail "@Dependency(\\.$name) is read but not set by prepare in $SCENARIOS_DIR; set it there or, if the library answers it without the outside world, add it to LIBRARY_DEFAULTS"
 	fi
@@ -260,16 +290,42 @@ EOF
 fi
 
 # (e) A storage strategy in use needs its default store replaced, or scenarios share the device's.
+# check_strategy STRATEGY DEFAULT PREPARE DIR: STRATEGY is used in the package or the app, so PREPARE, the bodies of
+# the `prepare` functions in DIR, must set DEFAULT.
 check_strategy() {
-	if grep -rqE "\\.$1\\(" "$kit" "$app" && ! is_set_in_prepare "$2"; then
-		fail ".$1 storage is used but $2 is not set by prepare in $SCENARIOS_DIR"
+	if grep -rqE "\\.$1\\(" "$kit" "$app" && ! is_set_in "$3" "$2"; then
+		fail ".$1 storage is used but $2 is not set by prepare in $4"
 	fi
 }
-check_strategy appStorage defaultAppStorage
-check_strategy fileStorage defaultFileStorage
-check_strategy inMemory defaultInMemoryStorage
+check_strategies() {
+	check_strategy appStorage defaultAppStorage "$1" "$2"
+	check_strategy fileStorage defaultFileStorage "$1" "$2"
+	check_strategy inMemory defaultInMemoryStorage "$1" "$2"
+}
+check_strategies "$tmp/prepare.swift" "$SCENARIOS_DIR"
+
+# (f) The timer's snapshots draw its real reducer in the test context, where a key nobody sets keeps its test value:
+# every key the timer's module reads, and every default store, needs a value that is not live from a `prepare` of the
+# snapshot tests' `Support`, which `TimerSnapshotDependencies.prepare` calls or is. The timer's other modules read
+# keys only inside live clients, which the preview values it sets replace.
+timer="$tmp/$TIMER_DIR"
+if [ -z "$(find "$timer" -name '*.swift' 2>/dev/null)" ]; then
+	fail "$TIMER_DIR has no Swift file; point TIMER_DIR at the timer's module"
+elif [ ! -s "$tmp/snapshot-prepare.swift" ]; then
+	fail "no prepare function in $SNAPSHOT_SUPPORT_DIR; point SNAPSHOT_SUPPORT_DIR at TimerSnapshotDependencies"
+else
+	for name in $(keys_read "$timer"); do
+		if is_library_default "$name"; then
+			continue
+		fi
+		if ! is_set_in "$tmp/snapshot-prepare.swift" "$name"; then
+			fail "@Dependency(\\.$name) is read by ${TIMER_DIR##*/} but not set by prepare in $SNAPSHOT_SUPPORT_DIR; set it in TimerSnapshotDependencies.prepare to a value that is not live"
+		fi
+	done
+	check_strategies "$tmp/snapshot-prepare.swift" "$SNAPSHOT_SUPPORT_DIR"
+fi
 
 if [ "$failures" -gt 0 ]; then
-	echo "check-scenario-dependencies: $failures problem(s); see the UI tests section of AGENTS.md" >&2
+	echo "check-scenario-dependencies: $failures problem(s); see the UI tests and Snapshot tests sections of AGENTS.md" >&2
 	exit 1
 fi

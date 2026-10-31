@@ -7,7 +7,7 @@
 tree() {
 	dir="$work/$1"
 	mkdir -p "$dir/scripts" "$dir/CircuitTimerKit/Sources/Probe" "$dir/CircuitTimerKit/Sources/AppScenarios" \
-		"$dir/CircuitTimer"
+		"$dir/CircuitTimer" "$dir/CircuitTimerKit/Sources/WorkoutTimerFeature" "$dir/CircuitTimerSnapshotTests/Support"
 	cp "$root/scripts/check-scenario-dependencies.sh" "$dir/scripts/"
 	cat > "$dir/CircuitTimerKit/Sources/Probe/ProbeClient.swift" <<'EOF'
 import Dependencies
@@ -46,6 +46,27 @@ EOF
 	cat > "$dir/CircuitTimer/ProbeApp.swift" <<'EOF'
 struct ProbeApp {
     @Dependency(\.probe) var probe
+}
+EOF
+	cat > "$dir/CircuitTimerKit/Sources/WorkoutTimerFeature/ProbeTimer.swift" <<'EOF'
+struct ProbeTimer {
+    @Dependency(\.probe) var probe
+    @Dependency(\.dismiss) var dismiss
+}
+EOF
+	cat > "$dir/CircuitTimerSnapshotTests/Support/SnapshotDependencies.swift" <<'EOF'
+enum SnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues) {
+        dependencies.defaultAppStorage = .inMemory
+    }
+}
+EOF
+	cat > "$dir/CircuitTimerSnapshotTests/Support/TimerSnapshot.swift" <<'EOF'
+enum TimerSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues, locale: Locale) {
+        SnapshotDependencies.prepare(&dependencies)
+        dependencies.probe = .previewValue
+    }
 }
 EOF
 }
@@ -137,11 +158,17 @@ struct ProbeByType {
 }
 EOF
 
-failing file-storage "$kit/Case.swift" ".fileStorage storage is used but defaultFileStorage is not set" <<'EOF'
+# Neither the scenarios nor the snapshots replace the default file store.
+describe "file storage"
+check file-storage "$kit/Case.swift" <<'EOF'
 struct ProbeFile {
     @Shared(.fileStorage(.documentsDirectory)) var count = 0
 }
 EOF
+expect_status 1
+expect_in "$work/out" ".fileStorage storage is used but defaultFileStorage is not set by prepare in CircuitTimerKit/Sources/AppScenarios"
+expect_in "$work/out" ".fileStorage storage is used but defaultFileStorage is not set by prepare in CircuitTimerSnapshotTests/Support"
+expect_in "$work/out" "check-scenario-dependencies: 2 problem(s)"
 
 # A key behind attributes is still a key: without a preview value it fails, with one it passes.
 failing attributed-key-without-preview "$kit/Case.swift" "Case.swift:1: a DependencyKey without a previewValue" <<'EOF'
@@ -243,5 +270,90 @@ struct Pair<A: Collection<Array<Int>>, B: TestDependencyKey, C> {
     var first: A
 }
 EOF
+
+timer=CircuitTimerKit/Sources/WorkoutTimerFeature
+
+failing timer-reads-unset-key "$timer/Case.swift" \
+	"@Dependency(\\.date) is read by WorkoutTimerFeature but not set by prepare in CircuitTimerSnapshotTests/Support" <<'EOF'
+struct ProbeTimerDate {
+    @Dependency(\.date.now) var now
+}
+EOF
+
+# Set outside the snapshots' `prepare`: only the timer's snapshot check fails, the scenarios still set it.
+failing timer-key-set-outside-prepare CircuitTimerSnapshotTests/Support/TimerSnapshot.swift \
+	"@Dependency(\\.probe) is read by WorkoutTimerFeature but not set by prepare in CircuitTimerSnapshotTests/Support" <<'EOF'
+enum TimerSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues, locale: Locale) {
+        SnapshotDependencies.prepare(&dependencies)
+    }
+
+    static func helper(_ dependencies: inout DependencyValues) {
+        dependencies.probe = .previewValue
+    }
+}
+EOF
+
+failing timer-key-set-in-comment CircuitTimerSnapshotTests/Support/TimerSnapshot.swift \
+	"@Dependency(\\.probe) is read by WorkoutTimerFeature but not set by prepare" <<'EOF'
+enum TimerSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues, locale: Locale) {
+        SnapshotDependencies.prepare(&dependencies)
+        // dependencies.probe = .previewValue
+    }
+}
+EOF
+
+failing snapshot-storage-not-replaced CircuitTimerSnapshotTests/Support/SnapshotDependencies.swift \
+	".appStorage storage is used but defaultAppStorage is not set by prepare in CircuitTimerSnapshotTests/Support" <<'EOF'
+enum SnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues) {
+        dependencies.date = .constant(.distantPast)
+    }
+}
+EOF
+
+# The timer's entry calls the shared `prepare`, so a key set there counts.
+describe "timer key set by the shared prepare"
+tree timer-key-set-by-shared-prepare
+cat > "$dir/CircuitTimerSnapshotTests/Support/SnapshotDependencies.swift" <<'EOF'
+enum SnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues) {
+        dependencies.defaultAppStorage = .inMemory
+        dependencies.probe = .previewValue
+    }
+}
+EOF
+cat > "$dir/CircuitTimerSnapshotTests/Support/TimerSnapshot.swift" <<'EOF'
+enum TimerSnapshotDependencies {
+    static func prepare(_ dependencies: inout DependencyValues, locale: Locale) {
+        SnapshotDependencies.prepare(&dependencies)
+    }
+}
+EOF
+run "$dir/scripts/check-scenario-dependencies.sh"
+expect_status 0
+expect_equal "$(cat "$work/out")" ""
+
+# A key read elsewhere in the package is the scenarios' to set, not the timer snapshots'.
+passing key-read-outside-the-timer "$kit/Case.swift" <<'EOF'
+struct ProbeElsewhere {
+    @Dependency(\.date) var date
+}
+EOF
+
+describe "timer module missing"
+tree timer-module-missing
+rm -r "$dir/CircuitTimerKit/Sources/WorkoutTimerFeature"
+run "$dir/scripts/check-scenario-dependencies.sh"
+expect_status 1
+expect_in "$work/out" "CircuitTimerKit/Sources/WorkoutTimerFeature has no Swift file"
+
+describe "snapshot prepare missing"
+tree snapshot-prepare-missing
+rm "$dir/CircuitTimerSnapshotTests/Support/"*.swift
+run "$dir/scripts/check-scenario-dependencies.sh"
+expect_status 1
+expect_in "$work/out" "no prepare function in CircuitTimerSnapshotTests/Support"
 
 finish
