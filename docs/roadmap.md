@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-11, a HealthKit workout session. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-6, in-app purchase with StoreKit 2; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -20,6 +20,7 @@ Next: CT-11, a HealthKit workout session. Checked milestones record delivered fu
   - [x] UI smoke test: edit an existing workout, save it and verify the changes in the list and reopened editor
   - [x] UI smoke tests: all six Settings switches in both directions and after returning to the tab; About version and navigation to both legal pages
   - [x] **CT-QA-2** — snapshot tests of the list and editor (dark only, English and Russian, Dynamic Type)
+  - [x] **CT-QA-3** — snapshot tests of the timer: its states drawn with `WorkoutTimerStack` as the window's root, in English and Russian at both text sizes
 - [x] **CT-3** — the workout timer, in slices:
   - [x] **CT-3-1** — the timer in the foreground: full screen from the list, countdowns, clock-jump handling, the screen kept awake
   - [x] **CT-3-2** — the original start path: the workout screen and its Start workout button
@@ -43,4 +44,3 @@ Next: CT-11, a HealthKit workout session. Checked milestones record delivered fu
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
-- [ ] **CT-QA-3** — snapshot tests of the timer: its states drawn with `WorkoutTimerStack` as the window's root, in English and Russian at both text sizes
