@@ -13,8 +13,8 @@ import WorkoutHealth
 import WorkoutStorage
 
 /// The timer's dependencies in a snapshot: none of them reaches audio, the disk, the idle timer, notifications,
-/// Live Activities or Health. `make lint` checks only `AppScenario.prepare`, so a new client the timer reads also
-/// needs a line here.
+/// Live Activities or Health. A new client the timer reads also needs a line here: `make lint` fails when a key the
+/// timer reads is set by no `prepare` in `Support`.
 enum TimerSnapshotDependencies {
     /// The moment every timer state is settled at, and what `date` returns.
     static let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
