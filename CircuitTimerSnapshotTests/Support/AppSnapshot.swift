@@ -51,7 +51,7 @@ func assertAppSnapshot(
 
 private struct AppSnapshotFailure: Error, CustomStringConvertible {
     var description: String {
-        "The timer's cover does not draw in the first frame; timer snapshots need their own root. "
+        "The timer's cover does not draw in the first frame; draw the timer with assertTimerSnapshot. "
             + "Alerts and dialogs are not supported yet."
     }
 }

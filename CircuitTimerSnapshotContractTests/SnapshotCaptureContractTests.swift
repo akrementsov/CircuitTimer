@@ -1,10 +1,12 @@
 @testable import AppFeature
 @testable import SnapshotCapture
 @testable import WorkoutEditorFeature
+@testable import WorkoutTimerFeature
 
 import ComposableArchitecture
 import Foundation
 import os
+import SwiftUI
 import Testing
 import UIKit
 import WorkoutDomain
@@ -499,6 +501,118 @@ struct SnapshotCaptureContractTests {
             #expect(window.windowScene == nil)
             if let previous = controller.previousKey { #expect(previous.isKeyWindow) }
         }
+    }
+}
+
+// The timer's entry; an extension keeps the suite's body within SwiftLint's type length.
+extension SnapshotCaptureContractTests {
+    @Test(arguments: ["factory", "start"])
+    func test_timerSnapshot_closeDialog_throwsWithoutMounting(input: String) async throws {
+        let run = SnapshotContractRun()
+        defer { run.cleanUp() }
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let windows = scene.windows.map(ObjectIdentifier.init)
+        var states = 0
+        await run.withEnvironment {
+            do {
+                try await assertTimerSnapshot(textSize: .large, function: "test_rejectedState()") { language in
+                    states += 1
+                    let workout = SnapshotFixtures.editorWorkout(language: language)
+                    var state = input == "factory" ? .paused(workout) : AppFeature().timerState(for: workout)
+                    state.destination = .closeConfirmation(AlertState { TextState("Probe") })
+                    return state
+                }
+                Issue.record("The close dialog must be rejected")
+            } catch {
+                #expect(String(describing: error).contains("The timer's close dialog does not draw in the first frame"))
+            }
+        }
+        #expect(states == 1)
+        #expect(scene.windows.map(ObjectIdentifier.init) == windows)
+        let rows = try run.rows()
+        #expect(rows.count == 1)
+        #expect(rows[0].hasSuffix("\tfirst\terror"))
+    }
+
+    @Test
+    func test_timerSnapshot_stateNotAppeared_throwsWithoutMounting() async throws {
+        let run = SnapshotContractRun()
+        defer { run.cleanUp() }
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let windows = scene.windows.map(ObjectIdentifier.init)
+        var states = 0
+        await run.withEnvironment {
+            do {
+                try await assertTimerSnapshot(textSize: .large, function: "test_rejectedState()") { language in
+                    states += 1
+                    return AppFeature().timerState(for: SnapshotFixtures.editorWorkout(language: language))
+                }
+                Issue.record("A state that has not appeared must be rejected")
+            } catch {
+                #expect(String(describing: error).contains("Build the timer state with the factories"))
+            }
+        }
+        #expect(states == 1)
+        #expect(scene.windows.map(ObjectIdentifier.init) == windows)
+        let rows = try run.rows()
+        #expect(rows.count == 1)
+        #expect(rows[0].hasSuffix("\tfirst\terror"))
+    }
+
+    @Test
+    func test_timerSnapshot_remount_buildsFreshState() async throws {
+        let run = SnapshotContractRun(testName: "test_timerSnapshot_remount_buildsFreshState")
+        defer { run.cleanUp() }
+        try await run.withEnvironment(mode: "failed") {
+            try await withKnownIssue(
+                "Seed the timer reference for the second mount",
+                {
+                    try await assertTimerSnapshot(textSize: .large, function: #function, line: 1, column: 1) { language in
+                        .finished(SnapshotFixtures.editorWorkout(language: language))
+                    }
+                },
+                matching: { $0.sourceLocation == SnapshotContractRun.location }
+            )
+        }
+        let before = try Data(contentsOf: run.reference.url)
+        try FileManager.default.removeItem(at: run.artifacts)
+        var states = 0
+        try await run.withEnvironment {
+            try await assertTimerSnapshot(textSize: .large, function: #function, line: 1, column: 1) { language in
+                states += 1
+                let workout = SnapshotFixtures.editorWorkout(language: language)
+                return states == 1 ? .paused(workout) : .finished(workout)
+            }
+        }
+        #expect(states == 2)
+        #expect(try Data(contentsOf: run.reference.url) == before)
+        #expect(try run.rows() == [run.row(attempt: "second", outcome: "passed")])
+    }
+
+    @Test
+    func test_timerSnapshotRoot_mounted_reportsAnActiveScene() async throws {
+        let run = SnapshotContractRun()
+        let phases = LockIsolated<[ScenePhase]>([])
+        let store = withDependencies {
+            TimerSnapshotDependencies.prepare(&$0, locale: run.variant.locale)
+        } operation: {
+            Store(initialState: .startCountdown(SnapshotFixtures.editorWorkout(language: .english))) {
+                Reduce<WorkoutTimerFeature.State, WorkoutTimerFeature.Action> { _, action in
+                    if case let .view(.scenePhaseChanged(phase)) = action { phases.withValue { $0.append(phase) } }
+                    return .none
+                }
+                WorkoutTimerFeature()
+            }
+        }
+        let root = timerSnapshotRoot(store, variant: run.variant)
+        let frame = try await SnapshotWindow.firstFrame(variant: run.variant) { _ in root }
+        #expect(frame.succeeded)
+        #expect(root.controller.view.window == nil)
+        #expect(phases.value == [.active])
+        #expect(store.isSceneActive)
+        #expect(!store.isInBackground)
+        #expect(store.countdown?.remaining == 3)
+        #expect(store.state.hasAppearedForSnapshot)
     }
 }
 
