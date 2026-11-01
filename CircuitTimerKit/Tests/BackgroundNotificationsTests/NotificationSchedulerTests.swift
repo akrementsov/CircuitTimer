@@ -4,6 +4,8 @@ import Dependencies
 import Foundation
 import Testing
 
+// A sweep or a sleep the code never reaches would otherwise keep a waiting test from ever returning.
+@Suite(.timeLimit(.minutes(1)))
 struct NotificationSchedulerTests: Sendable {
     private let owner = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
     private let now = Date(timeIntervalSince1970: 1_000)
@@ -147,16 +149,19 @@ struct NotificationSchedulerTests: Sendable {
         let scheduler = NotificationScheduler(transport: fake.transport)
         let first = Task { try await scheduler.removeOrphans(clock: clock) }
         await fake.waitForPending()
+        await clock.waitForSleeper()
         await clock.advance(by: .milliseconds(500))
         #expect(try await first.value == false)
         let retry = Task { try await scheduler.removeOrphans(clock: clock) }
+        await clock.waitForSleeper()
         await clock.advance(by: .milliseconds(500))
         #expect(try await retry.value == false)
         #expect(fake.pendingReads == 1)
         #expect(fake.deliveredReads == 1)
         await clock.advance(by: .seconds(29))
         let renewed = Task { try await scheduler.removeOrphans(clock: clock) }
-        await fake.waitForPending(count: 2)
+        // A sweep reads pending requests before delivered ones.
+        await fake.waitForDelivered(count: 2)
         #expect(fake.pendingReads == 2)
         #expect(fake.deliveredReads == 2)
         fake.completePending()

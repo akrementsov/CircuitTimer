@@ -233,6 +233,7 @@ struct WorkoutSessionsTests {
         let starting = Task { await start() }
         await settle()
         // The start stops waiting and admits its session; recovery then returns the same session as another object.
+        await clock.waitForSleeper()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         let recovered = FakeSession(activityID: health.session(0).activityID)
@@ -299,6 +300,7 @@ struct WorkoutSessionsTests {
         await settle()
         let first = Task { await start(at: moment(1)) }
         await settle()
+        await clock.waitForSleeper()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await first.value
         let second = Task { await start(Self.other, at: moment(2)) }
@@ -323,7 +325,11 @@ struct WorkoutSessionsTests {
         }
         let starting = Task { await start() }
         await settle()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        if duringRecovery {
+            // Only a start during recovery waits on the clock.
+            await clock.waitForSleeper()
+            await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        }
         await starting.value
 
         health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
@@ -344,6 +350,7 @@ struct WorkoutSessionsTests {
         await settle()
         #expect(orphan.calls.value == [.observe, .end])
 
+        await clock.waitForSleeper()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await recovering.value
 
@@ -477,6 +484,7 @@ struct WorkoutSessionsTests {
         await settle()
         #expect(health.created.value.isEmpty)
 
+        await clock.waitForSleeper()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         #expect(health.created.value.count == 1)
@@ -508,6 +516,7 @@ struct WorkoutSessionsTests {
         await settle()
         let starting = Task { await start() }
         await settle()
+        await clock.waitForSleeper()
         await clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
