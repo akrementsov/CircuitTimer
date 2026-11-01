@@ -24,6 +24,13 @@ public struct WatchCompanionClient: Sendable {
     public var beginTermination: @Sendable () -> Void
     /// Writes the state without any run. The caller bounds the wait.
     public var finishTermination: @Sendable () async -> Void
+    /// The watch's requests for the owner's timer; a new subscription replaces the owner's previous one.
+    public var controlRequests: @Sendable (_ owner: UUID) async -> AsyncStream<WatchControlRequest> = { _ in
+        AsyncStream { $0.finish() }
+    }
+    /// The timer's answer to a request: its settled run, or `nil` when it cannot publish one. The run is published
+    /// whether or not the request still waits.
+    public var refreshHandled: @Sendable (_ owner: UUID, _ requestID: Int, _ publication: WatchRunPublication?) async -> Void
 }
 
 extension WatchCompanionClient: DependencyKey {
@@ -31,6 +38,7 @@ extension WatchCompanionClient: DependencyKey {
         #if os(iOS)
         @Dependency(\.uuid) var uuid
         @Dependency(\.date) var date
+        @Dependency(\.continuousClock) var clock
         let companion = LockIsolated<WatchCompanion?>(nil)
         let revision = LockIsolated(0)
         return Self(
@@ -42,7 +50,8 @@ extension WatchCompanionClient: DependencyKey {
                     let started = WatchCompanion(
                         ledger: PublicationLedger(processID: uuid(), transport: transport),
                         transport: transport,
-                        now: { date.now }
+                        now: { date.now },
+                        clock: clock
                     )
                     // Subscribe before activating, so the request that launched the app reaches the actor.
                     let events = transport.events()
@@ -77,6 +86,13 @@ extension WatchCompanionClient: DependencyKey {
             },
             finishTermination: {
                 await companion.value?.finishTermination()
+            },
+            controlRequests: { owner in
+                guard let started = companion.value else { return AsyncStream { $0.finish() } }
+                return await started.controlRequests(owner: owner)
+            },
+            refreshHandled: { owner, requestID, publication in
+                await companion.value?.refreshHandled(owner: owner, requestID: requestID, publication: publication)
             }
         )
         #else
@@ -90,7 +106,12 @@ extension WatchCompanionClient: DependencyKey {
             publishRun: { _, _ in misuse() },
             end: { _ in misuse() },
             beginTermination: misuse,
-            finishTermination: misuse
+            finishTermination: misuse,
+            controlRequests: { _ in
+                misuse()
+                return AsyncStream { $0.finish() }
+            },
+            refreshHandled: { _, _, _ in misuse() }
         )
         #endif
     }()
@@ -103,7 +124,9 @@ extension WatchCompanionClient: DependencyKey {
         publishRun: { _, _ in },
         end: { _ in },
         beginTermination: {},
-        finishTermination: {}
+        finishTermination: {},
+        controlRequests: { _ in AsyncStream { $0.finish() } },
+        refreshHandled: { _, _, _ in }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()
