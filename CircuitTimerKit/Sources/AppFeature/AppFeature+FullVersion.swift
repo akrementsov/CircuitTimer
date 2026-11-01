@@ -6,6 +6,19 @@ import Purchases
 import SettingsFeature
 
 extension AppFeature {
+    /// Workouts the free version can create up to, the seeded sample included. A commercial rule, not a limit of the
+    /// workout model: it blocks only new workouts, so every stored one stays visible, editable and playable.
+    static let freeWorkoutLimit = 2
+
+    /// New workouts need the full version once the list shows this many; until StoreKit answers they need it too, and
+    /// a purchase sheet opened then closes by itself when the full version arrives. Copies of one workout from iCloud
+    /// count once, as the list shows them.
+    func isAtFreeWorkoutLimit(_ state: State) -> Bool {
+        guard state.fullVersion != .full, case let .loaded(workouts) = state.workouts else { return false }
+
+        return workouts.count >= Self.freeWorkoutLimit
+    }
+
     /// Asks for the purchase sheet; `presentRequestedPurchase` shows it once nothing is in the way. The latest request
     /// wins.
     func requestPurchase(_ entry: PurchaseFeature.Entry, _ state: inout State) {

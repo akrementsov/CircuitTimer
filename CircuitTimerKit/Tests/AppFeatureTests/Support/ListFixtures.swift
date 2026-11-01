@@ -14,6 +14,8 @@ import WorkoutHealth
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
     var state = AppFeature.State()
     state.workouts = .loaded(IdentifiedArray(uniqueElements: workouts))
+    // Bought, so the tests of adding and duplicating keep meaning what they did before the free limit.
+    state.fullVersion = .full
     return state
 }
 

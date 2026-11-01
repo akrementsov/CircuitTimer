@@ -183,6 +183,8 @@ A stage name may be empty; anything that displays a stage shows its intensity na
 
 New input of a workout or stage name goes through `WorkoutLimits.limitedName(_:previous:)`: at most `maxNameLength` characters, an edit past it rejected whole. A longer name stored before the limit shows in full, also in the Live Activity, which never cuts a name by length; an activity over the 4 KB limit ends and the timer shows its footnote. While it remains over the limit, any edit is accepted only if it reduces the character count, including a replacement with unrelated shorter text; an edit of the same length or longer is rejected whole.
 
+The free version's limit of two workouts (`AppFeature.freeWorkoutLimit`) is a commercial rule, not part of `WorkoutLimits`: it depends on the full version, not on what a workout may hold, and it blocks only creating — «+» and Duplicate open the purchase sheet once the list shows two (the seeded sample counts, copies of one workout from iCloud count once). Stored workouts stay visible, editable and playable whatever their number. Accepted bypasses: an import after the check, and a new-workout editor opened at one workout that saves a third after an import or a refund.
+
 ## UI tests
 
 How to add one, step by step: `docs/testing.md` › How to add a UI test.

@@ -326,6 +326,11 @@ public struct AppFeature: Sendable {
                     case var .loaded(workouts) = state.workouts,
                     let index = workouts.index(id: id)
                 else { return .none }
+                // Counted on the list as the user sees it, so a quick second tap meets the first copy.
+                guard !isAtFreeWorkoutLimit(state) else {
+                    requestPurchase(.limit(.workoutLimit), &state)
+                    return .none
+                }
 
                 let copy = duplicate(workouts[index])
                 workouts.insert(copy, at: index + 1)
@@ -514,6 +519,11 @@ public struct AppFeature: Sendable {
 
         switch request {
             case .create:
+                // Checked here, on the list a queued write or a reload has just made current.
+                guard !isAtFreeWorkoutLimit(state) else {
+                    requestPurchase(.limit(.workoutLimit), &state)
+                    return .none
+                }
                 state.path.append(
                     .editor(
                         WorkoutEditorFeature.State(
