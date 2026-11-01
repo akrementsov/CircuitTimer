@@ -80,6 +80,8 @@ extension StoreTransport {
             result = try await product.purchase(confirmIn: scene)
         } catch StoreKitError.userCancelled {
             return .cancelled
+        } catch Product.PurchaseError.purchaseNotAllowed {
+            throw PurchaseClientError.notAllowed
         }
 
         switch result {

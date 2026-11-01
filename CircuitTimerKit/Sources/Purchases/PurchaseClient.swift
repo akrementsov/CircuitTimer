@@ -16,8 +16,7 @@ public struct PurchaseClient: Sendable {
     public var offer: @Sendable () async throws -> FullVersionOffer
     /// A verified purchase is finished, and the full version published, before this returns.
     public var purchase: @Sendable () async throws -> PurchaseOutcome
-    /// `AppStore.sync()`, then the entitlement read again; the outcome is that read's own answer, or a newer one that
-    /// found the full version.
+    /// `AppStore.sync()`, then the entitlement read again; the outcome is the newest read's answer.
     public var restore: @Sendable () async throws -> RestoreOutcome
 }
 

@@ -7,6 +7,36 @@ import Purchases
 /// close through `delegate(.closeRequested)`.
 @Reducer
 public struct PurchaseFeature: Sendable {
+    // An alert with actions needs a hand-written `Action`: with a macro-generated one the scoped binding would drop the
+    // user's choice. See AGENTS.md › TCA.
+    @Reducer
+    public enum Destination {
+        @ReducerCaseIgnored
+        case alert(AlertState<Never>)
+        /// The App Store said yes but the full version did not unlock; restoring reads it again.
+        @ReducerCaseIgnored
+        case restoreOffer(AlertState<RestoreOfferChoice>)
+
+        @CasePathable
+        public enum Action: Equatable, Sendable {
+            case alert(Never)
+            case restoreOffer(RestoreOfferChoice)
+        }
+    }
+
+    public enum RestoreOfferChoice: Equatable, Sendable {
+        case restore
+    }
+
+    /// Why a purchase failed, as far as the alert tells the user apart.
+    public enum PurchaseFailure: Equatable, Sendable {
+        /// Screen Time or a profile does not allow purchases on this device.
+        case notAllowed
+        /// StoreKit could not verify the transaction; the payment may have gone through.
+        case unverified
+        case other
+    }
+
     /// Why the sheet opened when a locked feature opened it; the sheet says so above the feature list.
     public enum Reason: Equatable, Sendable {
         case workoutLimit
@@ -49,7 +79,7 @@ public struct PurchaseFeature: Sendable {
         /// Keeps the buttons busy while `expectsUnlock`, for at most `confirmationTimeout`.
         var isAwaitingConfirmation = false
         var hasStarted = false
-        @Presents var alert: AlertState<Never>?
+        @Presents var destination: Destination.State?
 
         public init(entry: Entry) {
             self.entry = entry
@@ -66,13 +96,34 @@ public struct PurchaseFeature: Sendable {
         var isBusy: Bool {
             operation != nil || isAwaitingConfirmation
         }
+
+        var isPurchasing: Bool {
+            operation == .purchasing || isAwaitingConfirmation
+        }
+
+        var isRestoring: Bool {
+            operation == .restoring
+        }
+
+        /// The one-time and Family Sharing line belongs to an offer the user can buy.
+        var showsFinePrint: Bool {
+            guard !isShowingSuccess, !isPending, case .loaded = offer else { return false }
+
+            return true
+        }
+
+        /// The full version came from elsewhere, such as Family Sharing or an earlier purchase StoreKit answered late,
+        /// and no operation of this sheet waits for it: the sheet has nothing left to sell.
+        var isUnlockedElsewhere: Bool {
+            status == .full && !didUnlockHere && !expectsUnlock && !isPending && operation == nil
+        }
     }
 
     public enum Action: ViewAction, Equatable, Sendable {
         case view(View)
         case `internal`(Internal)
         case delegate(Delegate)
-        case alert(PresentationAction<Never>)
+        case destination(PresentationAction<Destination.Action>)
 
         @CasePathable
         public enum View: Equatable, Sendable {
@@ -89,7 +140,7 @@ public struct PurchaseFeature: Sendable {
             case offerLoaded(FullVersionOffer)
             case offerFailed
             case purchaseFinished(PurchaseOutcome)
-            case purchaseFailed
+            case purchaseFailed(PurchaseFailure)
             case restoreFinished(RestoreOutcome)
             case restoreFailed
             case statusChanged(FullVersionStatus)
@@ -123,11 +174,13 @@ public struct PurchaseFeature: Sendable {
                     reduce(into: &state, action)
                 case let .internal(action):
                     reduce(into: &state, action)
-                case .delegate, .alert:
+                case .destination(.presented(.restoreOffer(.restore))):
+                    reduce(into: &state, Action.View.restoreTapped)
+                case .delegate, .destination:
                     .none
             }
         }
-        .ifLet(\.$alert, action: \.alert)
+        .ifLet(\.$destination, action: \.destination)
     }
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
@@ -178,42 +231,58 @@ public struct PurchaseFeature: Sendable {
                     case .purchased:
                         return operationSucceeded(&state)
                     case .pending:
-                        state.isPending = true
+                        if state.status == .full {
+                            // The approval arrived before the purchase returned.
+                            state.didUnlockHere = true
+                        } else {
+                            state.isPending = true
+                        }
                         return .none
                     case .cancelled:
                         return closeIfUnlockedElsewhere(state)
                 }
-            case .purchaseFailed:
+            case let .purchaseFailed(failure):
                 state.operation = nil
-                state.alert = .purchaseFailed
-                return closeIfUnlockedElsewhere(state)
+                guard !state.isUnlockedElsewhere else { return closeIfUnlockedElsewhere(state) }
+
+                switch failure {
+                    case .notAllowed:
+                        state.destination = .alert(.purchaseNotAllowed)
+                    case .unverified:
+                        state.destination = .restoreOffer(.purchaseUnverified)
+                    case .other:
+                        state.destination = .alert(.purchaseFailed)
+                }
+                return .none
             case let .restoreFinished(outcome):
                 state.operation = nil
                 switch outcome {
                     case .restored:
                         return operationSucceeded(&state)
                     case .nothingFound:
-                        // The full version a newer read found makes «nothing found» untrue.
-                        if state.status != .full {
-                            state.alert = .nothingToRestore
-                        }
-                        return closeIfUnlockedElsewhere(state)
+                        guard !state.isUnlockedElsewhere else { return closeIfUnlockedElsewhere(state) }
+
+                        state.destination = .alert(.nothingToRestore)
+                        return .none
                     case .cancelled:
                         return closeIfUnlockedElsewhere(state)
                 }
             case .restoreFailed:
                 state.operation = nil
-                state.alert = .restoreFailed
-                return closeIfUnlockedElsewhere(state)
+                guard !state.isUnlockedElsewhere else { return closeIfUnlockedElsewhere(state) }
+
+                state.destination = .alert(.restoreFailed)
+                return .none
             case let .statusChanged(status):
+                let previous = state.status
                 state.status = status
-                return statusChanged(&state)
+                return statusChanged(from: previous, &state)
             case .confirmationTimedOut:
                 guard state.isAwaitingConfirmation else { return .none }
 
                 Self.logger.error("StoreKit reported a successful operation, but the full version was not published in time")
                 state.isAwaitingConfirmation = false
-                state.alert = .confirmationFailed
+                state.destination = .restoreOffer(.confirmationFailed)
                 return .none
         }
     }
@@ -235,20 +304,25 @@ public struct PurchaseFeature: Sendable {
         .cancellable(id: CancelID.confirmation, cancelInFlight: true)
     }
 
-    private func statusChanged(_ state: inout State) -> Effect<Action> {
+    private func statusChanged(from previous: FullVersionStatus, _ state: inout State) -> Effect<Action> {
         switch state.status {
             case .full:
                 if state.expectsUnlock || state.isPending {
-                    // This sheet's purchase or restore, or its approved Ask to Buy.
+                    // This sheet's purchase or restore, also after its confirmation timed out, or its approved Ask to Buy.
                     state.didUnlockHere = true
                     state.expectsUnlock = false
                     state.isAwaitingConfirmation = false
                     state.isPending = false
+                    if state.destination?.is(\.restoreOffer) == true {
+                        state.destination = nil
+                    }
                     return .cancel(id: CancelID.confirmation)
                 }
                 return closeIfUnlockedElsewhere(state)
             case .free:
-                // A refund or a revocation: the offer again.
+                // A refund or a revocation returns the offer; StoreKit's first answer only says what was unknown.
+                guard previous == .full else { return .none }
+
                 state.didUnlockHere = false
                 state.expectsUnlock = false
                 state.isAwaitingConfirmation = false
@@ -259,12 +333,8 @@ public struct PurchaseFeature: Sendable {
         }
     }
 
-    /// The full version came from elsewhere, such as Family Sharing or an earlier purchase StoreKit answered late, also
-    /// while an operation of this sheet ran: the sheet has nothing left to sell.
     private func closeIfUnlockedElsewhere(_ state: State) -> Effect<Action> {
-        guard state.status == .full, !state.didUnlockHere, !state.isPending, state.operation == nil else { return .none }
-
-        return .send(.delegate(.closeRequested))
+        state.isUnlockedElsewhere ? .send(.delegate(.closeRequested)) : .none
     }
 
     private func loadOffer() -> Effect<Action> {
@@ -298,7 +368,12 @@ public struct PurchaseFeature: Sendable {
                 return
             } catch {
                 Self.logger.error("The purchase failed: \(String(reflecting: error), privacy: .public)")
-                await send(.internal(.purchaseFailed))
+                let failure: PurchaseFailure = switch error as? PurchaseClientError {
+                    case .notAllowed: .notAllowed
+                    case .unverified: .unverified
+                    default: .other
+                }
+                await send(.internal(.purchaseFailed(failure)))
             }
         }
         .cancellable(id: CancelID.operation)
@@ -318,3 +393,5 @@ public struct PurchaseFeature: Sendable {
         .cancellable(id: CancelID.operation)
     }
 }
+
+extension PurchaseFeature.Destination.State: Equatable, Sendable {}

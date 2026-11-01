@@ -102,25 +102,30 @@ final class EntitlementMonitor: Sendable {
         startIfNeeded()
         guard try await transport.sync() else { return .cancelled }
 
-        let isEntitled = await reconcile()
-        // A newer read may have found the full version after this one missed it.
-        return isEntitled || state.status == .full ? .restored : .nothingFound
+        // A read that a newer one overtook may be outdated either way; read until an answer is the newest.
+        var read = await reconcile()
+        while !read.isNewest {
+            read = await reconcile()
+        }
+        return read.isEntitled ? .restored : .nothingFound
     }
 
-    /// Reads the entitlement and publishes it while this read is still the newest one started; returns its own answer.
+    /// Reads the entitlement and publishes it while this read is still the newest one started; returns its own answer
+    /// and whether it was the newest.
     @discardableResult
-    private func reconcile() async -> Bool {
+    private func reconcile() async -> (isEntitled: Bool, isNewest: Bool) {
         let read = state.withValue { state in
             state.latestRead += 1
             return state.latestRead
         }
         let isEntitled = await transport.isEntitled()
-        state.withValue { state in
-            guard state.latestRead == read else { return }
+        let isNewest = state.withValue { state in
+            guard state.latestRead == read else { return false }
 
             state.publish(isEntitled ? .full : .free)
+            return true
         }
-        return isEntitled
+        return (isEntitled, isNewest)
     }
 
     private func startIfNeeded() {

@@ -34,7 +34,8 @@ public struct PurchaseView: View {
         }
         // A swipe down would leave the payment sheet on its own.
         .interactiveDismissDisabled(store.isBusy)
-        .alert($store.scope(\.alert, action: \.alert))
+        .alert($store.scope(\.$destination, action: \.destination).alert)
+        .alert($store.scope(\.$destination, action: \.destination).restoreOffer)
         .task { send(.task) }
     }
 
@@ -93,7 +94,7 @@ public struct PurchaseView: View {
             if !store.isShowingSuccess {
                 restoreButton
             }
-            if showsFinePrint {
+            if store.showsFinePrint {
                 Text("purchase.finePrint", bundle: .module)
                     .font(.token(.footnote))
                     .foregroundStyle(.text(.secondary))
@@ -135,7 +136,7 @@ public struct PurchaseView: View {
                 case let .loaded(offer):
                     BottomActionPanel(
                         title: Text("purchase.buy.price \(offer.displayPrice)", bundle: .module),
-                        isBusy: store.operation == .purchasing || store.isAwaitingConfirmation,
+                        isBusy: store.isPurchasing,
                         busyLabel: Text("purchase.purchasing", bundle: .module),
                         isEnabled: !store.isBusy
                     ) {
@@ -159,7 +160,7 @@ public struct PurchaseView: View {
         Button {
             send(.restoreTapped)
         } label: {
-            if store.operation == .restoring {
+            if store.isRestoring {
                 ProgressView()
                     .tint(.text(.secondary))
             } else {
@@ -168,18 +169,13 @@ public struct PurchaseView: View {
         }
         .font(.token(.button))
         .foregroundStyle(.text(.secondary))
+        // The explicit color would otherwise hide that the button is disabled.
+        .opacity(store.isBusy ? .token(opacity: .disabled) : 1)
         .frame(maxWidth: .infinity, minHeight: .token(size: .row))
         .contentShape(Rectangle())
-        .accessibilityLabel(Text(store.operation == .restoring ? "purchase.restoring" : "purchase.restore", bundle: .module))
+        .accessibilityLabel(Text(store.isRestoring ? "purchase.restoring" : "purchase.restore", bundle: .module))
         .disabled(store.isBusy)
         .accessibilityIdentifier(AccessibilityID.Purchase.restore)
-    }
-
-    private var showsFinePrint: Bool {
-        guard !store.isShowingSuccess, !store.isPending else { return false }
-
-        if case .loaded = store.offer { return true }
-        return false
     }
 
     @ToolbarContentBuilder

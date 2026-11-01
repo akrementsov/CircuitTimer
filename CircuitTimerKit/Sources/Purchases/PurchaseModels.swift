@@ -37,6 +37,8 @@ public enum PurchaseClientError: Error, Equatable, Sendable {
     case unverified
     /// No scene of the app is in the foreground to show the payment sheet over.
     case noActiveScene
+    /// The device does not allow purchases, such as under Screen Time restrictions.
+    case notAllowed
     /// A purchase result this version of the app does not know.
     case unknownResult
 }

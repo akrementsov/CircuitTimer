@@ -6,13 +6,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The App Store reported success, but the full version hasn't unlocked yet. Tap Restore Purchases to check again."
+            "value" : "The App Store reported success, but the full version hasn't unlocked yet. Restore Purchases checks it again."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "App Store сообщил об успехе, но полная версия пока не открылась. Нажмите «Восстановить покупки», чтобы проверить ещё раз."
+            "value" : "App Store сообщил об успехе, но полная версия пока не открылась. «Восстановить покупки» проверит её ещё раз."
           }
         }
       }
@@ -29,6 +29,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не удалось подтвердить покупку"
+          }
+        }
+      }
+    },
+    "purchase.alert.notAllowed.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't allow in-app purchases, for example because of Screen Time restrictions."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этом устройстве покупки в приложениях ограничены, например в Экранном времени."
+          }
+        }
+      }
+    },
+    "purchase.alert.notAllowed.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchases Are Not Allowed"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Покупки запрещены"
           }
         }
       }
@@ -61,6 +93,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Покупок не найдено"
+          }
+        }
+      }
+    },
+    "purchase.alert.ok" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ОК"
           }
         }
       }
@@ -125,6 +173,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не удалось восстановить покупки"
+          }
+        }
+      }
+    },
+    "purchase.alert.unverified.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The App Store couldn't verify the purchase. Restore Purchases checks it again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Store не смог проверить покупку. «Восстановить покупки» проверит её ещё раз."
+          }
+        }
+      }
+    },
+    "purchase.alert.unverified.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Verify the Purchase"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось проверить покупку"
           }
         }
       }
@@ -294,13 +374,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The purchase is waiting for a family organizer to approve it. The full version unlocks by itself once they do."
+            "value" : "The purchase is waiting for approval, for example by a family organizer. The full version unlocks by itself once it is approved."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Покупка ждёт одобрения взрослого из Семейного доступа. Полная версия откроется сама, как только он подтвердит."
+            "value" : "Покупка ждёт подтверждения, например взрослого из Семейного доступа. Полная версия откроется сама, как только её подтвердят."
           }
         }
       }
