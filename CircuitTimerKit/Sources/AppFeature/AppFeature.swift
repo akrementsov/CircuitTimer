@@ -7,6 +7,7 @@ import os
 import SettingsFeature
 import SwiftUI
 import TimerPreferences
+import WatchLink
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutEditorFeature
@@ -192,6 +193,7 @@ public struct AppFeature: Sendable {
     @Dependency(\.liveActivity) private var liveActivity
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) var uuid
+    @Dependency(\.watchCompanion) var watchCompanion
     @Dependency(\.workoutHealth) var workoutHealth
     @Dependency(\.workoutRunRecord) var workoutRunRecord
     @Dependency(\.workoutStorage) var workoutStorage
@@ -199,39 +201,45 @@ public struct AppFeature: Sendable {
     public init() {}
 
     public var body: some ReducerOf<Self> {
-        Scope(\.settings, action: \.settings) {
-            SettingsFeature()
-        }
-        Reduce { state, action in
-            switch action {
-                case let .view(action):
-                    reduce(into: &state, action)
-                case let .internal(action):
-                    reduce(into: &state, action)
-                case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
-                    workoutSaved(workout, &state)
-                case .path(.element(id: _, action: .editor(.delegate(.deletedElsewhere)))):
-                    outsideChange(&state)
-                case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
-                    startWorkout(workout, &state)
-                case let .destination(.presented(.resumeRun(choice))):
-                    resumeRunChosen(choice, &state)
-                case let .destination(.presented(.permissionStalled(choice))):
-                    permissionStallChosen(choice, &state)
-                case .destination(.dismiss):
-                    destinationDismissed(&state)
-                case .destination, .path, .settings:
-                    .none
+        // Around everything that can change the list: `onChange` sees only the state of its own base.
+        CombineReducers {
+            Scope(\.settings, action: \.settings) {
+                SettingsFeature()
+            }
+            Reduce { state, action in
+                switch action {
+                    case let .view(action):
+                        reduce(into: &state, action)
+                    case let .internal(action):
+                        reduce(into: &state, action)
+                    case let .path(.element(id: _, action: .editor(.delegate(.saved(workout))))):
+                        workoutSaved(workout, &state)
+                    case .path(.element(id: _, action: .editor(.delegate(.deletedElsewhere)))):
+                        outsideChange(&state)
+                    case let .path(.element(id: _, action: .editor(.delegate(.startRequested(workout))))):
+                        startWorkout(workout, &state)
+                    case let .destination(.presented(.resumeRun(choice))):
+                        resumeRunChosen(choice, &state)
+                    case let .destination(.presented(.permissionStalled(choice))):
+                        permissionStallChosen(choice, &state)
+                    case .destination(.dismiss):
+                        destinationDismissed(&state)
+                    case .destination, .path, .settings:
+                        .none
+                }
+            }
+            .ifLet(\.$destination, action: \.destination)
+            .forEach(\.path, action: \.path)
+            Reduce { state, _ in
+                guard let intent = state.startIntent else { return .none }
+                guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
+                      state.destination == nil || state.destination?.is(\.permissionStalled) == true
+                else { return cancelStartIntent(&state) }
+                return .none
             }
         }
-        .ifLet(\.$destination, action: \.destination)
-        .forEach(\.path, action: \.path)
-        Reduce { state, _ in
-            guard let intent = state.startIntent else { return .none }
-            guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
-                  state.destination == nil || state.destination?.is(\.permissionStalled) == true
-            else { return cancelStartIntent(&state) }
-            return .none
+        .onChange(of: \.settledWorkouts) { _, state in
+            publishWatchCatalog(state.settledWorkouts)
         }
     }
 

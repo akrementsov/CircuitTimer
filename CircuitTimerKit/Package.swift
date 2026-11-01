@@ -52,6 +52,7 @@ let package = Package(
                 "DesignSystem",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
