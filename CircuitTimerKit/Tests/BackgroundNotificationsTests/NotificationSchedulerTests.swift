@@ -4,7 +4,8 @@ import Dependencies
 import Foundation
 import Testing
 
-// A sweep or a sleep the code never reaches would otherwise keep a waiting test from ever returning.
+// `waitForSleeper` and the fake's waits loop until their condition holds: a regression fails the suite instead of
+// hanging it.
 @Suite(.timeLimit(.minutes(1)))
 struct NotificationSchedulerTests: Sendable {
     private let owner = UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
@@ -274,6 +275,7 @@ struct NotificationSchedulerTests: Sendable {
             try await scheduler.sync(owner, revision: 1, plan: [notification(after: 10)], now: { now }, clock: clock)
         }
         await fake.waitForPending(count: 2)
+        await clock.waitForSleeper()
         await clock.advance(by: .milliseconds(500))
         let report = try await operation.value
         #expect(!report.isVerified)
