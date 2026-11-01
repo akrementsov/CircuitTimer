@@ -65,6 +65,7 @@ let package = Package(
         .testTarget(
             name: "AppFeatureTests",
             dependencies: [
+                "TestSupport",
                 "TimerPreferences",
                 "BackgroundNotifications",
                 "BackgroundExecution",
