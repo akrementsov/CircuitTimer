@@ -9,7 +9,7 @@ import Testing
 struct WorkoutSessionsTests {
     let health = FakeHealth()
     let gate = TerminationGate()
-    let clock = TestClock<Duration>()
+    let clock = ManualClock()
     let sessions: WorkoutSessions
     static let owner = UUID(fixture: 501)
     static let other = UUID(fixture: 502)
@@ -49,9 +49,12 @@ struct WorkoutSessionsTests {
         await sessions.endOrphans(clock: clock)
     }
 
-    /// Lets the session's watch task hand its events to the actor.
-    func settle() async {
-        await Task.megaYield()
+    /// Returns once `count` `endAll` calls wait for sessions to end or saves to finish. Nothing outside the actor shows
+    /// that wait, so this asks the actor until it does.
+    func waitForEndAll(_ count: Int = 1) async {
+        while await sessions.endingWaiters.count < count {
+            await Task.yield()
+        }
     }
 
     @discardableResult
@@ -59,7 +62,7 @@ struct WorkoutSessionsTests {
         await start(owner, at: date)
         let session = health.created.value.last!
         session.report(.changed(.running, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         return session
     }
 
@@ -89,12 +92,12 @@ struct WorkoutSessionsTests {
         let session = await running()
 
         await end(track: track(stopsAt: 100), at: moment(10))
-        await settle()
+        await health.saved.wait { !$0.isEmpty }
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
         #expect(health.saved.value == [workout(0, 10)])
 
         session.report(.changed(.ended, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         #expect(session.calls.value.last == .release)
     }
 
@@ -104,16 +107,16 @@ struct WorkoutSessionsTests {
         let session = health.session(0)
 
         await end(track: track(), at: moment(10))
-        await settle()
+        await health.saved.wait { !$0.isEmpty }
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
         #expect(health.saved.value == [workout(0, 10)])
 
         session.report(.changed(.running, date: moment(1)))
-        await settle()
+        await session.waitUntilHandled()
         #expect(session.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end])
 
         session.report(.changed(.ended, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         #expect(session.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end, .release])
         #expect(health.saved.value == [workout(0, 10)])
     }
@@ -138,7 +141,7 @@ struct WorkoutSessionsTests {
         let session = await running()
         if isLost {
             session.report(.changed(.ended, date: moment(0)))
-            await settle()
+            await session.waitUntilHandled()
         } else {
             await end()
         }
@@ -156,7 +159,7 @@ struct WorkoutSessionsTests {
         await end(track: track(), at: moment(11))
         await end(Self.other, track: track())
         await start(Self.other)
-        await settle()
+        await health.saved.wait { !$0.isEmpty }
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
         #expect(health.created.value.count == 1)
@@ -184,9 +187,9 @@ struct WorkoutSessionsTests {
     @Test
     func test_start_gateClosedWhileWaitingForRecovery_createsNoSession() async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
+        await clock.waitForSleeps()
 
         gate.close()
         health.answerRecovery(.success(nil))
@@ -205,7 +208,6 @@ struct WorkoutSessionsTests {
         await endOrphans()
         await endAll(at: moment(20))
         await end(track: track())
-        await settle()
 
         #expect(health.created.value.isEmpty)
         #expect(health.recoveries.value == 0)
@@ -229,12 +231,11 @@ struct WorkoutSessionsTests {
     @Test
     func test_endOrphans_sessionWithAnOwnActivity_isNotEnded() async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
         // The start stops waiting and admits its session; recovery then returns the same session as another object.
-        await clock.waitForSleeper()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        await clock.waitForSleeps()
+        clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         let recovered = FakeSession(activityID: health.session(0).activityID)
 
@@ -248,9 +249,9 @@ struct WorkoutSessionsTests {
     @Test(arguments: [false, true])
     func test_end_reservedStart_createsAndSavesNothing(byEndAll: Bool) async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
+        await clock.waitForSleeps()
 
         await sync(track())
         if byEndAll {
@@ -261,7 +262,6 @@ struct WorkoutSessionsTests {
         health.answerRecovery(.success(nil))
         await recovering.value
         await starting.value
-        await settle()
 
         #expect(health.created.value.isEmpty)
         #expect(health.saved.value.isEmpty)
@@ -278,7 +278,6 @@ struct WorkoutSessionsTests {
         } else {
             await end(track: track())
         }
-        await settle()
 
         #expect(health.saved.value.isEmpty)
     }
@@ -297,14 +296,13 @@ struct WorkoutSessionsTests {
     @Test(arguments: [false, true])
     func test_endOrphans_recoveryThrows_waitingStartsGoOn(isCancellation: Bool) async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let first = Task { await start(at: moment(1)) }
-        await settle()
-        await clock.waitForSleeper()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        await clock.waitForSleeps()
+        clock.advance(by: WorkoutSessions.recoveryTimeout)
         await first.value
         let second = Task { await start(Self.other, at: moment(2)) }
-        await settle()
+        await clock.waitForSleeps()
 
         health.answerRecovery(.failure(isCancellation ? CancellationError() : FakeError()))
         await recovering.value
@@ -318,22 +316,21 @@ struct WorkoutSessionsTests {
         let orphan = FakeSession(activityID: UUID(fixture: 900))
         orphan.report(.changed(.ended, date: moment(0)))
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         if !duringRecovery {
             health.answerRecovery(.success(orphan))
             await recovering.value
         }
         let starting = Task { await start() }
-        await settle()
         if duringRecovery {
             // Only a start during recovery waits on the clock.
-            await clock.waitForSleeper()
-            await clock.advance(by: WorkoutSessions.recoveryTimeout)
+            await clock.waitForSleeps()
+            clock.advance(by: WorkoutSessions.recoveryTimeout)
         }
         await starting.value
 
         health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
-        await settle()
+        await health.session(0).waitUntilHandled()
         if duringRecovery {
             health.answerRecovery(.success(orphan))
             await recovering.value
@@ -347,11 +344,11 @@ struct WorkoutSessionsTests {
         let orphan = FakeSession(activityID: UUID(fixture: 900))
         health.answerRecovery(.success(orphan))
         let recovering = Task { await endOrphans() }
-        await settle()
+        // Recovery ends the orphan, then waits on the clock for it to report its end.
+        await clock.waitForSleeps()
         #expect(orphan.calls.value == [.observe, .end])
 
-        await clock.waitForSleeper()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        clock.advance(by: WorkoutSessions.recoveryTimeout)
         await recovering.value
 
         #expect(orphan.calls.value == [.observe, .end, .release])
@@ -372,7 +369,7 @@ struct WorkoutSessionsTests {
         let session = health.session(0)
 
         session.report(event)
-        await settle()
+        await session.waitUntilHandled()
         await start()
 
         let ended: [FakeSession.Call] = if case .failed = event { [.end, .release] } else { [.release] }
@@ -384,11 +381,10 @@ struct WorkoutSessionsTests {
     func test_startingSession_failsOrEnds_savesNothing(event: SessionEvent) async {
         await start()
         health.session(0).report(event)
-        await settle()
+        await health.session(0).waitUntilHandled()
 
         await sync(track())
         await end(track: track())
-        await settle()
 
         #expect(health.saved.value.isEmpty)
     }
@@ -404,7 +400,7 @@ struct WorkoutSessionsTests {
         let session = await running()
 
         session.report(event)
-        await settle()
+        await session.waitUntilHandled()
         await start()
 
         let ended: [FakeSession.Call] = if case .failed = event { [.end, .release] } else { [.release] }
@@ -417,7 +413,7 @@ struct WorkoutSessionsTests {
         await start()
         let session = health.session(0)
         let ending = Task { await sessions.endAll(at: moment(10), clock: clock) }
-        await settle()
+        await waitForEndAll()
 
         session.report(.failed(FakeError()))
         await ending.value
@@ -431,7 +427,7 @@ struct WorkoutSessionsTests {
         let session = health.session(0)
 
         session.report(.changed(state, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         await end()
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
@@ -443,7 +439,7 @@ struct WorkoutSessionsTests {
 
         session.report(.changed(.running, date: moment(0)))
         session.report(.changed(.paused, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         await end(at: moment(10))
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end])
@@ -463,10 +459,19 @@ struct WorkoutSessionsTests {
     @Test
     func test_start_concurrentForOneOwnerDuringRecovery_createsOneSession() async {
         let recovering = Task { await endOrphans() }
-        await settle()
-        let first = Task { await start() }
-        let second = Task { await start() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
+        // One start reserves the owner and waits for recovery; the other finds the reservation and returns.
+        let returned = Observed(0)
+        let first = Task {
+            await start()
+            returned.withValue { $0 += 1 }
+        }
+        let second = Task {
+            await start()
+            returned.withValue { $0 += 1 }
+        }
+        await clock.waitForSleeps()
+        await returned.wait { $0 == 1 }
 
         health.answerRecovery(.success(nil))
         await recovering.value
@@ -479,13 +484,12 @@ struct WorkoutSessionsTests {
     @Test
     func test_start_duringSlowRecovery_returnsAtTheTimeoutWithoutAwaitingIt() async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
+        await clock.waitForSleeps()
         #expect(health.created.value.isEmpty)
 
-        await clock.waitForSleeper()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         #expect(health.created.value.count == 1)
 
@@ -496,9 +500,9 @@ struct WorkoutSessionsTests {
     @Test
     func test_start_cancelledWhileWaitingForRecovery_stopsWaitingAndRecoveryGoesOn() async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
+        await clock.waitForSleeps()
 
         starting.cancel()
         await starting.value
@@ -513,17 +517,16 @@ struct WorkoutSessionsTests {
     @Test
     func test_start_againAfterAFailureDuringRecovery_admitsOneSession() async {
         let recovering = Task { await endOrphans() }
-        await settle()
+        await health.recoveries.wait { $0 == 1 }
         let starting = Task { await start() }
-        await settle()
-        await clock.waitForSleeper()
-        await clock.advance(by: WorkoutSessions.recoveryTimeout)
+        await clock.waitForSleeps()
+        clock.advance(by: WorkoutSessions.recoveryTimeout)
         await starting.value
         health.session(0).report(.failed(HKError(.errorAnotherWorkoutSessionStarted)))
-        await settle()
+        await health.session(0).waitUntilHandled()
         // The timer returns to the active scene and starts again, waiting for recovery like the first start.
         let again = Task { await start() }
-        await settle()
+        await clock.waitForSleeps()
 
         health.answerRecovery(.success(nil))
         await recovering.value
@@ -543,13 +546,15 @@ struct WorkoutSessionsTests {
             await sessions.endAll(at: moment(10), clock: clock)
             isDone.setValue(true)
         }
-        await settle()
+        await waitForEndAll()
         #expect(starting.calls.value == [.observe, .start(moment(0)), .end])
         #expect(runningSession.calls.value == [.observe, .start(moment(1)), .stop(moment(10)), .end])
 
         starting.report(.changed(.running, date: moment(0)))
         runningSession.report(.changed(.ended, date: moment(0)))
-        await settle()
+        await starting.waitUntilHandled()
+        await runningSession.waitUntilHandled()
+        await waitForEndAll()
         #expect(starting.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end])
         #expect(!isDone.value)
 
@@ -563,14 +568,14 @@ struct WorkoutSessionsTests {
         await start()
         let session = health.session(0)
         let ending = Task { await sessions.endAll(at: moment(10), clock: clock) }
-        await settle()
+        await waitForEndAll()
 
         ending.cancel()
         await ending.value
         #expect(session.calls.value == [.observe, .start(moment(0)), .end])
 
         session.report(.changed(.ended, date: moment(0)))
-        await settle()
+        await session.waitUntilHandled()
         #expect(session.calls.value.last == .release)
     }
 }
