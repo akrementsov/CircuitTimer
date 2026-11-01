@@ -52,3 +52,4 @@ Next: CT-6, in-app purchase with StoreKit 2; then CT-7, the App Store release wi
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
 - [x] **CT-13** — the timer's stage list at accessibility text sizes: a stage's name wraps, with its time under it, instead of being cut to a few letters
+- [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together once on CI (run 41304027831): the shared state held the reducer's write, the `UserDefaults` suite the value before it. Not reproduced locally; the checks now report the suite on a mismatch

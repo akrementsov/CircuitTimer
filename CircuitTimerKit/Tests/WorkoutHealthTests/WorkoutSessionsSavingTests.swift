@@ -13,7 +13,7 @@ extension WorkoutSessionsTests {
         await sync(track(stopsAt: 5))
 
         await end(track: track(stopsAt: 100), at: moment(10))
-        await settle()
+        await health.saved.wait { !$0.isEmpty }
 
         #expect(health.saved.value == [workout(0, 10)])
     }
@@ -25,15 +25,17 @@ extension WorkoutSessionsTests {
         health.holdSaves()
 
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
+        await health.saved.wait { !$0.isEmpty }
         #expect(health.saved.value == [workout(0, 10)])
 
         if endsFirst {
             session.report(.changed(.ended, date: moment(10)))
+            await session.waitUntilHandled()
         } else {
             health.releaseSaves()
+            await health.finishedSaves.wait { $0 == 1 }
         }
-        await settle()
         #expect(!ending.isDone.value)
 
         if endsFirst {
@@ -51,13 +53,13 @@ extension WorkoutSessionsTests {
 
         if byEndAll {
             let ending = endAllInTheBackground(at: moment(10))
-            await settle()
+            await waitForEndAll()
             session.report(.changed(.ended, date: moment(10)))
             await ending.task.value
         } else {
             await end(at: moment(10))
             session.report(.changed(.ended, date: moment(10)))
-            await settle()
+            await session.waitUntilHandled()
         }
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end, .release])
@@ -70,7 +72,7 @@ extension WorkoutSessionsTests {
         let session = await running()
 
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
         session.report(.changed(.ended, date: moment(10)))
         await ending.task.value
 
@@ -84,10 +86,9 @@ extension WorkoutSessionsTests {
         await sync(track())
 
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
         session.report(.changed(.ended, date: moment(10)))
         await ending.task.value
-        await settle()
 
         #expect(session.calls.value == [.observe, .start(moment(0)), .stop(moment(10)), .end, .release])
         #expect(health.saved.value == [workout(0, 10)])
@@ -102,7 +103,7 @@ extension WorkoutSessionsTests {
         await sync(track(from: 1), owner: Self.other)
 
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
         first.report(.changed(.ended, date: moment(10)))
         second.report(.changed(.ended, date: moment(10)))
         await ending.task.value
@@ -124,7 +125,8 @@ extension WorkoutSessionsTests {
         health.holdSaves()
 
         session.report(event)
-        await settle()
+        await session.waitUntilHandled()
+        await health.saved.wait { !$0.isEmpty }
         // A failure carries no date: the workout ends at `now()`.
         let lost = if case .failed = event { workout(0, 1_000) } else { workout(0, 30) }
         let ended: [FakeSession.Call] = if case .changed(.ended, _) = event { [.release] } else { [.end, .release] }
@@ -132,13 +134,12 @@ extension WorkoutSessionsTests {
         #expect(session.calls.value == [.observe, .start(moment(0))] + ended)
 
         let ending = endAllInTheBackground(at: moment(40))
-        await settle()
+        await waitForEndAll()
         #expect(!ending.isDone.value)
 
         health.releaseSaves()
         await ending.task.value
         await end(track: track(stopsAt: 2_000), at: moment(50))
-        await settle()
         #expect(health.saved.value == [lost])
     }
 
@@ -150,7 +151,8 @@ extension WorkoutSessionsTests {
         await sync(paused)
 
         session.report(.changed(.ended, date: moment(30)))
-        await settle()
+        await session.waitUntilHandled()
+        await health.saved.wait { !$0.isEmpty }
 
         #expect(health.saved.value == [workout(0, 30)])
     }
@@ -165,7 +167,7 @@ extension WorkoutSessionsTests {
         await sync(track(from: 5), revision: 2)
 
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
         session.report(.changed(.ended, date: moment(10)))
         await ending.task.value
 
@@ -176,12 +178,13 @@ extension WorkoutSessionsTests {
     func test_lostBeforeAnyTrack_firstSyncSavesUpToTheLossAndNothingLaterSaves() async {
         let session = await running()
         session.report(.changed(.ended, date: moment(30)))
-        await settle()
+        await session.waitUntilHandled()
 
         await sync(track(from: 0), revision: 1)
         await sync(track(from: 5), revision: 2)
         await end(track: track(from: 10), at: moment(50))
-        await settle()
+        // Waits for every save that started, so a second one would show.
+        await endAll(at: moment(60))
 
         #expect(health.saved.value == [workout(0, 30)])
     }
@@ -190,7 +193,7 @@ extension WorkoutSessionsTests {
     func test_lostBeforeAnyTrack_endSavesUpToTheLossAndALateSyncNothing() async {
         let session = await running()
         session.report(.changed(.ended, date: moment(30)))
-        await settle()
+        await session.waitUntilHandled()
 
         await end(track: track(from: 10), at: moment(50))
         await sync(track(from: 0))
@@ -207,7 +210,7 @@ extension WorkoutSessionsTests {
 
         await end(track: track(from: 0), at: moment(10))
         await end(Self.other, track: track(from: 1), at: moment(20))
-        await settle()
+        await health.saved.wait { $0.count == 2 }
 
         #expect(health.saved.value.count == 2)
         #expect(Set(health.saved.value) == [workout(0, 10), workout(1, 20)])
@@ -221,13 +224,12 @@ extension WorkoutSessionsTests {
         await sync(track())
         health.holdSaves()
         let ending = endAllInTheBackground(at: moment(10))
-        await settle()
+        await waitForEndAll()
         session.report(.changed(.ended, date: moment(10)))
-        await settle()
+        await session.waitUntilHandled()
 
         ending.task.cancel()
         await ending.task.value
-        await settle()
         #expect(health.finishedSaves.value == 0)
 
         health.releaseSaves()

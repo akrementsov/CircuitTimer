@@ -67,6 +67,7 @@ let package = Package(
         .testTarget(
             name: "AppFeatureTests",
             dependencies: [
+                "TestSupport",
                 "TimerPreferences",
                 "BackgroundNotifications",
                 "BackgroundExecution",
@@ -137,6 +138,7 @@ let package = Package(
             name: "BackgroundNotificationsTests",
             dependencies: [
                 "BackgroundNotifications",
+                "TestSupport",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
@@ -229,6 +231,11 @@ let package = Package(
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
             ],
             resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        // Clocks and values that tests wait on without yielding; linked by test targets only, so it is no product.
+        .target(
+            name: "TestSupport",
             swiftSettings: strictSettings
         ),
         // The channel between the iPhone app and the watch app: its wire format, the WatchConnectivity bridge and the
@@ -329,6 +336,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutActivityTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -343,6 +351,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutHealthTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutHealth",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],

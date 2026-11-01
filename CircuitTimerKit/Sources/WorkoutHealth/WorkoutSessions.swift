@@ -61,8 +61,9 @@ actor WorkoutSessions {
     private var hasRecovered = false
     private var isRecovering = false
     private var recoveryWaiters: [AsyncStream<Void>.Continuation] = []
-    /// `endAll` callers waiting for the ending sessions to report their end and the saves to finish.
-    private var endingWaiters: [AsyncStream<Void>.Continuation] = []
+    /// `endAll` callers waiting for the ending sessions to report their end and the saves to finish. Readable, so a
+    /// test can tell an `endAll` that waits from one that has not run yet.
+    private(set) var endingWaiters: [AsyncStream<Void>.Continuation] = []
 
     init(transport: SessionTransport, gate: TerminationGate, now: @escaping @Sendable () -> Date) {
         self.transport = transport
