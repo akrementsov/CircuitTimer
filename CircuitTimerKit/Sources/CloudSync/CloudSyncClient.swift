@@ -49,9 +49,9 @@ extension CloudSyncClient: DependencyKey {
             containerID: { CloudKitContainerID.inMainBundle() },
             accountStatus: { try await CKContainer(identifier: $0).accountStatus() },
             prepareInputs: {
-                // With the switch off or no container the store stays local whatever StoreKit says.
+                // With the switch off the store stays local whatever StoreKit says.
                 @SharedReader(.iCloudSync) var isICloudSyncOn
-                guard isICloudSyncOn, CloudKitContainerID.inMainBundle() != nil else { return }
+                guard isICloudSyncOn else { return }
 
                 @Dependency(\.purchases) var purchases
                 if await purchases.refreshStatus(.seconds(1)) == .unknown {

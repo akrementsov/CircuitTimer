@@ -125,14 +125,13 @@ expect_status 1
 expect_in "$work/out" "check-brand-colors: $brand: "
 expect_not_in "$work/out" "Traceback"
 
-finish
-
 describe "a logo copy that differs from the launch logo"
 tree
 logo "$app_logo" "#FFFFFF"
 check
 expect_status 1
 expect_in "$work/out" "check-brand-colors: $app_logo: not an exact copy of $launch_logo"
+expect_not_in "$work/out" "Traceback"
 
 describe "a missing logo copy"
 tree
@@ -140,3 +139,6 @@ rm "$work/tree/$app_logo"
 check
 expect_status 1
 expect_in "$work/out" "check-brand-colors: $app_logo: "
+expect_not_in "$work/out" "Traceback"
+
+finish

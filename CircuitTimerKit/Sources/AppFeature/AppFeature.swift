@@ -370,6 +370,9 @@ public struct AppFeature: Sendable {
             case .purchaseSheetDismissed:
                 return showWhatWaitedForPresentation(&state)
             case .timerCoverAppeared:
+                // A workout came between a write that failed under the purchase sheet and its alert; the list has been
+                // read again since, so the alert would only puzzle.
+                state.hasPendingMutationAlert = false
                 if case .presenting = state.runRestore { state.runRestore = .resolved }
                 state.isTimerCoverUp = true
                 // Under the cover, so the pop is not seen; closing the timer lands on the list.
@@ -588,7 +591,7 @@ public struct AppFeature: Sendable {
                         : .send(.internal(.timerPresentationFailed))
                     return .merge(end, notice)
                 }
-                return .merge(end, discardRunRecord(), scheduleWhatWaited(state))
+                return .merge(end, discardRunRecord())
             case .resumeRun:
                 // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
                 state.runRestore = .resolved

@@ -13,7 +13,7 @@ One non-consumable in-app purchase, the full version (`com.akrementsov.circuitti
 
 ## iCloud and the launch
 
-The store mirrors to iCloud only with the full version. The launch decides once per process: with the switch on and a container named, `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
+The store mirrors to iCloud only with the full version. The launch decides once per process: with the switch on, `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
 
 ## Where the app asks
 

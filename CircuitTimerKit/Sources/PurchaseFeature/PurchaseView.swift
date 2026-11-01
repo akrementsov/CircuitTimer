@@ -169,8 +169,8 @@ public struct PurchaseView: View {
         }
         .font(.token(.button))
         .foregroundStyle(.text(.secondary))
-        // The explicit color would otherwise hide that the button is disabled.
-        .opacity(store.isBusy ? .token(opacity: .disabled) : 1)
+        // The explicit color would otherwise hide that the button is disabled; its own spinner stays bright.
+        .opacity(store.isBusy && !store.isRestoring ? .token(opacity: .disabled) : 1)
         .frame(maxWidth: .infinity, minHeight: .token(size: .row))
         .contentShape(Rectangle())
         .accessibilityLabel(Text(store.isRestoring ? "purchase.restoring" : "purchase.restore", bundle: .module))
