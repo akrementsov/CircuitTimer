@@ -1,5 +1,6 @@
 /// What the watch hears from the iPhone, apart from the answers to its own requests. A context and a message stay
-/// apart: CT-9-3 lets only a message or a reply confirm a running clock.
+/// apart: only a reply confirms a running clock; a message may carry a confirmed clock on to newer content, a context
+/// never does.
 public enum PhoneLinkEvent: Equatable, Sendable {
     case status(LinkStatus)
     case context(PhoneState)

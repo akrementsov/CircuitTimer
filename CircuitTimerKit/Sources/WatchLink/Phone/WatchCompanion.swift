@@ -34,16 +34,43 @@ actor WatchCompanion {
     }
 
     func publishCatalog(revision: Int, catalog: CatalogState) async {
-        let outcome = await ledger.publish(revision: revision, catalog: catalog, at: now())
+        push(await ledger.publish(revision: revision, catalog: catalog, at: now()))
+    }
+
+    func publishRun(revision: Int, run: WatchRun) async {
+        push(await ledger.publishRun(revision: revision, run: run, at: now()), withCatalog: false)
+    }
+
+    /// Stops publishing the owner's run at once, without waiting for an actor hop or the queue.
+    nonisolated func markEnded(_ owner: UUID) {
+        ledger.markEnded(owner)
+    }
+
+    /// Numbers the state without the owner's run and sends it to an open watch.
+    func end(owner: UUID) async {
+        push(await ledger.end(owner: owner, at: now()), withCatalog: false)
+    }
+
+    /// Stops every publication synchronously, for termination.
+    nonisolated func closeGate() {
+        ledger.closeGate()
+    }
+
+    /// Writes the last state, without any run, and sends it to an open watch.
+    func finishTermination() async {
+        push(await ledger.finishTermination(at: now()), withCatalog: false)
+    }
+
+    private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) {
         switch outcome {
             case let .written(state), let .pending(state):
-                push(state)
+                push(withCatalog ? state : state.withoutCatalog)
             case .skipped:
                 break
         }
     }
 
-    /// An open watch app gets the list at once; a closed one reads the context when it opens.
+    /// An open watch app gets the state at once; a closed one reads the context when it opens.
     private func push(_ state: PhoneState) {
         guard transport.status().isReachable else { return }
         do {
@@ -59,7 +86,7 @@ actor WatchCompanion {
            let envelope = Self.decodeRequest(data) {
             switch envelope.request {
                 case let .refresh(knownCatalogDigest):
-                    let state = await ledger.reply(knownCatalogDigest: knownCatalogDigest, at: now())
+                    let state = ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: nil, at: now())
                     reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .state(state))
             }
         } else {
@@ -80,5 +107,22 @@ actor WatchCompanion {
             Logger.watchLink.error("A request of our version did not decode: \(String(reflecting: error), privacy: .public)")
             return nil
         }
+    }
+}
+
+private extension PhoneState {
+    /// The state as a message about the run carries it: the catalog stays in the context and in replies, the digest
+    /// tells the watch whether its list is still current.
+    var withoutCatalog: PhoneState {
+        PhoneState(
+            processID: processID,
+            sequence: sequence,
+            publishedAt: publishedAt,
+            catalog: nil,
+            catalogDigest: catalogDigest,
+            run: run,
+            isRunLive: isRunLive,
+            isRunTooLarge: isRunTooLarge
+        )
     }
 }

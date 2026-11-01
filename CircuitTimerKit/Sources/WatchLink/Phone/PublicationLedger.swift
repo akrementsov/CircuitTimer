@@ -2,38 +2,86 @@ import Foundation
 import os
 
 enum PublishOutcome: Equatable, Sendable {
-    /// Not newer than a publication already handled, or the same catalog already written.
+    /// Not newer than a publication already handled, of an owner that ended, after the gate closed, or the same
+    /// state already written.
     case skipped
     case written(PhoneState)
     /// Numbered but not written yet: no watch, an inactive session or a failed write. It is written again later.
     case pending(PhoneState)
 }
 
-/// The iPhone's published state. It numbers each state and writes the context in one section of its serial queue, so
-/// the order of the numbers is the order of the writes and an older state never replaces a newer one. CT-9-3 writes
-/// its termination state in a section of the same queue.
+/// The iPhone's published state: the catalog and the running workout in one value. It numbers each state and writes
+/// the context in one section of its serial queue, so the order of the numbers is the order of the writes and an
+/// older state never replaces a newer one.
 ///
-/// Every section is short and never waits for the main thread; callers await it without blocking a thread.
+/// Every section is short and never waits for the main thread; callers await it without blocking a thread. What a
+/// reply and the gates need is also kept under a lock, so a reply never waits for a context write.
 final class PublicationLedger: @unchecked Sendable {
-    // Unchecked: every stored variable below is touched only on `queue`.
+    /// What a reply reads and what closes publication, outside the queue.
+    private struct Shared: Sendable {
+        /// The newest numbered state whose write was decided: written, or pending.
+        var latest: PhoneState?
+        var endedOwners: Set<UUID> = []
+        var isGateClosed = false
+    }
+
+    // Unchecked: every stored variable below `shared` is touched only on `queue`.
     private let queue = DispatchQueue(label: "WatchLink.PublicationLedger")
     private let processID: UUID
     private let transport: LinkTransport
-    private var lastRevision = 0
+    private let shared = OSAllocatedUnfairLock(initialState: Shared())
+    private var catalogRevision = 0
+    private var runRevision = 0
     private var sequence = 0
     /// The newest numbered state, written or not.
     private var prepared: PhoneState?
     private var isWritten = false
+    /// The owner whose run does not fit in a transfer; its runs are not published until it ends.
+    private var tooLargeOwner: UUID?
 
     init(processID: UUID, transport: LinkTransport) {
         self.processID = processID
         self.transport = transport
     }
 
-    /// Publishes the catalog of `revision` unless a newer revision was published. A catalog too large for one write
-    /// is cut to what fits; if WatchConnectivity still refuses it, half of that; then `.unavailable(.tooLarge)`.
+    /// Publishes the catalog of `revision` unless a newer revision was published. The catalog is cut to what fits with
+    /// room for a run; if WatchConnectivity still refuses the state, half of that; then `.unavailable(.tooLarge)`.
     func publish(revision: Int, catalog: CatalogState, at now: Date) async -> PublishOutcome {
-        await onQueue { self.publishOnQueue(revision: revision, catalog: catalog, at: now) }
+        await onQueue { self.publishCatalogOnQueue(revision: revision, catalog: catalog, at: now) }
+    }
+
+    /// Publishes the run of `revision` with the current catalog, unless a newer run was published or its owner ended.
+    func publishRun(revision: Int, run: WatchRun, at now: Date) async -> PublishOutcome {
+        await onQueue { self.publishRunOnQueue(revision: revision, run: run, at: now) }
+    }
+
+    /// Marks the owner ended at once: no section numbers its run from now on. `end(owner:at:)` then numbers the state
+    /// without it.
+    func markEnded(_ owner: UUID) {
+        shared.withLock { _ = $0.endedOwners.insert(owner) }
+    }
+
+    /// Numbers the state without the run of `owner`, if it is the one published.
+    func end(owner: UUID, at now: Date) async -> PublishOutcome {
+        await onQueue {
+            guard self.prepared?.run?.owner == owner || self.tooLargeOwner == owner else { return .skipped }
+            self.tooLargeOwner = nil
+            return self.commit([self.prepared?.catalog], run: nil, at: now)
+        }
+    }
+
+    /// Closes publication synchronously, for termination: from now on only `finishTermination(at:)` writes.
+    func closeGate() {
+        shared.withLock { $0.isGateClosed = true }
+    }
+
+    /// Numbers and writes the state without any run, the last one this process writes.
+    func finishTermination(at now: Date) async -> PublishOutcome {
+        await onQueue {
+            guard self.prepared?.run != nil || self.tooLargeOwner != nil else { return .skipped }
+            self.tooLargeOwner = nil
+            return self.commit([self.prepared?.catalog], run: nil, at: now, isTerminal: true)
+        }
     }
 
     /// Writes the newest state again if its write did not happen, after activation or a change of watch. A state
@@ -41,16 +89,25 @@ final class PublicationLedger: @unchecked Sendable {
     /// Returns the state a fallback numbered, so an open watch can get it at once; `nil` when nothing new was numbered.
     func writeLatest() async -> PhoneState? {
         await onQueue {
-            guard let prepared = self.prepared, !self.isWritten else { return nil }
+            guard !self.isGateClosed, let prepared = self.prepared, !self.isWritten else { return nil }
+            if let owner = prepared.run?.owner, !self.isOpen(for: owner) {
+                // The owner ended before its own section ran: the state without its run replaces it.
+                switch self.commit([prepared.catalog], run: nil, at: prepared.publishedAt) {
+                    case let .written(state), let .pending(state):
+                        return state
+                    case .skipped:
+                        return nil
+                }
+            }
             switch self.write(prepared) {
                 case .written:
-                    self.isWritten = true
+                    self.adopt(prepared, isWritten: true)
                     return nil
                 case .pending:
                     return nil
                 case .tooLarge:
-                    guard let catalog = prepared.catalog else { return nil }
-                    switch self.commit(Self.fallbacks(after: catalog), at: prepared.publishedAt) {
+                    let catalogs: [CatalogState?] = prepared.catalog.map(Self.fallbacks) ?? [nil]
+                    switch self.commit(catalogs, run: prepared.run, at: prepared.publishedAt) {
                         case let .written(state), let .pending(state):
                             return state
                         case .skipped:
@@ -66,20 +123,32 @@ final class PublicationLedger: @unchecked Sendable {
         await onQueue { self.isWritten = false }
     }
 
-    /// The state to answer a request with: the catalog only if the watch's digest differs. A process that has not
-    /// published yet knows no catalog and says so with a `nil` digest.
-    func reply(knownCatalogDigest: String?, at now: Date) async -> PhoneState {
-        await onQueue {
-            guard let prepared = self.prepared else {
-                return PhoneState(processID: self.processID, sequence: 0, publishedAt: now, catalog: nil, catalogDigest: nil)
+    /// The owner of the run the newest decided state carries.
+    func runOwner() -> UUID? {
+        shared.withLock { $0.latest?.run?.owner }
+    }
+
+    /// The state to answer a request with, without waiting for the queue: the catalog only if the watch's digest
+    /// differs. The run is live only when its own timer answered: `answeredBy` is that timer's owner, still open. A
+    /// process that has published nothing knows no catalog and says so with a `nil` digest.
+    func reply(knownCatalogDigest: String?, answeredBy owner: UUID?, at now: Date) -> PhoneState {
+        shared.withLock { shared in
+            guard let latest = shared.latest else {
+                return PhoneState(processID: processID, sequence: 0, publishedAt: now, catalog: nil, catalogDigest: nil)
             }
+            let isRunLive = owner.map { owner in
+                latest.run?.owner == owner && !shared.isGateClosed && !shared.endedOwners.contains(owner)
+            } ?? false
             // Answered now: the iPhone still had this list when it answered, whether it sends the list or confirms it.
             return PhoneState(
-                processID: self.processID,
-                sequence: prepared.sequence,
+                processID: processID,
+                sequence: latest.sequence,
                 publishedAt: now,
-                catalog: prepared.catalogDigest == knownCatalogDigest ? nil : prepared.catalog,
-                catalogDigest: prepared.catalogDigest
+                catalog: latest.catalogDigest == knownCatalogDigest ? nil : latest.catalog,
+                catalogDigest: latest.catalogDigest,
+                run: latest.run,
+                isRunLive: isRunLive,
+                isRunTooLarge: latest.isRunTooLarge
             )
         }
     }
@@ -96,19 +165,61 @@ final class PublicationLedger: @unchecked Sendable {
         case tooLarge
     }
 
-    private func publishOnQueue(revision: Int, catalog: CatalogState, at now: Date) -> PublishOutcome {
-        guard revision > lastRevision else { return .skipped }
-        lastRevision = revision
-        return commit(Self.fitted(catalog, processID: processID, at: now), at: now)
+    private var isGateClosed: Bool {
+        shared.withLock { $0.isGateClosed }
     }
 
-    /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large.
-    private func commit(_ candidates: [CatalogState], at now: Date) -> PublishOutcome {
-        var candidates = candidates
-        while let candidate = candidates.first {
-            candidates.removeFirst()
-            guard let digest = Self.digest(of: candidate) else { continue }
-            if digest == prepared?.catalogDigest, isWritten {
+    private func isOpen(for owner: UUID) -> Bool {
+        shared.withLock { !$0.isGateClosed && !$0.endedOwners.contains(owner) }
+    }
+
+    private func publishCatalogOnQueue(revision: Int, catalog: CatalogState, at now: Date) -> PublishOutcome {
+        guard revision > catalogRevision else { return .skipped }
+        catalogRevision = revision
+        return commit(Self.fitted(catalog, processID: processID, at: now), run: prepared?.run, at: now)
+    }
+
+    private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
+        guard revision > runRevision, isOpen(for: run.owner) else { return .skipped }
+        runRevision = revision
+        if let tooLargeOwner {
+            // A run that did not fit stays hidden until its owner ends, so the watch does not flicker between stages
+            // whose names fit and stages whose names do not.
+            guard tooLargeOwner != run.owner else { return .skipped }
+            self.tooLargeOwner = nil
+        }
+        let catalogs: [CatalogState?] = prepared?.catalog.map { [$0] + Self.fallbacks(after: $0) } ?? [nil]
+        return commit(catalogs, run: run, at: now)
+    }
+
+    /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large; the run is dropped and
+    /// its owner marked as too large when even the last catalog does not fit with it.
+    private func commit(
+        _ catalogs: [CatalogState?],
+        run: WatchRun?,
+        at now: Date,
+        isTerminal: Bool = false
+    ) -> PublishOutcome {
+        guard isTerminal || !isGateClosed else { return .skipped }
+        // A section that started before the owner ended must not number its run again.
+        var run = run.flatMap { isOpen(for: $0.owner) ? $0 : nil }
+        if let owner = tooLargeOwner, !isOpen(for: owner) {
+            tooLargeOwner = nil
+        }
+        if let candidate = run, !Self.fits(catalog: catalogs.first.flatMap { $0 }, run: candidate, processID: processID, at: now) {
+            markTooLarge(candidate.owner)
+            run = nil
+        }
+        for catalog in catalogs {
+            let digest: String?
+            if let catalog {
+                guard let encoded = Self.digest(of: catalog) else { continue }
+                digest = encoded
+            } else {
+                digest = prepared?.catalogDigest
+            }
+            if isWritten, let prepared, prepared.catalogDigest == digest, prepared.run == run,
+               prepared.isRunTooLarge == (tooLargeOwner != nil) {
                 return .skipped
             }
             sequence += 1
@@ -116,28 +227,47 @@ final class PublicationLedger: @unchecked Sendable {
                 processID: processID,
                 sequence: sequence,
                 publishedAt: now,
-                catalog: candidate,
-                catalogDigest: digest
+                catalog: catalog,
+                catalogDigest: digest,
+                run: run,
+                isRunLive: run != nil,
+                isRunTooLarge: tooLargeOwner != nil
             )
-            switch write(state) {
+            switch write(state, isTerminal: isTerminal) {
                 case .written:
-                    prepared = state
-                    isWritten = true
+                    adopt(state, isWritten: true)
                     return .written(state)
                 case .pending:
-                    prepared = state
-                    isWritten = false
+                    adopt(state, isWritten: false)
                     return .pending(state)
                 case .tooLarge:
                     continue
             }
+        }
+        if let run {
+            // WatchConnectivity refused every catalog with the run: the run does not travel at all.
+            markTooLarge(run.owner)
+            return commit([catalogs.last.flatMap { $0 }], run: nil, at: now, isTerminal: isTerminal)
         }
         // Even `.unavailable(.tooLarge)` was refused, which a payload of a few hundred bytes should never be. The
         // context still holds the previous state, so replies keep answering with it rather than contradict it.
         return .skipped
     }
 
-    private func write(_ state: PhoneState) -> WriteResult {
+    private func adopt(_ state: PhoneState, isWritten: Bool) {
+        prepared = state
+        self.isWritten = isWritten
+        shared.withLock { $0.latest = state }
+    }
+
+    private func markTooLarge(_ owner: UUID) {
+        guard tooLargeOwner != owner else { return }
+        tooLargeOwner = owner
+        Logger.watchLink.error("A running workout does not fit in a transfer; the watch shows that it runs on the iPhone")
+    }
+
+    private func write(_ state: PhoneState, isTerminal: Bool = false) -> WriteResult {
+        guard isTerminal || !isGateClosed else { return .pending }
         let data: Data
         do {
             data = try WireCoding.encode(state)
@@ -154,16 +284,18 @@ final class PublicationLedger: @unchecked Sendable {
         }
     }
 
-    /// The catalog cut to the envelope limit, then half of that, then `.unavailable(.tooLarge)`: the order in which a
-    /// refused write falls back. A list of which not even one workout fits is too large, never an empty list.
-    private static func fitted(_ catalog: CatalogState, processID: UUID, at now: Date) -> [CatalogState] {
+    /// The catalog cut to the envelope limit less the run's reserve, then half of that, then
+    /// `.unavailable(.tooLarge)`: the order in which a refused write falls back. A list of which not even one workout
+    /// fits is too large, never an empty list. The reserve keeps the cut the same whether a run is published or not.
+    private static func fitted(_ catalog: CatalogState, processID: UUID, at now: Date) -> [CatalogState?] {
         guard case let .loaded(full) = catalog else { return [catalog] }
+        let limit = WatchLinkSchema.envelopeLimit - WatchLinkSchema.runReserve
         var low = 0
         var high = full.entries.count
         // The largest prefix whose state fits; an empty list always does.
         while low < high {
             let middle = (low + high + 1) / 2
-            if fits(.loaded(full.prefix(middle)), processID: processID, at: now) {
+            if fits(catalog: .loaded(full.prefix(middle)), run: nil, processID: processID, at: now, limit: limit) {
                 low = middle
             } else {
                 high = middle - 1
@@ -175,25 +307,34 @@ final class PublicationLedger: @unchecked Sendable {
     }
 
     /// What follows a catalog WatchConnectivity refused as too large.
-    private static func fallbacks(after catalog: CatalogState) -> [CatalogState] {
+    private static func fallbacks(after catalog: CatalogState) -> [CatalogState?] {
         guard case let .loaded(refused) = catalog, refused.entries.count > 1 else { return [.unavailable(.tooLarge)] }
         return [.loaded(refused.prefix(refused.entries.count / 2)), .unavailable(.tooLarge)]
     }
 
-    private static func fits(_ catalog: CatalogState, processID: UUID, at now: Date) -> Bool {
-        // The largest number and a full digest in a reply's envelope, the longest way a state travels.
+    /// Whether the state fits in the longest way it travels: a reply's envelope with the largest number and a full
+    /// digest. The context and a message carry the state alone, which is smaller.
+    private static func fits(
+        catalog: CatalogState?,
+        run: WatchRun?,
+        processID: UUID,
+        at now: Date,
+        limit: Int = WatchLinkSchema.envelopeLimit
+    ) -> Bool {
         let probe = PhoneState(
             processID: processID,
             sequence: .max,
             publishedAt: now,
             catalog: catalog,
-            catalogDigest: String(repeating: "0", count: 64)
+            catalogDigest: String(repeating: "0", count: 64),
+            run: run,
+            isRunLive: run != nil
         )
         do {
             let reply = WatchReplyEnvelope(requestID: processID, reply: .state(probe))
-            return try WireCoding.encode(reply).count <= WatchLinkSchema.envelopeLimit
+            return try WireCoding.encode(reply).count <= limit
         } catch {
-            Logger.watchLink.error("A catalog did not encode: \(String(reflecting: error), privacy: .public)")
+            Logger.watchLink.error("A state did not encode: \(String(reflecting: error), privacy: .public)")
             return false
         }
     }
