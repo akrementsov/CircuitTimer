@@ -36,7 +36,6 @@ extension WorkoutSessionsTests {
             health.releaseSaves()
             await health.finishedSaves.wait { $0 == 1 }
         }
-        await waitForEndAll()
         #expect(!ending.isDone.value)
 
         if endsFirst {
@@ -228,7 +227,6 @@ extension WorkoutSessionsTests {
         await waitForEndAll()
         session.report(.changed(.ended, date: moment(10)))
         await session.waitUntilHandled()
-        await waitForEndAll()
 
         ending.task.cancel()
         await ending.task.value

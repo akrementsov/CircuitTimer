@@ -242,8 +242,8 @@ Log with `os.Logger` and move the UI to an explicit state. Do not log expected o
 ## Tests
 
 - Swift Testing (`@Test`, `#expect`, `#require`); `@MainActor` suites for features.
-- `TestStore` is exhaustive by default; override dependencies per test; use `TestClock`, never real sleeps.
-- Outside a `TestStore`, wait for a condition, never for yields: `Task.megaYield()` and `TestClock` yield to background-priority tasks, which the CI runner starves for seconds at a time, and an `advance` before a sleep registers never wakes it. Use `TestSupport`'s `ManualClock` (`waitForSleeps` before `advance`), `Observed`, and fakes that report what they were asked. A `TestStore` runs its effects on the main serial executor, where yields keep their order.
+- `TestStore` is exhaustive by default; override dependencies per test; never real sleeps.
+- Wait for a condition, never for a number of yields: `Task.megaYield()` and `TestClock` yield to background-priority tasks, which the CI runner starves for seconds at a time, and an `advance` before a sleep registers never wakes it. Use `TestSupport`'s `ManualClock` (`waitForSleeps` before `advance`), `Observed`, and fakes that report what they were asked; where nothing outside the code shows the condition, poll it with `Task.yield()` at the test's own priority. `TestClock` and `megaYield` stay only where everything runs on the main serial executor, which keeps yields in order: inside a `TestStore` or `withMainSerialExecutor`.
 - Name tests `test_method_state_expected`.
 - Declare a test target only together with a committed source file: SwiftPM rejects a declared target whose directory is missing on a clean checkout. Test targets use the same `strictSettings`.
 - `WorkoutRun` keeps `position` and `cursor` readable through `@testable import` so tests can check its invariants.

@@ -555,7 +555,6 @@ struct WorkoutSessionsTests {
         runningSession.report(.changed(.ended, date: moment(0)))
         await starting.waitUntilHandled()
         await runningSession.waitUntilHandled()
-        await waitForEndAll()
         #expect(starting.calls.value == [.observe, .start(moment(0)), .end, .stop(Self.now), .end])
         #expect(!isDone.value)
 
