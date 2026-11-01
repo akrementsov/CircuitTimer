@@ -112,6 +112,7 @@
 		C7A100000000000000000006 /* CircuitTimer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CircuitTimer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7A100000000000000000007 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 		C7A100000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C7A100000000000000000094 /* CircuitTimer.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = CircuitTimer.storekit; sourceTree = "<group>"; };
 		C7A100000000000000000090 /* CircuitTimer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CircuitTimer.entitlements; sourceTree = "<group>"; };
 		C7A100000000000000000040 /* CircuitTimerWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CircuitTimerWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7A100000000000000000041 /* Widgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Widgets-Info.plist"; sourceTree = "<group>"; };
@@ -301,6 +302,7 @@
 			children = (
 				C7A100000000000000000007 /* App.xcconfig */,
 				C7A100000000000000000090 /* CircuitTimer.entitlements */,
+				C7A100000000000000000094 /* CircuitTimer.storekit */,
 				C7A100000000000000000020 /* Info.plist */,
 				C7A100000000000000000041 /* Widgets-Info.plist */,
 				C7A100000000000000000057 /* UITests.xcconfig */,

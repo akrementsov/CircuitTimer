@@ -3,6 +3,7 @@ import BackgroundNotifications
 import CloudSync
 import Dependencies
 import Foundation
+import Purchases
 import SettingsFeature
 import Sharing
 import UITestContract
@@ -41,6 +42,8 @@ extension AppScenario {
         dependencies.saveTip = .previewValue
         dependencies.appVersion = .init(shortVersion: { ScenarioFixture.appVersion })
         dependencies.cloudSync = .previewValue
+        // Bought, so every existing test sees the app as before the purchase existed; a locked scenario says so.
+        dependencies.purchases = .scenario(status: .full)
         dependencies.defaultAppStorage = .inMemory
         dependencies.uuid = .incrementing
         // Never advanced: a started timer stands still on its first countdown digit.

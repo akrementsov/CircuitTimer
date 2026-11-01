@@ -32,6 +32,7 @@ Two local packages. `CircuitTimerKit` holds the app's modules; every module is a
 | `BackgroundExecution` | Dependencies, DependenciesMacros, Foundation, UIKit, os | `BackgroundTaskClient` and its token for bounded background work |
 | `BackgroundNotifications` | Dependencies, DependenciesMacros, Foundation, UserNotifications, UIKit, os | Owner-scoped local notification queue, permission access, early foreground delegate and orphan cleanup |
 | `CloudSync` | Dependencies, DependenciesMacros, Sharing, Foundation, CloudKit, CoreData, os | The iCloud sync switch (`@Shared(.appStorage)` key `iCloudSync`, on by default), the launch's decision whether the store mirrors, `CloudSyncClient` with the status of the account and of imports and exports, and the stream of remote changes |
+| `Purchases` | Dependencies, DependenciesMacros, Foundation, StoreKit, UIKit, os | The full version with StoreKit 2: `PurchaseClient` with its status (`unknown`, `free`, `full`), price, purchase and restore; `EntitlementMonitor`, which listens to transaction updates for the whole process and publishes only the newest read; `StoreTransport` and its live StoreKit calls. iOS only |
 | `WorkoutDomain` | Foundation, CryptoKit | Workout model, `WorkoutLimits`, `WorkoutSchedule` and its fingerprint, `WorkoutRun` and its `Outlook`, `TimeMath` |
 | `WorkoutActivity` | `WorkoutDomain`, Dependencies, DependenciesMacros, Foundation, ActivityKit, AppIntents, os | The Live Activity: its attributes and a compact `ContentState` built from a settled run, `WorkoutActivityDisplay` (what the Lock Screen and the Dynamic Island show), `LiveActivityClient`, its owner-scoped control channel, localized Pause/Resume intents and its coordinator |
 | `WorkoutHealth` | Dependencies, DependenciesMacros, Foundation, HealthKit, os | `WorkoutHealthClient`: Health access, one `HKWorkoutSession` per timer owner on iOS 26 and later, `WorkoutHealthTrack` and the workout saved from it when the session ends, its termination gate and the end of a session an earlier process left running |
@@ -57,6 +58,7 @@ Layering:
 - `SettingsFeature` needs no workout module and imports none.
 - `WatchRemoteFeature` is the watch app's feature: no iPhone feature imports it, and it imports none.
 - `CloudSync` imports no feature, TCA or workout module: `WorkoutStorage` asks it how to open the store, `AppFeature` reads its remote changes and Settings its status and switch.
+- `Purchases` imports no feature, TCA, SwiftUI or workout module; nothing is stored on the device: the status comes from StoreKit in every process. `Configs/CircuitTimer.storekit` serves it when the app runs from Xcode; UI test scenarios and snapshots never reach StoreKit.
 - `TimerPreferences` depends only on Sharing: Settings writes the timer preferences and the timer reads them, so neither feature imports the other.
 - `WorkoutTimerFeature` reads no workouts: `AppFeature` hands it a `WorkoutSchedule`. Of `WorkoutStorage` it uses only `WorkoutRunRecordClient`, to save its own run.
 - `WorkoutDomain`, `WorkoutStorage` and `WorkoutHealth` never import TCA or SwiftUI. `WorkoutDomain` depends on none of our modules.
