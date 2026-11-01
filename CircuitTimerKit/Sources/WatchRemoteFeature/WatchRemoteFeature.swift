@@ -3,9 +3,10 @@ import Foundation
 import os
 import SwiftUI
 import WatchLink
+import WorkoutDomain
 
-/// The watch app: the iPhone's workout list and the state of the link to it. The iPhone runs every workout; the watch
-/// only shows what the iPhone published.
+/// The watch app: the iPhone's workout list, its running workout and the state of the link to it. The iPhone runs
+/// every workout; the watch only shows what the iPhone published.
 @Reducer
 public struct WatchRemoteFeature: Sendable {
     @ObservableState
@@ -18,6 +19,14 @@ public struct WatchRemoteFeature: Sendable {
         var problem: LinkProblem?
         /// The watch app is in front: active, or inactive with the wrist lowered, which is not leaving.
         var isSceneActive = false
+        var run: ShownRun?
+        /// A workout runs on the iPhone that does not fit in a transfer.
+        var isRunTooLarge = false
+        var lease: Lease?
+        /// Always On with the wrist lowered: no digits and no renewal.
+        var isLuminanceReduced = false
+        /// Ties a scheduled stage end to the content that scheduled it.
+        var runGeneration = 0
 
         public init() {}
     }
@@ -31,10 +40,18 @@ public struct WatchRemoteFeature: Sendable {
     }
 
     struct RefreshLoop: Equatable, Sendable {
-        /// The one request in flight; only an answer, failure or timeout carrying this ID ends it.
-        var inFlight: UUID?
-        /// A reason to ask came while a request was in flight: ask again when it ends.
+        /// The one request in flight; only an answer, failure or timeout carrying its ID ends it.
+        var inFlight: RefreshRequest?
+        /// Numbers the requests; a lease and a renewal name the request they belong to.
+        var lastSerial = 0
+        /// A reason about the list came while a request was in flight: ask again when it ends.
         var needsRefresh = false
+        /// The run's renewal came due while its request was in flight: a confirming reply asks again at once.
+        var isRenewalDue = false
+        /// A retry is scheduled; until it runs, no new reason asks.
+        var isRetryScheduled = false
+        /// Ties a scheduled run retry to the reply that scheduled it.
+        var runRetryGeneration = 0
         var failures = 0
         /// Ties a scheduled retry to the failure that scheduled it.
         var retryGeneration = 0
@@ -62,6 +79,7 @@ public struct WatchRemoteFeature: Sendable {
         @CasePathable public enum View: Equatable, Sendable {
             case task
             case scenePhaseChanged(ScenePhase)
+            case luminanceChanged(isReduced: Bool)
         }
 
         @CasePathable public enum Internal: Equatable, Sendable {
@@ -71,6 +89,10 @@ public struct WatchRemoteFeature: Sendable {
             case refreshFailed(sentID: UUID, PhoneLinkError)
             case refreshTimedOut(sentID: UUID)
             case retryDue(Int)
+            case renewalDue(serial: Int)
+            case leaseExpired(serial: Int)
+            case runRetryDue(generation: Int)
+            case stageEnded(generation: Int)
         }
     }
 
@@ -79,6 +101,10 @@ public struct WatchRemoteFeature: Sendable {
         case refresh
         case refreshTimeout
         case retry
+        case renewal
+        case lease
+        case runRetry
+        case stageEnd
     }
 
     static let retryDelays: [Duration] = [.seconds(5), .seconds(10), .seconds(20)]
@@ -86,6 +112,7 @@ public struct WatchRemoteFeature: Sendable {
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "WatchRemote")
 
     @Dependency(\.continuousClock) var clock
+    @Dependency(\.date) var date
     @Dependency(\.phoneCompanion) var phoneCompanion
     @Dependency(\.uuid) var uuid
 
@@ -93,7 +120,9 @@ public struct WatchRemoteFeature: Sendable {
 
     public var body: some ReducerOf<Self> {
         Reduce { state, action in
-            switch action {
+            // A lease that ran out goes before anything else, so no action shows its digits.
+            dropExpiredLease(&state)
+            return switch action {
                 case let .view(action):
                     reduce(into: &state, action)
                 case let .internal(action):
@@ -115,13 +144,21 @@ public struct WatchRemoteFeature: Sendable {
             case .scenePhaseChanged(.background):
                 guard state.isSceneActive else { return .none }
                 state.isSceneActive = false
-                // A request still in flight when the app leaves is dropped: the return asks again.
+                // A request still in flight when the app leaves is dropped: the return asks again. The run's digits
+                // need a new confirmation then too.
                 state.refresh.inFlight = nil
                 state.refresh.needsRefresh = false
+                state.refresh.isRenewalDue = false
+                state.refresh.isRetryScheduled = false
+                state.lease = nil
                 return .merge(
                     .cancel(id: CancelID.retry),
                     .cancel(id: CancelID.refresh),
-                    .cancel(id: CancelID.refreshTimeout)
+                    .cancel(id: CancelID.refreshTimeout),
+                    .cancel(id: CancelID.renewal),
+                    .cancel(id: CancelID.lease),
+                    .cancel(id: CancelID.runRetry),
+                    .cancel(id: CancelID.stageEnd)
                 )
             case .scenePhaseChanged(.inactive):
                 // A lowered wrist keeps the app in front: its request and retries go on, and raising it is no return.
@@ -141,11 +178,17 @@ public struct WatchRemoteFeature: Sendable {
                 if state.problem == .companionMissing {
                     state.problem = nil
                 }
-                return .run { [phoneCompanion] send in
-                    await send(.internal(.statusRead(phoneCompanion.status())))
-                }
+                return .merge(
+                    // The stage end was cancelled with the leaving; the shown run's clock needs it again.
+                    state.run == nil ? .none : scheduleStageEnd(&state),
+                    .run { [phoneCompanion] send in
+                        await send(.internal(.statusRead(phoneCompanion.status())))
+                    }
+                )
             case .scenePhaseChanged:
                 return .none
+            case let .luminanceChanged(isReduced):
+                return luminanceChanged(isReduced, &state)
         }
     }
 
@@ -170,12 +213,15 @@ public struct WatchRemoteFeature: Sendable {
             case let .refreshFailed(sentID, error):
                 return refreshFailed(sentID: sentID, error, &state)
             case let .refreshTimedOut(sentID):
-                guard finish(sentID, &state) else { return .none }
+                guard finish(sentID, &state) != nil else { return .none }
                 state.problem = .failed
-                return .merge(.cancel(id: CancelID.refresh), scheduleRetry(&state))
+                return .merge(.cancel(id: CancelID.refresh), dropRunRenewal(&state), scheduleRetry(&state))
             case let .retryDue(generation):
                 guard generation == state.refresh.retryGeneration else { return .none }
+                state.refresh.isRetryScheduled = false
                 return requestRefresh(&state)
+            case .renewalDue, .leaseExpired, .runRetryDue, .stageEnded:
+                return reduceRun(into: &state, action)
         }
     }
 
@@ -183,20 +229,33 @@ public struct WatchRemoteFeature: Sendable {
     private func updateLink(_ status: LinkStatus, _ state: inout State) -> Bool {
         let becameReachable = state.link?.canSend != true && status.canSend
         state.link = status
+        if !status.canSend {
+            // Out of reach, nothing vouches for the run's time.
+            state.lease = nil
+        }
         if becameReachable {
             state.refresh.failures = 0
         }
         return becameReachable
     }
 
+    /// A context or a message. An accepted state with a run that no live lease covers, or whose stage is over, is a
+    /// reason to ask about the run.
     func receive(_ phoneState: PhoneState, from source: StateSource, _ state: inout State) -> Effect<Action> {
         let outcome = state.order.receive(phoneState, from: source)
-        if let change = outcome.change {
-            // A state accepted from the iPhone proves its app is there, the link works and both apps read each other.
-            state.problem = nil
-            apply(change, publishedAt: phoneState.publishedAt, &state)
-        }
-        return outcome.asksAgain ? requestRefresh(&state) : .none
+        let applied = applyAccepted(outcome, phoneState, &state)
+        let listReason = outcome.asksAgain ? requestRefresh(&state) : .none
+        let isUnconfirmed = state.lease == nil || state.run?.isStageOver == true
+        let runReason = outcome.change != nil && isUnconfirmed ? askForRun(&state) : .none
+        return .merge(applied, listReason, runReason)
+    }
+
+    func applyAccepted(_ outcome: PhoneOrder.Outcome, _ phoneState: PhoneState, _ state: inout State) -> Effect<Action> {
+        guard let change = outcome.change else { return .none }
+        // A state accepted from the iPhone proves its app is there, the link works and both apps read each other.
+        state.problem = nil
+        apply(change, publishedAt: phoneState.publishedAt, &state)
+        return applyRun(phoneState, &state)
     }
 
     private func apply(_ change: PhoneOrder.CatalogChange, publishedAt: Date, _ state: inout State) {

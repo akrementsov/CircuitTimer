@@ -256,6 +256,8 @@ let package = Package(
             dependencies: [
                 "DesignSystem",
                 "WatchLink",
+                "WorkoutActivity",
+                "WorkoutDomain",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
