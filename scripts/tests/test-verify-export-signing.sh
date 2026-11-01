@@ -179,6 +179,15 @@ expect_in "$work/out" "::error::"
 expect_in "$work/out" "Watch/CircuitTimerWatch.app/Info.plist"
 expect_not_in "$work/out" "carries its entitlements"
 
+describe "archive: a watch Info.plist that is not a property list"
+archive_fixture
+printf 'not a property list' > "$watch_info"
+check_archive
+expect_status 1
+expect_in "$work/out" "::error::"
+expect_not_in "$work/out" "Traceback"
+expect_not_in "$work/out" "carries its entitlements"
+
 describe "archive: an unsigned app"
 archive_fixture
 rm "$signature"
@@ -274,6 +283,21 @@ expect_in "$work/out" "::error::CircuitTimerWatch.app: application-identifier is
 describe "ipa: a watch app with a development signature"
 watch_ipa get-task-allow true
 expect_in "$work/out" "::error::CircuitTimerWatch.app: get-task-allow is set, so this is a development signature"
+
+# Each row changes one key of the watch app's profile.
+while IFS='|' read -r name key value message; do
+	describe "ipa: a watch app with $name"
+	ipa_fixture
+	edit_plist "$watch/embedded.mobileprovision" "$key" "$value"
+	zip_ipa
+	check_ipa
+	expect_status 1
+	expect_in "$work/out" "::error::CircuitTimerWatch.app: $message"
+	expect_not_in "$work/out" "CircuitTimerWatch.app: signed for"
+done <<EOF
+a profile of another team|TeamIdentifier|["FGHIJ67890"]|the profile belongs to ['FGHIJ67890'], not $team
+a profile that lists devices|ProvisionedDevices|["00008110-000A1C2E3F45801E"]|the profile lists devices, so it is not an App Store profile
+EOF
 
 describe "ipa: an unsigned watch app"
 ipa_fixture
