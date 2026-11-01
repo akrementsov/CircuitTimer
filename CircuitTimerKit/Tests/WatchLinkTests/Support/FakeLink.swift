@@ -2,6 +2,7 @@
 
 import Dependencies
 import Foundation
+import TestSupport
 import WatchConnectivity
 
 /// A `LinkTransport` that records what the link writes and sends, and lets a test decide what WatchConnectivity
@@ -17,20 +18,15 @@ final class FakeLink: Sendable {
     /// Answers `sendRequest`; by default the request is unanswered.
     let respond = LockIsolated<(@Sendable (Data) async throws -> Data)?>(nil)
     let events = LockIsolated<AsyncStream<SessionEvent>.Continuation?>(nil)
-    /// Finishes when the stream of the link's events ends, so a test waits for it without yielding.
-    let eventsEnded: AsyncStream<Void>
-    private let endEvents: AsyncStream<Void>.Continuation
-
-    init() {
-        (eventsEnded, endEvents) = AsyncStream.makeStream()
-    }
+    /// Set when the stream of the link's events ends, so a test waits for it without yielding.
+    let eventsEnded = Observed(false)
 
     var transport: LinkTransport {
         LinkTransport(
             activate: {},
             events: {
                 let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-                continuation.onTermination = { _ in self.endEvents.finish() }
+                continuation.onTermination = { _ in self.eventsEnded.setValue(true) }
                 self.events.setValue(continuation)
                 return stream
             },

@@ -50,7 +50,7 @@ struct PhoneCompanionClientTests {
         await reader.value
 
         // Returns once the source ends; if it never does, the suite's time limit fails the test.
-        for await _ in watch.eventsEnded {}
+        await watch.eventsEnded.wait { $0 }
     }
 
     @Test

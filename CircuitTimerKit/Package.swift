@@ -286,6 +286,7 @@ let package = Package(
         .testTarget(
             name: "WatchLinkTests",
             dependencies: [
+                "TestSupport",
                 "WatchLink",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
