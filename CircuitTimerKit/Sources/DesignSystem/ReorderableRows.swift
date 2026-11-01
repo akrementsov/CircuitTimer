@@ -157,9 +157,10 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
                 isEnabled: canDrag,
                 pressDuration: Self.pressDuration,
                 accepts: { liftableItem(at: $0) != nil },
-                onLift: { point in
-                    if let item = liftableItem(at: point) {
+                onLift: { start, point in
+                    if let item = liftableItem(at: start) {
                         lift(item)
+                        fingerMoved(to: start.y)
                         fingerMoved(to: point.y)
                     }
                 },
@@ -348,12 +349,16 @@ private struct ReorderDrag<ID: Hashable>: Equatable {
 /// row inside a scroll view: from iOS 18 a drag gesture keeps the scroll view from scrolling and a long press on the row
 /// loses to the row's buttons, and on iOS 17 the swipe's drag inside the row takes the touch from a lifted row. The
 /// press starts only where `accepts` takes the point, and a scroll that moves first makes it fail, as on any scroll
-/// view. Points are in the global space, which doesn't move when the screen scrolls under a resting finger.
+/// view. Points are in the global space, which doesn't move when the screen scrolls under a resting finger. The lift
+/// takes the row where the touch came down: UIKit can report it after the finger has moved on, when the main thread is
+/// busy. Over a text field UIKit first settles whether the field's text drag begins, which holds the lift back by
+/// 0.15–0.2 s (iOS 17.5 and 27.0); turning text drag off would cost the field that drag, so the delay stays.
 struct ScrollViewLongPress: UIViewRepresentable {
     let isEnabled: Bool
     let pressDuration: Double
     let accepts: (CGPoint) -> Bool
-    let onLift: (CGPoint) -> Void
+    /// Where the touch came down, and where the finger is now.
+    let onLift: (_ start: CGPoint, _ point: CGPoint) -> Void
     let onFingerMove: (CGPoint) -> Void
     let onDrop: () -> Void
     let onCancel: () -> Void
@@ -379,6 +384,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: ScrollViewLongPress
         let recognizer = UILongPressGestureRecognizer()
+        private var touchStart: CGPoint?
 
         init(parent: ScrollViewLongPress) {
             self.parent = parent
@@ -391,13 +397,15 @@ struct ScrollViewLongPress: UIViewRepresentable {
             let point = recognizer.location(in: nil)
             switch recognizer.state {
                 case .began:
-                    parent.onLift(point)
+                    parent.onLift(touchStart ?? point, point)
                 case .changed:
                     parent.onFingerMove(point)
                 case .ended:
+                    touchStart = nil
                     parent.onFingerMove(point)
                     parent.onDrop()
                 case .cancelled, .failed:
+                    touchStart = nil
                     parent.onCancel()
                 default:
                     break
@@ -407,7 +415,11 @@ struct ScrollViewLongPress: UIViewRepresentable {
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
             // TextKit's selection gestures own touches in the numeric field, including its internal text views.
             // A row lift starts earlier than selection and disables the field, interrupting the cursor drag.
-            touch.view?.isInsideNumericField != true && parent.accepts(touch.location(in: nil))
+            let point = touch.location(in: nil)
+            guard touch.view?.isInsideNumericField != true, parent.accepts(point) else { return false }
+
+            touchStart = point
+            return true
         }
 
         /// Alongside the row's buttons, which on iOS 26 hold the touch from its start; a lifted row's buttons are

@@ -16,7 +16,7 @@ struct RowTextEditingGestureTests {
             isEnabled: true,
             pressDuration: 0.35,
             accepts: { _ in true },
-            onLift: { _ in },
+            onLift: { _, _ in },
             onFingerMove: { latestPoint = $0 },
             onDrop: { droppedAt = latestPoint },
             onCancel: {}
@@ -24,9 +24,33 @@ struct RowTextEditingGestureTests {
 
         // Invoke the registered UIKit target with an ended recognizer: its final point need not have appeared in
         // a preceding .changed event. Dropping first would commit the previous point (or none at all).
-        coordinator.handle(EndedLongPress(point: finalPoint))
+        coordinator.handle(StatedLongPress(state: .ended, point: finalPoint))
 
         #expect(droppedAt == finalPoint)
+    }
+
+    /// A busy main thread can report the lift after the finger has moved over the next row: the row under the touch's
+    /// start is the one that lifts, and the finger's travel counts from there.
+    @Test
+    func test_longPress_beganAfterTheFingerMoved_liftsFromWhereTheTouchCameDown() {
+        let start = CGPoint(x: 50, y: 100)
+        let moved = CGPoint(x: 50, y: 150)
+        var lift: (start: CGPoint, point: CGPoint)?
+        let coordinator = ScrollViewLongPress(
+            isEnabled: true,
+            pressDuration: 0.35,
+            accepts: { _ in true },
+            onLift: { lift = ($0, $1) },
+            onFingerMove: { _ in },
+            onDrop: {},
+            onCancel: {}
+        ).makeCoordinator()
+
+        #expect(coordinator.gestureRecognizer(coordinator.recognizer, shouldReceive: FieldTouch(view: UIView(), point: start)))
+        coordinator.handle(StatedLongPress(state: .began, point: moved))
+
+        #expect(lift?.start == start)
+        #expect(lift?.point == moved)
     }
 
     @Test(arguments: [false, true])
@@ -53,7 +77,7 @@ struct RowTextEditingGestureTests {
             isEnabled: true,
             pressDuration: 0.35,
             accepts: { _ in true },
-            onLift: { _ in },
+            onLift: { _, _ in },
             onFingerMove: { _ in },
             onDrop: {},
             onCancel: {}
@@ -87,16 +111,18 @@ struct RowTextEditingGestureTests {
 }
 
 @MainActor
-private final class EndedLongPress: UILongPressGestureRecognizer {
+private final class StatedLongPress: UILongPressGestureRecognizer {
+    private let fixedState: UIGestureRecognizer.State
     private let point: CGPoint
 
-    init(point: CGPoint) {
+    init(state: UIGestureRecognizer.State, point: CGPoint) {
+        fixedState = state
         self.point = point
         super.init(target: nil, action: nil)
     }
 
     override var state: UIGestureRecognizer.State {
-        get { .ended }
+        get { fixedState }
         set {}
     }
 
@@ -106,13 +132,15 @@ private final class EndedLongPress: UILongPressGestureRecognizer {
 @MainActor
 private final class FieldTouch: UITouch {
     private let touchedView: UIView
+    private let point: CGPoint
 
-    init(view: UIView) {
+    init(view: UIView, point: CGPoint = .zero) {
         touchedView = view
+        self.point = point
         super.init()
     }
 
     override var view: UIView? { touchedView }
 
-    override func location(in view: UIView?) -> CGPoint { .zero }
+    override func location(in view: UIView?) -> CGPoint { point }
 }
