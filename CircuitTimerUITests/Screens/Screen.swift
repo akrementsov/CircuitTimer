@@ -9,3 +9,9 @@ protocol Screen {
 
     init(_ app: XCUIApplication, file: StaticString, line: UInt)
 }
+
+/// How long a drag presses a row before it moves. A row lifts 0.35 s after touch-down, and a stage row pressed on its
+/// name at 0.50–0.57 s, while UIKit settles the name field's loupe and text drag (iPhone 17, iOS 27.0). A busy main
+/// thread lifts it later still, and a drag that starts first moves nothing: the field's loupe takes the press, or the
+/// late lift picks the row under the moved finger.
+let rowLiftHold: TimeInterval = 1.5
