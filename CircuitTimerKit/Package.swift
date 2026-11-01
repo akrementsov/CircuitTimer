@@ -302,6 +302,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutActivityTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),

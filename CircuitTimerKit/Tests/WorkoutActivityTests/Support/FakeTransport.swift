@@ -2,6 +2,7 @@
 
 import Dependencies
 import Foundation
+import TestSupport
 
 /// An `ActivityTransport` that records every call and lets a test decide what iOS answers.
 final class FakeTransport: Sendable {
@@ -15,7 +16,7 @@ final class FakeTransport: Sendable {
         case endEveryAgain
     }
 
-    let calls = LockIsolated<[Call]>([])
+    let calls = Observed<[Call]>([])
     /// The attributes of each request, in order.
     let requestedAttributes = LockIsolated<[Attributes]>([])
     let isEnabled = LockIsolated(true)

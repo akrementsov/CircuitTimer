@@ -3,11 +3,12 @@
 import Dependencies
 import Foundation
 import Testing
+import TestSupport
 
 @Suite(.timeLimit(.minutes(1)))
 struct LiveActivityControlTests {
     private let fake = FakeTransport()
-    private let clock = TestClock<Duration>()
+    private let clock = ManualClock()
     private static let owner = UUID(fixture: 1)
     private static let other = UUID(fixture: 2)
 
@@ -114,7 +115,10 @@ struct LiveActivityControlTests {
         if isCancelled {
             delivery.cancel()
         } else {
-            await clock.advance(by: LiveActivityCoordinator.controlTimeout)
+            // The delivery waits for its acknowledgement on the clock; advancing before that wait begins would never
+            // end it.
+            await clock.waitForSleeps()
+            clock.advance(by: LiveActivityCoordinator.controlTimeout)
         }
         #expect(await delivery.value == (isCancelled ? .cancelled : .timedOut))
         #expect(await deliver(coordinator) == .busy)
@@ -266,7 +270,9 @@ struct LiveActivityControlTests {
         if isCancelled {
             delivery.cancel()
         } else {
-            await clock.advance(by: LiveActivityCoordinator.endTimeout)
+            // The delivery waits for the orphan's end on the clock; advancing before that wait begins would never end it.
+            await clock.waitForSleeps()
+            clock.advance(by: LiveActivityCoordinator.endTimeout)
         }
         #expect(await delivery.value == (isCancelled ? .cancelled : .orphanEnded))
         #expect(fake.calls.value.isEmpty)
