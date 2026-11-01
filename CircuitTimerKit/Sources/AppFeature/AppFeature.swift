@@ -4,6 +4,8 @@ import CloudSync
 import ComposableArchitecture
 import Foundation
 import os
+import PurchaseFeature
+import Purchases
 import SettingsFeature
 import SwiftUI
 import TimerPreferences
@@ -27,6 +29,7 @@ public struct AppFeature: Sendable {
         @ReducerCaseIgnored
         case permissionStalled(AlertState<PermissionStallChoice>)
         case timer(WorkoutTimerFeature)
+        case purchase(PurchaseFeature)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
@@ -34,6 +37,7 @@ public struct AppFeature: Sendable {
             case resumeRun(ResumeRunChoice)
             case permissionStalled(PermissionStallChoice)
             case timer(WorkoutTimerFeature.Action)
+            case purchase(PurchaseFeature.Action)
         }
     }
 
@@ -102,6 +106,12 @@ public struct AppFeature: Sendable {
         var startGeneration = 0
         var isSceneActive = true
         var isNotificationCleanupStalled = false
+        /// Whether this Apple ID owns the full version, as the purchases client publishes it.
+        public internal(set) var fullVersion: FullVersionStatus = .unknown
+        /// The purchase sheet someone asked for; shown once nothing else is in the way.
+        var purchaseRequest: PurchaseFeature.Entry?
+        /// A write failed while the purchase sheet was up; its alert shows once the sheet has gone.
+        var hasPendingMutationAlert = false
 
         public init() {}
 
@@ -166,6 +176,9 @@ public struct AppFeature: Sendable {
             case healthAccessQueried(generation: Int, HealthAccess?)
             case healthPermissionAnswered(generation: Int, succeeded: Bool)
             case healthStalled(generation: Int)
+            case fullVersionChanged(FullVersionStatus)
+            /// Sent after the purchase sheet or an alert has gone: what waited for a free presentation may show now.
+            case presentationFreed
         }
     }
 
@@ -178,6 +191,7 @@ public struct AppFeature: Sendable {
         case notificationPermissionStall
         case notificationCleanup
         case healthPermission
+        case fullVersion
         case healthStall
     }
 
@@ -190,6 +204,7 @@ public struct AppFeature: Sendable {
     @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
     @Dependency(\.liveActivity) private var liveActivity
+    @Dependency(\.purchases) var purchases
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) var uuid
     @Dependency(\.workoutHealth) var workoutHealth
@@ -218,6 +233,8 @@ public struct AppFeature: Sendable {
                     resumeRunChosen(choice, &state)
                 case let .destination(.presented(.permissionStalled(choice))):
                     permissionStallChosen(choice, &state)
+                case .destination(.presented(.purchase(.delegate(.closeRequested)))):
+                    purchaseCloseRequested(&state)
                 case .destination(.dismiss):
                     destinationDismissed(&state)
                 case .destination, .path, .settings:
@@ -226,6 +243,11 @@ public struct AppFeature: Sendable {
         }
         .ifLet(\.$destination, action: \.destination)
         .forEach(\.path, action: \.path)
+        // Before the start intent's check: a sheet shown here cancels a Start waiting for permission in the same pass,
+        // so a late permission answer never replaces the sheet.
+        Reduce { state, _ in
+            presentRequestedPurchase(&state)
+        }
         Reduce { state, _ in
             guard let intent = state.startIntent else { return .none }
             guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
@@ -245,6 +267,7 @@ public struct AppFeature: Sendable {
                 return .merge(
                     readRunRecord(&state),
                     prepareCloudSyncDecision(),
+                    observeFullVersion(),
                     cleanupNotifications(),
                     endLiveActivityOrphans(),
                     endHealthOrphans(),
@@ -368,6 +391,11 @@ public struct AppFeature: Sendable {
                 return healthPermissionAnswered(succeeded: succeeded, generation: generation, &state)
             case let .healthStalled(generation):
                 return healthStalled(generation: generation, &state)
+            case let .fullVersionChanged(status):
+                state.fullVersion = status
+                return .none
+            case .presentationFreed:
+                return showWhatWaitedForPresentation(&state)
             case let .workoutsLoaded(stored):
                 state.isReloading = false
                 // A write made on the shown list during the reload may be missing from what was read: read again once
@@ -421,10 +449,16 @@ public struct AppFeature: Sendable {
                 state.pendingMutations = []
                 state.needsReload = false
                 state.deferredScreen = nil
-                // A presented timer is never replaced: it would close without ending its session. No write starts under
-                // the cover yet, so this guard is defensive; the reload still resyncs the list.
-                if state.destination?.is(\.timer) != true {
-                    state.destination = .alert(.mutationFailed)
+                switch state.destination {
+                    case .timer:
+                        // A presented timer is never replaced: it would close without ending its session. No write
+                        // starts under the cover yet, so this is defensive; the reload still resyncs the list.
+                        break
+                    case .purchase:
+                        // Replacing the sheet would cut a purchase short; the alert waits for it to close.
+                        state.hasPendingMutationAlert = true
+                    case .alert, .resumeRun, .permissionStalled, nil:
+                        state.destination = .alert(.mutationFailed)
                 }
                 return loadWorkouts(&state)
             case let .runRecordLoaded(stored):
@@ -593,10 +627,14 @@ public struct AppFeature: Sendable {
             case .resumeRun:
                 // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
                 state.runRestore = .resolved
-                return .none
+                return scheduleWhatWaited(state)
             case .permissionStalled:
                 return .send(.internal(.notificationPermissionWait))
-            case .alert, nil:
+            case .purchase:
+                return scheduleWhatWaited(state)
+            case .alert:
+                return scheduleWhatWaited(state)
+            case nil:
                 return .none
         }
     }

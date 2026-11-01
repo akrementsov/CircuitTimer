@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import Foundation
+import PurchaseFeature
 import SettingsFeature
 import SwiftUI
 import UITestContract
@@ -52,6 +53,9 @@ public struct AppView: View {
         .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
             WorkoutTimerStack(store: timerStore)
                 .onAppear { send(.timerCoverAppeared) }
+        }
+        .sheet(item: $store.scope(\.$destination, action: \.destination).purchase) { purchaseStore in
+            PurchaseView(store: purchaseStore)
         }
     }
 

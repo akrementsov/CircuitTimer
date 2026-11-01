@@ -6,6 +6,7 @@ import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
 import Foundation
+import Purchases
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutHealth
@@ -35,6 +36,7 @@ func makeStore(
         $0.liveActivity = .previewValue
         $0.cues = .previewValue
         $0.cloudSync = .previewValue
+        $0.purchases = .previewValue
         $0.workoutHealth = .previewValue
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }
