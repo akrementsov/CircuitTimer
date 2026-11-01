@@ -6,6 +6,7 @@ import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
 import Foundation
+import WatchLink
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutHealth
@@ -16,13 +17,25 @@ func loaded(_ workouts: [Workout]) -> AppFeature.State {
     return state
 }
 
+/// What the app published to the watch, in the order the effects ran, and how many revisions the reducer took.
+struct WatchPublications: Sendable {
+    let published = LockIsolated<[WatchPublication]>([])
+    let revisions = LockIsolated(0)
+}
+
+struct WatchPublication: Equatable, Sendable {
+    let revision: Int
+    let catalog: CatalogState
+}
+
 /// `healthAccess` starts as already read, so a Start opens the timer without the Health stage; a test of that stage
-/// passes `nil`.
+/// passes `nil`. Every store records what it publishes to the watch; a test of the publication passes `watch`.
 @MainActor
 func makeStore(
     _ state: AppFeature.State,
     notificationsEnabled: Bool = false,
     healthAccess: HealthAccess? = .unavailable,
+    watch: WatchPublications = WatchPublications(),
     dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<AppFeature> {
     var state = state
@@ -51,6 +64,15 @@ func makeStore(
             }
         }
         $0.workoutRunRecord.write = { _, _ in }
+        $0.watchCompanion.nextRevision = {
+            watch.revisions.withValue {
+                $0 += 1
+                return $0
+            }
+        }
+        $0.watchCompanion.publishCatalog = { revision, catalog in
+            watch.published.withValue { $0.append(WatchPublication(revision: revision, catalog: catalog)) }
+        }
         dependencies(&$0)
     }
 }

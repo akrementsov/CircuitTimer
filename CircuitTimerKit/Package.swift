@@ -73,6 +73,7 @@ let package = Package(
                 "CloudSync",
                 "AppFeature",
                 "SettingsFeature",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",
