@@ -58,4 +58,5 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] Force quit the iPhone app, then open the watch app: it gets an answer and the list is marked as earlier. Note whether the iPhone app's scene connects when it was launched that way.
 - [ ] On iOS 17.5, opening the watch app repeatedly does not exhaust the iPhone's background launches.
 - [ ] With the watch app closed, a change on the iPhone reaches it by the next time it opens.
+- [ ] With two watches paired to the iPhone, switch to the other one: once its session activates, its watch app shows the iPhone's current list without a change on the iPhone.
 - [ ] Many workouts and one very long name: the list is cut with its note.
