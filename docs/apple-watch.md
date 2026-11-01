@@ -2,9 +2,11 @@
 
 The watch app is a remote for the iPhone timer: the workout runs on the iPhone, and without it the watch app does not work. It needs watchOS 10 or later and ships inside the iPhone app. CT-9 delivers it in slices; this page grows with them. The implementation rules are in [AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9), [Module map](../AGENTS.md#module-map) and [Delivery](../AGENTS.md#delivery); change this file together with them.
 
-## What it does now (CT-9-2)
+## What it does now (CT-9-3)
 
-The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. The rows do nothing yet: the running stage, Pause and Resume and Start from the watch follow in CT-9-3 to CT-9-5 ([roadmap](roadmap.md)).
+The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, as the Live Activity does: the workout's name, the stage, its time and the stage that comes next; paused, «Get ready» and «Done» read as on the card. The rows and the run do nothing yet: Pause and Resume and Start from the watch follow in CT-9-4 and CT-9-5 ([roadmap](roadmap.md)).
+
+The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked; raising the wrist shows it again, or asks once.
 
 The list updates when the workouts change on the iPhone. When the watch has no fresh list, it says why:
 
@@ -17,12 +19,15 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 | The list does not fit in one transfer | the start of the list with «Not every workout fits on the watch.»; if even that fails, the last list dimmed or «Workouts don't fit on the watch» |
 | The iPhone app was launched in the background and has not loaded its workouts | the last list under «Earlier list from … · Waiting for iPhone», or «Open CircuitTimer on your iPhone» |
 | The two apps speak different versions | «Update CircuitTimer on your iPhone» or «… on your watch» |
+| A workout runs whose names do not fit in a transfer | «A workout is running on your iPhone», until it closes |
 
 ## How it works
 
 - The iPhone app publishes its list whenever it settles: after it loads, and after every save, delete, duplicate and reorder once the write has finished. The newest list goes into the WatchConnectivity application context, which the watch app receives now or when it opens, and to a reachable watch app at once as a message.
 - The watch app asks the iPhone for its current state when it opens or comes back to the front (lowering and raising the wrist does not count), when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. Once the iPhone answers, the watch does not ask again until the next of these reasons; an unchanged list is confirmed by its digest without being sent again.
 - A request from the watch can launch the iPhone app in the background. That process answers at once but has not read the workouts, so it says it knows no list; the list comes when the iPhone app loads it.
+- The iPhone's timer publishes its run with the list after every change, into the context and to a reachable watch as a message. A request from the watch goes to the running timer, which settles the run, and only its answer confirms the time; the watch counts the 10 seconds from when it sent that request. A context or a message shows the run, but never confirms its time.
+- Closing the timer, or the system ending the iPhone app, removes the run from what the watch receives; the watch then shows the list again.
 
 ## How it is built and shipped
 
@@ -37,7 +42,7 @@ One tag after CT-9-5 checks what only App Store Connect can:
 
 - [ ] `testflight.yml` exports and verifies the IPA: the cloud signing creates the watch app's App ID and signs it for the App Store.
 - [ ] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; this shows whether App Store Connect minds.
-- [ ] Before the tag, the device checklist's items that only a live session can check pass on that build: the force-quit launch by a request, switching watches and repeated wrist raises.
+- [ ] Before the tag, the device checklist's items that only a live session can check pass on that build: the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26.
 
 ## Accepted limits
 
@@ -46,6 +51,15 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - An iPhone app launched in the background by the watch does not read its workouts, so the watch keeps its list marked as earlier until the iPhone app loads them.
 - While the watch app stays open and the iPhone is out of reach, a context a new iPhone process wrote waits: the watch believes a new process only through the answer to its own request, because WatchConnectivity promises no order between two processes. The watch shows the earlier list until it can ask.
 - After the user switches to another watch, the iPhone writes its newest list again once the session for that watch activates.
+- After a change on the iPhone whose message is lost, such as a pause, the watch may count the old time for up to 10 seconds from its last confirmed request, then hides it.
+- A lost or slow reply (the iPhone's timer has 5 seconds to answer) hides the time until the next confirmation; on iOS 17–25 a suspended iPhone app is woken for each request, which takes a few seconds.
+- The renewal asks every 5 seconds also while the run is paused or waits for the user: a pause ended on the iPhone is a change of time too.
+- On iOS 17–25 the renewal can wake the iPhone app up to 12 times a minute, and each answer runs the timer's settling once; if iOS limits these launches, the time hides more often.
+- The time ends on screen at the confirmation's end in wall time; a watch clock moved meanwhile moves that end, and the next action of the watch app corrects it. If watchOS does not redraw the screen at that moment, the time goes at its next redraw.
+- The time shown includes the difference between the iPhone's and the watch's clocks.
+- Out of reach, the last run shows without its time; after the iPhone app died without ending its run, the run stays until a new iPhone process answers.
+- A workout whose names do not fit in a transfer is not shown on the watch until its timer closes. Since CT-9-3 the list is cut to 60,000 − 8,192 bytes, leaving room for a running workout.
+- Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
 ## Device checklist
 
@@ -61,3 +75,13 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] With the watch app closed, a change on the iPhone reaches it by the next time it opens.
 - [ ] With two watches paired to the iPhone, switch to the other one: once its session activates, its watch app shows the iPhone's current list without a change on the iPhone.
 - [ ] Many workouts and one very long name: the list is cut with its note.
+- [ ] iOS 26 with Health, iPhone locked: stages change on the watch as they go, and a pause on the iPhone shows on the watch within about a second. Note whether «Waiting for iPhone…» shows at a stage's end.
+- [ ] iOS 17.5, iPhone app in the background: at a stage's end the time hides and comes back within seconds; 20 minutes of a workout do not exhaust the background launches; note the iPhone's battery use and the record writes the renewal causes.
+- [ ] Bluetooth off on the iPhone during a stage: «iPhone isn't connected» at once, no time.
+- [ ] Always On, and a watch without it: wrist lowered — no time; raised within 3 seconds — the time at once; after 15 seconds — one request, then the time.
+- [ ] Return to Clock, by default and with «After 1 hour».
+- [ ] The watch's and the iPhone's times differ by at most a second.
+- [ ] Closing the timer: an open watch shows the list at once, a closed one when it opens. A swipe in the App Switcher on iOS 26 does the same; a force quit on iOS 17.5 leaves the run without time until a request, then the list.
+- [ ] Continue of a saved run shows the run on the watch.
+- [ ] A workout with very long stage names: «A workout is running on your iPhone» until it closes, then the list.
+- [ ] The run's screen in English and Russian and at the largest text size.
