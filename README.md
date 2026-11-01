@@ -150,24 +150,28 @@ flowchart TD
 
     Watch["CircuitTimerWatch app"] --> WatchRemoteFeature
     WatchRemoteFeature --> DesignSystem
+    WatchRemoteFeature --> WatchLink
+    AppFeature --> WatchLink
+    WatchLink --> WorkoutActivity
 ```
 
-Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. `WatchRemoteFeature`, the watch app's feature, sits beside the screen features but outside the iPhone app's layers: no iPhone module imports it. The exact lists are `CircuitTimerKit/Package.swift` and, for the app, the widget and the watch app, [AGENTS.md › Module map](AGENTS.md#module-map).
+Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. `WatchRemoteFeature`, the watch app's feature, sits beside the screen features but outside the iPhone app's layers: no iPhone module imports it. `WatchLink`, the channel between the two apps, builds for both. The exact lists are `CircuitTimerKit/Package.swift` and, for the app, the widget and the watch app, [AGENTS.md › Module map](AGENTS.md#module-map).
 
 | Module | Responsibility |
 |---|---|
-| `AppFeature` | Tab bar, the workout list (loading, empty, retryable error), navigation, restoring a saved run, the teardown when iOS terminates the app |
+| `AppFeature` | Tab bar, the workout list (loading, empty, retryable error) and its publication to the watch, navigation, restoring a saved run, the teardown when iOS terminates the app |
 | `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; stage durations as MM:SS on the number pad |
 | `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity, a Health workout session on iOS 26 and later and the run's track for the workout it saves |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
 | `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder; builds for watchOS too |
-| `WatchRemoteFeature` | The Apple Watch app's screens; the `CircuitTimerWatch` target embedded in the iPhone app shows them ([Apple Watch](docs/apple-watch.md)) |
+| `WatchRemoteFeature` | The Apple Watch app: the iPhone's workout list and the state of the link; the `CircuitTimerWatch` target embedded in the iPhone app shows it ([Apple Watch](docs/apple-watch.md)) |
+| `WatchLink` | The WatchConnectivity channel between the iPhone app and the watch app: the wire format, its order rules and both sides' clients |
 | `WorkoutStorage` | `WorkoutStorageClient` (struct of closures, in memory for previews): SwiftData mirrored to iCloud when sync is on; the saved run file |
 | `CloudSync` | The sync switch, the launch's mirroring decision, account and import/export status |
 | `TimerPreferences` | The signal and Keep screen on switches, shared by Settings and the timer |
 | `BackgroundExecution` | Background-task assertions around the saved run's writes |
 | `BackgroundNotifications` | Owner-scoped local notifications, permission access, foreground suppression |
-| `WorkoutActivity` | The Live Activity's state, its Lock Screen and Island content, Pause/Resume intents; drawn by `CircuitTimerWidgets` |
+| `WorkoutActivity` | The Live Activity's state, its Lock Screen and Island content, Pause/Resume intents; drawn by `CircuitTimerWidgets`; builds for watchOS too |
 | `WorkoutHealth` | Health access and, on iOS 26 and later, the workout session that keeps a running timer's app alive, so closing it removes the card and notifications; the workout saved to Health when the session ends ([Apple Health](docs/apple-health.md)) |
 | `WorkoutDomain` | The workout model, limits, the schedule and the `WorkoutRun` engine; Foundation and CryptoKit only, so `WorkoutActivity` and the widget can link it |
 | `UITestContract` | Below the features, no dependencies: accessibility identifiers and the UI tests' launch names |
