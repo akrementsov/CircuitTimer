@@ -22,6 +22,7 @@
 		C7A300000000000000000063 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C7A300000000000000000064 /* Assets.xcassets */; };
 		C7A300000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000068 /* BackgroundNotifications */; };
 		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
+		C7A3000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000E1 /* WatchLink */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
 		C7A3000000000000000000A0 /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000A1 /* SettingsFeature */; };
 		C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B1 /* WorkoutTimerFeature */; };
@@ -34,6 +35,7 @@
 		C7A400000000000000000062 /* WorkoutDomain in Frameworks */ = {isa = PBXBuildFile; productRef = C7A40000000000000000005F /* WorkoutDomain */; };
 		C7A400000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000068 /* BackgroundNotifications */; };
 		C7A400000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000091 /* CloudSync */; };
+		C7A4000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000E1 /* WatchLink */; };
 		C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000072 /* WorkoutEditorFeature */; };
 		C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B1 /* WorkoutTimerFeature */; };
 		C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B3 /* WorkoutActivity */; };
@@ -240,6 +242,7 @@
 				C7A300000000000000000062 /* WorkoutDomain in Frameworks */,
 				C7A300000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A300000000000000000090 /* CloudSync in Frameworks */,
+				C7A3000000000000000000E0 /* WatchLink in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A3000000000000000000A0 /* SettingsFeature in Frameworks */,
 				C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
@@ -259,6 +262,7 @@
 				C7A400000000000000000062 /* WorkoutDomain in Frameworks */,
 				C7A400000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A400000000000000000090 /* CloudSync in Frameworks */,
+				C7A4000000000000000000E0 /* WatchLink in Frameworks */,
 				C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
 				C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */,
@@ -467,6 +471,7 @@
 				C7A30000000000000000005F /* WorkoutDomain */,
 				C7A300000000000000000068 /* BackgroundNotifications */,
 				C7A300000000000000000091 /* CloudSync */,
+				C7A3000000000000000000E1 /* WatchLink */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
 				C7A3000000000000000000A1 /* SettingsFeature */,
 				C7A3000000000000000000B1 /* WorkoutTimerFeature */,
@@ -499,6 +504,7 @@
 				C7A40000000000000000005F /* WorkoutDomain */,
 				C7A400000000000000000068 /* BackgroundNotifications */,
 				C7A400000000000000000091 /* CloudSync */,
+				C7A4000000000000000000E1 /* WatchLink */,
 				C7A400000000000000000072 /* WorkoutEditorFeature */,
 				C7A4000000000000000000B1 /* WorkoutTimerFeature */,
 				C7A4000000000000000000B3 /* WorkoutActivity */,
@@ -1130,6 +1136,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CloudSync;
 		};
+		C7A3000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 		C7A300000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A3000000000000000000A1 /* SettingsFeature */ = {isa = XCSwiftPackageProductDependency; productName = SettingsFeature; };
 		C7A40000000000000000005D /* SnapshotCapture */ = {
@@ -1153,6 +1160,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = CloudSync;
 		};
+		C7A4000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 		C7A400000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A3000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
 		C7A3000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };

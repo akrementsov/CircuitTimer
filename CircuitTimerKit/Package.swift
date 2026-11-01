@@ -91,6 +91,7 @@ let package = Package(
                 "CloudSync",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
