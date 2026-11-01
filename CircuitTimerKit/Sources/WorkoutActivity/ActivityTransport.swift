@@ -1,3 +1,6 @@
+// iOS only: ActivityKit does not exist on watchOS.
+#if os(iOS)
+
 import ActivityKit
 import Foundation
 import os
@@ -165,3 +168,4 @@ extension ActivityPresence {
         }
     }
 }
+#endif

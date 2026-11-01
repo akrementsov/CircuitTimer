@@ -1,9 +1,12 @@
-import ActivityKit
 import Foundation
+
+#if os(iOS)
+import ActivityKit
+#endif
 
 /// The Live Activity of one workout run: the workout's name, fixed for the activity's life, and a
 /// compact state of the run that the Lock Screen and the Dynamic Island draw without the app.
-public struct WorkoutActivityAttributes: ActivityAttributes, Hashable, Sendable {
+public struct WorkoutActivityAttributes: Codable, Hashable, Sendable {
     /// iOS rejects an activity whose attributes and state together encode to more than this.
     public static let encodedSizeLimit = 4_096
 
@@ -98,3 +101,8 @@ public struct WorkoutActivityAttributes: ActivityAttributes, Hashable, Sendable 
         }
     }
 }
+
+// The watch decodes the same attributes and state, and has no ActivityKit.
+#if os(iOS)
+extension WorkoutActivityAttributes: ActivityAttributes {}
+#endif

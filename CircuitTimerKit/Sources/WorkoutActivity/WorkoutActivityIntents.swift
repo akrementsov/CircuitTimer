@@ -1,3 +1,6 @@
+// iOS only: `LiveActivityIntent` is unavailable on watchOS.
+#if os(iOS)
+
 import AppIntents
 import Dependencies
 import Foundation
@@ -122,3 +125,4 @@ private enum ControlError: LocalizedError {
         }
     }
 }
+#endif

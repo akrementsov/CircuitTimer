@@ -1,6 +1,9 @@
 import Foundation
 import os
 
+// iOS only: it drives Live Activities through `ActivityTransport`, which needs ActivityKit.
+#if os(iOS)
+
 /// Applies each owner's syncs and ends one at a time, newest revision first, on a loop that a
 /// cancelled caller does not stop: a timer that closes still has its activity removed.
 actor LiveActivityCoordinator {
@@ -504,3 +507,4 @@ extension LiveActivityCoordinator {
         return .orphanEnded
     }
 }
+#endif
