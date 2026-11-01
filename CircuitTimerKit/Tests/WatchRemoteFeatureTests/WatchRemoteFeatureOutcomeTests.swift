@@ -143,7 +143,7 @@ struct WatchRemoteFeatureOutcomeTests {
             $0.refresh.retryGeneration = 2
         }
         await clock.advance(by: .seconds(5))
-        await store.send(.view(.scenePhaseChanged(.inactive))) {
+        await store.send(.view(.scenePhaseChanged(.background))) {
             $0.isSceneActive = false
             $0.refresh.inFlight = nil
         }
@@ -258,7 +258,7 @@ struct WatchRemoteFeatureOutcomeTests {
             $0.refresh.retryGeneration = 1
         }
         await Task.megaYield()
-        await store.send(.view(.scenePhaseChanged(.inactive))) {
+        await store.send(.view(.scenePhaseChanged(.background))) {
             $0.isSceneActive = false
             $0.refresh.inFlight = nil
         }
@@ -291,6 +291,41 @@ struct WatchRemoteFeatureOutcomeTests {
         await store.send(.internal(.event(.context(phoneState(sequence: 2, catalog: .loaded(watchCatalog("Evening")), digest: "B")))))
 
         #expect(store.state.problem == nil)
+    }
+
+    /// A lowered wrist keeps the app in front: the request in flight goes on, and raising the wrist asks nothing.
+    @Test
+    func test_wristLoweredAndRaised_keepsTheRequestAndAsksNothingMore() async {
+        let sent = SentRequests()
+        let store = Self.heldStore(Self.asking(), sent: sent)
+
+        await store.send(.view(.scenePhaseChanged(.inactive)))
+        await store.send(.view(.scenePhaseChanged(.active)))
+        await store.receive(\.internal.event)
+
+        #expect(store.state.refresh.inFlight == Self.current)
+        #expect(sent.requests.value.isEmpty)
+    }
+
+    /// A raised wrist reads the status again and asks only if the iPhone came back meanwhile.
+    @Test
+    func test_wristRaised_iPhoneBackInReach_asksOnce() async {
+        let sent = SentRequests()
+        var state = Self.asking()
+        state.refresh.inFlight = nil
+        state.link = unreachable
+        let store = Self.heldStore(state, sent: sent)
+
+        await store.send(.view(.scenePhaseChanged(.active)))
+        await store.receive(\.internal.event) {
+            $0.link = reachable
+            $0.refresh.inFlight = UUID(0)
+            $0.refresh.retryGeneration = 1
+        }
+
+        #expect(sent.requests.value.count == 1)
+        store.exhaustivity = .off
+        await store.skipInFlightEffects()
     }
 
     @Test

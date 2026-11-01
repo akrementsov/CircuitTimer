@@ -16,6 +16,7 @@ public struct WatchRemoteFeature: Sendable {
         var order = PhoneOrder()
         var refresh = RefreshLoop()
         var problem: LinkProblem?
+        /// The watch app is in front: active, or inactive with the wrist lowered, which is not leaving.
         var isSceneActive = false
 
         public init() {}
@@ -111,26 +112,40 @@ public struct WatchRemoteFeature: Sendable {
                     }
                 }
                 .cancellable(id: CancelID.events, cancelInFlight: true)
-            case let .scenePhaseChanged(phase):
-                state.isSceneActive = phase == .active
-                guard state.isSceneActive else {
-                    // A request still in flight when the scene leaves is dropped: the return asks again.
-                    state.refresh.inFlight = nil
-                    state.refresh.needsRefresh = false
-                    return .merge(
-                        .cancel(id: CancelID.retry),
-                        .cancel(id: CancelID.refresh),
-                        .cancel(id: CancelID.refreshTimeout)
-                    )
+            case .scenePhaseChanged(.background):
+                guard state.isSceneActive else { return .none }
+                state.isSceneActive = false
+                // A request still in flight when the app leaves is dropped: the return asks again.
+                state.refresh.inFlight = nil
+                state.refresh.needsRefresh = false
+                return .merge(
+                    .cancel(id: CancelID.retry),
+                    .cancel(id: CancelID.refresh),
+                    .cancel(id: CancelID.refreshTimeout)
+                )
+            case .scenePhaseChanged(.inactive):
+                // A lowered wrist keeps the app in front: its request and retries go on, and raising it is no return.
+                return .none
+            case .scenePhaseChanged(.active):
+                // The status has no callback for every change, such as an unlock: read it again whenever the app is
+                // active.
+                guard !state.isSceneActive else {
+                    // A raised wrist asks only if the status brings the iPhone back, as any status would: a request
+                    // per raise could launch the iPhone app in the background each time.
+                    return .run { [phoneCompanion] send in
+                        await send(.internal(.event(.status(phoneCompanion.status()))))
+                    }
                 }
+                state.isSceneActive = true
                 state.refresh.failures = 0
                 if state.problem == .companionMissing {
                     state.problem = nil
                 }
-                // The status has no callback for every change, such as an unlock: read it again on each return.
                 return .run { [phoneCompanion] send in
                     await send(.internal(.statusRead(phoneCompanion.status())))
                 }
+            case .scenePhaseChanged:
+                return .none
         }
     }
 

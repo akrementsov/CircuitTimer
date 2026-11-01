@@ -13,7 +13,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 | The iPhone is out of reach | the last list, under «iPhone isn't connected · Updated …», or «iPhone isn't connected» without a list |
 | The iPhone restarted and is locked | «Unlock your iPhone» |
 | The iPhone app is not installed | «CircuitTimer isn't available on iPhone» |
-| The iPhone could not load its workouts | the last list, dimmed, with «Couldn't load workouts on iPhone. Showing the earlier list.» |
+| The iPhone could not load its workouts | the last list, dimmed, with «Couldn't load workouts on iPhone. Showing the earlier list.» under the status line, if any, such as «iPhone isn't connected · Updated …» |
 | The list does not fit in one transfer | the start of the list with «Not every workout fits on the watch.»; if even that fails, the last list dimmed or «Workouts don't fit on the watch» |
 | The iPhone app was launched in the background and has not loaded its workouts | the last list under «Earlier list from … · Waiting for iPhone», or «Open CircuitTimer on your iPhone» |
 | The two apps speak different versions | «Update CircuitTimer on your iPhone» or «… on your watch» |
@@ -21,7 +21,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 ## How it works
 
 - The iPhone app publishes its list whenever it settles: after it loads, and after every save, delete, duplicate and reorder once the write has finished. The newest list goes into the WatchConnectivity application context, which the watch app receives now or when it opens, and to a reachable watch app at once as a message.
-- The watch app asks the iPhone for its current state when it opens or comes back to the front, when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. Once the iPhone answers, the watch does not ask again until the next of these reasons; an unchanged list is confirmed by its digest without being sent again.
+- The watch app asks the iPhone for its current state when it opens or comes back to the front (lowering and raising the wrist does not count), when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. Once the iPhone answers, the watch does not ask again until the next of these reasons; an unchanged list is confirmed by its digest without being sent again.
 - A request from the watch can launch the iPhone app in the background. That process answers at once but has not read the workouts, so it says it knows no list; the list comes when the iPhone app loads it.
 
 ## How it is built and shipped
@@ -37,6 +37,7 @@ One tag after CT-9-5 checks what only App Store Connect can:
 
 - [ ] `testflight.yml` exports and verifies the IPA: the cloud signing creates the watch app's App ID and signs it for the App Store.
 - [ ] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; this shows whether App Store Connect minds.
+- [ ] Before the tag, the device checklist's items that only a live session can check pass on that build: the force-quit launch by a request, switching watches and repeated wrist raises.
 
 ## Accepted limits
 
@@ -56,7 +57,7 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] The list appears, and follows a save, a delete, a duplicate and a reorder on the iPhone, with the watch app open and when it opens later.
 - [ ] Each situation in the table above shows its text; out of reach, the last list keeps its time.
 - [ ] Force quit the iPhone app, then open the watch app: it gets an answer and the list is marked as earlier. Note whether the iPhone app's scene connects when it was launched that way.
-- [ ] On iOS 17.5, opening the watch app repeatedly does not exhaust the iPhone's background launches.
+- [ ] On iOS 17.5, opening the watch app and raising the wrist repeatedly does not exhaust the iPhone's background launches.
 - [ ] With the watch app closed, a change on the iPhone reaches it by the next time it opens.
 - [ ] With two watches paired to the iPhone, switch to the other one: once its session activates, its watch app shows the iPhone's current list without a change on the iPhone.
 - [ ] Many workouts and one very long name: the list is cut with its note.

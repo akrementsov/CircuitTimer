@@ -38,17 +38,24 @@ final class PublicationLedger: @unchecked Sendable {
 
     /// Writes the newest state again if its write did not happen, after activation or a change of watch. A state
     /// WatchConnectivity now refuses as too large falls back as a new publication would.
-    func writeLatest() async {
+    /// Returns the state a fallback numbered, so an open watch can get it at once; `nil` when nothing new was numbered.
+    func writeLatest() async -> PhoneState? {
         await onQueue {
-            guard let prepared = self.prepared, !self.isWritten else { return }
+            guard let prepared = self.prepared, !self.isWritten else { return nil }
             switch self.write(prepared) {
                 case .written:
                     self.isWritten = true
+                    return nil
                 case .pending:
-                    break
+                    return nil
                 case .tooLarge:
-                    guard let catalog = prepared.catalog else { return }
-                    _ = self.commit(Self.fallbacks(after: catalog), at: prepared.publishedAt)
+                    guard let catalog = prepared.catalog else { return nil }
+                    switch self.commit(Self.fallbacks(after: catalog), at: prepared.publishedAt) {
+                        case let .written(state), let .pending(state):
+                            return state
+                        case .skipped:
+                            return nil
+                    }
             }
         }
     }
@@ -66,17 +73,14 @@ final class PublicationLedger: @unchecked Sendable {
             guard let prepared = self.prepared else {
                 return PhoneState(processID: self.processID, sequence: 0, publishedAt: now, catalog: nil, catalogDigest: nil)
             }
-            guard prepared.catalogDigest != knownCatalogDigest else {
-                // A confirmation: the iPhone still had this list now.
-                return PhoneState(
-                    processID: self.processID,
-                    sequence: prepared.sequence,
-                    publishedAt: now,
-                    catalog: nil,
-                    catalogDigest: prepared.catalogDigest
-                )
-            }
-            return prepared
+            // Answered now: the iPhone still had this list when it answered, whether it sends the list or confirms it.
+            return PhoneState(
+                processID: self.processID,
+                sequence: prepared.sequence,
+                publishedAt: now,
+                catalog: prepared.catalogDigest == knownCatalogDigest ? nil : prepared.catalog,
+                catalogDigest: prepared.catalogDigest
+            )
         }
     }
 
@@ -128,6 +132,8 @@ final class PublicationLedger: @unchecked Sendable {
                     continue
             }
         }
+        // Even `.unavailable(.tooLarge)` was refused, which a payload of a few hundred bytes should never be. The
+        // context still holds the previous state, so replies keep answering with it rather than contradict it.
         return .skipped
     }
 

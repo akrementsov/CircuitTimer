@@ -19,7 +19,9 @@ actor WatchCompanion {
         for await event in events {
             switch event {
                 case .activated, .statusChanged:
-                    await ledger.writeLatest()
+                    if let fallback = await ledger.writeLatest() {
+                        push(fallback)
+                    }
                 case .watchChanged:
                     await ledger.watchChanged()
                 case let .request(data, ticket):

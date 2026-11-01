@@ -45,7 +45,9 @@ struct PublicationLedgerTests {
 
         let full = await ledger.reply(knownCatalogDigest: "old", at: linkNow)
         #expect(full.catalog == .loaded(makeCatalog(1)))
-        #expect(full.publishedAt == published)
+        #expect(full.sequence == 1)
+        // The iPhone answers for the list now, not when it published it.
+        #expect(full.publishedAt == linkNow)
     }
 
     @Test
@@ -83,9 +85,9 @@ struct PublicationLedgerTests {
         }
         #expect(link.contexts.value.isEmpty)
 
-        await ledger.writeLatest()
+        #expect(await ledger.writeLatest() == nil)
         #expect(try link.writtenStates() == [state])
-        await ledger.writeLatest()
+        #expect(await ledger.writeLatest() == nil)
         #expect(link.contexts.value.count == 1)
 
         link.snapshot.withValue { $0.canPublish = false }
@@ -137,9 +139,10 @@ struct PublicationLedgerTests {
         link.snapshot.withValue { $0.canPublish = true }
         link.refusals.setValue([FakeLink.tooLarge])
 
-        await ledger.writeLatest()
+        let fallback = await ledger.writeLatest()
 
         #expect(try link.writtenStates().map(\.catalog) == [.loaded(makeCatalog(4).prefix(2))])
+        #expect(try fallback == link.writtenStates().last)
     }
 
     @Test
@@ -162,11 +165,11 @@ struct PublicationLedgerTests {
     func test_watchChanged_writesTheNewestStateAgain() async throws {
         let ledger = ledger
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
-        await ledger.writeLatest()
+        _ = await ledger.writeLatest()
         #expect(link.contexts.value.count == 1)
 
         await ledger.watchChanged()
-        await ledger.writeLatest()
+        _ = await ledger.writeLatest()
 
         let written = try link.writtenStates()
         #expect(written.count == 2)

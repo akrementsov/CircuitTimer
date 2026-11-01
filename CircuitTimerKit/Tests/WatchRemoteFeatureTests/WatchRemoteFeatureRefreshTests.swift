@@ -91,7 +91,7 @@ struct WatchRemoteFeatureRefreshTests {
     func test_reply_confirmingTheDigest_keepsTheListAndMovesItsTime() async {
         let sent = SentRequests()
         let catalog = watchCatalog("Morning")
-        var state = stateShowing(catalog, digest: "A")
+        var state = stateShowing(catalog, digest: "A", inFront: false)
         // A newer process answered «unknown»: the list is marked as earlier.
         _ = state.order.receive(phoneState(process: 2, sequence: 0), from: .reply)
         #expect(state.screen == .list(catalog, dimmed: nil, status: .earlierList(updatedAt: earlier)))
@@ -115,7 +115,7 @@ struct WatchRemoteFeatureRefreshTests {
         let sent = SentRequests()
         let catalog = watchCatalog("Morning")
         sent.answer.setValue { reply($0, phoneState(process: 2, sequence: 0)) }
-        let store = makeWatchStore(stateShowing(catalog, digest: "A"), sent: sent)
+        let store = makeWatchStore(stateShowing(catalog, digest: "A", inFront: false), sent: sent)
         store.exhaustivity = .off
 
         await store.send(.view(.scenePhaseChanged(.active)))
@@ -137,7 +137,7 @@ struct WatchRemoteFeatureRefreshTests {
         let first = watchCatalog("First")
         let second = watchCatalog("Second")
         let answer = AsyncStream<WatchReplyEnvelope>.makeStream()
-        let store = TestStore(initialState: stateShowing(first, digest: "A", sequence: 5)) {
+        let store = TestStore(initialState: stateShowing(first, digest: "A", sequence: 5, inFront: false)) {
             WatchRemoteFeature()
         } withDependencies: {
             $0.uuid = .incrementing
@@ -315,7 +315,7 @@ struct WatchRemoteFeatureRefreshTests {
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.receive(\.internal.statusRead)
         #expect(store.state.refresh.inFlight == UUID(0))
-        await store.send(.view(.scenePhaseChanged(.inactive)))
+        await store.send(.view(.scenePhaseChanged(.background)))
         #expect(store.state.refresh.inFlight == nil)
         let late = phoneState(sequence: 1, catalog: .loaded(watchCatalog("Late")), digest: "L")
         await store.send(.internal(.refreshAnswered(sentID: UUID(0), reply(UUID(0), late))))

@@ -8,8 +8,8 @@ public struct PhoneState: Codable, Equatable, Sendable {
     public let processID: UUID
     /// Increases with every state one process publishes, in the order of the context writes.
     public let sequence: Int
-    /// When the iPhone published it, or, in a reply that confirms the watch's catalog, when it answered. It orders
-    /// nothing and only says how fresh the list is.
+    /// When the iPhone published it, or, in a reply, when it answered. It orders nothing and only says how fresh the
+    /// list is.
     public let publishedAt: Date
     /// `nil`: the state says nothing about the catalog, the watch keeps its own.
     public let catalog: CatalogState?

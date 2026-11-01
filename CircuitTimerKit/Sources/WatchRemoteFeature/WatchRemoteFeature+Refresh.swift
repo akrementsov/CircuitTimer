@@ -74,6 +74,8 @@ extension WatchRemoteFeature {
     func refreshFailed(sentID: UUID, _ error: PhoneLinkError, _ state: inout State) -> Effect<Action> {
         guard finish(sentID, &state) else { return .none }
         let ended = Effect<Action>.cancel(id: CancelID.refreshTimeout)
+        // An end no retry can fix keeps `needsRefresh`: the reason waits for the next request a status, the scene or a
+        // state starts, instead of asking again into the same failure.
         switch error {
             case let .incompatible(peerSchemaVersion):
                 state.problem = .incompatible(Self.side(toUpdate: peerSchemaVersion))

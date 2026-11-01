@@ -62,11 +62,18 @@ func makeWatchStore(
     }
 }
 
-/// A state the reducer reaches when the iPhone's list arrived in a context.
-func stateShowing(_ catalog: WatchCatalog, digest: String, process: Int = 1, sequence: Int = 1) -> WatchRemoteFeature.State {
+/// A state the reducer reaches when the iPhone's list arrived in a context; `inFront: false` for a watch app about to
+/// come to the front.
+func stateShowing(
+    _ catalog: WatchCatalog,
+    digest: String,
+    process: Int = 1,
+    sequence: Int = 1,
+    inFront: Bool = true
+) -> WatchRemoteFeature.State {
     var state = WatchRemoteFeature.State()
     state.link = reachable
-    state.isSceneActive = true
+    state.isSceneActive = inFront
     _ = state.order.receive(phoneState(process: process, sequence: sequence, catalog: .loaded(catalog), digest: digest), from: .context)
     state.catalog = .init(lastLoaded: catalog, updatedAt: earlier)
     return state

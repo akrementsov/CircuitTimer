@@ -87,6 +87,24 @@ struct WatchCompanionTests {
         #expect(link.messages.value.count == 2)
     }
 
+    /// A context write refused as too large on activation falls back, and an open watch gets the fallback at once.
+    @Test
+    func test_activation_refusedWrite_pushesTheFallback() async throws {
+        let companion = start()
+        link.snapshot.withValue { $0.canPublish = false }
+        await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(4)))
+        link.snapshot.withValue { $0.canPublish = true }
+        link.refusals.setValue([FakeLink.tooLarge])
+        let events = try #require(link.events.value)
+
+        events.yield(.activated)
+        // A request queued behind the activation answers once it is handled.
+        _ = await ask(try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: 7), request: .refresh(knownCatalogDigest: nil))))
+
+        #expect(try link.sentStates().map(\.catalog) == [.loaded(makeCatalog(4)), .loaded(makeCatalog(4).prefix(2))])
+        #expect(try link.sentStates().last == link.writtenStates().last)
+    }
+
     @Test
     func test_watchChanged_thenActivation_writesTheNewestStateAgain() async throws {
         let companion = start()

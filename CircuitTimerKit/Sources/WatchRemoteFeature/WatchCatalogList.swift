@@ -13,12 +13,14 @@ struct WatchCatalogList: View {
     var body: some View {
         ScrollView {
             VStack(spacing: .token(spacing: .xs)) {
+                // Why the list may be old comes first; a dimmed list then says why the iPhone sent no newer one.
+                if let status {
+                    WatchStatusText(status: status)
+                }
                 if let dimmed {
                     note(dimmed == .tooLarge
                         ? Text("watch.catalog.tooLarge.note", bundle: .module)
                         : Text("watch.catalog.loadFailed.note", bundle: .module))
-                } else if let status {
-                    WatchStatusText(status: status)
                 }
                 ForEach(catalog.entries) { entry in
                     WatchWorkoutRow(entry: entry, isDimmed: dimmed != nil)
