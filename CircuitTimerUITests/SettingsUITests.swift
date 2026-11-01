@@ -5,6 +5,10 @@ import XCTest
 final class SettingsUITests: XCTestCase {
     /// Each launch resets the scenario's in-memory preferences; this checks retention within one process.
     func test_emptyList_toggleSettings_keepsValuesWhenReturningToTab() {
+        // Long, not stuck: after each of the twelve switch taps XCTest waits 1.3 s for the app to go idle, locally and on
+        // CI alike. The test takes 35 s locally and 48–60 s on the CI runner, which ran out the default 60 s at its last
+        // step.
+        executionTimeAllowance = 120
         let app = launch(.emptyList)
 
         WorkoutListScreen(app)
