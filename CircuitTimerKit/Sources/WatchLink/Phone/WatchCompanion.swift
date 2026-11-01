@@ -20,6 +20,8 @@ actor WatchCompanion {
             switch event {
                 case .activated, .statusChanged:
                     await ledger.writeLatest()
+                case .watchChanged:
+                    await ledger.watchChanged()
                 case let .request(data, ticket):
                     await answer(data, through: ticket)
                 case .context, .message:

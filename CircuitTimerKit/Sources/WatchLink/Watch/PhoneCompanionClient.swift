@@ -67,7 +67,7 @@ extension PhoneCompanionClient: DependencyKey {
             let task = Task {
                 for await event in source {
                     switch event {
-                        case .activated, .statusChanged:
+                        case .activated, .statusChanged, .watchChanged:
                             continuation.yield(.status(transport.status().linkStatus))
                         case let .context(data):
                             continuation.yield(decodeState(data).map(PhoneLinkEvent.context) ?? undecodable(data))

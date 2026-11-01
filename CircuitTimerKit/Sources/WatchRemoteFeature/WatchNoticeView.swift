@@ -1,4 +1,5 @@
 import DesignSystem
+import Foundation
 import SwiftUI
 
 /// A title and an explanation in place of the list, with the reason the list may be old above them.

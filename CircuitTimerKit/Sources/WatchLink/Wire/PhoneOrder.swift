@@ -39,7 +39,8 @@ public struct PhoneOrder: Equatable, Sendable {
     /// The process that last vouched for the catalog the watch shows; another accepted process means the list may be
     /// old.
     public private(set) var catalogConfirmedBy: UUID?
-    private var askedFor: Asked?
+    /// The states asked about lately, so two delayed processes taking turns do not wake the iPhone again and again.
+    private var askedFor: [Asked] = []
 
     public init() {}
 
@@ -78,8 +79,13 @@ public struct PhoneOrder: Equatable, Sendable {
     /// Asks once for each state, so a message delivered twice does not wake the iPhone twice.
     private mutating func ask(for state: PhoneState) -> Bool {
         let asked = Asked(processID: state.processID, sequence: state.sequence)
-        guard askedFor != asked else { return false }
-        askedFor = asked
+        guard !askedFor.contains(asked) else { return false }
+        askedFor.append(asked)
+        if askedFor.count > Self.askedLimit {
+            askedFor.removeFirst()
+        }
         return true
     }
+
+    private static let askedLimit = 8
 }

@@ -1,6 +1,13 @@
 import Foundation
 import WatchLink
 
+extension WatchCatalog.Entry {
+    /// A name of only spaces reads as untitled, as on the iPhone; the watch labels it in its own language.
+    var isUntitled: Bool {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 extension WatchRemoteFeature.State {
     enum Screen: Equatable {
         case update(WatchRemoteFeature.UpdateSide)
@@ -53,7 +60,8 @@ extension WatchRemoteFeature.State {
         if problem == .companionMissing {
             return .companionMissing
         }
-        guard let link, refresh.hasAnswered || refresh.inFlight == nil else { return .connecting }
+        // A session still activating is connecting, not unreachable.
+        guard let link, link.isActivated, refresh.hasAnswered || refresh.inFlight == nil else { return .connecting }
         if problem != nil || !link.canSend {
             return .unreachable
         }
@@ -74,7 +82,7 @@ extension WatchRemoteFeature.State {
             case .incompatible, nil:
                 break
         }
-        if link?.canSend == false {
+        if let link, link.isActivated, !link.canSend {
             return .unreachable(updatedAt: updatedAt)
         }
         if let processID = order.processID, order.catalogConfirmedBy != processID {

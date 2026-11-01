@@ -153,6 +153,7 @@ flowchart TD
     WatchRemoteFeature --> WatchLink
     AppFeature --> WatchLink
     WatchLink --> WorkoutActivity
+    WatchLink --> WorkoutDomain
 ```
 
 Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. `WatchRemoteFeature`, the watch app's feature, sits beside the screen features but outside the iPhone app's layers: no iPhone module imports it. `WatchLink`, the channel between the two apps, builds for both. The exact lists are `CircuitTimerKit/Package.swift` and, for the app, the widget and the watch app, [AGENTS.md › Module map](AGENTS.md#module-map).

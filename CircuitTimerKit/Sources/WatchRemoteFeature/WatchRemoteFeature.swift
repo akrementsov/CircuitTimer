@@ -130,9 +130,10 @@ public struct WatchRemoteFeature: Sendable {
             case let .event(.status(status)):
                 return updateLink(status, &state) ? requestRefresh(&state) : .none
             case let .statusRead(status):
-                // Read because the scene became active, which is a reason to ask by itself.
+                // Read because the scene became active, which is a reason to ask by itself; a request already in
+                // flight, such as one the first status started, answers it too.
                 _ = updateLink(status, &state)
-                return requestRefresh(&state)
+                return state.refresh.inFlight == nil ? requestRefresh(&state) : .none
             case let .event(.context(phoneState)):
                 return receive(phoneState, from: .context, &state)
             case let .event(.message(phoneState)):
@@ -167,9 +168,8 @@ public struct WatchRemoteFeature: Sendable {
     func receive(_ phoneState: PhoneState, from source: StateSource, _ state: inout State) -> Effect<Action> {
         let outcome = state.order.receive(phoneState, from: source)
         if let change = outcome.change {
-            if case .incompatible = state.problem {
-                state.problem = nil
-            }
+            // A state accepted from the iPhone proves its app is there, the link works and both apps read each other.
+            state.problem = nil
             apply(change, publishedAt: phoneState.publishedAt, &state)
         }
         return outcome.asksAgain ? requestRefresh(&state) : .none

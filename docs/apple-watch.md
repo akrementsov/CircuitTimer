@@ -21,7 +21,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 ## How it works
 
 - The iPhone app publishes its list whenever it settles: after it loads, and after every save, delete, duplicate and reorder once the write has finished. The newest list goes into the WatchConnectivity application context, which the watch app receives now or when it opens, and to a reachable watch app at once as a message.
-- The watch app asks the iPhone for its current state when it opens or comes back to the front, when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds. It never polls: an unchanged list is confirmed by its digest without being sent again.
+- The watch app asks the iPhone for its current state when it opens or comes back to the front, when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. It never polls: an unchanged list is confirmed by its digest without being sent again.
 - A request from the watch can launch the iPhone app in the background. That process answers at once but has not read the workouts, so it says it knows no list; the list comes when the iPhone app loads it.
 
 ## How it is built and shipped
@@ -43,6 +43,8 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - WatchConnectivity documents no size limit; the iPhone keeps each transfer under 60,000 bytes, an assumption checked on a device.
 - A context write that fails waits for the next activation, change of watch or publication on the iPhone, or for the watch app to come to the front.
 - An iPhone app launched in the background by the watch does not read its workouts, so the watch keeps its list marked as earlier until the iPhone app loads them.
+- While the watch app stays open and the iPhone is out of reach, a context a new iPhone process wrote waits: the watch believes a new process only through the answer to its own request, because WatchConnectivity promises no order between two processes. The watch shows the earlier list until it can ask.
+- After the user switches to another watch, the iPhone writes its newest list again once the session for that watch activates.
 
 ## Device checklist
 

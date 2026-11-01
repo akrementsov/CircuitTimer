@@ -1,4 +1,5 @@
 import DesignSystem
+import Foundation
 import SwiftUI
 import WatchLink
 
@@ -67,10 +68,7 @@ private struct WatchWorkoutRow: View {
         )
     }
 
-    /// A name of only spaces reads as untitled, as on the iPhone; the label follows the watch's language.
     private var name: Text {
-        entry.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? Text("watch.workout.untitled", bundle: .module)
-            : Text(verbatim: entry.name)
+        entry.isUntitled ? Text("watch.workout.untitled", bundle: .module) : Text(verbatim: entry.name)
     }
 }

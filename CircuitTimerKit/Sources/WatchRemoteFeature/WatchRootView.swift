@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import DesignSystem
+import Foundation
 import SwiftUI
 import WatchLink
 
@@ -102,6 +103,35 @@ extension WatchRemoteFeature.State {
     }
 }
 
+extension Date {
+    static let previewDate = Date(timeIntervalSinceReferenceDate: 800_000_000)
+}
+
+extension WatchRemoteFeature.State {
+    /// A list an earlier iPhone process published, after a newer process answered that it knows no list yet.
+    static var previewEarlierList: Self {
+        var state = Self.preview()
+        let earlier = PhoneState(
+            processID: UUID(uuid: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+            sequence: 1,
+            publishedAt: .previewDate,
+            catalog: .loaded(.preview),
+            catalogDigest: "earlier"
+        )
+        let newer = PhoneState(
+            processID: UUID(uuid: (2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+            sequence: 0,
+            publishedAt: .previewDate,
+            catalog: nil,
+            catalogDigest: nil
+        )
+        _ = state.order.receive(earlier, from: .context)
+        _ = state.order.receive(newer, from: .reply)
+        state.catalog = .init(lastLoaded: .preview, updatedAt: .previewDate)
+        return state
+    }
+}
+
 extension WatchCatalog {
     static let preview = WatchCatalog(entries: [
         .init(id: previewID(1), name: "Morning circuit", totalMilliseconds: 1_260_000, isPlayable: true),
@@ -120,26 +150,43 @@ extension WatchCatalog {
 }
 
 #Preview("List") {
-    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog.preview, updatedAt: .distantPast)))
+    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog.preview, updatedAt: .previewDate)))
 }
 
 #Preview("List, iPhone unreachable") {
     previewView(.preview(
         link: LinkStatus(isActivated: true, isReachable: false, needsUnlock: false),
-        catalog: .init(lastLoaded: WatchCatalog.preview, updatedAt: .distantPast)
+        catalog: .init(lastLoaded: WatchCatalog.preview, updatedAt: .previewDate)
     ))
 }
 
 #Preview("List the iPhone could not reload") {
-    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog.preview, unavailable: .loadFailed, updatedAt: .distantPast)))
+    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog.preview, unavailable: .loadFailed, updatedAt: .previewDate)))
+}
+
+#Preview("List cut to fit") {
+    let cut = WatchCatalog(entries: WatchCatalog.preview.entries, isTruncated: true)
+    return previewView(.preview(catalog: .init(lastLoaded: cut, updatedAt: .previewDate)))
+}
+
+#Preview("List, the link failed") {
+    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog.preview, updatedAt: .previewDate), problem: .failed))
+}
+
+#Preview("Earlier list") {
+    previewView(.previewEarlierList)
+}
+
+#Preview("No list, the iPhone could not load") {
+    previewView(.preview(catalog: .init(unavailable: .loadFailed, updatedAt: .previewDate)))
 }
 
 #Preview("No workouts") {
-    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog(entries: []), updatedAt: .distantPast)))
+    previewView(.preview(catalog: .init(lastLoaded: WatchCatalog(entries: []), updatedAt: .previewDate)))
 }
 
 #Preview("Too large") {
-    previewView(.preview(catalog: .init(unavailable: .tooLarge, updatedAt: .distantPast)))
+    previewView(.preview(catalog: .init(unavailable: .tooLarge, updatedAt: .previewDate)))
 }
 
 #Preview("Connecting") {
@@ -164,5 +211,9 @@ extension WatchCatalog {
 
 #Preview("Update the iPhone") {
     previewView(.preview(problem: .incompatible(.phone)))
+}
+
+#Preview("Update the watch") {
+    previewView(.preview(problem: .incompatible(.watch)))
 }
 #endif

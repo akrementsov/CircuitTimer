@@ -37,7 +37,7 @@ public enum PhoneLinkError: Error, Equatable, Sendable {
             case .payloadTooLarge:
                 self = .payloadTooLarge
             default:
-                Logger.watchLink.error("A WatchConnectivity error the link does not expect: \(error.code)")
+                Logger.watchLink.error("A link error the link does not expect: \(error.domain, privacy: .public) \(error.code)")
                 self = .failed
         }
     }

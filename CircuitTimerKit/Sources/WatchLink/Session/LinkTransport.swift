@@ -20,6 +20,8 @@ enum SessionEvent: Sendable {
     case activated
     /// Reachability, pairing, the watch app or the companion app changed; read `status()` again.
     case statusChanged
+    /// The iPhone switched to another watch; its session activates again for it.
+    case watchChanged
     case context(Data)
     case message(Data)
     /// The other side waits for exactly one answer through the ticket.

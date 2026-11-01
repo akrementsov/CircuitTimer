@@ -1,9 +1,11 @@
-// iOS only: ActivityKit does not exist on watchOS.
-#if os(iOS)
-
-import ActivityKit
 import Foundation
 import os
+#if os(iOS)
+import ActivityKit
+#endif
+
+// iOS only: ActivityKit does not exist on watchOS.
+#if os(iOS)
 
 /// Why iOS refused to start an activity, sorted by what the coordinator does about it.
 enum ActivityRequestFailure: Error, Equatable {

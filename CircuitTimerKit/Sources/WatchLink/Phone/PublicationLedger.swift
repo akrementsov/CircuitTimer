@@ -36,12 +36,27 @@ final class PublicationLedger: @unchecked Sendable {
         await onQueue { self.publishOnQueue(revision: revision, catalog: catalog, at: now) }
     }
 
-    /// Writes the newest state again if its write did not happen, after activation or a change of watch.
+    /// Writes the newest state again if its write did not happen, after activation or a change of watch. A state
+    /// WatchConnectivity now refuses as too large falls back as a new publication would.
     func writeLatest() async {
         await onQueue {
             guard let prepared = self.prepared, !self.isWritten else { return }
-            self.isWritten = self.write(prepared) == .written
+            switch self.write(prepared) {
+                case .written:
+                    self.isWritten = true
+                case .pending:
+                    break
+                case .tooLarge:
+                    guard let catalog = prepared.catalog else { return }
+                    _ = self.commit(Self.fallbacks(after: catalog), at: prepared.publishedAt)
+            }
         }
+    }
+
+    /// The user switched to another watch: the context belongs to the watch it was written for, so the newest state
+    /// is written again once the session for the new one activates.
+    func watchChanged() async {
+        await onQueue { self.isWritten = false }
     }
 
     /// The state to answer a request with: the catalog only if the watch's digest differs. A process that has not
@@ -52,10 +67,11 @@ final class PublicationLedger: @unchecked Sendable {
                 return PhoneState(processID: self.processID, sequence: 0, publishedAt: now, catalog: nil, catalogDigest: nil)
             }
             guard prepared.catalogDigest != knownCatalogDigest else {
+                // A confirmation: the iPhone still had this list now.
                 return PhoneState(
                     processID: self.processID,
                     sequence: prepared.sequence,
-                    publishedAt: prepared.publishedAt,
+                    publishedAt: now,
                     catalog: nil,
                     catalogDigest: prepared.catalogDigest
                 )
@@ -79,7 +95,12 @@ final class PublicationLedger: @unchecked Sendable {
     private func publishOnQueue(revision: Int, catalog: CatalogState, at now: Date) -> PublishOutcome {
         guard revision > lastRevision else { return .skipped }
         lastRevision = revision
-        var candidates = Self.fitted(catalog, processID: processID, at: now)
+        return commit(Self.fitted(catalog, processID: processID, at: now), at: now)
+    }
+
+    /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large.
+    private func commit(_ candidates: [CatalogState], at now: Date) -> PublishOutcome {
+        var candidates = candidates
         while let candidate = candidates.first {
             candidates.removeFirst()
             guard let digest = Self.digest(of: candidate) else { continue }
@@ -128,7 +149,7 @@ final class PublicationLedger: @unchecked Sendable {
     }
 
     /// The catalog cut to the envelope limit, then half of that, then `.unavailable(.tooLarge)`: the order in which a
-    /// refused write falls back.
+    /// refused write falls back. A list of which not even one workout fits is too large, never an empty list.
     private static func fitted(_ catalog: CatalogState, processID: UUID, at now: Date) -> [CatalogState] {
         guard case let .loaded(full) = catalog else { return [catalog] }
         var low = 0
@@ -142,12 +163,19 @@ final class PublicationLedger: @unchecked Sendable {
                 high = middle - 1
             }
         }
+        guard low > 0 || full.entries.isEmpty else { return [.unavailable(.tooLarge)] }
         let fitting = low == full.entries.count ? full : full.prefix(low)
-        return [.loaded(fitting), .loaded(fitting.prefix(fitting.entries.count / 2)), .unavailable(.tooLarge)]
+        return [.loaded(fitting)] + fallbacks(after: .loaded(fitting))
+    }
+
+    /// What follows a catalog WatchConnectivity refused as too large.
+    private static func fallbacks(after catalog: CatalogState) -> [CatalogState] {
+        guard case let .loaded(refused) = catalog, refused.entries.count > 1 else { return [.unavailable(.tooLarge)] }
+        return [.loaded(refused.prefix(refused.entries.count / 2)), .unavailable(.tooLarge)]
     }
 
     private static func fits(_ catalog: CatalogState, processID: UUID, at now: Date) -> Bool {
-        // The largest number and a full digest: the real state is never longer.
+        // The largest number and a full digest in a reply's envelope, the longest way a state travels.
         let probe = PhoneState(
             processID: processID,
             sequence: .max,
@@ -156,7 +184,8 @@ final class PublicationLedger: @unchecked Sendable {
             catalogDigest: String(repeating: "0", count: 64)
         )
         do {
-            return try WireCoding.encode(probe).count <= WatchLinkSchema.envelopeLimit
+            let reply = WatchReplyEnvelope(requestID: processID, reply: .state(probe))
+            return try WireCoding.encode(reply).count <= WatchLinkSchema.envelopeLimit
         } catch {
             Logger.watchLink.error("A catalog did not encode: \(String(reflecting: error), privacy: .public)")
             return false

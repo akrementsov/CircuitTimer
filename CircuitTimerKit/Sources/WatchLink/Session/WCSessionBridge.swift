@@ -5,6 +5,9 @@ import os
 
 /// The delegate of the default `WCSession`, turning its callbacks into one stream of events. WatchConnectivity calls
 /// the delegate on its own serial queue; the stream and the events nobody has read yet share one lock.
+///
+/// Unchecked: WatchConnectivity does not mark `WCSession` as `Sendable`. The bridge only calls the session's methods,
+/// from the delegate's queue and from the clients' callers, and never replaces it after `init`.
 final class WCSessionBridge: NSObject, WCSessionDelegate, @unchecked Sendable {
     private struct Subscription {
         var current: AsyncStream<SessionEvent>.Continuation?
@@ -131,6 +134,7 @@ final class WCSessionBridge: NSObject, WCSessionDelegate, @unchecked Sendable {
 
     /// The user switched to another watch: the session comes back for the new one.
     func sessionDidDeactivate(_ session: WCSession) {
+        deliver(.watchChanged)
         session.activate()
     }
 

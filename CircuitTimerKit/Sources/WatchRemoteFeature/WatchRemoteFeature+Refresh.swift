@@ -16,8 +16,11 @@ extension WatchRemoteFeature {
         let requestID = uuid()
         state.refresh.inFlight = requestID
         state.refresh.needsRefresh = false
+        // A retry scheduled before this request would only ask again after it.
+        state.refresh.retryGeneration += 1
         let request = WatchRequest.refresh(knownCatalogDigest: state.order.catalogDigest)
         return .merge(
+            .cancel(id: CancelID.retry),
             .run { [phoneCompanion] send in
                 do {
                     let reply = try await phoneCompanion.send(requestID, request)
