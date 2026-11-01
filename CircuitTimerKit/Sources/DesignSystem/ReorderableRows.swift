@@ -157,11 +157,10 @@ public struct ReorderableRows<Item: Identifiable, Row: View>: View {
                 isEnabled: canDrag,
                 pressDuration: Self.pressDuration,
                 accepts: { liftableItem(at: $0) != nil },
-                onLift: { start, point in
+                onLift: { start in
                     if let item = liftableItem(at: start) {
                         lift(item)
                         fingerMoved(to: start.y)
-                        fingerMoved(to: point.y)
                     }
                 },
                 onFingerMove: { fingerMoved(to: $0.y) },
@@ -357,8 +356,8 @@ struct ScrollViewLongPress: UIViewRepresentable {
     let isEnabled: Bool
     let pressDuration: Double
     let accepts: (CGPoint) -> Bool
-    /// Where the touch came down, and where the finger is now.
-    let onLift: (_ start: CGPoint, _ point: CGPoint) -> Void
+    /// Where the touch came down; `onFingerMove` follows at once with where the finger is now.
+    let onLift: (_ start: CGPoint) -> Void
     let onFingerMove: (CGPoint) -> Void
     let onDrop: () -> Void
     let onCancel: () -> Void
@@ -384,6 +383,7 @@ struct ScrollViewLongPress: UIViewRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: ScrollViewLongPress
         let recognizer = UILongPressGestureRecognizer()
+        /// Where the press's first finger came down.
         private var touchStart: CGPoint?
 
         init(parent: ScrollViewLongPress) {
@@ -397,7 +397,8 @@ struct ScrollViewLongPress: UIViewRepresentable {
             let point = recognizer.location(in: nil)
             switch recognizer.state {
                 case .began:
-                    parent.onLift(touchStart ?? point, point)
+                    parent.onLift(touchStart ?? point)
+                    parent.onFingerMove(point)
                 case .changed:
                     parent.onFingerMove(point)
                 case .ended:
@@ -418,7 +419,10 @@ struct ScrollViewLongPress: UIViewRepresentable {
             let point = touch.location(in: nil)
             guard touch.view?.isInsideNumericField != true, parent.accepts(point) else { return false }
 
-            touchStart = point
+            // A press that failed while still possible never reports it, so a new press starts from no touches.
+            if recognizer.numberOfTouches == 0 {
+                touchStart = point
+            }
             return true
         }
 

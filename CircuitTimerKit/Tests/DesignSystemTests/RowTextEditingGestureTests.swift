@@ -16,7 +16,7 @@ struct RowTextEditingGestureTests {
             isEnabled: true,
             pressDuration: 0.35,
             accepts: { _ in true },
-            onLift: { _, _ in },
+            onLift: { _ in },
             onFingerMove: { latestPoint = $0 },
             onDrop: { droppedAt = latestPoint },
             onCancel: {}
@@ -35,13 +35,13 @@ struct RowTextEditingGestureTests {
     func test_longPress_beganAfterTheFingerMoved_liftsFromWhereTheTouchCameDown() {
         let start = CGPoint(x: 50, y: 100)
         let moved = CGPoint(x: 50, y: 150)
-        var lift: (start: CGPoint, point: CGPoint)?
+        var events: [String] = []
         let coordinator = ScrollViewLongPress(
             isEnabled: true,
             pressDuration: 0.35,
             accepts: { _ in true },
-            onLift: { lift = ($0, $1) },
-            onFingerMove: { _ in },
+            onLift: { events.append("lift \($0.y)") },
+            onFingerMove: { events.append("move \($0.y)") },
             onDrop: {},
             onCancel: {}
         ).makeCoordinator()
@@ -49,8 +49,7 @@ struct RowTextEditingGestureTests {
         #expect(coordinator.gestureRecognizer(coordinator.recognizer, shouldReceive: FieldTouch(view: UIView(), point: start)))
         coordinator.handle(StatedLongPress(state: .began, point: moved))
 
-        #expect(lift?.start == start)
-        #expect(lift?.point == moved)
+        #expect(events == ["lift 100.0", "move 150.0"])
     }
 
     @Test(arguments: [false, true])
@@ -77,7 +76,7 @@ struct RowTextEditingGestureTests {
             isEnabled: true,
             pressDuration: 0.35,
             accepts: { _ in true },
-            onLift: { _, _ in },
+            onLift: { _ in },
             onFingerMove: { _ in },
             onDrop: {},
             onCancel: {}
