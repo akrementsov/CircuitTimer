@@ -19,6 +19,7 @@ let package = Package(
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
         .library(name: "CloudSync", targets: ["CloudSync"]),
         .library(name: "Purchases", targets: ["Purchases"]),
+        .library(name: "PurchaseFeature", targets: ["PurchaseFeature"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
         .library(name: "WorkoutHealth", targets: ["WorkoutHealth"]),
@@ -172,6 +173,17 @@ let package = Package(
                 "CloudSync",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "PurchaseFeature",
+            dependencies: [
+                "DesignSystem",
+                "Purchases",
+                "UITestContract",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
         .target(
