@@ -239,6 +239,17 @@ Public initializers take `id` explicitly; features get identifiers from `@Depend
 - `-CTInitializeCloudKitSchema` in a signed Debug build creates the Development schema and exits before the app's store opens. Deploy it to Production before a release tag.
 - How it works, the accepted limits, the experiments and the device checklist: `docs/icloud-sync.md`.
 
+## Purchases (CT-6)
+
+What the user sees, the accepted limits and the App Store Connect checklist are in `docs/purchases.md`; change it together with this section.
+
+- One non-consumable, `FullVersion.productID`, Family Sharing on; the price is only `Product.displayPrice`. It unlocks iCloud sync, more than two workouts and (CT-6-2, after CT-9) the Apple Watch app.
+- Nothing about the purchase is stored on the device: `PurchaseClient` asks StoreKit in every process and reports `unknown` until the first answer. `EntitlementMonitor` starts its listener of `Transaction.updates` and its first read at its first use, in two unstructured tasks that outlive every caller; only the newest read started publishes, and a purchase outdates reads under way. `restore()` decides by its own read, or a newer one that found the full version.
+- `PurchaseFeature` is shown only by `AppFeature` (`Destination.purchase`), after the saved-run question is settled (`.resolved`, or `.found` while the first load failed) and never in place of an alert or the timer; a request waits for an alert and is dropped under the timer, any request is dropped once `fullVersion` is `.full`. Its tail reducer runs before the start intent's check. A write that fails under the sheet waits and shows its alert from a later action, as does a saved run found while the sheet was up.
+- The sheet's success follows the published status: an operation that says yes before the status does waits at most 3 s, then shows «Couldn't Confirm the Purchase»; a `.full` that arrives from elsewhere closes the sheet, a `.free` returns it to the offer. A cancelled payment shows nothing.
+- `.unknown` counts as locked for actions (the locked switch, the limit) and shows nothing in texts.
+- Scenarios own the full version (`PurchaseClient.scenario(status: .full)`); previews and snapshots use `previewValue`, whose `changes` finishes without a status so a preset state stays.
+
 ## Errors
 
 Log with `os.Logger` and move the UI to an explicit state. Do not log expected outcomes such as cancellation.
