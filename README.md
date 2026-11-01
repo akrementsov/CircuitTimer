@@ -29,7 +29,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 
 ## Stack
 
-- Swift 6 language mode with complete strict concurrency, iOS 17+
+- Swift 6 language mode with complete strict concurrency, iOS 17+; the Apple Watch app watchOS 10+
 - SwiftUI and [The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) 1.26 with the 2.0 deprecations trait enabled
 - [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) for every side effect, [swift-sharing](https://github.com/pointfreeco/swift-sharing) for preferences
 - SwiftData mirrored to CloudKit; ActivityKit and App Intents for the Live Activity; TipKit
@@ -91,7 +91,7 @@ Test commands for one area or one snapshot: [Testing guide › Commands](docs/te
 
 ## Architecture
 
-The app's code lives in one local Swift package, `CircuitTimerKit`; a second one, `CircuitTimerSnapshotKit`, holds only `SnapshotCapture` for the snapshot tests. The app and its widget extension are thin targets over the package's modules.
+The app's code lives in one local Swift package, `CircuitTimerKit`; a second one, `CircuitTimerSnapshotKit`, holds only `SnapshotCapture` for the snapshot tests. The app, its widget extension and its watch app are thin targets over the package's modules.
 
 The modules form four layers. A module imports only from its own layer or the layers below, except that the screen features never import each other; `AppFeature` composes them.
 
@@ -147,9 +147,12 @@ flowchart TD
 
     Widgets["CircuitTimerWidgets extension"] --> WorkoutActivity
     Widgets --> DesignSystem
+
+    Watch["CircuitTimerWatch app"] --> WatchRemoteFeature
+    WatchRemoteFeature --> DesignSystem
 ```
 
-Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. The exact lists are `CircuitTimerKit/Package.swift` and, for the app and the widget, [AGENTS.md › Module map](AGENTS.md#module-map).
+Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract` and the Debug-only `AppScenarios` are left out. `WatchRemoteFeature`, the watch app's feature, sits beside the screen features but outside the iPhone app's layers: no iPhone module imports it. The exact lists are `CircuitTimerKit/Package.swift` and, for the app, the widget and the watch app, [AGENTS.md › Module map](AGENTS.md#module-map).
 
 | Module | Responsibility |
 |---|---|
@@ -157,7 +160,8 @@ Not drawn: the editor and the timer also import `WorkoutDomain`; `UITestContract
 | `WorkoutEditorFeature` | The workout screen: read-only with Start, or a draft saved or discarded whole; an empty stage per section of a new workout; stage durations as MM:SS on the number pad |
 | `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity, a Health workout session on iOS 26 and later and the run's track for the workout it saves |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
-| `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder |
+| `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder; builds for watchOS too |
+| `WatchRemoteFeature` | The Apple Watch app's screens; the `CircuitTimerWatch` target embedded in the iPhone app shows them ([Apple Watch](docs/apple-watch.md)) |
 | `WorkoutStorage` | `WorkoutStorageClient` (struct of closures, in memory for previews): SwiftData mirrored to iCloud when sync is on; the saved run file |
 | `CloudSync` | The sync switch, the launch's mirroring decision, account and import/export status |
 | `TimerPreferences` | The signal and Keep screen on switches, shared by Settings and the timer |

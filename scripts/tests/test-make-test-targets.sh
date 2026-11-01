@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Tests `make test`, `make test-ui` and `make build-ui-tests` up to xcodebuild, which a stand-in replaces: their paths
-# per destination, the build the UI tests find done, and the guard of UI_TEST_WORKERS. Make exits 2 when the recipe
-# fails.
+# Tests `make test`, `make test-ui`, `make build-ui-tests` and `make build-watch-package` up to xcodebuild, which a
+# stand-in replaces: their paths per destination, the build the UI tests find done, the guard of UI_TEST_WORKERS and
+# the strict watchOS build. Make exits 2 when the recipe fails.
 . "$(dirname "$0")/lib.sh"
 
-# Records its arguments, one per line.
+# Records its arguments, one per line, and in "$XCODEBUILD_ARGUMENTS.context" its directory and the strict switch.
 mkdir -p "$work/bin"
 cat > "$work/bin/xcodebuild" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$XCODEBUILD_ARGUMENTS"
+printf '%s\n' "$PWD" "CIRCUITTIMER_STRICT_WARNINGS=${CIRCUITTIMER_STRICT_WARNINGS-}" > "$XCODEBUILD_ARGUMENTS.context"
 if [ "$1" = build-for-testing ]; then
 	while [ "$1" != -derivedDataPath ]; do shift; done
 	app="$2/Build/Products/Debug-iphonesimulator/CircuitTimer.app"
@@ -88,6 +89,26 @@ test_ui UI_TEST_WORKERS=2
 expect_status 2
 expect_in "$work/out" "test-ui: parallel workers clone simulators, which only CI may do (see AGENTS.md)"
 expect_missing "$work/arguments"
+
+describe "the strict watchOS build of the watch app's modules"
+rm -f "$work/arguments"
+run make -s -C "$root" build-watch-package DERIVED_DATA="$work/dd" SOURCE_PACKAGES="$work/sp"
+expect_status 0
+expect_equal "$(head -1 "$work/arguments")" build
+expect_equal "$(grep -A1 -e '-scheme' "$work/arguments")" "-scheme
+WatchRemoteFeature"
+expect_equal "$(grep -A1 -e '-destination' "$work/arguments")" "-destination
+generic/platform=watchOS Simulator"
+expect_equal "$(grep -A1 -e '-derivedDataPath' "$work/arguments")" "-derivedDataPath
+$work/dd/WatchPackage"
+expect_in "$work/arguments" "ARCHS=$(uname -m)"
+expect_equal "$(cat "$work/arguments.context")" "$root/CircuitTimerKit
+CIRCUITTIMER_STRICT_WARNINGS=1"
+
+describe "make ci builds the watch app's modules"
+run make -n -C "$root" ci DERIVED_DATA="$work/dd"
+expect_status 0
+expect_in "$work/out" "xcodebuild build -scheme WatchRemoteFeature"
 
 for workers in 0 01 abc "" 100; do
 	describe "UI_TEST_WORKERS='$workers'"

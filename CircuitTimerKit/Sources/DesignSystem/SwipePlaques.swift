@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// What a swipe plaque does, which sets its fill.
 public enum SwipePlaqueRole: Sendable {
     /// A red plaque, as the original app's delete.
@@ -412,3 +415,4 @@ struct HorizontalPanRecognizer: UIGestureRecognizerRepresentable {
     .background(.surface(.screen))
     .preferredColorScheme(.dark)
 }
+#endif

@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// How fast the screen scrolls while a lifted row is held near the top or the bottom of the visible area, in points
 /// per frame: negative scrolls up, positive down.
 enum EdgeAutoScroll {
@@ -124,3 +127,4 @@ struct AutoScrollDriver: UIViewRepresentable {
         }
     }
 }
+#endif

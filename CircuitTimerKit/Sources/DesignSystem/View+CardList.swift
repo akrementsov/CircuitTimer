@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 extension View {
     /// A plain `List` of card rows on the screen color, inset from the screen's edges. Rows set their own heights
     /// and backgrounds with `cardRow(_:endsList:)` and `screenRow()`.
@@ -17,3 +20,4 @@ extension View {
             .background { Rectangle().fill(.surface(.screen)).ignoresSafeArea() }
     }
 }
+#endif

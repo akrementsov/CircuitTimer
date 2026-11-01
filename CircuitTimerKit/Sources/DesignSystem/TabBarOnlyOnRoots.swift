@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 extension View {
     /// For a `TabView` some of whose navigation stacks keep the tab bar to their roots with
     /// `tabBarOnlyOnRoot(isPushed:)`. Measured outside the tabs, the screen's own bottom inset reaches the pushed
@@ -54,3 +57,4 @@ private struct TabBarOnlyOnRoot: ViewModifier {
         }
     }
 }
+#endif

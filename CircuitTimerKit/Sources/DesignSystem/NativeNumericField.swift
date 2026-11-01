@@ -1,5 +1,8 @@
 import UIKit
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// Numeric groups are not words: tapping between two digits must keep the insertion point there.
 final class NativeNumericField: UITextField {
     private var characterTokenizer: NumericTokenizer?
@@ -104,3 +107,4 @@ private final class NumericTokenizer: NSObject, UITextInputTokenizer {
             || direction.rawValue == UITextLayoutDirection.left.rawValue
     }
 }
+#endif

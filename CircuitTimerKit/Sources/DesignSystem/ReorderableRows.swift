@@ -2,6 +2,9 @@ import os
 import SwiftUI
 import UIKit
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// Where the rows sit while one of them is dragged. Heights are in the order of the rows, with `spacing` between
 /// neighbours.
 struct ReorderGeometry: Equatable {
@@ -479,3 +482,4 @@ private struct LiftedRowTracker: ViewModifier {
         )
     }
 }
+#endif

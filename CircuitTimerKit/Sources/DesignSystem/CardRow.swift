@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// Where a list row sits in its card: only the card's outer corners are rounded.
 public enum CardRowPosition: Sendable {
     case top
@@ -54,3 +57,4 @@ private struct CardRowBackground: View {
         return RectangleCornerRadii(topLeading: top, bottomLeading: bottom, bottomTrailing: bottom, topTrailing: top)
     }
 }
+#endif

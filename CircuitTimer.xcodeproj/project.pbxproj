@@ -41,6 +41,8 @@
 		C7A4000000000000000000B6 /* WorkoutStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B7 /* WorkoutStorage */; };
 		C7A4000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B9 /* BackgroundExecution */; };
 		C7A100000000000000000064 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
+		C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A500000000000000000002 /* WatchRemoteFeature */; };
+		C7A500000000000000000003 /* CircuitTimerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C7A500000000000000000004 /* CircuitTimerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +74,13 @@
 			remoteGlobalIDString = C7A30000000000000000004C;
 			remoteInfo = CircuitTimerSnapshotHost;
 		};
+		C7A500000000000000000005 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C7A100000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C7A500000000000000000006;
+			remoteInfo = CircuitTimerWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -84,6 +93,17 @@
 				C7A10000000000000000004F /* CircuitTimerWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7A500000000000000000007 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				C7A500000000000000000003 /* CircuitTimerWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -103,6 +123,7 @@
 		C7A300000000000000000043 /* SnapshotTests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SnapshotTests.xcconfig; sourceTree = "<group>"; };
 		C7A300000000000000000064 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = CircuitTimer/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		C7A400000000000000000041 /* CircuitTimerSnapshotContractTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CircuitTimerSnapshotContractTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C7A500000000000000000004 /* CircuitTimerWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CircuitTimerWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -136,6 +157,11 @@
 		C7A100000000000000000058 /* CircuitTimerUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CircuitTimerUITests;
+			sourceTree = "<group>";
+		};
+		C7A500000000000000000008 /* CircuitTimerWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CircuitTimerWatch;
 			sourceTree = "<group>";
 		};
 		C7A300000000000000000044 /* CircuitTimerSnapshotHost */ = {
@@ -242,6 +268,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C7A500000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -251,6 +285,7 @@
 				C7A100000000000000000004 /* Configs */,
 				C7A100000000000000000005 /* CircuitTimer */,
 				C7A100000000000000000042 /* CircuitTimerWidgets */,
+				C7A500000000000000000008 /* CircuitTimerWatch */,
 				C7A100000000000000000058 /* CircuitTimerUITests */,
 				C7A300000000000000000044 /* CircuitTimerSnapshotHost */,
 				C7A300000000000000000045 /* CircuitTimerSnapshotTests */,
@@ -280,6 +315,7 @@
 			children = (
 				C7A100000000000000000006 /* CircuitTimer.app */,
 				C7A100000000000000000040 /* CircuitTimerWidgets.appex */,
+				C7A500000000000000000004 /* CircuitTimerWatch.app */,
 				C7A100000000000000000056 /* CircuitTimerUITests.xctest */,
 				C7A300000000000000000040 /* CircuitTimerSnapshotHost.app */,
 				C7A300000000000000000041 /* CircuitTimerSnapshotTests.xctest */,
@@ -299,11 +335,13 @@
 				C7A10000000000000000000A /* Frameworks */,
 				C7A10000000000000000000B /* Resources */,
 				C7A10000000000000000004E /* Embed Foundation Extensions */,
+				C7A500000000000000000007 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				C7A100000000000000000050 /* PBXTargetDependency */,
+				C7A50000000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C7A100000000000000000005 /* CircuitTimer */,
@@ -344,6 +382,29 @@
 			productName = CircuitTimerWidgets;
 			productReference = C7A100000000000000000040 /* CircuitTimerWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
+		};
+		C7A500000000000000000006 /* CircuitTimerWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C7A50000000000000000000C /* Build configuration list for PBXNativeTarget "CircuitTimerWatch" */;
+			buildPhases = (
+				C7A50000000000000000000A /* Sources */,
+				C7A500000000000000000009 /* Frameworks */,
+				C7A50000000000000000000B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C7A500000000000000000008 /* CircuitTimerWatch */,
+			);
+			name = CircuitTimerWatch;
+			packageProductDependencies = (
+				C7A500000000000000000002 /* WatchRemoteFeature */,
+			);
+			productName = CircuitTimerWatch;
+			productReference = C7A500000000000000000004 /* CircuitTimerWatch.app */;
+			productType = "com.apple.product-type.application";
 		};
 		C7A100000000000000000059 /* CircuitTimerUITests */ = {
 			isa = PBXNativeTarget;
@@ -468,6 +529,9 @@
 					C7A100000000000000000043 = {
 						CreatedOnToolsVersion = 26.5;
 					};
+					C7A500000000000000000006 = {
+						CreatedOnToolsVersion = 27.1;
+					};
 					C7A100000000000000000059 = {
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = C7A100000000000000000008;
@@ -499,6 +563,7 @@
 				C7A40000000000000000004D /* CircuitTimerSnapshotContractTests */,
 				C7A100000000000000000008 /* CircuitTimer */,
 				C7A100000000000000000043 /* CircuitTimerWidgets */,
+				C7A500000000000000000006 /* CircuitTimerWatch */,
 				C7A100000000000000000059 /* CircuitTimerUITests */,
 			);
 		};
@@ -542,6 +607,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		C7A400000000000000000053 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7A50000000000000000000B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -593,6 +665,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C7A50000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -615,6 +694,11 @@
 			isa = PBXTargetDependency;
 			target = C7A30000000000000000004C /* CircuitTimerSnapshotHost */;
 			targetProxy = C7A400000000000000000054 /* PBXContainerItemProxy */;
+		};
+		C7A50000000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C7A500000000000000000006 /* CircuitTimerWatch */;
+			targetProxy = C7A500000000000000000005 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -831,6 +915,68 @@
 			buildSettings = {PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_ID).snapshotcontracts"; };
 			name = Release;
 		};
+		C7A50000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C7A100000000000000000007 /* App.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CircuitTimer;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(APP_BUNDLE_ID)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(WATCH_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		C7A50000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C7A100000000000000000007 /* App.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = CircuitTimer;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(APP_BUNDLE_ID)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(WATCH_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -893,6 +1039,15 @@
 			buildConfigurations = (
 				C7A400000000000000000058 /* Debug */,
 				C7A400000000000000000059 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C7A50000000000000000000C /* Build configuration list for PBXNativeTarget "CircuitTimerWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C7A50000000000000000000E /* Debug */,
+				C7A50000000000000000000F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1009,6 +1164,10 @@
 		C7A4000000000000000000B5 /* WorkoutHealth */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutHealth; };
 		C7A4000000000000000000B7 /* WorkoutStorage */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutStorage; };
 		C7A4000000000000000000B9 /* BackgroundExecution */ = {isa = XCSwiftPackageProductDependency; productName = BackgroundExecution; };
+		C7A500000000000000000002 /* WatchRemoteFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WatchRemoteFeature;
+		};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C7A100000000000000000001 /* Project object */;

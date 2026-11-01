@@ -50,7 +50,7 @@ jobs:
     runs-on: xcode-27
     # A backstop for a hang in a step without its own timeout; GitHub's default is six hours. It stays above
     # the step timeouts below added together, so a slow run is not cancelled before they report.
-    timeout-minutes: 185
+    timeout-minutes: 200
     steps:
       - uses: actions/checkout@v7
 
@@ -136,6 +136,13 @@ jobs:
         if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
         timeout-minutes: 10
         run: make test-snapshot-kit
+
+      # The modules the watch app links, strictly, for a generic watchOS destination: the image's watchOS SDK suffices.
+      - name: Build the watch package
+        id: build-watch-package
+        if: ${{ !cancelled() && steps.lockfiles.outcome == 'success' }}
+        timeout-minutes: 10
+        run: make build-watch-package
 
       # Into the next step's DerivedData, so compilation errors are reported separately from image differences.
       - name: Build the snapshot tests

@@ -86,6 +86,7 @@ jobs:
             echo "team=$(sed -n 's/^DEVELOPMENT_TEAM = //p' Configs/App.xcconfig)"
             echo "app=$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")"
             echo "widgets=$(plutil -extract CFBundleIdentifier raw "$app/PlugIns/CircuitTimerWidgets.appex/Info.plist")"
+            echo "watch=$(plutil -extract CFBundleIdentifier raw "$app/Watch/CircuitTimerWatch.app/Info.plist")"
             echo "container=$(plutil -extract CTCloudKitContainerIdentifier raw "$app/Info.plist")"
           } >> "$GITHUB_OUTPUT"
 
@@ -96,7 +97,7 @@ jobs:
           umask 077
           printf '%s' "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
 
-      # The archive is signed only ad hoc, so only an export shows whether both bundles keep their App Store signature.
+      # The archive is signed only ad hoc, so only an export shows whether every bundle keeps its App Store signature.
       # An upload leaves no exported files behind, so a separate export to a folder is inspected first: a wrong
       # signature stops the run before anything is uploaded. The upload signs again with the same cloud identity
       # and automatic profiles, so this is strong evidence about the uploaded build, not a proof.
@@ -108,6 +109,7 @@ jobs:
           TEAM: ${{ steps.archive.outputs.team }}
           APP_ID: ${{ steps.archive.outputs.app }}
           WIDGETS_ID: ${{ steps.archive.outputs.widgets }}
+          WATCH_ID: ${{ steps.archive.outputs.watch }}
           CONTAINER: ${{ steps.archive.outputs.container }}
         run: |
           options="$RUNNER_TEMP/ExportOptions-inspect.plist"
@@ -118,7 +120,7 @@ jobs:
             -allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
           python3 -I scripts/verify-export-signing.py ipa .build/ExportInspect/CircuitTimer.ipa \
-            "$TEAM" "$APP_ID" "$WIDGETS_ID" "$CONTAINER"
+            "$TEAM" "$APP_ID" "$WIDGETS_ID" "$WATCH_ID" "$CONTAINER"
 
       - name: Upload to TestFlight
         timeout-minutes: 20

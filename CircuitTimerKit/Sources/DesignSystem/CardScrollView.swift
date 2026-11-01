@@ -1,5 +1,8 @@
 import SwiftUI
 
+// iOS only: uses UIKit or SwiftUI API that watchOS lacks, directly or through another iOS-only type.
+#if os(iOS)
+
 /// A scroll view of cards whose rows swipe and reorder: it measures where the content and the visible area are, scrolls
 /// by itself while a lifted row is held near an edge, closes an open swipe when the content scrolls or a gap is tapped,
 /// and hands `interaction` to the rows inside. `content` gets the proxy for the screen's own scrolling.
@@ -83,3 +86,4 @@ private struct ScrolledBarBackground: ViewModifier {
         }
     }
 }
+#endif
