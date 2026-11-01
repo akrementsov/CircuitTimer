@@ -237,6 +237,8 @@ public struct AppFeature: Sendable {
                     purchaseCloseRequested(&state)
                 case .destination(.dismiss):
                     destinationDismissed(&state)
+                case let .settings(.delegate(.fullVersionRequested(request))):
+                    fullVersionRequested(request, &state)
                 case .destination, .path, .settings:
                     .none
             }

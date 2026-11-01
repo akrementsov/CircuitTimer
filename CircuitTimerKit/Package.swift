@@ -152,6 +152,7 @@ let package = Package(
             name: "SettingsFeature",
             dependencies: [
                 "CloudSync",
+                "Purchases",
                 "TimerPreferences",
                 "DesignSystem",
                 "UITestContract",
@@ -291,6 +292,7 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "CloudSync",
+                "Purchases",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),

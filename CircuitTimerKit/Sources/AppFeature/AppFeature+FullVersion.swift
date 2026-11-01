@@ -3,12 +3,25 @@ import Foundation
 import os
 import PurchaseFeature
 import Purchases
+import SettingsFeature
 
 extension AppFeature {
     /// Asks for the purchase sheet; `presentRequestedPurchase` shows it once nothing is in the way. The latest request
     /// wins.
     func requestPurchase(_ entry: PurchaseFeature.Entry, _ state: inout State) {
         state.purchaseRequest = entry
+    }
+
+    func fullVersionRequested(_ request: SettingsFeature.FullVersionRequest, _ state: inout State) -> Effect<Action> {
+        switch request {
+            case .buy:
+                requestPurchase(.browse, &state)
+            case .restore:
+                requestPurchase(.restore, &state)
+            case .iCloudSync:
+                requestPurchase(.limit(.iCloudSync), &state)
+        }
+        return .none
     }
 
     /// Runs after every action. Shows a requested sheet once the launch's question about a saved run is settled and

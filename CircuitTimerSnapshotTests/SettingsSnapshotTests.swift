@@ -18,6 +18,7 @@ extension SnapshotTests {
                 state.selectedTab = .settings
                 state.settings.$isICloudSyncOn.withLock { $0 = false }
                 state.settings.cloudSyncStatus = CloudSyncStatus(isRequested: false, isMirroring: false, problem: nil)
+                state.settings.fullVersion = .full
                 return state
             }
         }
