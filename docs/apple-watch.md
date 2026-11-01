@@ -21,7 +21,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 ## How it works
 
 - The iPhone app publishes its list whenever it settles: after it loads, and after every save, delete, duplicate and reorder once the write has finished. The newest list goes into the WatchConnectivity application context, which the watch app receives now or when it opens, and to a reachable watch app at once as a message.
-- The watch app asks the iPhone for its current state when it opens or comes back to the front, when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. It never polls: an unchanged list is confirmed by its digest without being sent again.
+- The watch app asks the iPhone for its current state when it opens or comes back to the front, when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. Once the iPhone answers, the watch does not ask again until the next of these reasons; an unchanged list is confirmed by its digest without being sent again.
 - A request from the watch can launch the iPhone app in the background. That process answers at once but has not read the workouts, so it says it knows no list; the list comes when the iPhone app loads it.
 
 ## How it is built and shipped

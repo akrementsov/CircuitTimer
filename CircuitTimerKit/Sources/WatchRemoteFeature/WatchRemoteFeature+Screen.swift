@@ -61,7 +61,7 @@ extension WatchRemoteFeature.State {
             return .companionMissing
         }
         // A session still activating is connecting, not unreachable.
-        guard let link, link.isActivated, refresh.hasAnswered || refresh.inFlight == nil else { return .connecting }
+        guard let link, !link.isActivating, refresh.hasAnswered || refresh.inFlight == nil else { return .connecting }
         if problem != nil || !link.canSend {
             return .unreachable
         }
@@ -82,7 +82,7 @@ extension WatchRemoteFeature.State {
             case .incompatible, nil:
                 break
         }
-        if let link, link.isActivated, !link.canSend {
+        if let link, !link.isActivating, !link.canSend {
             return .unreachable(updatedAt: updatedAt)
         }
         if let processID = order.processID, order.catalogConfirmedBy != processID {

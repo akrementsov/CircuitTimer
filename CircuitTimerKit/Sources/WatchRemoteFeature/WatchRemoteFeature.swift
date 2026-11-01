@@ -113,7 +113,16 @@ public struct WatchRemoteFeature: Sendable {
                 .cancellable(id: CancelID.events, cancelInFlight: true)
             case let .scenePhaseChanged(phase):
                 state.isSceneActive = phase == .active
-                guard state.isSceneActive else { return .cancel(id: CancelID.retry) }
+                guard state.isSceneActive else {
+                    // A request still in flight when the scene leaves is dropped: the return asks again.
+                    state.refresh.inFlight = nil
+                    state.refresh.needsRefresh = false
+                    return .merge(
+                        .cancel(id: CancelID.retry),
+                        .cancel(id: CancelID.refresh),
+                        .cancel(id: CancelID.refreshTimeout)
+                    )
+                }
                 state.refresh.failures = 0
                 if state.problem == .companionMissing {
                     state.problem = nil

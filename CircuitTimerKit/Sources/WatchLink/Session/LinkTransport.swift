@@ -8,11 +8,13 @@ struct SessionSnapshot: Equatable, Sendable {
     var needsUnlock: Bool
     /// The context can reach a watch: on the iPhone a paired watch with the app; on the watch, always.
     var canPublish: Bool
+    /// Activation has not reported its end yet.
+    var isActivating = false
 
     static let inactive = SessionSnapshot(isActivated: false, isReachable: false, needsUnlock: false, canPublish: false)
 
     var linkStatus: LinkStatus {
-        LinkStatus(isActivated: isActivated, isReachable: isReachable, needsUnlock: needsUnlock)
+        LinkStatus(isActivated: isActivated, isReachable: isReachable, needsUnlock: needsUnlock, isActivating: isActivating)
     }
 }
 

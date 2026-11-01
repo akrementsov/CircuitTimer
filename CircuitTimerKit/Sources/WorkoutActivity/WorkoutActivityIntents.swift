@@ -1,11 +1,9 @@
 import Dependencies
 import Foundation
-#if os(iOS)
-import AppIntents
-#endif
 
 // iOS only: `LiveActivityIntent` is unavailable on watchOS.
 #if os(iOS)
+import AppIntents
 
 public struct WorkoutActivityIntents: AppIntentsPackage {}
 

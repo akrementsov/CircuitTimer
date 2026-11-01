@@ -14,6 +14,8 @@ final class WCSessionBridge: NSObject, WCSessionDelegate, @unchecked Sendable {
         /// Events that arrived while no stream was read: the request that launched the iPhone app comes before its
         /// actor subscribes, and the watch activates in its host's `init`, before the first `.task`.
         var pending: [SessionEvent] = []
+        /// WatchConnectivity has reported the end of an activation, successful or not.
+        var hasActivationEnded = false
     }
 
     private let session: WCSession
@@ -75,6 +77,12 @@ final class WCSessionBridge: NSObject, WCSessionDelegate, @unchecked Sendable {
     }
 
     private func status() -> SessionSnapshot {
+        var snapshot = currentStatus()
+        snapshot.isActivating = !snapshot.isActivated && !subscription.withLock { $0.hasActivationEnded }
+        return snapshot
+    }
+
+    private func currentStatus() -> SessionSnapshot {
         let isActivated = session.activationState == .activated
         #if os(iOS)
         return SessionSnapshot(
@@ -109,6 +117,7 @@ final class WCSessionBridge: NSObject, WCSessionDelegate, @unchecked Sendable {
         if let error {
             Logger.watchLink.error("The session did not activate: \(String(reflecting: error), privacy: .public)")
         }
+        subscription.withLock { $0.hasActivationEnded = true }
         deliver(state == .activated ? .activated : .statusChanged)
     }
 

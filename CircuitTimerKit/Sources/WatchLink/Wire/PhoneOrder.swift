@@ -76,7 +76,8 @@ public struct PhoneOrder: Equatable, Sendable {
         return Outcome(change: .unknown, asksAgain: ask(for: state))
     }
 
-    /// Asks once for each state, so a message delivered twice does not wake the iPhone twice.
+    /// Asks once for each of the last eight states it asked about, so a message delivered twice, or two delayed
+    /// processes taking turns, do not wake the iPhone again; an older one may ask once more.
     private mutating func ask(for state: PhoneState) -> Bool {
         let asked = Asked(processID: state.processID, sequence: state.sequence)
         guard !askedFor.contains(asked) else { return false }
