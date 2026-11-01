@@ -8,7 +8,7 @@ The watch app installs with the iPhone app and shows one screen: «Open CircuitT
 
 ## How it is built and shipped
 
-- `WatchRemoteFeature` holds the watch app's screens. It builds for iOS and watchOS, so the tests it gets in later slices run with the package's on the iPhone simulator; it has none yet. `DesignSystem` builds for watchOS too; its iOS screen parts are left out there.
+- `WatchRemoteFeature` holds the watch app's screens. It builds for iOS and watchOS, so its tests run with the package's on the iPhone simulator. `DesignSystem` builds for watchOS too; its iOS screen parts are left out there.
 - The `CircuitTimerWatch` target is a thin watchOS app that shows `WatchRootView`. The iPhone app depends on it and embeds it in `CircuitTimer.app/Watch/`, so every app build, the UI test build and the archive build it.
 - `make build-watch-package` builds the watch app's modules strictly for a generic watchOS Simulator destination, for the Mac's architecture only. It needs the watchOS SDK, not a watchOS runtime; the `xcode-27` CI image has the SDK. The watch's own architectures (`arm64_32` for watches with chips before S9, `arm64` from S9) compile only in `make archive` and in device builds, without strict warnings: accepted while the watch app links only `DesignSystem` and this screen; CT-9-2, which builds `WorkoutActivity` and the new `WatchLink` for the watch, decides whether CI builds the watch's own architectures too.
 - `make archive` signs the watch app ad hoc between the widget and the iPhone app; `testflight.yml` checks its Info.plist in the archive and its App Store signature, without HealthKit or iCloud, in the exported IPA.
@@ -26,3 +26,4 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 
 - [ ] A TestFlight build installs the watch app with the iPhone app (automatically, or from the Watch app's Available Apps).
 - [ ] The watch app's name is CircuitTimer, its icon the iPhone app's, and it shows the screen above in English and Russian, its background filling the screen.
+- [ ] At the largest text size the screen scrolls and no text is cut off.
