@@ -286,7 +286,11 @@ let package = Package(
         ),
         .testTarget(
             name: "WatchRemoteFeatureTests",
-            dependencies: ["WatchRemoteFeature"],
+            dependencies: [
+                "WatchLink",
+                "WatchRemoteFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
