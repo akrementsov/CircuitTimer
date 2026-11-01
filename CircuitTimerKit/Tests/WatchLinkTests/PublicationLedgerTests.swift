@@ -191,6 +191,24 @@ struct PublicationLedgerTests {
     }
 
     @Test
+    func test_publish_olderRevisionAfterARefusedOne_keepsTheFallbackWritten() async throws {
+        let ledger = ledger
+        link.refusals.setValue([FakeLink.tooLarge])
+        let refused = await ledger.publish(revision: 3, catalog: .loaded(makeCatalog(4)), at: linkNow)
+        let older = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(6)), at: linkNow)
+
+        guard case let .written(half) = refused else {
+            Issue.record("The refused list fell back to nothing: \(refused)")
+            return
+        }
+        #expect(half.catalog == .loaded(makeCatalog(4).prefix(2)))
+        #expect(older == .skipped)
+        #expect(try link.writtenStates() == [half])
+        let reply = await ledger.reply(knownCatalogDigest: nil, at: linkNow)
+        #expect(reply.catalog == half.catalog)
+    }
+
+    @Test
     func test_publish_concurrentRevisions_writeIncreasingSequencesOfIncreasingRevisions() async throws {
         let ledger = ledger
         await withTaskGroup(of: Void.self) { group in

@@ -260,21 +260,23 @@ struct AppFeatureWatchTests {
     @Test
     func test_reload_sameList_publishesItAgainUnderANewRevision() async {
         let watch = WatchPublications()
-        var state = loaded([first, second])
-        state.pendingMutations = [.reorder([first.id, second.id])]
+        var state = AppFeature.State()
+        state.workouts = .loading
         let store = makeStore(state, watch: watch) {
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [self.first, self.second]) }
         }
 
-        await store.send(.internal(.mutationFinished(.storeDiverged))) {
-            $0.pendingMutations = []
-            $0.isReloading = true
+        await store.send(.internal(.workoutsLoaded(StoredWorkouts(workouts: [first, second])))) {
+            $0.workouts = .loaded([self.first, self.second])
         }
+        await store.send(.view(.retryButtonTapped)) { $0.isReloading = true }
         await store.receive(\.internal.workoutsLoaded) { $0.isReloading = false }
         await store.finish()
 
+        let catalog = CatalogState.loaded(WatchCatalog(workouts: [first, second]))
         #expect(watch.published.value == [
-            WatchPublication(revision: 1, catalog: .loaded(WatchCatalog(workouts: [first, second]))),
+            WatchPublication(revision: 1, catalog: catalog),
+            WatchPublication(revision: 2, catalog: catalog),
         ])
     }
 
