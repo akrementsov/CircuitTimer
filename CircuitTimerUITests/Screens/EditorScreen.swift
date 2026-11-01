@@ -60,7 +60,7 @@ struct EditorScreen: Screen {
         // Hold the name itself, leaving the duration's cursor gestures alone.
         let start = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let end = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        start.press(forDuration: 0.6, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
+        start.press(forDuration: rowLiftHold, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
         return self
     }
 

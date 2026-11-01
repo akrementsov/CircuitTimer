@@ -3,11 +3,12 @@
 import Dependencies
 import Foundation
 import Testing
+import TestSupport
 
 @Suite(.timeLimit(.minutes(1)))
 struct LiveActivityCoordinatorTests {
     private let fake = FakeTransport()
-    private let clock = TestClock<Duration>()
+    private let clock = ManualClock()
     private let coordinator: LiveActivityCoordinator
     private static let owner = UUID(fixture: 1)
     private static let other = UUID(fixture: 2)
@@ -218,10 +219,10 @@ struct LiveActivityCoordinatorTests {
         fake.listsOnRequest.setValue(false)
         #expect(await sync(.held(1), revision: 1) == nil)
 
-        await clock.advance(by: .milliseconds(9_900))
+        clock.advance(by: .milliseconds(9_900))
         #expect(await sync(.held(2), revision: 2) == nil)
         #expect(await sync(.held(2), revision: 3) == nil)
-        await clock.advance(by: .milliseconds(100))
+        clock.advance(by: .milliseconds(100))
         #expect(fake.calls.value == [.request(.held(1)), .update("activity-1", .held(2))])
 
         #expect(await sync(.held(3), revision: 4) == LiveActivityNotice(serial: 1, isFailing: true))
@@ -240,7 +241,7 @@ struct LiveActivityCoordinatorTests {
     func test_sync_activityNeverListed_unchangedContent_isDroppedAtTheDeadlineByPresenceAlone() async {
         fake.listsOnRequest.setValue(false)
         _ = await sync(.held(1), revision: 1)
-        await clock.advance(by: .seconds(10))
+        clock.advance(by: .seconds(10))
 
         #expect(await sync(.held(1), revision: 2) == LiveActivityNotice(serial: 1, isFailing: true))
         #expect(fake.calls.value == [.request(.held(1)), .end("activity-1", nil, .immediate)])
@@ -253,7 +254,7 @@ struct LiveActivityCoordinatorTests {
         fake.presence.withValue { $0["activity-1"] = .alive }
         _ = await sync(.held(2), revision: 2)
 
-        await clock.advance(by: .seconds(10))
+        clock.advance(by: .seconds(10))
         #expect(await sync(.held(3), revision: 3) == nil)
 
         #expect(fake.calls.value == [.request(.held(1)), .update("activity-1", .held(2)), .update("activity-1", .held(3))])
@@ -359,8 +360,10 @@ struct LiveActivityCoordinatorTests {
         fake.endGate.setValue(gate)
         let ending = Task { await end() }
         await gate.entered.next()
+        // `end` waits for the drain on the clock; advancing before that wait begins would never end it.
+        await clock.waitForSleeps()
 
-        await clock.advance(by: LiveActivityCoordinator.endTimeout)
+        clock.advance(by: LiveActivityCoordinator.endTimeout)
         await ending.value
         #expect(fake.calls.value == [.request(.held(1))])
 
