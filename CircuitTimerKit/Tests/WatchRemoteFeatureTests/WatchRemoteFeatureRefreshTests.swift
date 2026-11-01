@@ -78,8 +78,11 @@ struct WatchRemoteFeatureRefreshTests {
         await store.send(.internal(.event(.message(phoneState(process: 2, sequence: 1, digest: "B")))))
         await store.receive(\.internal.refreshAnswered)
         await store.send(.internal(.event(.message(phoneState(process: 2, sequence: 1, digest: "B")))))
+        // The same process's next state with the same digest is another state, so it is asked about once more.
+        await store.send(.internal(.event(.message(phoneState(process: 2, sequence: 2, digest: "B")))))
+        await store.receive(\.internal.refreshAnswered)
 
-        #expect(sent.requests.value == [.refresh(knownCatalogDigest: "A"), .refresh(knownCatalogDigest: "A")])
+        #expect(sent.requests.value == Array(repeating: .refresh(knownCatalogDigest: "A"), count: 3))
         #expect(store.state.catalog?.lastLoaded == catalog)
         #expect(store.state.catalog?.updatedAt == earlier)
     }

@@ -256,6 +256,28 @@ struct AppFeatureWatchTests {
         #expect(watch.published.value == [WatchPublication(revision: 1, catalog: .loaded(WatchCatalog(workouts: [renamed])))])
     }
 
+    /// The watch link drops a list it already has by its digest, so the app publishes it again rather than compare.
+    @Test
+    func test_reload_sameList_publishesItAgainUnderANewRevision() async {
+        let watch = WatchPublications()
+        var state = loaded([first, second])
+        state.pendingMutations = [.reorder([first.id, second.id])]
+        let store = makeStore(state, watch: watch) {
+            $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [self.first, self.second]) }
+        }
+
+        await store.send(.internal(.mutationFinished(.storeDiverged))) {
+            $0.pendingMutations = []
+            $0.isReloading = true
+        }
+        await store.receive(\.internal.workoutsLoaded) { $0.isReloading = false }
+        await store.finish()
+
+        #expect(watch.published.value == [
+            WatchPublication(revision: 1, catalog: .loaded(WatchCatalog(workouts: [first, second]))),
+        ])
+    }
+
     private static func ids(_ catalog: CatalogState) -> [UUID]? {
         guard case let .loaded(catalog) = catalog else { return nil }
         return catalog.entries.map(\.id)

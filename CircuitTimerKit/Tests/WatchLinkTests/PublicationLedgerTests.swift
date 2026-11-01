@@ -65,8 +65,9 @@ struct PublicationLedgerTests {
         #expect(cut.isTruncated)
         #expect(cut.entries.count < 200)
         #expect(cut.entries == Array(large.entries.prefix(cut.entries.count)))
-        let longest = WatchReplyEnvelope(requestID: UUID(link: 9), reply: .state(written[0]))
-        #expect(try WireCoding.encode(longest).count <= WatchLinkSchema.envelopeLimit)
+        // The cut is the largest prefix whose longest reply fits: one more workout would not.
+        #expect(try Self.longestReplySize(of: cut) <= WatchLinkSchema.envelopeLimit)
+        #expect(try Self.longestReplySize(of: large.prefix(cut.entries.count + 1)) > WatchLinkSchema.envelopeLimit)
         #expect(written[1].catalog == .unavailable(.tooLarge))
         #expect(written[2].catalog == .loaded(WatchCatalog(entries: [])))
     }
@@ -105,9 +106,13 @@ struct PublicationLedgerTests {
         _ = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(6)), at: linkNow)
         #expect(try link.writtenStates().last?.catalog == .unavailable(.tooLarge))
 
+        // A list in between, so the single workout's fallback is not the state already written.
+        _ = await ledger.publish(revision: 3, catalog: .loaded(makeCatalog(2)), at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge])
-        _ = await ledger.publish(revision: 3, catalog: .loaded(makeCatalog(1) { _ in "Only" }), at: linkNow)
+        _ = await ledger.publish(revision: 4, catalog: .loaded(makeCatalog(1) { _ in "Only" }), at: linkNow)
         #expect(try link.writtenStates().last?.catalog == .unavailable(.tooLarge))
+        // Every refused candidate took a number of its own.
+        #expect(try link.writtenStates().map(\.sequence) == [2, 5, 6, 8])
     }
 
     @Test
@@ -176,6 +181,13 @@ struct PublicationLedgerTests {
 
         #expect(older == .skipped)
         #expect(try link.writtenStates().map(\.catalog) == [.loaded(makeCatalog(3))])
+
+        // An older revision is dropped before it tries a write, so a refusal never takes it down the fallback path.
+        link.refusals.setValue([FakeLink.tooLarge])
+        let olderOnTheFallbackPath = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(4)), at: linkNow)
+        #expect(olderOnTheFallbackPath == .skipped)
+        #expect(link.refusals.value.count == 1)
+        #expect(link.contexts.value.count == 1)
     }
 
     @Test
@@ -199,5 +211,17 @@ struct PublicationLedgerTests {
         #expect(Set(written.map(\.sequence)).count == written.count)
         #expect(counts == counts.sorted())
         #expect(Set(counts).count == counts.count)
+    }
+
+    /// The size of a reply carrying `catalog` with the largest number and a full digest, the longest way it travels.
+    private static func longestReplySize(of catalog: WatchCatalog) throws -> Int {
+        let state = PhoneState(
+            processID: UUID(link: 1),
+            sequence: .max,
+            publishedAt: linkNow,
+            catalog: .loaded(catalog),
+            catalogDigest: String(repeating: "0", count: 64)
+        )
+        return try WireCoding.encode(WatchReplyEnvelope(requestID: UUID(link: 1), reply: .state(state))).count
     }
 }
