@@ -269,6 +269,7 @@ let package = Package(
                 "BackgroundExecution",
                 "DesignSystem",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",

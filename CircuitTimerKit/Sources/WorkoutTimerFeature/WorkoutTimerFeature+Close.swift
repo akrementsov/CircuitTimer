@@ -62,11 +62,14 @@ extension WorkoutTimerFeature {
         let notifications = backgroundNotifications
         let activity = liveActivity
         let health = workoutHealth
+        let watch = watchCompanion
         let record = workoutRunRecord
         // `end` finishes before `dismiss` starts the teardown. A loop whose cancellation registers before the
         // teardown is cancelled by it; one that registers later checks `isEnded` after registering, finds the
         // session ended and returns before it sleeps.
-        let close = Effect<Action>.run { [timerSession, health, cues, notifications, activity, dismiss, record, backgroundTask] _ in
+        let close = Effect<Action>.run { [timerSession, cues, dismiss, backgroundTask] _ in
+            // First: from here no request confirms the closing run on the watch. It waits for no write.
+            await watch.end(id)
             await timerSession.end(owner: id)
             await health.end(id, track, now)
             await cues.end(id)

@@ -5,6 +5,7 @@ import Foundation
 import os
 import SwiftUI
 import TimerPreferences
+import WatchLink
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutHealth
@@ -150,6 +151,7 @@ public struct WorkoutTimerFeature: Sendable {
         public enum View: Equatable, Sendable {
             case task
             case activityTask
+            case watchTask
             case closeButtonTapped
             case playPauseButtonTapped
             case nextButtonTapped
@@ -174,6 +176,7 @@ public struct WorkoutTimerFeature: Sendable {
             case activityRequestsEnded
             case activityRequestReceived(LiveActivityControlRequest)
             case activitySynchronized(revision: Int, LiveActivitySyncResult)
+            case watchRequestReceived(WatchControlRequest)
         }
     }
 
@@ -182,6 +185,7 @@ public struct WorkoutTimerFeature: Sendable {
         case cues
         case notificationAccess
         case activityRequests
+        case watchRequests
     }
 
     /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
@@ -198,6 +202,7 @@ public struct WorkoutTimerFeature: Sendable {
     @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.preferredLocales) var preferredLocales
     @Dependency(\.timerSession) var timerSession
+    @Dependency(\.watchCompanion) var watchCompanion
     @Dependency(\.workoutHealth) var workoutHealth
     @Dependency(\.workoutRunRecord) var workoutRunRecord
 
@@ -233,9 +238,10 @@ public struct WorkoutTimerFeature: Sendable {
             let awake = syncScreenAwake(&state)
             let notifications = syncNotifications(&state, after: action, at: now)
             let activity = syncLiveActivity(&state, after: action, at: now)
+            let watch = syncWatch(&state, after: action, at: now)
             let health = startHealthSession(state, after: action, at: now)
             let track = syncHealthTrack(&state, at: now)
-            return .merge(signals, awake, notifications, activity, health, track, finishActivityControl(&state))
+            return .merge(signals, awake, notifications, activity, watch, health, track, finishActivityControl(&state))
         }
     }
 
@@ -245,8 +251,8 @@ public struct WorkoutTimerFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         // The close alert relies on a stopped clock; a control that slips under it would restart the clock or
         // replace the alert. Leaving and coming back still count: the clock is stopped, and the run is saved.
-        if action != .task, action != .activityTask, !action.is(\.scenePhaseChanged), action != .notificationPreferencesChanged,
-           state.destination != nil { return .none }
+        if action != .task, action != .activityTask, action != .watchTask, !action.is(\.scenePhaseChanged),
+           action != .notificationPreferencesChanged, state.destination != nil { return .none }
 
         let now = date()
         switch action {
@@ -259,6 +265,8 @@ public struct WorkoutTimerFeature: Sendable {
                 guard state.activityControls == nil else { return .none }
                 state.activityControls = ActivityControlState()
                 return subscribeActivityRequests(state.id)
+            case .watchTask:
+                return subscribeWatchRequests(state.id)
             case .notificationPreferencesChanged:
                 return .none
             case .closeButtonTapped:
@@ -288,6 +296,10 @@ public struct WorkoutTimerFeature: Sendable {
                 return acknowledgeActivityRequest(state.id, requestID: pending.id, result: .unavailable)
             case let .activityRequestReceived(request):
                 return handleActivityRequest(request, &state, at: date())
+            case .watchRequestReceived:
+                // The watch asks for the run as it is now: settle it; the second reducer answers with it.
+                let now = date()
+                return advance(&state, at: now) ? syncClock(&state, at: now) : .none
             case let .activitySynchronized(revision, result):
                 activitySynchronized(revision: revision, result: result, &state)
                 return .none

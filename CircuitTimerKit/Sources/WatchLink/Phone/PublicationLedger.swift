@@ -182,6 +182,8 @@ final class PublicationLedger: @unchecked Sendable {
     private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
         guard revision > runRevision, isOpen(for: run.owner) else { return .skipped }
         runRevision = revision
+        // The timer publishes after every action; a run already written costs no encoding.
+        if run == prepared?.run, isWritten { return .skipped }
         if let tooLargeOwner {
             // A run that did not fit stays hidden until its owner ends, so the watch does not flicker between stages
             // whose names fit and stages whose names do not.
