@@ -276,6 +276,15 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WatchLinkTests",
+            dependencies: [
+                "WatchLink",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WatchRemoteFeatureTests",
             dependencies: ["WatchRemoteFeature"],
             swiftSettings: strictSettings
