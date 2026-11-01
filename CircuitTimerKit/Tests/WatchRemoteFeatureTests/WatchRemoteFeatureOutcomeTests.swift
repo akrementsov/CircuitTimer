@@ -52,12 +52,16 @@ struct WatchRemoteFeatureOutcomeTests {
     }
 
     /// A store whose requests never end, so a test sees each one start and nothing after it.
-    private static func heldStore(_ state: WatchRemoteFeature.State, sent: SentRequests) -> TestStoreOf<WatchRemoteFeature> {
+    private static func heldStore(
+        _ state: WatchRemoteFeature.State,
+        sent: SentRequests,
+        clock: TestClock<Duration> = TestClock()
+    ) -> TestStoreOf<WatchRemoteFeature> {
         TestStore(initialState: state) {
             WatchRemoteFeature()
         } withDependencies: {
             $0.uuid = .incrementing
-            $0.continuousClock = TestClock()
+            $0.continuousClock = clock
             $0.phoneCompanion.status = { reachable }
             $0.phoneCompanion.send = { _, request in
                 sent.requests.withValue { $0.append(request) }
@@ -101,6 +105,48 @@ struct WatchRemoteFeatureOutcomeTests {
         #expect(store.state.refresh.inFlight == nil)
         #expect(!store.state.refresh.needsRefresh)
         #expect(sent.requests.value.isEmpty)
+    }
+
+    /// With a request in flight the flag is set before the scene and the link are checked, so the reason survives a
+    /// link that went away meanwhile.
+    @Test
+    func test_reason_requestInFlightIPhoneOutOfReach_setsTheFlag() async {
+        let sent = SentRequests()
+        var state = stateShowing(watchCatalog("Morning"), digest: "A")
+        state.refresh.inFlight = Self.current
+        state.link = unreachable
+        let store = Self.heldStore(state, sent: sent)
+        store.exhaustivity = .off
+
+        await store.send(.internal(.event(.message(phoneState(sequence: 2, digest: "B")))))
+
+        #expect(store.state.refresh.inFlight == Self.current)
+        #expect(store.state.refresh.needsRefresh)
+        #expect(sent.requests.value.isEmpty)
+    }
+
+    /// A request started for another reason cancels the retry scheduled before it: the store would fail on its
+    /// `retryDue` five seconds later.
+    @Test
+    func test_newRequest_afterARetryWasScheduled_cancelsTheRetry() async {
+        let clock = TestClock()
+        let store = Self.heldStore(Self.asking(), sent: SentRequests(), clock: clock)
+
+        await store.send(.internal(.refreshFailed(sentID: Self.current, .unreachable))) {
+            $0.refresh.inFlight = nil
+            $0.refresh.failures = 1
+            $0.refresh.retryGeneration = 1
+            $0.problem = .unreachable
+        }
+        await store.send(.internal(.statusRead(reachable))) {
+            $0.refresh.inFlight = UUID(0)
+            $0.refresh.retryGeneration = 2
+        }
+        await clock.advance(by: .seconds(5))
+        await store.send(.view(.scenePhaseChanged(.inactive))) {
+            $0.isSceneActive = false
+            $0.refresh.inFlight = nil
+        }
     }
 
     @Test
