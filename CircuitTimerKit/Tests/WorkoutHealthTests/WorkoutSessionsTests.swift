@@ -4,6 +4,7 @@ import Dependencies
 import Foundation
 import HealthKit
 import Testing
+import TestSupport
 
 @Suite(.timeLimit(.minutes(1)))
 struct WorkoutSessionsTests {

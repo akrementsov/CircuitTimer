@@ -3,8 +3,9 @@
 import Dependencies
 import Foundation
 import Testing
+import TestSupport
 
-// `waitForSleeper` and the fake's waits loop until their condition holds: a regression fails the suite instead of
+// `waitForSleeps` and the fake's waits last until their condition holds: a regression fails the suite instead of
 // hanging it.
 @Suite(.timeLimit(.minutes(1)))
 struct NotificationSchedulerTests: Sendable {
@@ -146,20 +147,20 @@ struct NotificationSchedulerTests: Sendable {
     func test_cleanup_unresolvedSweep_rateLimitsNewReadsForThirtySeconds() async throws {
         let fake = NotificationFake()
         fake.holdsPending = true
-        let clock = TestClock<Duration>()
+        let clock = ManualClock()
         let scheduler = NotificationScheduler(transport: fake.transport)
         let first = Task { try await scheduler.removeOrphans(clock: clock) }
         await fake.waitForPending()
-        await clock.waitForSleeper()
-        await clock.advance(by: .milliseconds(500))
+        await clock.waitForSleeps()
+        clock.advance(by: .milliseconds(500))
         #expect(try await first.value == false)
         let retry = Task { try await scheduler.removeOrphans(clock: clock) }
-        await clock.waitForSleeper()
-        await clock.advance(by: .milliseconds(500))
+        await clock.waitForSleeps()
+        clock.advance(by: .milliseconds(500))
         #expect(try await retry.value == false)
         #expect(fake.pendingReads == 1)
         #expect(fake.deliveredReads == 1)
-        await clock.advance(by: .seconds(29))
+        clock.advance(by: .seconds(29))
         let renewed = Task { try await scheduler.removeOrphans(clock: clock) }
         // A sweep reads pending requests before delivered ones.
         await fake.waitForDelivered(count: 2)
@@ -269,14 +270,14 @@ struct NotificationSchedulerTests: Sendable {
     func test_sync_pendingSnapshotMissing_doesNotConfirmFutureCoverage() async throws {
         let fake = NotificationFake()
         fake.holdsPending = true
-        let clock = TestClock<Duration>()
+        let clock = ManualClock()
         let scheduler = NotificationScheduler(transport: fake.transport)
         let operation = Task {
             try await scheduler.sync(owner, revision: 1, plan: [notification(after: 10)], now: { now }, clock: clock)
         }
         await fake.waitForPending(count: 2)
-        await clock.waitForSleeper()
-        await clock.advance(by: .milliseconds(500))
+        await clock.waitForSleeps()
+        clock.advance(by: .milliseconds(500))
         let report = try await operation.value
         #expect(!report.isVerified)
         #expect(report.confirmedFuture == 0)

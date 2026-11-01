@@ -133,6 +133,7 @@ let package = Package(
             name: "BackgroundNotificationsTests",
             dependencies: [
                 "BackgroundNotifications",
+                "TestSupport",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
@@ -227,6 +228,11 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
+        // Clocks and values that tests wait on without yielding; linked by test targets only, so it is no product.
+        .target(
+            name: "TestSupport",
+            swiftSettings: strictSettings
+        ),
         // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
         .target(
             name: "WatchRemoteFeature",
@@ -310,6 +316,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutHealthTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutHealth",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],

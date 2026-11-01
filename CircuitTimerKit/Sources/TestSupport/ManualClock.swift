@@ -1,12 +1,26 @@
-import Dependencies
 import os
 
 /// A clock that moves only when a test advances it. A sleep is registered before it suspends, so `waitForSleeps` sees
 /// it and the `advance` that follows always wakes it. Unlike `TestClock`, nothing here yields to background-priority
 /// tasks, which a loaded runner starves for seconds at a time.
-final class ManualClock: Clock, Sendable {
-    typealias Duration = Swift.Duration
-    typealias Instant = TestClock<Swift.Duration>.Instant
+public final class ManualClock: Clock, Sendable {
+    public struct Instant: InstantProtocol, Sendable {
+        public typealias Duration = Swift.Duration
+
+        let offset: Duration
+
+        public func advanced(by duration: Duration) -> Self {
+            Self(offset: offset + duration)
+        }
+
+        public func duration(to other: Self) -> Duration {
+            other.offset - offset
+        }
+
+        public static func < (lhs: Self, rhs: Self) -> Bool {
+            lhs.offset < rhs.offset
+        }
+    }
 
     private struct Sleeper: Sendable {
         let number: Int
@@ -20,7 +34,7 @@ final class ManualClock: Clock, Sendable {
     }
 
     private struct State: Sendable {
-        var now = Instant()
+        var now = Instant(offset: .zero)
         var sleepers: [Sleeper] = []
         var sleepCount = 0
         var waiters: [SleepWaiter] = []
@@ -28,15 +42,17 @@ final class ManualClock: Clock, Sendable {
 
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    var now: Instant {
+    public init() {}
+
+    public var now: Instant {
         state.withLock { $0.now }
     }
 
-    var minimumResolution: Duration {
+    public var minimumResolution: Duration {
         .zero
     }
 
-    func sleep(until deadline: Instant, tolerance _: Duration?) async throws {
+    public func sleep(until deadline: Instant, tolerance _: Duration?) async throws {
         try Task.checkCancellation()
         let (stream, wake) = AsyncStream<Never>.makeStream()
         let (number, ready) = state.withLock { state -> (Int?, [CheckedContinuation<Void, Never>]) in
@@ -61,7 +77,7 @@ final class ManualClock: Clock, Sendable {
     }
 
     /// Moves the clock and wakes every sleep it reaches.
-    func advance(by duration: Duration) {
+    public func advance(by duration: Duration) {
         let due = state.withLock { state in
             state.now = state.now.advanced(by: duration)
             let now = state.now
@@ -75,7 +91,7 @@ final class ManualClock: Clock, Sendable {
     }
 
     /// Returns once `pending` sleeps wait on the clock at the same time.
-    func waitForSleeps(_ pending: Int = 1) async {
+    public func waitForSleeps(_ pending: Int = 1) async {
         await withCheckedContinuation { continuation in
             let isReady = state.withLock { state in
                 guard state.sleepers.count < pending else { return true }
