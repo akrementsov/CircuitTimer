@@ -4,7 +4,7 @@ import Dependencies
 import Foundation
 import Testing
 
-@Suite
+@Suite(.timeLimit(.minutes(1)))
 struct PhoneCompanionClientTests {
     private let watch = FakeLink()
 
@@ -49,10 +49,8 @@ struct PhoneCompanionClientTests {
         reader.cancel()
         await reader.value
 
-        for _ in 0..<1_000 where !watch.eventsTerminated.value {
-            await Task.yield()
-        }
-        #expect(watch.eventsTerminated.value)
+        // Returns once the source ends; if it never does, the suite's time limit fails the test.
+        for await _ in watch.eventsEnded {}
     }
 
     @Test

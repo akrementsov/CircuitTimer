@@ -17,14 +17,20 @@ final class FakeLink: Sendable {
     /// Answers `sendRequest`; by default the request is unanswered.
     let respond = LockIsolated<(@Sendable (Data) async throws -> Data)?>(nil)
     let events = LockIsolated<AsyncStream<SessionEvent>.Continuation?>(nil)
-    let eventsTerminated = LockIsolated(false)
+    /// Finishes when the stream of the link's events ends, so a test waits for it without yielding.
+    let eventsEnded: AsyncStream<Void>
+    private let endEvents: AsyncStream<Void>.Continuation
+
+    init() {
+        (eventsEnded, endEvents) = AsyncStream.makeStream()
+    }
 
     var transport: LinkTransport {
         LinkTransport(
             activate: {},
             events: {
                 let (stream, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-                continuation.onTermination = { _ in self.eventsTerminated.setValue(true) }
+                continuation.onTermination = { _ in self.endEvents.finish() }
                 self.events.setValue(continuation)
                 return stream
             },
