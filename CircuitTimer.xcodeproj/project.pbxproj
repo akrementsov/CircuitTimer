@@ -45,6 +45,7 @@
 		C7A4000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B9 /* BackgroundExecution */; };
 		C7A100000000000000000064 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 		C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A500000000000000000002 /* WatchRemoteFeature */; };
+		C7A5000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A5000000000000000000E1 /* WatchLink */; };
 		C7A500000000000000000003 /* CircuitTimerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C7A500000000000000000004 /* CircuitTimerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -279,6 +280,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */,
+				C7A5000000000000000000E0 /* WatchLink in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -408,6 +410,7 @@
 			name = CircuitTimerWatch;
 			packageProductDependencies = (
 				C7A500000000000000000002 /* WatchRemoteFeature */,
+				C7A5000000000000000000E1 /* WatchLink */,
 			);
 			productName = CircuitTimerWatch;
 			productReference = C7A500000000000000000004 /* CircuitTimerWatch.app */;
@@ -1180,6 +1183,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = WatchRemoteFeature;
 		};
+		C7A5000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C7A100000000000000000001 /* Project object */;

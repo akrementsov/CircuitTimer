@@ -245,7 +245,11 @@ let package = Package(
         // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
         .target(
             name: "WatchRemoteFeature",
-            dependencies: ["DesignSystem"],
+            dependencies: [
+                "DesignSystem",
+                "WatchLink",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
