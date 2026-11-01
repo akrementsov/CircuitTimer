@@ -73,7 +73,7 @@ final class EntitlementMonitor: Sendable {
                     return nil
                 }
             }
-            let first = await group.next() ?? nil
+            let first = await group.next().flatMap { $0 }
             group.cancelAll()
             return first
         }
@@ -133,7 +133,7 @@ final class EntitlementMonitor: Sendable {
         // Outlives every caller: StoreKit delivers updates, such as an approved Ask to Buy or a refund, only to a
         // running listener.
         // swiftlint:disable:next no_unstructured_task
-        Task { [transport] in
+        Task { [weak self, transport] in
             await transport.listen { [weak self] in
                 await self?.reconcile()
             }

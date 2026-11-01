@@ -2,9 +2,9 @@ import CloudKit
 import Dependencies
 import DependenciesMacros
 import Foundation
+import os
 import Purchases
 import Sharing
-import os
 
 /// Whether this launch syncs workouts through iCloud, and how that goes.
 @DependencyClient

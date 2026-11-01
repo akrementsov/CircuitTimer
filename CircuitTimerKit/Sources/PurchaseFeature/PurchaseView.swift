@@ -34,7 +34,7 @@ public struct PurchaseView: View {
         }
         // A swipe down would leave the payment sheet on its own.
         .interactiveDismissDisabled(store.isBusy)
-        .alert($store.scope(state: \.alert, action: \.alert))
+        .alert($store.scope(\.alert, action: \.alert))
         .task { send(.task) }
     }
 
@@ -214,7 +214,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Price loaded") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
     })
@@ -222,7 +222,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Limit: workouts") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .limit(.workoutLimit))) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .limit(.workoutLimit))) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
     })
@@ -230,7 +230,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Limit: iCloud") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .limit(.iCloudSync))) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .limit(.iCloudSync))) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
     })
@@ -238,12 +238,12 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Loading the price") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) { $0.status = .free })
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) { $0.status = .free })
         .preferredColorScheme(.dark)
 }
 
 #Preview("Purchasing") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
         $0.operation = .purchasing
@@ -252,7 +252,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Restoring") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
         $0.operation = .restoring
@@ -261,7 +261,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Waiting for approval") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .free
         $0.isPending = true
@@ -270,7 +270,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("App Store unavailable") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .unavailable
         $0.status = .free
     })
@@ -278,7 +278,7 @@ extension PurchaseFeature.Reason {
 }
 
 #Preview("Purchased") {
-    PurchaseView(store: .preview(PurchaseFeature.State(entry: .browse)) {
+    PurchaseView(store: previewStore(PurchaseFeature.State(entry: .browse)) {
         $0.offer = .loaded(FullVersionOffer(displayPrice: "$0.99"))
         $0.status = .full
         $0.didUnlockHere = true
@@ -286,16 +286,18 @@ extension PurchaseFeature.Reason {
     .preferredColorScheme(.dark)
 }
 
-extension StoreOf<PurchaseFeature> {
-    /// A store that shows `state` as given: `hasStarted` keeps the sheet's first `.task` from loading the price over it.
-    fileprivate static func preview(_ state: PurchaseFeature.State, _ configure: (inout PurchaseFeature.State) -> Void) -> Self {
-        var state = state
-        state.hasStarted = true
-        configure(&state)
-        return Store(initialState: state) {
-            PurchaseFeature()
-        } withDependencies: {
-            $0.purchases = .previewValue
-        }
+/// A store that shows `state` as given: `hasStarted` keeps the sheet's first `.task` from loading the price over it.
+@MainActor
+private func previewStore(
+    _ state: PurchaseFeature.State,
+    _ configure: (inout PurchaseFeature.State) -> Void
+) -> StoreOf<PurchaseFeature> {
+    var state = state
+    state.hasStarted = true
+    configure(&state)
+    return Store(initialState: state) {
+        PurchaseFeature()
+    } withDependencies: {
+        $0.purchases = .previewValue
     }
 }

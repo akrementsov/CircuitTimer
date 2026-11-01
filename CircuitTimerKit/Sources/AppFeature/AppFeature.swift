@@ -452,22 +452,7 @@ public struct AppFeature: Sendable {
                 // A reload still in flight presents it when it lands.
                 return state.isReloading ? .none : presentDeferredScreen(&state)
             case .mutationFailed:
-                // Later writes were derived from a list that storage did not accept; drop them and resync.
-                state.pendingMutations = []
-                state.needsReload = false
-                state.deferredScreen = nil
-                switch state.destination {
-                    case .timer:
-                        // A presented timer is never replaced: it would close without ending its session. No write
-                        // starts under the cover yet, so this is defensive; the reload still resyncs the list.
-                        break
-                    case .purchase:
-                        // Replacing the sheet would cut a purchase short; the alert waits for it to close.
-                        state.hasPendingMutationAlert = true
-                    case .alert, .resumeRun, .permissionStalled, nil:
-                        state.destination = .alert(.mutationFailed)
-                }
-                return loadWorkouts(&state)
+                return mutationFailed(&state)
             case let .runRecordLoaded(stored):
                 return runRecordLoaded(stored, &state)
             case let .runRecordLoadingFailed(failure):
@@ -506,41 +491,6 @@ public struct AppFeature: Sendable {
         guard state.pendingMutations.isEmpty, !state.isReloading, case .loaded = state.workouts else { return .none }
 
         return presentDeferredScreen(&state)
-    }
-
-    private func presentDeferredScreen(_ state: inout State) -> Effect<Action> {
-        guard let request = state.deferredScreen else { return .none }
-
-        // A request that cannot open now is dropped rather than kept for a surprise later.
-        state.deferredScreen = nil
-        // An empty stack also drops a second tap made while the editor is being pushed, and an empty destination
-        // one made while the timer is being presented.
-        guard state.destination == nil, state.path.isEmpty, state.selectedTab == .workouts else { return .none }
-
-        switch request {
-            case .create:
-                // Checked here, on the list a queued write or a reload has just made current.
-                guard !isAtFreeWorkoutLimit(state) else {
-                    requestPurchase(.limit(.workoutLimit), &state)
-                    return .none
-                }
-                state.path.append(
-                    .editor(
-                        WorkoutEditorFeature.State(
-                            newWorkoutID: uuid(),
-                            warmUpStageID: uuid(),
-                            trainingStageID: uuid(),
-                            coolDownStageID: uuid()
-                        )
-                    )
-                )
-            case let .open(id):
-                // The workout may be gone by now; then there is nothing to show.
-                guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
-
-                state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
-        }
-        return .none
     }
 
     /// Activities of an earlier process show a run this launch has not continued; a continued run starts its own.

@@ -1,8 +1,8 @@
 import Dependencies
 import Foundation
+import os
 import StoreKit
 import UIKit
-import os
 
 extension StoreTransport {
     static func live() -> Self {

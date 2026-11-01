@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
-import Purchases
 import os
+import Purchases
 
 /// The purchase sheet: the full version's price, buying and restoring it. It does not know who showed it and asks to
 /// close through `delegate(.closeRequested)`.
