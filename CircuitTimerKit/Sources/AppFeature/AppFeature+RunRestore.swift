@@ -171,7 +171,7 @@ extension AppFeature {
         switch choice {
             case .finish:
                 state.runRestore = .resolved
-                return discardRunRecord(reportingFailure: true)
+                return .merge(discardRunRecord(reportingFailure: true), scheduleWhatWaited(state))
             case .resume:
                 // Request the cover from a later action, after the presentation reducer clears the chosen alert.
                 return .run { send in

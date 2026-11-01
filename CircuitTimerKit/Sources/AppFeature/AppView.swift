@@ -54,7 +54,10 @@ public struct AppView: View {
             WorkoutTimerStack(store: timerStore)
                 .onAppear { send(.timerCoverAppeared) }
         }
-        .sheet(item: $store.scope(\.$destination, action: \.destination).purchase) { purchaseStore in
+        // What waited for the sheet, a write error or the saved-run question, shows only after it has gone.
+        .sheet(item: $store.scope(\.$destination, action: \.destination).purchase) {
+            send(.purchaseSheetDismissed)
+        } content: { purchaseStore in
             PurchaseView(store: purchaseStore)
         }
     }

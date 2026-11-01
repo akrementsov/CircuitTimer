@@ -136,9 +136,7 @@ private func previewStore(_ screen: PreviewScreen, fullVersion: FullVersionStatu
             state.path.append(.about(version: "0.1.0"))
             state.path.append(.legalDocument(.privacyPolicy))
     }
-    return Store(initialState: state) { SettingsFeature() } withDependencies: {
-        $0.purchases = .previewValue
-    }
+    return Store(initialState: state) { SettingsFeature() }
 }
 
 #Preview("Settings") {

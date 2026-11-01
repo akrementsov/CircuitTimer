@@ -67,7 +67,7 @@ extension AppFeature {
             case .create:
                 // Checked here, on the list a queued write or a reload has just made current.
                 guard !isAtFreeWorkoutLimit(state) else {
-                    requestPurchase(.limit(.workoutLimit), &state)
+                    state.purchaseRequest = .limit(.workoutLimit)
                     return .none
                 }
                 state.path.append(

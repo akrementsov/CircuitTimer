@@ -49,6 +49,10 @@ extension CloudSyncClient: DependencyKey {
             containerID: { CloudKitContainerID.inMainBundle() },
             accountStatus: { try await CKContainer(identifier: $0).accountStatus() },
             prepareInputs: {
+                // With the switch off or no container the store stays local whatever StoreKit says.
+                @SharedReader(.iCloudSync) var isICloudSyncOn
+                guard isICloudSyncOn, CloudKitContainerID.inMainBundle() != nil else { return }
+
                 @Dependency(\.purchases) var purchases
                 if await purchases.refreshStatus(.seconds(1)) == .unknown {
                     CloudSyncMonitor.logger.error("StoreKit did not answer in time; this launch keeps workouts on the device")

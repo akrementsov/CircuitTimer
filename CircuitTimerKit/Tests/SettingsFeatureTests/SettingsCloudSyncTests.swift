@@ -3,7 +3,6 @@
 import CloudSync
 import ComposableArchitecture
 import Foundation
-import Purchases
 import Testing
 
 /// The switch, the status of this launch and the footnote they give.
@@ -80,7 +79,6 @@ struct SettingsCloudSyncTests {
             $0.defaultAppStorage = defaults
         } operation: {
             TestStore(initialState: SettingsFeature.State()) { SettingsFeature() } withDependencies: {
-                $0.purchases = .previewValue
                 $0.cloudSync.status = {
                     let call = subscriptions.withValue { count in
                         count += 1

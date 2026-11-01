@@ -25,8 +25,9 @@ public struct SettingsFeature: Sendable {
         /// Read when the app launches; a change shows a footnote until the next launch applies it.
         @Shared(.iCloudSync) public var isICloudSyncOn = true
         var cloudSyncStatus: CloudSyncStatus?
-        /// iCloud sync is part of the full version; the rows under it buy or restore it.
-        var fullVersion: FullVersionStatus = .unknown
+        /// iCloud sync is part of the full version; the rows under it buy or restore it. The app keeps it current from
+        /// its one subscription.
+        public var fullVersion: FullVersionStatus = .unknown
         public internal(set) var path = StackState<Path.State>()
 
         public init() {}
@@ -71,7 +72,6 @@ public struct SettingsFeature: Sendable {
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case cloudSyncStatusChanged(CloudSyncStatus)
-            case fullVersionChanged(FullVersionStatus)
         }
 
         @CasePathable
@@ -82,11 +82,9 @@ public struct SettingsFeature: Sendable {
 
     enum CancelID: Hashable, Sendable {
         case cloudSyncStatus
-        case fullVersion
     }
 
     @Dependency(\.cloudSync) var cloudSync
-    @Dependency(\.purchases) var purchases
     @Dependency(\.appVersion) private var appVersion
 
     public init() {}
@@ -99,9 +97,6 @@ public struct SettingsFeature: Sendable {
                 case let .internal(.cloudSyncStatusChanged(status)):
                     state.cloudSyncStatus = status
                     return .none
-                case let .internal(.fullVersionChanged(status)):
-                    state.fullVersion = status
-                    return .none
                 case .delegate, .path:
                     return .none
             }
@@ -112,7 +107,7 @@ public struct SettingsFeature: Sendable {
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
         switch action {
             case .task:
-                return .merge(observeCloudSyncStatus(), observeFullVersion())
+                return observeCloudSyncStatus()
             case let .backgroundNotificationsToggled(value):
                 state.$isBackgroundNotificationsOn.withLock { $0 = value }
                 return .none

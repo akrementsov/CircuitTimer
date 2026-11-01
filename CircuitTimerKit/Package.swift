@@ -292,7 +292,6 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "CloudSync",
-                "Purchases",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),

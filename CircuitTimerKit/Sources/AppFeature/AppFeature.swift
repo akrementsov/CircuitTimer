@@ -148,6 +148,8 @@ public struct AppFeature: Sendable {
             case workoutMovedUp(Workout.ID)
             case workoutMovedDown(Workout.ID)
             case timerCoverAppeared
+            /// The purchase sheet has left the screen, however it was closed.
+            case purchaseSheetDismissed
             case scenePhaseChanged(ScenePhase)
             case notificationCleanupRetryTapped
         }
@@ -247,8 +249,8 @@ public struct AppFeature: Sendable {
         .forEach(\.path, action: \.path)
         // Before the start intent's check: a sheet shown here cancels a Start waiting for permission in the same pass,
         // so a late permission answer never replaces the sheet.
-        Reduce { state, _ in
-            presentRequestedPurchase(&state)
+        Reduce { state, action in
+            presentRequestedPurchase(after: action, &state)
         }
         Reduce { state, _ in
             guard let intent = state.startIntent else { return .none }
@@ -328,7 +330,7 @@ public struct AppFeature: Sendable {
                 else { return .none }
                 // Counted on the list as the user sees it, so a quick second tap meets the first copy.
                 guard !isAtFreeWorkoutLimit(state) else {
-                    requestPurchase(.limit(.workoutLimit), &state)
+                    state.purchaseRequest = .limit(.workoutLimit)
                     return .none
                 }
 
@@ -365,6 +367,8 @@ public struct AppFeature: Sendable {
                 return sceneChanged(phase, &state)
             case .notificationCleanupRetryTapped:
                 return cleanupNotifications(reportSuccess: true)
+            case .purchaseSheetDismissed:
+                return showWhatWaitedForPresentation(&state)
             case .timerCoverAppeared:
                 if case .presenting = state.runRestore { state.runRestore = .resolved }
                 state.isTimerCoverUp = true
@@ -399,8 +403,7 @@ public struct AppFeature: Sendable {
             case let .healthStalled(generation):
                 return healthStalled(generation: generation, &state)
             case let .fullVersionChanged(status):
-                state.fullVersion = status
-                return .none
+                return fullVersionChanged(status, &state)
             case .presentationFreed:
                 return showWhatWaitedForPresentation(&state)
             case let .workoutsLoaded(stored):
@@ -585,7 +588,7 @@ public struct AppFeature: Sendable {
                         : .send(.internal(.timerPresentationFailed))
                     return .merge(end, notice)
                 }
-                return .merge(end, discardRunRecord())
+                return .merge(end, discardRunRecord(), scheduleWhatWaited(state))
             case .resumeRun:
                 // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
                 state.runRestore = .resolved
@@ -593,7 +596,8 @@ public struct AppFeature: Sendable {
             case .permissionStalled:
                 return .send(.internal(.notificationPermissionWait))
             case .purchase:
-                return scheduleWhatWaited(state)
+                // The sheet's `onDismiss` follows once it has left the screen.
+                return .none
             case .alert:
                 return scheduleWhatWaited(state)
             case nil:

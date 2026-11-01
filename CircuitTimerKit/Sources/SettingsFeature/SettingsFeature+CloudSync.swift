@@ -11,15 +11,6 @@ extension SettingsFeature {
         }
         .cancellable(id: CancelID.cloudSyncStatus, cancelInFlight: true)
     }
-
-    func observeFullVersion() -> Effect<Action> {
-        .run { [purchases] send in
-            for await status in await purchases.changes() {
-                await send(.internal(.fullVersionChanged(status)))
-            }
-        }
-        .cancellable(id: CancelID.fullVersion, cancelInFlight: true)
-    }
 }
 
 extension SettingsFeature.State {
