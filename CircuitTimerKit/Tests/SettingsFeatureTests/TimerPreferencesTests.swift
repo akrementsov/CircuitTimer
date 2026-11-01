@@ -24,7 +24,7 @@ struct TimerPreferencesTests {
         } operation: { SettingsFeature.State() }
         #expect(!reloaded.isBackgroundNotificationsOn)
         #expect(reloaded.isSoundOn && reloaded.isVibrationOn && reloaded.isSpeechOn && reloaded.isKeepScreenOn)
-        #expect(defaults.object(forKey: "signalBackgroundNotifications") as? Bool == false)
+        expectStored(false, forKey: "signalBackgroundNotifications", in: defaults, shared: store.state.isBackgroundNotificationsOn)
     }
 
     @Test
@@ -39,7 +39,7 @@ struct TimerPreferencesTests {
         await store.send(.view(.backgroundNotificationsToggled(true))) {
             $0.$isBackgroundNotificationsOn.withLock { $0 = true }
         }
-        #expect(defaults.object(forKey: "signalBackgroundNotifications") as? Bool == true)
+        expectStored(true, forKey: "signalBackgroundNotifications", in: defaults, shared: store.state.isBackgroundNotificationsOn)
     }
 
     @Test
@@ -57,7 +57,7 @@ struct TimerPreferencesTests {
         } operation: { SettingsFeature.State() }
         #expect(!reloaded.isKeepScreenOn)
         #expect(reloaded.isSoundOn && reloaded.isVibrationOn && reloaded.isSpeechOn)
-        #expect(defaults.object(forKey: "timerKeepScreenOn") as? Bool == false)
+        expectStored(false, forKey: "timerKeepScreenOn", in: defaults, shared: store.state.isKeepScreenOn)
         await store.send(.view(.keepScreenOnToggled(true))) { $0.$isKeepScreenOn.withLock { $0 = true } }
     }
 
@@ -77,10 +77,31 @@ struct TimerPreferencesTests {
             $0.defaultAppStorage = defaults
         } operation: { SettingsFeature.State() }
         #expect(!reloaded.isSoundOn && !reloaded.isVibrationOn && !reloaded.isSpeechOn)
-        #expect(defaults.object(forKey: "signalSound") as? Bool == false)
-        #expect(defaults.object(forKey: "signalVibration") as? Bool == false)
-        #expect(defaults.object(forKey: "signalSpokenStageNames") as? Bool == false)
+        expectStored(false, forKey: "signalSound", in: defaults, shared: store.state.isSoundOn)
+        expectStored(false, forKey: "signalVibration", in: defaults, shared: store.state.isVibrationOn)
+        expectStored(false, forKey: "signalSpokenStageNames", in: defaults, shared: store.state.isSpeechOn)
         await store.send(.view(.soundToggled(true))) { $0.$isSoundOn.withLock { $0 = true } }
         #expect(!store.state.isVibrationOn && !store.state.isSpeechOn)
+    }
+
+    /// Checks what the suite holds for `key`. A mismatch also reports what the store's shared state holds and every
+    /// preference in the suite, which tells a write that never reached the suite from a suite that another write
+    /// changed.
+    private func expectStored(
+        _ expected: Bool,
+        forKey key: String,
+        in defaults: UserDefaults,
+        shared: Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) {
+        let preferences = defaults.dictionaryRepresentation()
+            .filter { $0.key.hasPrefix("signal") || $0.key.hasPrefix("timer") || $0.key == "iCloudSync" }
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key)=\($0.value)" }
+        #expect(
+            defaults.object(forKey: key) as? Bool == expected,
+            "\(key): shared state holds \(shared); the suite holds \(preferences.joined(separator: ", "))",
+            sourceLocation: sourceLocation
+        )
     }
 }
