@@ -1,3 +1,4 @@
+import CloudSync
 import Dependencies
 import DependenciesMacros
 import WorkoutDomain
@@ -50,19 +51,42 @@ extension WorkoutStorageClient {
         swiftData(provider: WorkoutStoreProvider(isStoredInMemoryOnly: isStoredInMemoryOnly))
     }
 
-    static func swiftData(provider: WorkoutStoreProvider) -> Self {
+    /// `prepare` runs before every operation: the live store waits there, once per process, for CloudSync to know
+    /// whether this launch may mirror, so the provider opens the store once, synchronously, with the final answer.
+    static func swiftData(
+        provider: WorkoutStoreProvider,
+        prepare: @escaping @Sendable () async -> Void = {}
+    ) -> Self {
         Self(
-            fetchAll: { try await provider.store().fetchAll() },
-            save: { try await provider.store().save($0) },
-            insert: { try await provider.store().insert($0, after: $1) },
-            delete: { try await provider.store().delete($0) },
-            reorder: { try await provider.store().reorder($0) }
+            fetchAll: {
+                await prepare()
+                return try await provider.store().fetchAll()
+            },
+            save: {
+                await prepare()
+                return try await provider.store().save($0)
+            },
+            insert: {
+                await prepare()
+                return try await provider.store().insert($0, after: $1)
+            },
+            delete: {
+                await prepare()
+                return try await provider.store().delete($0)
+            },
+            reorder: {
+                await prepare()
+                return try await provider.store().reorder($0)
+            }
         )
     }
 }
 
 extension WorkoutStorageClient: DependencyKey {
-    public static let liveValue = Self.swiftData(provider: .live())
+    public static let liveValue = Self.swiftData(provider: .live()) {
+        @Dependency(\.cloudSync) var cloudSync
+        await cloudSync.prepareDecision()
+    }
     /// In memory, seeded with the sample workout on first read.
     public static let previewValue = Self.swiftData(isStoredInMemoryOnly: true)
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented,

@@ -244,6 +244,7 @@ public struct AppFeature: Sendable {
                 state.workouts = .loading
                 return .merge(
                     readRunRecord(&state),
+                    prepareCloudSyncDecision(),
                     cleanupNotifications(),
                     endLiveActivityOrphans(),
                     endHealthOrphans(),

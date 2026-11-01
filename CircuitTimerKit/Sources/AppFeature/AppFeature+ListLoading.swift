@@ -45,6 +45,14 @@ extension AppFeature {
         .cancellable(id: CancelID.load, cancelInFlight: true)
     }
 
+    /// Starts the launch's iCloud decision, and the StoreKit read it waits for, beside the run record read: the list
+    /// opens the store only after both, so they overlap instead of adding up.
+    func prepareCloudSyncDecision() -> Effect<Action> {
+        .run { [cloudSync] _ in
+            await cloudSync.prepareDecision()
+        }
+    }
+
     /// Reads the list again whenever iCloud may have changed the store, for as long as the app runs.
     func observeRemoteChanges() -> Effect<Action> {
         .run { [cloudSync] send in
