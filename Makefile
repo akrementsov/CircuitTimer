@@ -99,11 +99,11 @@ build-snapshot-kit:
 		-destination '$(BUILD_DESTINATION)' ARCHS=$(HOST_ARCH) \
 		-derivedDataPath "$(DERIVED_DATA)/SnapshotKit" $(XCODEBUILD_FLAGS)
 
-# The modules the watch app links, strictly, for watchOS. No watchOS simulator runtime is needed: a generic destination
-# only needs the SDK.
+# The modules the watch app links, strictly, for the watch's own architectures: arm64_32 for chips before S9, arm64 from
+# S9. A generic device destination needs only the SDK, and a package build no signing.
 build-watch-package:
 	cd CircuitTimerKit && $(STRICT) xcodebuild build -scheme WatchRemoteFeature \
-		-destination 'generic/platform=watchOS Simulator' ARCHS=$(HOST_ARCH) \
+		-destination 'generic/platform=watchOS' CODE_SIGNING_ALLOWED=NO \
 		-derivedDataPath "$(DERIVED_DATA)/WatchPackage" $(XCODEBUILD_FLAGS)
 
 test-snapshot-kit:

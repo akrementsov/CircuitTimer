@@ -98,10 +98,12 @@ expect_equal "$(head -1 "$work/arguments")" build
 expect_equal "$(grep -A1 -e '-scheme' "$work/arguments")" "-scheme
 WatchRemoteFeature"
 expect_equal "$(grep -A1 -e '-destination' "$work/arguments")" "-destination
-generic/platform=watchOS Simulator"
+generic/platform=watchOS"
 expect_equal "$(grep -A1 -e '-derivedDataPath' "$work/arguments")" "-derivedDataPath
 $work/dd/WatchPackage"
-expect_in "$work/arguments" "ARCHS=$(uname -m)"
+# The watch's own architectures are the generic destination's: no single architecture is forced.
+expect_not_in "$work/arguments" "ARCHS="
+expect_in "$work/arguments" "CODE_SIGNING_ALLOWED=NO"
 expect_equal "$(cat "$work/arguments.context")" "$root/CircuitTimerKit
 CIRCUITTIMER_STRICT_WARNINGS=1"
 
