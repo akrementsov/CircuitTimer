@@ -1,6 +1,326 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "watch.catalog.empty.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a workout on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Создайте тренировку на iPhone."
+          }
+        }
+      }
+    },
+    "watch.catalog.empty.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No workouts yet"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировок пока нет"
+          }
+        }
+      }
+    },
+    "watch.catalog.loadFailed.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load workouts on iPhone. Showing the earlier list."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить тренировки на iPhone. Показан прежний список."
+          }
+        }
+      }
+    },
+    "watch.catalog.tooLarge.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shorten the list or long names on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сократите список или длинные названия на iPhone."
+          }
+        }
+      }
+    },
+    "watch.catalog.tooLarge.note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The list doesn't fit on the watch. Shorten it or long names on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список не помещается на часах. Сократите его или длинные названия на iPhone."
+          }
+        }
+      }
+    },
+    "watch.catalog.tooLarge.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workouts don't fit on the watch"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировки не помещаются на часах"
+          }
+        }
+      }
+    },
+    "watch.catalog.truncated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not every workout fits on the watch."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На часах показаны не все тренировки."
+          }
+        }
+      }
+    },
+    "watch.catalog.unavailable.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open CircuitTimer on your iPhone to try again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте CircuitTimer на iPhone, чтобы попробовать снова."
+          }
+        }
+      }
+    },
+    "watch.catalog.unavailable.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load workouts on iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить тренировки на iPhone"
+          }
+        }
+      }
+    },
+    "watch.connecting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting to iPhone…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Связываемся с iPhone…"
+          }
+        }
+      }
+    },
+    "watch.link.companionMissing.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install or open it on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установите или откройте его на iPhone."
+          }
+        }
+      }
+    },
+    "watch.link.companionMissing.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer isn't available on iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer на iPhone недоступен"
+          }
+        }
+      }
+    },
+    "watch.link.unlock.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After a restart, iPhone connects only once unlocked."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "После перезагрузки iPhone связывается с часами только после разблокировки."
+          }
+        }
+      }
+    },
+    "watch.link.unlock.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock your iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разблокируйте iPhone"
+          }
+        }
+      }
+    },
+    "watch.link.unreachable.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep your iPhone nearby with Bluetooth or Wi‑Fi on."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Держите iPhone рядом, с включёнными Bluetooth или Wi‑Fi."
+          }
+        }
+      }
+    },
+    "watch.link.unreachable.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone isn't connected"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone не на связи"
+          }
+        }
+      }
+    },
+    "watch.link.update.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The iPhone and watch apps are different versions."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версии приложения на iPhone и часах не совпадают."
+          }
+        }
+      }
+    },
+    "watch.link.updatePhone.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update CircuitTimer on your iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновите CircuitTimer на iPhone"
+          }
+        }
+      }
+    },
+    "watch.link.updateWatch.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update CircuitTimer on your watch"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновите CircuitTimer на часах"
+          }
+        }
+      }
+    },
+    "watch.list.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workouts"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировки"
+          }
+        }
+      }
+    },
     "watch.noCatalog.message" : {
       "localizations" : {
         "en" : {
@@ -29,6 +349,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Откройте CircuitTimer на iPhone"
+          }
+        }
+      }
+    },
+    "watch.status.companionMissing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer isn't available on iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CircuitTimer на iPhone недоступен"
+          }
+        }
+      }
+    },
+    "watch.status.earlierList %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earlier list from %@ · Waiting for iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Прежний список от %@ · Ждём iPhone"
+          }
+        }
+      }
+    },
+    "watch.status.failed %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't reach iPhone · Updated %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось связаться с iPhone · Обновлено: %@"
+          }
+        }
+      }
+    },
+    "watch.status.unlock" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock your iPhone to update"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разблокируйте iPhone, чтобы обновить"
+          }
+        }
+      }
+    },
+    "watch.status.unreachable %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone isn't connected · Updated %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone не на связи · Обновлено: %@"
+          }
+        }
+      }
+    },
+    "watch.workout.untitled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка без названия"
           }
         }
       }

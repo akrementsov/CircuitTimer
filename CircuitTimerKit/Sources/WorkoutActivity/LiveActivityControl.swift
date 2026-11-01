@@ -1,5 +1,17 @@
 import Foundation
 
+/// Whether the timer should warn that its activity cannot be shown. A newer state of the
+/// coordinator always has a larger serial, whatever order the results reach the reducer in.
+public struct LiveActivityNotice: Equatable, Sendable {
+    public let serial: Int
+    public let isFailing: Bool
+
+    public init(serial: Int, isFailing: Bool) {
+        self.serial = serial
+        self.isFailing = isFailing
+    }
+}
+
 public enum LiveActivityCommand: Equatable, Sendable {
     case pause
     case resume

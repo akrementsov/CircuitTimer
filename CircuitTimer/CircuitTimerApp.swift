@@ -5,6 +5,7 @@ import Foundation
 import os
 import SwiftUI
 import TipKit
+import WatchLink
 #if DEBUG
 import AppScenarios
 import UITestContract
@@ -34,6 +35,9 @@ struct CircuitTimerApp: App {
         #endif
         @Dependency(\.backgroundNotifications) var notifications
         notifications.installForegroundSuppression()
+        // Before the first scene: a request from the watch may have launched the app, and the scene may never come.
+        @Dependency(\.watchCompanion) var watchCompanion
+        watchCompanion.activate()
         // Once per launch, before any tip shows. Without it tips stay hidden; what they explain is said elsewhere too.
         do {
             try Tips.configure([.datastoreLocation(.applicationDefault), .displayFrequency(.immediate)])

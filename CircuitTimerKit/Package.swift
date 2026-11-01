@@ -26,6 +26,7 @@ let package = Package(
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
+        .library(name: "WatchLink", targets: ["WatchLink"]),
         .library(name: "WatchRemoteFeature", targets: ["WatchRemoteFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
@@ -51,6 +52,7 @@ let package = Package(
                 "DesignSystem",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -72,6 +74,7 @@ let package = Package(
                 "CloudSync",
                 "AppFeature",
                 "SettingsFeature",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",
@@ -91,6 +94,7 @@ let package = Package(
                 "CloudSync",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -234,10 +238,26 @@ let package = Package(
             name: "TestSupport",
             swiftSettings: strictSettings
         ),
+        // The channel between the iPhone app and the watch app: its wire format, the WatchConnectivity bridge and the
+        // clients of both sides. Builds for iOS and watchOS.
+        .target(
+            name: "WatchLink",
+            dependencies: [
+                "WorkoutActivity",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
         .target(
             name: "WatchRemoteFeature",
-            dependencies: ["DesignSystem"],
+            dependencies: [
+                "DesignSystem",
+                "WatchLink",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
@@ -264,8 +284,22 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WatchLinkTests",
+            dependencies: [
+                "TestSupport",
+                "WatchLink",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WatchRemoteFeatureTests",
-            dependencies: ["WatchRemoteFeature"],
+            dependencies: [
+                "WatchLink",
+                "WatchRemoteFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
