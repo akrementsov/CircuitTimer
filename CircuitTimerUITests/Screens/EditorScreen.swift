@@ -60,7 +60,11 @@ struct EditorScreen: Screen {
         // Hold the name itself, leaving the duration's cursor gestures alone.
         let start = source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let end = destination.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        start.press(forDuration: 0.6, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
+        // The drag must start after the row has lifted. Over a name field UIKit first settles the field's loupe and
+        // text drag, so the lift arrives 0.50–0.57 s after touch-down on iPhone 17 / iOS 27.0, measured locally, not at
+        // the row's 0.35 s; list rows lift at 0.35 s. A 0.6 s hold left the slower CI runner no margin: the loupe took
+        // the press or the late lift picked the row under the moved finger, and nothing moved.
+        start.press(forDuration: 1.5, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0)
         return self
     }
 
