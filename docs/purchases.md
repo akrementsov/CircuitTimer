@@ -9,15 +9,15 @@ One non-consumable in-app purchase, the full version (`com.akrementsov.circuitti
 - `EntitlementMonitor` listens to `Transaction.updates` for the whole process from its first use, finishes every verified transaction and reads the entitlement again after each. A refund, a revocation, the end of Family Sharing and an Ask to Buy approval arrive this way while the app runs.
 - Reads are numbered: only the newest one started publishes its answer, and a purchase makes the reads already under way older, so a late read never overwrites a newer purchase or refund.
 - A purchase uses `Product.purchase(confirmIn:)` with the foreground `UIWindowScene` (the view-controller variant needs iOS 18.2). A cancelled payment or App Store sign-in is not an error and shows nothing.
-- Restore runs `AppStore.sync()` and reads the entitlement again; its outcome is that read's answer, or a newer read's that found the full version, so it never says «nothing found» to an owner.
+- Restore runs `AppStore.sync()` and reads the entitlement again until its read is the newest one, so a transaction update that arrives meanwhile never makes it say the wrong thing.
 
 ## iCloud and the launch
 
-The store mirrors to iCloud only with the full version. The launch decides once per process: `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
+The store mirrors to iCloud only with the full version. The launch decides once per process: with the switch on and a container named, `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
 
 ## Where the app asks
 
-- **Settings.** Without the full version the iCloud switch is a locked button (a lock next to its title, the switch drawn off) that opens the purchase sheet, and two rows offer «Buy the App» and «Restore Purchases»; Restore opens the sheet and restores at once. With it, the switch works as before and one row says «Full Version — Purchased». While StoreKit has not answered, neither rows nor footnote show.
+- **Settings.** The tab reads the status `AppFeature` follows, so a buyer never sees the lock on its first frame. Without the full version the iCloud switch is a locked button (a lock next to its title, the switch drawn off) that opens the purchase sheet, and two rows offer «Buy the App» and «Restore Purchases»; Restore opens the sheet and restores at once. With it, the switch works as before and one row says «Full Version — Purchased». While StoreKit has not answered, neither rows nor footnote show.
 - **The workout list.** «+» and Duplicate open the sheet once the list shows two workouts; the «+» looks as always. Stored workouts stay visible, editable and playable whatever their number.
 - **The Apple Watch app** (CT-6-2, after CT-9): the iPhone sends the watch nothing and ignores its commands without the full version; the watch says to buy it on the iPhone.
 
@@ -31,11 +31,11 @@ The store mirrors to iCloud only with the full version. The launch decides once 
 | Opened by a limit | The same with a plaque: «The free version keeps two workouts» or «iCloud sync is part of the full version» |
 | Loading the price | A dimmed button with a spinner; Restore works |
 | Purchasing, restoring | A spinner on that button, the other dimmed, the close button and the swipe disabled |
-| Waiting for approval | Ask to Buy: a note and a dimmed «Waiting for Approval»; the sheet may close, and the approval unlocks the app later |
+| Waiting for approval | Ask to Buy or another approval: a note and a dimmed «Waiting for Approval»; the sheet may close, and the approval unlocks the app later |
 | App Store unavailable | A note and «Try Again» |
 | Purchased | «Thank You!», the features with checkmarks, a note that iCloud starts at the next launch, «Done» |
 
-Alerts: «Purchase Failed» for a failed payment, «No Purchases Found» when a restore finds nothing, «Couldn't Restore Purchases» for a failed restore, and «Couldn't Confirm the Purchase» when StoreKit reported success but the status did not say `full` within 3 seconds. A full version that arrives from elsewhere while the sheet is open, such as through Family Sharing, closes it.
+Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» when Screen Time or a profile forbids them, «No Purchases Found» when a restore finds nothing, «Couldn't Restore Purchases» for a failed restore. «Couldn't Verify the Purchase» (StoreKit could not verify a transaction) and «Couldn't Confirm the Purchase» (StoreKit reported success but the status did not say `full` within 3 seconds) offer Restore Purchases; a full version that arrives later still shows «Thank You!». A full version that arrives from elsewhere while the sheet is open, such as through Family Sharing, closes it. A write error or a saved run that waited for the sheet shows after it has left the screen.
 
 ## Accepted limits
 
