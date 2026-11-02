@@ -269,11 +269,14 @@ final class PublicationLedger: @unchecked Sendable {
             tooLargeOwner = nil
         }
         for catalog in catalogs {
-            // Checked again right before numbering: a section that started before the owner ended must not number
-            // its run. One that numbered it just before the mark is replaced by the owner's end section, and no reply
+            // Checked again before each candidate: a section that started before the owner ended must not number its
+            // run. One that numbered it just before the mark is replaced by the owner's end section, and no reply
             // calls that run live.
             guard isTerminal || !isGateClosed else { return .skipped }
-            let run = run.flatMap { isOpen(for: $0.owner) ? $0 : nil }
+            if let run, !isOpen(for: run.owner) {
+                // The state without the run starts again from the candidates refused without one, the whole list.
+                return commit(candidates(for: nil), run: nil, at: now, isTerminal: isTerminal)
+            }
             if let run, !Self.fits(catalog: catalog, run: run, processID: processID, at: now) {
                 // A shorter catalog may still fit with the run; the run goes only when none does.
                 continue
