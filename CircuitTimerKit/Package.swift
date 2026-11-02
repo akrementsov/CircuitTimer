@@ -198,6 +198,14 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        .testTarget(
+            name: "PurchasesTests",
+            dependencies: [
+                "Purchases",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "TimerPreferences",
             dependencies: [
