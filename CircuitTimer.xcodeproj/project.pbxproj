@@ -23,6 +23,7 @@
 		C7A300000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000068 /* BackgroundNotifications */; };
 		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
 		C7A3000000000000000000C0 /* Purchases in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000C1 /* Purchases */; };
+		C7A3000000000000000000C2 /* PurchaseFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000C3 /* PurchaseFeature */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
 		C7A3000000000000000000A0 /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000A1 /* SettingsFeature */; };
 		C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B1 /* WorkoutTimerFeature */; };
@@ -244,6 +245,7 @@
 				C7A300000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A300000000000000000090 /* CloudSync in Frameworks */,
 				C7A3000000000000000000C0 /* Purchases in Frameworks */,
+				C7A3000000000000000000C2 /* PurchaseFeature in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A3000000000000000000A0 /* SettingsFeature in Frameworks */,
 				C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
@@ -474,6 +476,7 @@
 				C7A300000000000000000068 /* BackgroundNotifications */,
 				C7A300000000000000000091 /* CloudSync */,
 				C7A3000000000000000000C1 /* Purchases */,
+				C7A3000000000000000000C3 /* PurchaseFeature */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
 				C7A3000000000000000000A1 /* SettingsFeature */,
 				C7A3000000000000000000B1 /* WorkoutTimerFeature */,
@@ -1139,6 +1142,7 @@
 			productName = CloudSync;
 		};
 		C7A3000000000000000000C1 /* Purchases */ = {isa = XCSwiftPackageProductDependency; productName = Purchases; };
+		C7A3000000000000000000C3 /* PurchaseFeature */ = {isa = XCSwiftPackageProductDependency; productName = PurchaseFeature; };
 		C7A300000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A3000000000000000000A1 /* SettingsFeature */ = {isa = XCSwiftPackageProductDependency; productName = SettingsFeature; };
 		C7A40000000000000000005D /* SnapshotCapture */ = {
