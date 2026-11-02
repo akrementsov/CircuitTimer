@@ -10,6 +10,9 @@ public enum WatchLinkSchema {
     /// The largest encoded envelope the iPhone sends. WatchConnectivity documents no limit; this one is an assumption
     /// checked on a device.
     public static let envelopeLimit = 60_000
+    /// The room a catalog leaves for a running workout: the catalog is cut to `envelopeLimit` less this, so its cut
+    /// does not change with each stage. A whole state is still checked against `envelopeLimit`.
+    public static let runReserve = 8_192
     /// The single key of the application context; its value is the encoded `PhoneState`.
     static let contextKey = "ct.v"
 }

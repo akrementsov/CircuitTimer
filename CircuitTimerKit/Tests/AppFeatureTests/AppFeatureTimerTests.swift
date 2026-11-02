@@ -6,6 +6,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WatchLink
 import WorkoutDomain
 import WorkoutHealth
 import WorkoutStorage
@@ -17,6 +18,7 @@ import WorkoutStorage
 struct AppFeatureTimerTests {
     private struct WriteFailure: Error {}
     private enum TeardownCall: Equatable, Sendable {
+        case watch(UUID)
         case session(UUID)
         case health(UUID, WorkoutHealthTrack, Date)
         case cues(UUID)
@@ -216,7 +218,7 @@ struct AppFeatureTimerTests {
     }
 
     @Test(arguments: [false, true])
-    func test_destinationDismiss_timerEndsSessionCuesNotificationsAndActivityInOrder(coverUp: Bool) async {
+    func test_destinationDismiss_timerEndsWatchSessionCuesNotificationsAndActivityInOrder(coverUp: Bool) async {
         let owner = UUID(fixture: 7)
         var timer = Self.timer(owner, for: first)
         // The run the timer followed until the dismissal, which the session projects onto it.
@@ -229,6 +231,7 @@ struct AppFeatureTimerTests {
         let calls = LockIsolated<[TeardownCall]>([])
         let store = makeStore(state) {
             $0.date = .constant(Self.closed)
+            $0.watchCompanion.end = { id in calls.withValue { $0.append(.watch(id)) } }
             $0.timerSession.end = { id in calls.withValue { $0.append(.session(id)) } }
             $0.workoutHealth.end = { id, track, date in calls.withValue { $0.append(.health(id, track, date)) } }
             $0.cues.end = { id in calls.withValue { $0.append(.cues(id)) } }
@@ -241,8 +244,10 @@ struct AppFeatureTimerTests {
             if coverUp { $0.isTimerCoverUp = false }
         }
         await store.finish()
+        // The watch first: from then on no request confirms the run that is closing.
         #expect(calls.value == [
-            .session(owner), .health(owner, track, Self.closed), .cues(owner), .notifications(owner), .liveActivity(owner),
+            .watch(owner), .session(owner), .health(owner, track, Self.closed), .cues(owner), .notifications(owner),
+            .liveActivity(owner),
         ])
     }
 

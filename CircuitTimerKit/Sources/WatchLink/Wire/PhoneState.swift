@@ -15,10 +15,13 @@ public struct PhoneState: Codable, Equatable, Sendable {
     public let catalog: CatalogState?
     /// The digest of the iPhone's current catalog; `nil` when that process knows no catalog yet.
     public let catalogDigest: String?
-    /// The running workout; always `nil` until CT-9-3.
+    /// The running workout, or `nil` when no timer is open on the iPhone.
     public let run: WatchRun?
-    /// Whether `run` is running now; always `false` until CT-9-3.
+    /// In a reply: the timer of `run` answered this request, so the watch may count its clock. In the context and in
+    /// a message: `run` has an open owner, which confirms nothing about the time on its own.
     public let isRunLive: Bool
+    /// A workout runs on the iPhone that does not fit in a transfer, so `run` is `nil`.
+    public let isRunTooLarge: Bool
 
     public init(
         processID: UUID,
@@ -27,7 +30,8 @@ public struct PhoneState: Codable, Equatable, Sendable {
         catalog: CatalogState?,
         catalogDigest: String?,
         run: WatchRun? = nil,
-        isRunLive: Bool = false
+        isRunLive: Bool = false,
+        isRunTooLarge: Bool = false
     ) {
         schemaVersion = WatchLinkSchema.version
         self.processID = processID
@@ -37,6 +41,7 @@ public struct PhoneState: Codable, Equatable, Sendable {
         self.catalogDigest = catalogDigest
         self.run = run
         self.isRunLive = isRunLive
+        self.isRunTooLarge = isRunTooLarge
     }
 }
 
@@ -60,7 +65,7 @@ public enum UnavailableReason: String, Codable, Equatable, Sendable {
     }
 }
 
-/// A workout running on the iPhone, as its Live Activity shows it. CT-9-3 fills it.
+/// A workout running on the iPhone, as its Live Activity shows it.
 public struct WatchRun: Codable, Equatable, Sendable {
     public let owner: UUID
     public let attributes: WorkoutActivityAttributes

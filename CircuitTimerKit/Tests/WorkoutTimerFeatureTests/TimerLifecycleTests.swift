@@ -142,7 +142,7 @@ struct TimerLifecycleTests {
         }
         await store.finish()
 
-        #expect(timer.calls.value == [.end(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [.endWatch(owner: timerID), .end(owner: timerID), .dismiss])
     }
 
     @Test

@@ -24,6 +24,9 @@ func loaded(_ workouts: [Workout]) -> AppFeature.State {
 struct WatchPublications: Sendable {
     let published = LockIsolated<[WatchPublication]>([])
     let revisions = LockIsolated(0)
+    /// The runs the timer published and the owners whose runs ended, in order.
+    let runs = LockIsolated<[WatchRun]>([])
+    let ended = LockIsolated<[UUID]>([])
 }
 
 struct WatchPublication: Equatable, Sendable {
@@ -77,6 +80,10 @@ func makeStore(
         $0.watchCompanion.publishCatalog = { revision, catalog in
             watch.published.withValue { $0.append(WatchPublication(revision: revision, catalog: catalog)) }
         }
+        $0.watchCompanion.publishRun = { _, run in watch.runs.withValue { $0.append(run) } }
+        $0.watchCompanion.end = { owner in watch.ended.withValue { $0.append(owner) } }
+        $0.watchCompanion.controlRequests = { _ in AsyncStream { $0.finish() } }
+        $0.watchCompanion.refreshHandled = { _, _, _ in }
         dependencies(&$0)
     }
 }

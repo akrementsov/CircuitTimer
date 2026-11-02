@@ -6,6 +6,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WatchLink
 import WorkoutActivity
 import WorkoutHealth
 import WorkoutStorage
@@ -130,6 +131,7 @@ enum TimerCall: Equatable, Sendable {
     case requestAwake(owner: UUID, awake: Bool, revision: Int)
     case end(owner: UUID)
     case endLiveActivity(owner: UUID)
+    case endWatch(owner: UUID)
     case dismiss
 
     static func awake(_ awake: Bool, _ revision: Int) -> Self {
@@ -217,6 +219,8 @@ final class TimerHarness {
     let assertions: LockIsolated<[BackgroundTaskToken]>
     let releasedAssertions: LockIsolated<[BackgroundTaskToken]>
     let recordFailures: LockIsolated<Int>
+    /// What the timer published to the watch and answered to its requests, and the stream of those requests.
+    let watch = TimerWatch()
     var expectedRecordRevision = 0
     let store: TestStoreOf<WorkoutTimerFeature>
 
@@ -259,6 +263,7 @@ final class TimerHarness {
         self.calls = calls
         self.ended = ended
         self.failures = failures
+        let watch = watch
         store = TestStore(initialState: state) {
             WorkoutTimerFeature()
         } withDependencies: {
@@ -295,6 +300,15 @@ final class TimerHarness {
             $0.continuousClock = FailingClock(base: clock, failures: failures)
             $0.date = DateGenerator { wall.value }
             $0.dismiss = DismissEffect { calls.withValue { $0.append(.dismiss) } }
+            $0.watchCompanion.nextRevision = { watch.revisions.withValue { $0 += 1; return $0 } }
+            $0.watchCompanion.publishRun = { revision, run in
+                watch.published.withValue { $0.append(WatchRunPublication(revision: revision, run: run)) }
+            }
+            $0.watchCompanion.end = { owner in calls.withValue { $0.append(.endWatch(owner: owner)) } }
+            $0.watchCompanion.controlRequests = { owner in watch.subscribe(owner) }
+            $0.watchCompanion.refreshHandled = { owner, requestID, publication in
+                watch.answers.withValue { $0.append(WatchAnswer(owner: owner, requestID: requestID, publication: publication)) }
+            }
             $0.timerSession = TimerSessionClient(
                 requestAwake: { owner, awake, revision in
                     calls.withValue { $0.append(.requestAwake(owner: owner, awake: awake, revision: revision)) }
@@ -433,4 +447,37 @@ extension WorkoutTimerFeature.State {
         healthRevision += 1
         sentHealthTrack = healthTrack
     }
+}
+
+/// The watch link as the timer sees it: what it published, answered and subscribed to. Each subscription gets a
+/// stream of its own, as from the link; `request(_:)` sends a request to the newest one.
+final class TimerWatch: Sendable {
+    let revisions = LockIsolated(0)
+    let published = LockIsolated<[WatchRunPublication]>([])
+    let answers = LockIsolated<[WatchAnswer]>([])
+    let subscriptions = LockIsolated<[UUID]>([])
+    private let continuations = LockIsolated<[AsyncStream<WatchControlRequest>.Continuation]>([])
+
+    func subscribe(_ owner: UUID) -> AsyncStream<WatchControlRequest> {
+        let (stream, continuation) = AsyncStream.makeStream(of: WatchControlRequest.self)
+        subscriptions.withValue { $0.append(owner) }
+        continuations.withValue { $0.append(continuation) }
+        return stream
+    }
+
+    func request(_ id: Int) {
+        continuations.value.last?.yield(WatchControlRequest(id: id, kind: .refresh))
+    }
+
+    func finish() {
+        for continuation in continuations.value {
+            continuation.finish()
+        }
+    }
+}
+
+struct WatchAnswer: Equatable, Sendable {
+    let owner: UUID
+    let requestID: Int
+    let publication: WatchRunPublication?
 }

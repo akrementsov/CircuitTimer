@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import WorkoutDomain
 
 extension WorkoutTimerFeature {
     func prepareCountdown(owner: UUID, revision: Int, generation: Int) -> Effect<Action> {

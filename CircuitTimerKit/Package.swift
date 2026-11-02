@@ -302,6 +302,8 @@ let package = Package(
             dependencies: [
                 "DesignSystem",
                 "WatchLink",
+                "WorkoutActivity",
+                "WorkoutDomain",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             resources: [.process("Resources")],
@@ -315,6 +317,7 @@ let package = Package(
                 "BackgroundExecution",
                 "DesignSystem",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",
@@ -334,6 +337,7 @@ let package = Package(
             dependencies: [
                 "TestSupport",
                 "WatchLink",
+                "WorkoutActivity",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
@@ -342,8 +346,11 @@ let package = Package(
         .testTarget(
             name: "WatchRemoteFeatureTests",
             dependencies: [
+                "TestSupport",
                 "WatchLink",
                 "WatchRemoteFeature",
+                "WorkoutActivity",
+                "WorkoutDomain",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             swiftSettings: strictSettings
@@ -410,6 +417,7 @@ let package = Package(
             dependencies: [
                 "BackgroundNotifications",
                 "BackgroundExecution",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",

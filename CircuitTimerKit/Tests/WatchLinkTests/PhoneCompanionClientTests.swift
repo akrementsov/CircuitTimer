@@ -88,7 +88,8 @@ struct PhoneCompanionClientTests {
         let companion = WatchCompanion(
             ledger: PublicationLedger(processID: UUID(link: 5), transport: phone.transport),
             transport: phone.transport,
-            now: { linkNow }
+            now: { linkNow },
+            clock: TestClock()
         )
         let events = phone.transport.events()
         Task { await companion.run(events) }

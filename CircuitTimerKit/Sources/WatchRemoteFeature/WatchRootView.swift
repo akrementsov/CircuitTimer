@@ -3,12 +3,15 @@ import DesignSystem
 import Foundation
 import SwiftUI
 import WatchLink
+import WorkoutActivity
+import WorkoutDomain
 
 /// The watch app's root: the iPhone's workouts, or why there are none.
 @ViewAction(for: WatchRemoteFeature.self)
 public struct WatchRootView: View {
     public let store: StoreOf<WatchRemoteFeature>
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     public init(store: StoreOf<WatchRemoteFeature>) {
         self.store = store
@@ -17,12 +20,29 @@ public struct WatchRootView: View {
     public var body: some View {
         NavigationStack {
             content
-                .navigationTitle(Text("watch.list.title", bundle: .module))
+                .navigationTitle(title)
         }
         .background(.surface(.screen))
         .preferredColorScheme(.dark)
         .task { send(.task) }
         .onChange(of: scenePhase, initial: true) { _, phase in send(.scenePhaseChanged(phase)) }
+        .onChange(of: isLuminanceReduced, initial: true) { _, isReduced in send(.luminanceChanged(isReduced: isReduced)) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemClockDidChange)) { _ in
+            send(.systemClockChanged)
+        }
+    }
+
+    /// The list's title, or during a workout its name, as the iPhone timer's header shows it; none while a workout too
+    /// large to travel runs, whose name the watch does not know.
+    private var title: Text {
+        switch store.screen {
+            case let .run(screen):
+                Text(screen.display.title)
+            case .notice(.runTooLarge):
+                Text(verbatim: "")
+            case .update, .list, .empty, .unavailable, .notice:
+                Text("watch.list.title", bundle: .module)
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -54,6 +74,8 @@ public struct WatchRootView: View {
                 )
             case let .notice(notice):
                 noticeView(notice)
+            case let .run(screen):
+                WatchRunView(screen: screen)
         }
     }
 
@@ -80,6 +102,11 @@ public struct WatchRootView: View {
                 WatchNoticeView(
                     title: Text("watch.noCatalog.title", bundle: .module),
                     message: Text("watch.noCatalog.message", bundle: .module)
+                )
+            case .runTooLarge:
+                WatchNoticeView(
+                    title: Text("watch.run.tooLarge.title", bundle: .module),
+                    message: Text("watch.run.tooLarge.message", bundle: .module)
                 )
         }
     }
@@ -141,6 +168,49 @@ extension WatchCatalog {
 
     private static func previewID(_ last: UInt8) -> UUID {
         UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, last))
+    }
+}
+
+extension WatchRemoteFeature.State {
+    /// A run as the iPhone published it, confirmed unless `confirmed` is false.
+    static func previewRun(
+        _ phase: WorkoutActivityAttributes.Phase,
+        confirmed: Bool = true,
+        isLuminanceReduced: Bool = false,
+        link: LinkStatus = LinkStatus(isActivated: true, isReachable: true, needsUnlock: false)
+    ) -> Self {
+        var state = Self.preview(link: link, catalog: .init(lastLoaded: .preview, updatedAt: .previewDate))
+        let run = WatchRun(
+            owner: UUID(uuid: (9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+            attributes: WorkoutActivityAttributes(workoutName: "Morning circuit"),
+            content: WorkoutActivityAttributes.ContentState(phase: phase)
+        )
+        state.run = WatchRemoteFeature.ShownRun(run: run, isLive: true)
+        if confirmed {
+            state.lease = WatchRemoteFeature.Lease(
+                serial: 1,
+                sentAt: MonotonicInstant(now: ContinuousClock()),
+                openedAt: .distantPast,
+                deadline: .distantFuture
+            )
+        }
+        state.isLuminanceReduced = isLuminanceReduced
+        return state
+    }
+}
+
+extension WorkoutActivityAttributes.Phase {
+    /// A work stage 20 seconds in, with 25 to go, then a rest.
+    static var previewRunning: Self {
+        // A preview has no injected clock; its stage counts from the moment it renders.
+        // swiftlint:disable:next no_direct_date
+        let now = Date.now
+        return .running(WorkoutActivityAttributes.Running(
+            stage: .init(kind: .work, name: "Burpees"),
+            stageStart: now.addingTimeInterval(-20),
+            stageEnd: now.addingTimeInterval(25),
+            next: .stage(.init(kind: .rest, name: nil), end: now.addingTimeInterval(45))
+        ))
     }
 }
 
@@ -215,5 +285,43 @@ extension WatchCatalog {
 
 #Preview("Update the watch") {
     previewView(.preview(problem: .incompatible(.watch)))
+}
+
+#Preview("Run") {
+    previewView(.previewRun(.previewRunning))
+}
+
+#Preview("Run, waiting for iPhone") {
+    previewView(.previewRun(.previewRunning, confirmed: false))
+}
+
+#Preview("Run, iPhone unreachable") {
+    previewView(.previewRun(
+        .previewRunning,
+        confirmed: false,
+        link: LinkStatus(isActivated: true, isReachable: false, needsUnlock: false)
+    ))
+}
+
+#Preview("Run, wrist lowered") {
+    previewView(.previewRun(.previewRunning, isLuminanceReduced: true))
+}
+
+#Preview("Run, paused") {
+    previewView(.previewRun(.paused(.init(stage: .init(kind: .work, name: "Burpees"), remainingMilliseconds: 25_000))))
+}
+
+#Preview("Run, get ready") {
+    previewView(.previewRun(.getReady(first: .init(stage: .init(kind: .work, name: "Burpees"), remainingMilliseconds: 45_000))))
+}
+
+#Preview("Run, done") {
+    previewView(.previewRun(.finished))
+}
+
+#Preview("Run too large") {
+    var state = WatchRemoteFeature.State.preview()
+    state.isRunTooLarge = true
+    return previewView(state)
 }
 #endif

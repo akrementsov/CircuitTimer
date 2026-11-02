@@ -204,11 +204,11 @@ public struct AppFeature: Sendable {
     @Dependency(\.backgroundTask) var backgroundTask
     @Dependency(\.cloudSync) var cloudSync
     @Dependency(\.continuousClock) var clock
-    @Dependency(\.cues) private var cues
+    @Dependency(\.cues) var cues
     @Dependency(\.date) var date
-    @Dependency(\.liveActivity) private var liveActivity
+    @Dependency(\.liveActivity) var liveActivity
     @Dependency(\.purchases) var purchases
-    @Dependency(\.timerSession) private var timerSession
+    @Dependency(\.timerSession) var timerSession
     @Dependency(\.uuid) var uuid
     @Dependency(\.watchCompanion) var watchCompanion
     @Dependency(\.workoutHealth) var workoutHealth
@@ -546,17 +546,8 @@ public struct AppFeature: Sendable {
                 // timer started later. A dismissal before the cover appeared is not the user's: the run stays saved.
                 let isCoverUp = state.isTimerCoverUp
                 state.isTimerCoverUp = false
-                let id = timer.id
                 // The timer's newest track; the session projects it onto the dismissal.
-                let track = timer.healthTrack
-                let now = date()
-                let end = Effect<Action>.run { [timerSession, workoutHealth, cues, backgroundNotifications, liveActivity] _ in
-                    await timerSession.end(owner: id)
-                    await workoutHealth.end(id, track, now)
-                    await cues.end(id)
-                    await backgroundNotifications.end(id)
-                    await liveActivity.end(id)
-                }
+                let end = endTimerOwners(timer.id, track: timer.healthTrack, at: date())
                 guard isCoverUp else {
                     Self.logger.error("The timer was dismissed before its cover appeared; its run stays saved")
                     if case let .presenting(stored) = state.runRestore {

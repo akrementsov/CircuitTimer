@@ -332,7 +332,7 @@ struct TimerControlTests {
         await store.finish()
 
         #expect(store.state.destination == nil)
-        #expect(timer.calls.value == [.end(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [.endWatch(owner: timerID), .end(owner: timerID), .dismiss])
     }
 
     @Test
@@ -354,7 +354,7 @@ struct TimerControlTests {
         #expect(store.state.destination == nil)
         // The vote and the close run side by side; `end` drops the vote either way.
         #expect(timer.calls.value.contains(.awake(false, 2)))
-        #expect(timer.calls.value.filter { $0 != .awake(false, 2) } == [.end(owner: timerID), .dismiss])
+        #expect(timer.calls.value.filter { $0 != .awake(false, 2) } == [.endWatch(owner: timerID), .end(owner: timerID), .dismiss])
     }
 
     @Test
@@ -377,7 +377,7 @@ struct TimerControlTests {
         }
         await store.finish()
 
-        #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [.awake(false, 2), .endWatch(owner: timerID), .end(owner: timerID), .dismiss])
     }
 
     @Test(arguments: [

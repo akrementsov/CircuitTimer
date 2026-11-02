@@ -4,6 +4,7 @@ import ComposableArchitecture
 import Foundation
 import SwiftUI
 import WatchLink
+import WorkoutDomain
 
 let reachable = LinkStatus(isActivated: true, isReachable: true, needsUnlock: false)
 let unreachable = LinkStatus(isActivated: true, isReachable: false, needsUnlock: false)
@@ -77,4 +78,12 @@ func stateShowing(
     _ = state.order.receive(phoneState(process: process, sequence: sequence, catalog: .loaded(catalog), digest: digest), from: .context)
     state.catalog = .init(lastLoaded: catalog, updatedAt: earlier)
     return state
+}
+
+extension WatchRemoteFeature.RefreshRequest {
+    /// The request the reducer records when it sends `id` as its `serial`-th request at the present of `clock`. Test
+    /// clocks start at the same instant, so a fresh one stands for a store clock that has not moved.
+    static func sent(_ id: UUID, serial: Int = 1, on clock: TestClock<Duration> = TestClock()) -> Self {
+        Self(id: id, serial: serial, sentAt: MonotonicInstant(now: clock))
+    }
 }
