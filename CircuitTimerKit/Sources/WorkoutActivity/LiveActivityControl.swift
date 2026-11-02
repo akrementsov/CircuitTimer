@@ -12,6 +12,13 @@ public struct LiveActivityNotice: Equatable, Sendable {
     }
 }
 
+/// Limits the card's and the watch's commands share.
+public enum LiveActivityControlTiming {
+    /// A command held this long without its drain finishing counts as stalled: it keeps the owner's single admission,
+    /// but later commands are answered `unavailable` instead of `busy`. Two of an intent's 5 s waits.
+    public static let stallLimit: Duration = .seconds(10)
+}
+
 public enum LiveActivityCommand: String, Codable, Equatable, Sendable {
     case pause
     case resume

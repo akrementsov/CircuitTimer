@@ -6,7 +6,7 @@ The running workout shows on the Lock Screen and in the Dynamic Island, with Pau
 
 The Lock Screen card and expanded Dynamic Island have one Pause/Resume button beside the clock. Resume continues immediately, including a manual pause, and closes an open stage list or finish confirmation in the app. The initial countdown and finished card have no control; compact and minimal Island views stay read-only.
 
-A card command targets its activity and control generation, so an older card cannot toggle a later pause. If the app process has gone, tapping ends only that orphan card: the saved run stays available for the next launch's Continue prompt. An intent waits at most five seconds for the card and notification sync; timing out does not undo a command already delivered. The run's existing background assertion protects its disk write; intent execution takes no additional assertion.
+A card command targets its activity and control generation, so an older card cannot toggle a later pause. If the app process has gone, tapping ends only that orphan card: the saved run stays available for the next launch's Continue prompt. An intent waits at most five seconds for the card and notification sync; timing out does not undo a command already delivered. While a command is still being applied, a second tap is refused with «try again shortly»; once the first has been stuck for ten seconds, the refusal asks to check the timer in the app instead. A second command never runs on top of the first. The run's existing background assertion protects its disk write; intent execution takes no additional assertion.
 
 App and UI-test builds check the compiled intent metadata in both hosts, including the static-module registration needed on iOS 17.
 
