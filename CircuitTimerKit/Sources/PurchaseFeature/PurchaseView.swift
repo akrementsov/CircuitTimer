@@ -98,25 +98,35 @@ public struct PurchaseView: View {
         dynamicTypeSize.isAccessibilitySize
     }
 
+    /// A restore under way shows its spinner in the panel at every size: one started by the sheet's `.task` would
+    /// otherwise spin below the fold while every button above it is dimmed.
+    private var showsRestoreInPanel: Bool {
+        !store.isShowingSuccess && (!keepsPanelToMainAction || store.isRestoring)
+    }
+
     private var actions: some View {
         VStack(spacing: .zero) {
             mainAction
+            if showsRestoreInPanel {
+                restoreButton
+            }
             if !keepsPanelToMainAction {
-                if !store.isShowingSuccess {
-                    restoreButton
-                }
                 finePrint
+                    .padding(.horizontal, .token(spacing: .l))
             }
         }
     }
 
     private var secondaryActions: some View {
         VStack(spacing: .zero) {
-            if let note {
-                CaptionPlate(Text(note, bundle: .module))
+            if let note = store.note {
+                Text(note.textKey, bundle: .module)
+                    .font(.token(.footnote))
+                    .foregroundStyle(.text(.secondary))
+                    .multilineTextAlignment(.center)
                     .padding(.bottom, .token(spacing: .xs))
             }
-            if !store.isShowingSuccess {
+            if !store.isShowingSuccess, !showsRestoreInPanel {
                 restoreButton
             }
             finePrint
@@ -130,23 +140,14 @@ public struct PurchaseView: View {
                 .font(.token(.footnote))
                 .foregroundStyle(.text(.secondary))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, .token(spacing: .l))
                 .padding(.bottom, .token(spacing: .xs))
         }
     }
 
-    /// What the main button's state needs said, above the button or, at accessibility sizes, after the features.
-    private var note: LocalizedStringKey? {
-        if store.isShowingSuccess { return "purchase.note.iCloudNextLaunch" }
-        if store.isPending { return "purchase.note.pending" }
-        if store.offer == .unavailable { return "purchase.note.unavailable" }
-        return nil
-    }
-
     private var panelNote: Text? {
-        guard !keepsPanelToMainAction, let note else { return nil }
+        guard !keepsPanelToMainAction, let note = store.note else { return nil }
 
-        return Text(note, bundle: .module)
+        return Text(note.textKey, bundle: .module)
     }
 
     @ViewBuilder
@@ -240,6 +241,16 @@ public struct PurchaseView: View {
             .accessibilityIdentifier(AccessibilityID.Purchase.close)
             // Escape from a bar item would otherwise go up to the navigation controller.
             .accessibilityAction(.escape) { send(.closeTapped) }
+        }
+    }
+}
+
+extension PurchaseFeature.Note {
+    fileprivate var textKey: LocalizedStringKey {
+        switch self {
+            case .iCloudNextLaunch: "purchase.note.iCloudNextLaunch"
+            case .pending: "purchase.note.pending"
+            case .unavailable: "purchase.note.unavailable"
         }
     }
 }

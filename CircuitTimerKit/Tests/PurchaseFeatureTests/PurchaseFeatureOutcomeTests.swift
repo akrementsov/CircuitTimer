@@ -194,6 +194,24 @@ struct PurchaseFeatureOutcomeTests {
         await firstAnswer.send(.internal(.statusChanged(.free))) { $0.status = .free }
     }
 
+    @Test
+    func test_note_eachState_saysWhatItsMainButtonNeeds() {
+        #expect(sheet().note == nil)
+        #expect(sheet(operation: .purchasing).note == nil)
+
+        var unlocked = sheet(status: .full)
+        unlocked.didUnlockHere = true
+        #expect(unlocked.note == .iCloudNextLaunch)
+
+        var pending = sheet()
+        pending.isPending = true
+        #expect(pending.note == .pending)
+
+        var unavailable = sheet()
+        unavailable.offer = .unavailable
+        #expect(unavailable.note == .unavailable)
+    }
+
     private func succeeded(_ operation: PurchaseFeature.Operation) -> PurchaseFeature.Action.Internal {
         operation == .purchasing ? .purchaseFinished(.purchased) : .restoreFinished(.restored)
     }

@@ -50,6 +50,14 @@ public struct PurchaseFeature: Sendable {
         case limit(Reason)
     }
 
+    /// What the main button's state needs said beside it.
+    enum Note: Equatable, Sendable {
+        /// The sheet's purchase or restore unlocked the full version; iCloud follows at the next launch.
+        case iCloudNextLaunch
+        case pending
+        case unavailable
+    }
+
     enum Offer: Equatable, Sendable {
         case loading
         case loaded(FullVersionOffer)
@@ -103,6 +111,13 @@ public struct PurchaseFeature: Sendable {
 
         var isRestoring: Bool {
             operation == .restoring
+        }
+
+        var note: Note? {
+            if isShowingSuccess { return .iCloudNextLaunch }
+            if isPending { return .pending }
+            if offer == .unavailable { return .unavailable }
+            return nil
         }
 
         /// The one-time and Family Sharing line belongs to an offer the user can buy.
