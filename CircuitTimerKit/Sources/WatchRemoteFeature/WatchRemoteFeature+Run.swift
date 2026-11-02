@@ -25,8 +25,11 @@ extension WatchRemoteFeature {
         let serial: Int
         /// When that request was sent; it decides the lease's end.
         let sentAt: MonotonicInstant
-        /// The same end in wall time, only for the screen to hide the digits on its own.
-        let deadline: Date
+        /// When the lease opened, in wall time: the screen's timeline starts there.
+        let openedAt: Date
+        /// The lease's end in wall time, only for the screen to hide the digits on its own; every action computes it
+        /// again from `sentAt`, so a wall clock moved meanwhile moves it back where it belongs.
+        var deadline: Date
     }
 
     /// Whether the watch asks the iPhone about its run: the run's screen shows, its timer can still change, and the
@@ -45,13 +48,15 @@ extension WatchRemoteFeature {
         return requestRefresh(&state)
     }
 
-    /// Drops a lease whose time ran out: every action starts with it, so a late `leaseExpired` never shows digits.
+    /// Drops a lease whose time ran out and moves a live lease's wall-clock end to what the monotonic clock vouches
+    /// for: every action starts with it, so a late `leaseExpired` or a moved wall clock never shows digits.
     func dropExpiredLease(_ state: inout State) {
         guard let lease = state.lease else { return }
         guard let elapsed = lease.sentAt.duration(toNowOf: clock), elapsed < Self.confirmationLease else {
             state.lease = nil
             return
         }
+        state.lease?.deadline = date().adding(Self.confirmationLease - elapsed)
     }
 
     /// Takes the run of an accepted state. A newer state without a live timer, or with another owner's run, revokes
@@ -96,7 +101,8 @@ extension WatchRemoteFeature {
     func openLease(from request: RefreshRequest, _ state: inout State) -> Effect<Action> {
         guard let elapsed = request.sentAt.duration(toNowOf: clock), elapsed < Self.confirmationLease else { return .none }
         let remaining = Self.confirmationLease - elapsed
-        state.lease = Lease(serial: request.serial, sentAt: request.sentAt, deadline: date().adding(remaining))
+        let now = date()
+        state.lease = Lease(serial: request.serial, sentAt: request.sentAt, openedAt: now, deadline: now.adding(remaining))
         return .run { [clock] send in
             try await clock.sleep(for: remaining)
             await send(.internal(.leaseExpired(serial: request.serial)))
@@ -146,7 +152,7 @@ extension WatchRemoteFeature {
                 guard generation == state.runGeneration else { return .none }
                 state.run?.isStageOver = true
                 return askForRun(&state)
-            default:
+            case .event, .statusRead, .refreshAnswered, .refreshFailed, .refreshTimedOut, .retryDue:
                 return .none
         }
     }
@@ -160,16 +166,23 @@ extension WatchRemoteFeature {
             state.refresh.isRenewalDue = false
             return .cancel(id: CancelID.renewal)
         }
-        guard wasReduced else { return .none }
-        if let lease = state.lease, let elapsed = lease.sentAt.duration(toNowOf: clock), elapsed < Self.leaseRenewal,
-           needsRenewal(state) {
-            let serial = state.refresh.lastSerial
+        guard wasReduced, needsRenewal(state) else { return .none }
+        // The renewal counts from the newest request: the one in flight, or the one whose reply opened the lease.
+        let anchor = state.refresh.inFlight.map { ($0.serial, $0.sentAt) } ?? state.lease.map { ($0.serial, $0.sentAt) }
+        let isStageOver = state.run?.isStageOver == true
+        if let (serial, sentAt) = anchor, let elapsed = sentAt.duration(toNowOf: clock), elapsed < Self.leaseRenewal,
+           !isStageOver || state.refresh.inFlight != nil {
             let remaining = Self.leaseRenewal - elapsed
             return .run { [clock] send in
                 try await clock.sleep(for: remaining)
                 await send(.internal(.renewalDue(serial: serial)))
             }
             .cancellable(id: CancelID.renewal, cancelInFlight: true)
+        }
+        if state.refresh.inFlight != nil {
+            // Due already: the reply of the request in flight asks again at once.
+            state.refresh.isRenewalDue = true
+            return .none
         }
         return askForRun(&state)
     }

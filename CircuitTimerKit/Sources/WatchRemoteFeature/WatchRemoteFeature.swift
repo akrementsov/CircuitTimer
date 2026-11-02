@@ -80,6 +80,8 @@ public struct WatchRemoteFeature: Sendable {
             case task
             case scenePhaseChanged(ScenePhase)
             case luminanceChanged(isReduced: Bool)
+            /// The system clock was set; the reducer moves a lease's wall-clock end as every action does.
+            case systemClockChanged
         }
 
         @CasePathable public enum Internal: Equatable, Sendable {
@@ -189,6 +191,8 @@ public struct WatchRemoteFeature: Sendable {
                 return .none
             case let .luminanceChanged(isReduced):
                 return luminanceChanged(isReduced, &state)
+            case .systemClockChanged:
+                return .none
         }
     }
 

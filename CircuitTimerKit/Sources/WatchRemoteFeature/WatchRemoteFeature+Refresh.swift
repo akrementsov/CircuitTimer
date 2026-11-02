@@ -101,9 +101,18 @@ extension WatchRemoteFeature {
         if confirms, state.run != nil {
             state.refresh.failures = 0
             let lease = openLease(from: request, &state)
-            let renewal: Effect<Action> = state.refresh.isRenewalDue ? askForRun(&state) : .none
+            // New content whose stage already ended asks at once; the same content waits for the renewal, so clocks
+            // that disagree by a little do not make a request per reply.
+            let isNewStageOver = state.run?.isStageOver == true && shownBefore?.run != state.run?.run
+            let renewal: Effect<Action> = state.refresh.isRenewalDue || isNewStageOver ? askForRun(&state) : .none
             state.refresh.isRenewalDue = false
             run = .merge(lease, renewal)
+        } else if outcome.change == nil, phoneState.isRunLive, phoneState.processID == state.order.processID,
+                  phoneState.run?.owner == state.run?.run.owner {
+            // A live reply a newer message of the same process overtook: the iPhone answered; ask again at once for
+            // the newer content rather than count it as a failure.
+            state.refresh.isRenewalDue = false
+            run = askForRun(&state)
         } else if needsRenewal(state) {
             state.refresh.isRenewalDue = false
             run = scheduleRunRetry(&state)

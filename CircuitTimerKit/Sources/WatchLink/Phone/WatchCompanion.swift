@@ -42,15 +42,18 @@ actor WatchCompanion {
         self.clock = clock
     }
 
-    /// Handles each event in a task of its own: a request waits for its timer, and no wait holds the next event.
+    /// Writes go to the ledger's queue in the order of their events; a request is answered in a task of its own, so
+    /// its wait for the timer holds no other event.
     func run(_ events: AsyncStream<SessionEvent>) async {
         await withDiscardingTaskGroup { group in
             for await event in events {
                 switch event {
                     case .activated, .statusChanged:
-                        group.addTask { await self.writeLatest() }
+                        ledger.writeLatest { [self] fallback in
+                            if let fallback { push(fallback) }
+                        }
                     case .watchChanged:
-                        group.addTask { await self.ledger.watchChanged() }
+                        ledger.watchChanged()
                     case let .request(data, ticket):
                         group.addTask { await self.answer(data, through: ticket) }
                     case .context, .message:
@@ -94,6 +97,8 @@ actor WatchCompanion {
     /// The timer's stream of requests. A new subscription of the same owner replaces the old one, whose waiting
     /// requests are answered as not live.
     func controlRequests(owner: UUID) -> AsyncStream<WatchControlRequest> {
+        // A timer that subscribes after its end gets nothing to wait on.
+        guard !ledger.isEnded(owner) else { return AsyncStream { $0.finish() } }
         if let old = subscriptions[owner] {
             subscriptionEnded(owner: owner, subscriptionID: old.id)
         }
@@ -135,12 +140,6 @@ actor WatchCompanion {
         }
     }
 
-    private func writeLatest() async {
-        if let fallback = await ledger.writeLatest() {
-            push(.pending(fallback))
-        }
-    }
-
     private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) {
         switch outcome {
             case let .written(state), let .pending(state):
@@ -151,7 +150,7 @@ actor WatchCompanion {
     }
 
     /// An open watch app gets the state at once; a closed one reads the context when it opens.
-    private func push(_ state: PhoneState) {
+    nonisolated private func push(_ state: PhoneState) {
         guard transport.status().isReachable else { return }
         do {
             transport.sendMessage(try WireCoding.encode(state))
@@ -222,7 +221,9 @@ actor WatchCompanion {
             published.give(true)
             push(outcome, withCatalog: false)
         }
-        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false) else {
+        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false),
+              ledger.latestRun() == publication.run else {
+            // Too slow, or the ledger kept other content, such as after a refused write: not this answer's run.
             return notLive()
         }
         return ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: owner, at: now())

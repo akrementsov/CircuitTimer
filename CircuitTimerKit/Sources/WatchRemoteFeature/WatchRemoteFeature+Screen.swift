@@ -24,6 +24,8 @@ extension WatchRemoteFeature.State {
     /// The running workout as the Live Activity draws it, with its digits only under a live lease.
     struct RunScreen: Equatable {
         let display: WorkoutActivityDisplay
+        /// When the lease opened: the screen's timeline starts there, so its first entry is already past.
+        let digitsFrom: Date?
         /// When the digits must be gone: the lease's end, or the running stage's end if it comes first. `nil`: no
         /// digits now.
         let digitsUntil: Date?
@@ -127,6 +129,7 @@ extension WatchRemoteFeature.State {
         }
         return RunScreen(
             display: WorkoutActivityDisplay(attributes: shown.run.attributes, content: content, isStale: false),
+            digitsFrom: digitsUntil == nil ? nil : lease?.openedAt,
             digitsUntil: digitsUntil,
             note: note
         )

@@ -78,9 +78,13 @@ final class PublicationLedger: @unchecked Sendable {
     /// Numbers and writes the state without any run, the last one this process writes.
     func finishTermination(at now: Date) async -> PublishOutcome {
         await onQueue {
-            guard self.prepared?.run != nil || self.tooLargeOwner != nil else { return .skipped }
+            // A state without a run that was never written counts too: the watch must not keep a run its context
+            // still holds.
+            guard let prepared = self.prepared, prepared.run != nil || self.tooLargeOwner != nil || !self.isWritten else {
+                return .skipped
+            }
             self.tooLargeOwner = nil
-            return self.commit([self.prepared?.catalog], run: nil, at: now, isTerminal: true)
+            return self.commit([prepared.catalog], run: nil, at: now, isTerminal: true)
         }
     }
 
@@ -88,44 +92,61 @@ final class PublicationLedger: @unchecked Sendable {
     /// WatchConnectivity now refuses as too large falls back as a new publication would.
     /// Returns the state a fallback numbered, so an open watch can get it at once; `nil` when nothing new was numbered.
     func writeLatest() async -> PhoneState? {
-        await onQueue {
-            guard !self.isGateClosed, let prepared = self.prepared, !self.isWritten else { return nil }
-            if let owner = prepared.run?.owner, !self.isOpen(for: owner) {
-                // The owner ended before its own section ran: the state without its run replaces it.
-                switch self.commit([prepared.catalog], run: nil, at: prepared.publishedAt) {
-                    case let .written(state), let .pending(state):
-                        return state
-                    case .skipped:
-                        return nil
-                }
-            }
-            switch self.write(prepared) {
-                case .written:
-                    self.adopt(prepared, isWritten: true)
-                    return nil
-                case .pending:
-                    return nil
-                case .tooLarge:
-                    let catalogs: [CatalogState?] = prepared.catalog.map(Self.fallbacks) ?? [nil]
-                    switch self.commit(catalogs, run: prepared.run, at: prepared.publishedAt) {
-                        case let .written(state), let .pending(state):
-                            return state
-                        case .skipped:
-                            return nil
-                    }
-            }
+        await withCheckedContinuation { continuation in
+            writeLatest { continuation.resume(returning: $0) }
+        }
+    }
+
+    /// `writeLatest()` for a caller that must enqueue it in order with other events without waiting.
+    func writeLatest(then completion: @escaping @Sendable (PhoneState?) -> Void) {
+        queue.async { completion(self.writeLatestOnQueue()) }
+    }
+
+    private func writeLatestOnQueue() -> PhoneState? {
+        guard !isGateClosed, let prepared, !isWritten else { return nil }
+        if let owner = prepared.run?.owner, !isOpen(for: owner) {
+            // The owner ended before its own section ran: the state without its run replaces it.
+            return numbered(commit([prepared.catalog], run: nil, at: prepared.publishedAt))
+        }
+        switch write(prepared) {
+            case .written:
+                adopt(prepared, isWritten: true)
+                return nil
+            case .pending:
+                return nil
+            case .tooLarge:
+                let catalogs: [CatalogState?] = prepared.catalog.map(Self.fallbacks) ?? [nil]
+                return numbered(commit(catalogs, run: prepared.run, at: prepared.publishedAt))
+        }
+    }
+
+    private func numbered(_ outcome: PublishOutcome) -> PhoneState? {
+        switch outcome {
+            case let .written(state), let .pending(state):
+                state
+            case .skipped:
+                nil
         }
     }
 
     /// The user switched to another watch: the context belongs to the watch it was written for, so the newest state
     /// is written again once the session for the new one activates.
-    func watchChanged() async {
-        await onQueue { self.isWritten = false }
+    func watchChanged() {
+        queue.async { self.isWritten = false }
     }
 
     /// The owner of the run the newest decided state carries.
     func runOwner() -> UUID? {
         shared.withLock { $0.latest?.run?.owner }
+    }
+
+    /// The run the newest decided state carries.
+    func latestRun() -> WatchRun? {
+        shared.withLock { $0.latest?.run }
+    }
+
+    func isEnded(_ owner: UUID) -> Bool {
+        shared.withLock { $0.endedOwners.contains(owner) }
     }
 
     /// The state to answer a request with, without waiting for the queue: the catalog only if the watch's digest
@@ -182,8 +203,9 @@ final class PublicationLedger: @unchecked Sendable {
     private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
         guard revision > runRevision, isOpen(for: run.owner) else { return .skipped }
         runRevision = revision
-        // The timer publishes after every action; a run already written costs no encoding.
-        if run == prepared?.run, isWritten { return .skipped }
+        // The timer publishes after every action: the same run costs no encoding, written or not; a write that did
+        // not happen is written again on activation or a status change.
+        if run == prepared?.run { return .skipped }
         if let tooLargeOwner {
             // A run that did not fit stays hidden until its owner ends, so the watch does not flicker between stages
             // whose names fit and stages whose names do not.
@@ -203,16 +225,19 @@ final class PublicationLedger: @unchecked Sendable {
         isTerminal: Bool = false
     ) -> PublishOutcome {
         guard isTerminal || !isGateClosed else { return .skipped }
-        // A section that started before the owner ended must not number its run again.
-        var run = run.flatMap { isOpen(for: $0.owner) ? $0 : nil }
         if let owner = tooLargeOwner, !isOpen(for: owner) {
             tooLargeOwner = nil
         }
-        if let candidate = run, !Self.fits(catalog: catalogs.first.flatMap { $0 }, run: candidate, processID: processID, at: now) {
-            markTooLarge(candidate.owner)
-            run = nil
-        }
         for catalog in catalogs {
+            // Checked again right before numbering: a section that started before the owner ended must not number
+            // its run. One that numbered it just before the mark is replaced by the owner's end section, and no reply
+            // calls that run live.
+            guard isTerminal || !isGateClosed else { return .skipped }
+            let run = run.flatMap { isOpen(for: $0.owner) ? $0 : nil }
+            if let run, !Self.fits(catalog: catalog, run: run, processID: processID, at: now) {
+                // A shorter catalog may still fit with the run; the run goes only when none does.
+                continue
+            }
             let digest: String?
             if let catalog {
                 guard let encoded = Self.digest(of: catalog) else { continue }
@@ -246,8 +271,8 @@ final class PublicationLedger: @unchecked Sendable {
                     continue
             }
         }
-        if let run {
-            // WatchConnectivity refused every catalog with the run: the run does not travel at all.
+        if let run, isOpen(for: run.owner) {
+            // No catalog fits with the run, or WatchConnectivity refused every one: the run does not travel at all.
             markTooLarge(run.owner)
             return commit([catalogs.last.flatMap { $0 }], run: nil, at: now, isTerminal: isTerminal)
         }

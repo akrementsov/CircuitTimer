@@ -55,10 +55,10 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - A lost or slow reply (the iPhone's timer has 5 seconds to answer) hides the time until the next confirmation; on iOS 17–25 a suspended iPhone app is woken for each request, which takes a few seconds.
 - The renewal asks every 5 seconds also while the run is paused or waits for the user: a pause ended on the iPhone is a change of time too.
 - On iOS 17–25 the renewal can wake the iPhone app up to 12 times a minute, and each answer runs the timer's settling once; if iOS limits these launches, the time hides more often.
-- The time ends on screen at the confirmation's end in wall time; a watch clock moved meanwhile moves that end, and the next action of the watch app corrects it. If watchOS does not redraw the screen at that moment, the time goes at its next redraw.
+- The time ends on screen at the confirmation's end in wall time; a watch clock set meanwhile is caught by the watch app, which moves that end back to what its monotonic clock vouches for. If watchOS does not redraw the screen at that moment, the time goes at its next redraw.
 - The time shown includes the difference between the iPhone's and the watch's clocks.
 - Out of reach, the last run shows without its time; after the iPhone app died without ending its run, the run stays until a new iPhone process answers.
-- A workout whose names do not fit in a transfer is not shown on the watch until its timer closes. Since CT-9-3 the list is cut to 60,000 − 8,192 bytes, leaving room for a running workout.
+- A workout whose names do not fit in a transfer, even with a shorter list, is not shown on the watch until its timer closes, another workout starts or the iPhone app ends. Since CT-9-3 the list is cut to 60,000 − 8,192 bytes, leaving room for a running workout.
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
 ## Device checklist

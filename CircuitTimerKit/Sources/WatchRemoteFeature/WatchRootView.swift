@@ -27,6 +27,9 @@ public struct WatchRootView: View {
         .task { send(.task) }
         .onChange(of: scenePhase, initial: true) { _, phase in send(.scenePhaseChanged(phase)) }
         .onChange(of: isLuminanceReduced, initial: true) { _, isReduced in send(.luminanceChanged(isReduced: isReduced)) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemClockDidChange)) { _ in
+            send(.systemClockChanged)
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -174,6 +177,7 @@ extension WatchRemoteFeature.State {
             state.lease = WatchRemoteFeature.Lease(
                 serial: 1,
                 sentAt: MonotonicInstant(now: ContinuousClock()),
+                openedAt: .distantPast,
                 deadline: .distantFuture
             )
         }

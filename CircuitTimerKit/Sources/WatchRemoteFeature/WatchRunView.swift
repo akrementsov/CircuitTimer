@@ -88,8 +88,9 @@ struct WatchRunView: View {
 
     /// Shown only while the iPhone's confirmation holds: the timeline redraws at `digitsUntil` and hides them then.
     @ViewBuilder private func digits(@ViewBuilder _ content: @escaping () -> some View) -> some View {
-        if let until = screen.digitsUntil {
-            TimelineView(.explicit([until])) { context in
+        if let from = screen.digitsFrom, let until = screen.digitsUntil {
+            // The first entry is already past, so the timeline draws at once; the second hides the digits.
+            TimelineView(.explicit([min(from, until), until])) { context in
                 if screen.showsDigits(at: context.date) {
                     content()
                 }
@@ -126,13 +127,22 @@ struct WatchClockText: View {
     let range: ClosedRange<Date>
 
     var body: some View {
-        Text(verbatim: range.upperBound.timeIntervalSince(range.lowerBound).rounded() >= 600 ? "22:22" : "2:22")
+        Text(verbatim: Self.template(for: range))
             .hidden()
             .overlay(alignment: .leading) {
                 Text(timerInterval: range, countsDown: true, showsHours: false)
                     .minimumScaleFactor(0.9)
             }
             .font(.token(.runningStageClock))
+    }
+
+    /// Ten minutes, from which the minutes take two digits.
+    private static let twoDigitMinutes: TimeInterval = 600
+
+    /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and `WorkoutLimits` keeps a stage
+    /// under 100 minutes, so the minutes never take three digits. Whole seconds decide, as on the Live Activity.
+    private static func template(for range: ClosedRange<Date>) -> String {
+        range.upperBound.timeIntervalSince(range.lowerBound).rounded() >= twoDigitMinutes ? "22:22" : "2:22"
     }
 }
 
