@@ -192,4 +192,55 @@ struct WatchRemoteFeatureRunSceneTests {
         #expect(harness.state.lease == nil)
         #expect(harness.state.refresh.inFlight?.id == UUID(watch: 9))
     }
+
+    /// A confirming reply whose renewal is due and whose state asks about the list sends one request: its reply answers
+    /// both.
+    @Test
+    func test_confirmingReply_renewalDueAndAListReason_asksOnce() async {
+        let run = runningRun()
+        var due = State.showing(run, lease: true, inFlight: true)
+        due.refresh.isRenewalDue = true
+        let harness = RunHarness(due)
+
+        await harness.store.send(Self.answered(9, runState(sequence: 3, run: run, digest: "B")))
+
+        #expect(harness.requests == 3)
+        #expect(!harness.state.refresh.needsRefresh)
+        await harness.finish()
+    }
+
+    // MARK: A set clock
+
+    /// The wait for the stage's end counts again from the new date: a clock set back keeps the stage going.
+    @Test
+    func test_systemClockChanged_setBack_movesTheStageEnd() async {
+        let harness = RunHarness()
+        await harness.confirm(runningRun(stage: "A", endsIn: 3))
+        harness.wall.withValue { $0 = $0.addingTimeInterval(-60) }
+
+        await harness.store.send(.view(.systemClockChanged))
+        // An old stage end that fired would wait as a received action, and the next send fails until it is handled.
+        harness.store.exhaustivity = .on
+        await harness.advance(seconds: 3)
+        await harness.store.send(.internal(.stageEnded(generation: 0)))
+
+        #expect(harness.state.run?.isStageOver == false)
+        harness.store.exhaustivity = .off
+        await harness.finish()
+    }
+
+    /// A clock set past the stage's end ends it at once and asks, as the end itself would.
+    @Test
+    func test_systemClockChanged_setPastTheStageEnd_endsTheStageAndAsks() async {
+        let harness = RunHarness()
+        await harness.confirm(runningRun(stage: "A", endsIn: 30))
+        let requests = harness.requests
+        harness.wall.withValue { $0 = $0.addingTimeInterval(40) }
+
+        await harness.store.send(.view(.systemClockChanged))
+
+        #expect(harness.state.run?.isStageOver == true)
+        #expect(harness.requests == requests + 1)
+        await harness.finish()
+    }
 }

@@ -69,6 +69,29 @@ struct TimerWatchTests {
         #expect(timer.store.state.clockGeneration == 1)
     }
 
+    /// A request after the work stage ended unseen commits the run in the rest stage before it answers with it. A new
+    /// stage changes neither the status nor an operation, so the running loop stays and nothing is written.
+    @Test
+    func test_watchRequest_runningPastTheStageEnd_commitsTheNextStageAndAnswersWithIt() async throws {
+        let timer = TimerHarness(.fixture(.running))
+        // No loop runs in the fixture, so nothing has moved the run past the work stage's end, 7 s from now.
+        await timer.advance(seconds: 8)
+
+        await timer.send(.internal(.watchRequestReceived(WatchControlRequest(id: 8, kind: .refresh)))) {
+            $0.settle(at: timer.now)
+        }
+        await timer.store.finish()
+
+        #expect(timer.store.state.snapshot.currentStage?.kind == .rest)
+        let answer = try #require(timer.watch.answers.value.first)
+        #expect(answer.publication == WatchRunPublication(revision: 1, run: Self.run(of: timer.store.state, at: timer.now)))
+        guard case let .running(running) = answer.publication?.run.content.phase else {
+            Issue.record("The answer is not a running stage")
+            return
+        }
+        #expect(running.stage.kind == .rest)
+    }
+
     @Test(arguments: [false, true])
     func test_watchRequest_beforeTheClockStartedOrWhileClosing_answersNil(closing: Bool) async {
         var state: WorkoutTimerFeature.State = closing ? .fixture(.paused) : .fresh()

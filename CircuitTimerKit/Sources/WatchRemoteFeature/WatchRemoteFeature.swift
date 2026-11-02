@@ -192,7 +192,7 @@ public struct WatchRemoteFeature: Sendable {
             case let .luminanceChanged(isReduced):
                 return luminanceChanged(isReduced, &state)
             case .systemClockChanged:
-                return .none
+                return systemClockChanged(&state)
         }
     }
 

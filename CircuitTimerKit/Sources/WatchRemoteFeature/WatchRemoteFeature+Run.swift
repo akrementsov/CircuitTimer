@@ -100,6 +100,15 @@ extension WatchRemoteFeature {
         .cancellable(id: CancelID.stageEnd, cancelInFlight: true)
     }
 
+    /// A set clock moves the stage's end in wall time: the wait for it is counted again from the new date, and a stage
+    /// the move ended asks as its own end would.
+    func systemClockChanged(_ state: inout State) -> Effect<Action> {
+        guard let shown = state.run else { return .none }
+        let stageEnd = scheduleStageEnd(&state)
+        guard !shown.isStageOver, state.run?.isStageOver == true else { return stageEnd }
+        return .merge(stageEnd, askForRun(&state))
+    }
+
     /// Opens the lease from a confirming reply, counted from when its request was sent.
     func openLease(from request: RefreshRequest, _ state: inout State) -> Effect<Action> {
         guard let elapsed = request.sentAt.duration(toNowOf: clock), elapsed < Self.confirmationLease else { return .none }

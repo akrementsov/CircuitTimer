@@ -54,7 +54,7 @@ struct WatchRunView: View {
         VStack(alignment: .leading, spacing: .zero) {
             switch display.clock {
                 case let .counting(range):
-                    digits(showsDigits) { WatchClockText(range: range) }
+                    digits(showsDigits, holding: WatchClockText.template(for: range)) { WatchClockText(range: range) }
                     headline
                 case .pauseGlyph:
                     // The glyph stands beside the word, so the time left fits under them.
@@ -63,8 +63,9 @@ struct WatchRunView: View {
                         headline
                     }
                     if case let .fixed(remaining) = display.islandClock {
-                        digits(showsDigits) {
-                            Text(verbatim: remaining.clockText(.timerRemaining))
+                        let reading = remaining.clockText(.timerRemaining)
+                        digits(showsDigits, holding: reading) {
+                            Text(verbatim: reading)
                                 .font(.token(.runningStageClock))
                         }
                     }
@@ -134,19 +135,19 @@ struct WatchRunView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Without the digits a hidden reading keeps their place, so the cards do not jump when they go and come back.
-    @ViewBuilder private func digits(_ showsDigits: Bool, @ViewBuilder _ content: () -> some View) -> some View {
+    /// Without the digits a hidden `template` keeps their place, so the cards do not jump when they go and come back.
+    @ViewBuilder private func digits(
+        _ showsDigits: Bool,
+        holding template: String,
+        @ViewBuilder _ content: () -> some View
+    ) -> some View {
         if showsDigits {
             content()
         } else {
-            digitsPlace
+            Text(verbatim: template)
+                .font(.token(.runningStageClock))
+                .hidden()
         }
-    }
-
-    private var digitsPlace: some View {
-        Text(verbatim: "2:22")
-            .font(.token(.runningStageClock))
-            .hidden()
     }
 
     private func glyph(_ name: String) -> some View {
@@ -192,7 +193,7 @@ struct WatchClockText: View {
 
     /// `2:22`, or `22:22` from ten minutes on: 2 is League Gothic's widest digit, and `WorkoutLimits` keeps a stage
     /// under 100 minutes, so the minutes never take three digits. Whole seconds decide, as on the Live Activity.
-    private static func template(for range: ClosedRange<Date>) -> String {
+    static func template(for range: ClosedRange<Date>) -> String {
         range.upperBound.timeIntervalSince(range.lowerBound).rounded() >= twoDigitMinutes ? "22:22" : "2:22"
     }
 }

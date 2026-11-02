@@ -121,7 +121,14 @@ extension WatchRemoteFeature {
             state.refresh.isRenewalDue = false
             run = .none
         }
-        let list: Effect<Action> = outcome.asksAgain ? requestRefresh(&state) : askAgainIfNeeded(&state)
+        // A request the run just sent was sent after this reply, so its own reply answers the list's reasons too.
+        let list: Effect<Action> = if state.refresh.inFlight != nil {
+            .none
+        } else if outcome.asksAgain {
+            requestRefresh(&state)
+        } else {
+            askAgainIfNeeded(&state)
+        }
         return .merge(ended, applied, run, list)
     }
 
