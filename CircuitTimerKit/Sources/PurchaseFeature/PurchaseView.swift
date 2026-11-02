@@ -7,6 +7,7 @@ import UITestContract
 @ViewAction(for: PurchaseFeature.self)
 public struct PurchaseView: View {
     @Bindable public var store: StoreOf<PurchaseFeature>
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     public init(store: StoreOf<PurchaseFeature>) {
         self.store = store
@@ -23,6 +24,9 @@ public struct PurchaseView: View {
                             .accessibilityIdentifier(AccessibilityID.Purchase.reason)
                     }
                     features
+                    if keepsPanelToMainAction {
+                        secondaryActions
+                    }
                 }
                 .padding(.horizontal, .token(spacing: .l))
             }
@@ -88,21 +92,61 @@ public struct PurchaseView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// At accessibility sizes the panel holding everything would cover most of the screen and the features under it:
+    /// it keeps the main button, and the note, Restore and the fine print follow the features instead.
+    private var keepsPanelToMainAction: Bool {
+        dynamicTypeSize.isAccessibilitySize
+    }
+
     private var actions: some View {
         VStack(spacing: .zero) {
             mainAction
+            if !keepsPanelToMainAction {
+                if !store.isShowingSuccess {
+                    restoreButton
+                }
+                finePrint
+            }
+        }
+    }
+
+    private var secondaryActions: some View {
+        VStack(spacing: .zero) {
+            if let note {
+                CaptionPlate(Text(note, bundle: .module))
+                    .padding(.bottom, .token(spacing: .xs))
+            }
             if !store.isShowingSuccess {
                 restoreButton
             }
-            if store.showsFinePrint {
-                Text("purchase.finePrint", bundle: .module)
-                    .font(.token(.footnote))
-                    .foregroundStyle(.text(.secondary))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, .token(spacing: .l))
-                    .padding(.bottom, .token(spacing: .xs))
-            }
+            finePrint
         }
+    }
+
+    @ViewBuilder
+    private var finePrint: some View {
+        if store.showsFinePrint {
+            Text("purchase.finePrint", bundle: .module)
+                .font(.token(.footnote))
+                .foregroundStyle(.text(.secondary))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, .token(spacing: .l))
+                .padding(.bottom, .token(spacing: .xs))
+        }
+    }
+
+    /// What the main button's state needs said, above the button or, at accessibility sizes, after the features.
+    private var note: LocalizedStringKey? {
+        if store.isShowingSuccess { return "purchase.note.iCloudNextLaunch" }
+        if store.isPending { return "purchase.note.pending" }
+        if store.offer == .unavailable { return "purchase.note.unavailable" }
+        return nil
+    }
+
+    private var panelNote: Text? {
+        guard !keepsPanelToMainAction, let note else { return nil }
+
+        return Text(note, bundle: .module)
     }
 
     @ViewBuilder
@@ -110,7 +154,7 @@ public struct PurchaseView: View {
         if store.isShowingSuccess {
             BottomActionPanel(
                 title: Text("purchase.done", bundle: .module),
-                hint: Text("purchase.note.iCloudNextLaunch", bundle: .module),
+                hint: panelNote,
                 isEnabled: true
             ) {
                 send(.doneTapped)
@@ -119,7 +163,7 @@ public struct PurchaseView: View {
         } else if store.isPending {
             BottomActionPanel(
                 title: Text("purchase.pending", bundle: .module),
-                hint: Text("purchase.note.pending", bundle: .module),
+                hint: panelNote,
                 isEnabled: false
             ) {}
             .accessibilityIdentifier(AccessibilityID.Purchase.pending)
@@ -146,7 +190,7 @@ public struct PurchaseView: View {
                 case .unavailable:
                     BottomActionPanel(
                         title: Text("purchase.retry", bundle: .module),
-                        hint: Text("purchase.note.unavailable", bundle: .module),
+                        hint: panelNote,
                         isEnabled: !store.isBusy
                     ) {
                         send(.retryTapped)
