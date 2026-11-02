@@ -297,9 +297,11 @@ struct WatchRemoteFeatureRunTests {
         await harness.confirm(runningRun(stage: "A", endsIn: 3))
         await harness.store.send(.internal(.event(.context(runState(sequence: 4, run: runningRun(stage: "B", endsIn: 30))))))
 
-        // From here the store is exhaustive: the old stage end would arrive as an unexpected action.
+        // From here the store is exhaustive: an old stage end that fired would wait as a received action, and the
+        // next send fails until it is handled. The old generation's end that the test sends itself changes nothing.
         harness.store.exhaustivity = .on
         await harness.advance(seconds: 3)
+        await harness.store.send(.internal(.stageEnded(generation: 0)))
 
         #expect(harness.state.run?.isStageOver == false)
         // The new stage end and the lease are still scheduled; leaving them is not an issue of this test.

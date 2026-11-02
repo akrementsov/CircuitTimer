@@ -448,9 +448,9 @@ struct PublicationLedgerRunTests {
     }
 
     /// The gate closes while a section is trying its first candidate: the next candidate finds it closed under the lock
-    /// and numbers nothing; only the terminal state is written after it.
+    /// and numbers nothing. The context already holds the state without the run, so termination has nothing to write.
     @Test
-    func test_closeGate_whileASectionTriesACandidate_numbersNothingButTheTerminalState() async throws {
+    func test_closeGate_whileASectionTriesACandidate_numbersNothing_andTerminationHasNothingToWrite() async throws {
         let ledger = ledger
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         let gate = WriteGate()
