@@ -25,18 +25,21 @@ struct WatchCompanionRunTests {
         return companion
     }
 
-    /// Sends a refresh and returns its one reply.
-    private func refresh(_ number: Int = 7) async throws -> (envelope: WatchReplyEnvelope, count: Int) {
+    /// Sends a refresh and returns its first reply, with every reply its ticket got, so a test can look again later.
+    private func refresh(_ number: Int = 7) async throws -> (envelope: WatchReplyEnvelope, answers: LockIsolated<[Data]>) {
         let request = try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: number), request: .refresh(knownCatalogDigest: nil)))
         let answers = LockIsolated<[Data]>([])
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let ticket = ReplyTicket { data in
-                answers.withValue { $0.append(data) }
-                continuation.resume()
+                let isFirst = answers.withValue { answers in
+                    answers.append(data)
+                    return answers.count == 1
+                }
+                if isFirst { continuation.resume() }
             }
             link.events.value?.yield(.request(request, ticket))
         }
-        return (try WireCoding.decode(WatchReplyEnvelope.self, from: answers.value[0]), answers.value.count)
+        return (try WireCoding.decode(WatchReplyEnvelope.self, from: answers.value[0]), answers)
     }
 
     private static func state(of envelope: WatchReplyEnvelope) throws -> PhoneState {
@@ -64,10 +67,10 @@ struct WatchCompanionRunTests {
         await companion.refreshHandled(
             owner: owner(1), requestID: request.id, publication: WatchRunPublication(revision: 2, run: makeRun(stage: "A2"))
         )
-        let (envelope, count) = try await pending.value
+        let (envelope, answers) = try await pending.value
 
         let state = try Self.state(of: envelope)
-        #expect(count == 1)
+        #expect(answers.value.count == 1)
         #expect(envelope.requestID == UUID(link: 7))
         #expect(state.isRunLive)
         #expect(state.run == makeRun(stage: "A2"))
@@ -210,11 +213,14 @@ struct WatchCompanionRunTests {
 
         let replacement = await companion.controlRequests(owner: owner(1))
 
-        #expect(try !Self.state(of: try await pending.value.envelope).isRunLive)
+        let (envelope, answers) = try await pending.value
+        #expect(try !Self.state(of: envelope).isRunLive)
         await companion.refreshHandled(
             owner: owner(1), requestID: request.id, publication: WatchRunPublication(revision: 2, run: makeRun(stage: "A2"))
         )
         #expect(try link.writtenStates().last?.run == makeRun(stage: "A2"))
+        // The late answer only published: the request was replied to once.
+        #expect(answers.value.count == 1)
         _ = replacement
     }
 

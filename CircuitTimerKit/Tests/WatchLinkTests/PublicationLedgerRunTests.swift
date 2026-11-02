@@ -263,6 +263,23 @@ struct PublicationLedgerRunTests {
     }
 
     @Test
+    func test_end_numbersTheStateWithoutTheRun_andTheLedgerKnowsNoRunOwner() async throws {
+        let ledger = ledger
+        _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
+        #expect(ledger.runOwner() == owner(1))
+
+        let outcome = await ledger.end(owner: owner(1), at: linkNow)
+
+        guard case let .written(state) = outcome else {
+            Issue.record("The state without the run was not written: \(outcome)")
+            return
+        }
+        #expect(state.run == nil)
+        #expect(ledger.runOwner() == nil)
+        #expect(await ledger.end(owner: owner(1), at: linkNow) == .skipped)
+    }
+
+    @Test
     func test_refusalWithARun_holdsOnlyForItsOwner() async throws {
         let ledger = ledger
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
@@ -377,26 +394,29 @@ struct PublicationLedgerRunTests {
 
     // MARK: Races, driven by a write held on the ledger's queue
 
+    /// A catalog section is trying the run with its first candidate when the owner ends: the next candidate finds the
+    /// mark under the lock and the section starts again without the run.
     @Test
-    func test_markEnded_whileASectionIsQueued_numbersNoRunOfTheEndedOwner() async throws {
+    func test_markEnded_whileACatalogSectionTriesTheRun_restartsItWithoutTheRun() async throws {
         let ledger = ledger
+        _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
+        let five: CatalogState = .loaded(makeCatalog(5))
         let gate = WriteGate()
         defer { gate.open() }
         link.gate.setValue(gate)
-        let held = Task { await ledger.publish(revision: 1, catalog: Self.four, at: linkNow) }
+        link.refusals.setValue([FakeLink.tooLarge])
+        let publication = Task { await ledger.publish(revision: 2, catalog: five, at: linkNow) }
         await gate.started.wait { $0 }
-        let queued = Task { await ledger.publishRun(revision: 2, run: makeRun(stage: "A2"), at: linkNow) }
+        #expect(link.offeredStates().last?.run == makeRun(stage: "A1"))
 
         ledger.markEnded(owner(1))
         gate.open()
-        _ = await held.value
+        _ = await publication.value
 
-        #expect(await queued.value == .skipped)
-        // A later catalog carries no run of the ended owner, and nothing calls its run live.
-        _ = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(3)), at: linkNow)
-        #expect(try link.writtenStates().last?.run == nil)
-        #expect(try !link.writtenStates().contains { $0.run == makeRun(stage: "A2") })
+        let last = try #require(try link.writtenStates().last)
+        #expect(last.run == nil)
+        #expect(last.catalog == five)
         #expect(!ledger.reply(knownCatalogDigest: nil, answeredBy: (owner(1), 1), at: linkNow).isRunLive)
     }
 
@@ -427,28 +447,31 @@ struct PublicationLedgerRunTests {
         #expect(Set(written.map(\.sequence)).count == written.count)
     }
 
+    /// The gate closes while a section is trying its first candidate: the next candidate finds it closed under the lock
+    /// and numbers nothing; only the terminal state is written after it.
     @Test
-    func test_closeGate_whileASectionIsQueued_numbersNothingButTheTerminalState() async throws {
+    func test_closeGate_whileASectionTriesACandidate_numbersNothingButTheTerminalState() async throws {
         let ledger = ledger
+        _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         let gate = WriteGate()
         defer { gate.open() }
         link.gate.setValue(gate)
-        let held = Task { await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow) }
+        link.refusals.setValue([FakeLink.tooLarge])
+        let publication = Task { await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow) }
         await gate.started.wait { $0 }
-        let queued = Task { await ledger.publishRun(revision: 2, run: makeRun(stage: "A2"), at: linkNow) }
 
         ledger.closeGate()
         gate.open()
-        _ = await held.value
 
-        #expect(await queued.value == .skipped)
+        #expect(await publication.value == .skipped)
+        #expect(try link.writtenStates().map(\.run) == [nil])
         _ = await ledger.finishTermination(at: linkNow)
-        let written = try link.writtenStates()
-        #expect(written.map(\.run) == [makeRun(stage: "A1"), nil])
+        #expect(try link.writtenStates().count == 1)
+        #expect(try link.writtenStates().last?.run == nil)
     }
 
     @Test
-    func test_heldWrite_queuedRunsNumberInQueueOrder_andReplyDoesNotWait() async throws {
+    func test_heldWrite_replyReturnsWhileTheQueueIsBlocked_andRunsNumberInRevisionOrder() async throws {
         let ledger = ledger
         let gate = WriteGate()
         defer { gate.open() }
@@ -457,7 +480,8 @@ struct PublicationLedgerRunTests {
         await gate.started.wait { $0 }
         let second = Task { await ledger.publishRun(revision: 2, run: makeRun(stage: "A2"), at: linkNow) }
 
-        // The queue is blocked inside a write; a reply reads the lock only.
+        // The queue is blocked inside a write; a reply reads the lock only. The second publication may reach the
+        // queue before or after the release: either way it is numbered after the first.
         _ = ledger.reply(knownCatalogDigest: nil, answeredBy: (owner(1), 1), at: linkNow)
         gate.open()
         _ = await first.value
