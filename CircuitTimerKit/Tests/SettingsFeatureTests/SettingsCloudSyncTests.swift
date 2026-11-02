@@ -38,6 +38,29 @@ private let footnoteCases: [CloudSyncFootnoteCase] = [
     CloudSyncFootnoteCase(true, syncStatus(true, true, .syncFailed), "settings.iCloud.failed"),
 ]
 
+/// Without the full version: what StoreKit said, the status of this launch and the footnote they give.
+struct LockedFootnoteCase: Sendable {
+    let fullVersion: FullVersionStatus
+    let status: CloudSyncStatus?
+    let footnote: String?
+
+    init(_ fullVersion: FullVersionStatus, _ status: CloudSyncStatus?, _ footnote: String?) {
+        self.fullVersion = fullVersion
+        self.status = status
+        self.footnote = footnote
+    }
+}
+
+/// Nothing until StoreKit answers; then the lock, and whether this launch still mirrors until the next one.
+private let lockedFootnoteCases: [LockedFootnoteCase] = [
+    LockedFootnoteCase(.unknown, syncStatus(true, true, .noAccount), nil),
+    LockedFootnoteCase(.unknown, nil, nil),
+    LockedFootnoteCase(.free, syncStatus(true, true, nil), "settings.iCloud.lockedUntilRelaunch"),
+    LockedFootnoteCase(.free, syncStatus(true, false, nil), "settings.iCloud.locked"),
+    LockedFootnoteCase(.free, syncStatus(false, false, .noAccount), "settings.iCloud.locked"),
+    LockedFootnoteCase(.free, nil, "settings.iCloud.locked"),
+]
+
 @MainActor
 @Suite
 struct SettingsCloudSyncTests {
@@ -146,26 +169,17 @@ struct SettingsCloudSyncTests {
         #expect(store.state.isICloudSyncOn == isOn)
     }
 
-    @Test(arguments: [
-        (FullVersionStatus.unknown, syncStatus(true, true, .noAccount), nil),
-        (.unknown, nil, nil),
-        (.free, syncStatus(true, true, nil), "settings.iCloud.lockedUntilRelaunch"),
-        (.free, syncStatus(true, false, nil), "settings.iCloud.locked"),
-        (.free, syncStatus(false, false, .noAccount), "settings.iCloud.locked"),
-        (.free, nil, "settings.iCloud.locked"),
-    ] as [(FullVersionStatus, CloudSyncStatus?, String?)])
+    @Test(arguments: lockedFootnoteCases)
     func test_cloudSyncFootnote_withoutTheFullVersion_saysItIsLockedOrNothingUntilStoreKitAnswers(
-        status: FullVersionStatus,
-        syncStatus: CloudSyncStatus?,
-        footnote: String?
+        _ footnoteCase: LockedFootnoteCase
     ) {
         var state = withDependencies {
             $0.defaultAppStorage = UserDefaults.inMemory
         } operation: { SettingsFeature.State() }
-        state.cloudSyncStatus = syncStatus
-        state.fullVersion = status
+        state.cloudSyncStatus = footnoteCase.status
+        state.fullVersion = footnoteCase.fullVersion
 
-        #expect(state.cloudSyncFootnote == footnote)
+        #expect(state.cloudSyncFootnote == footnoteCase.footnote)
     }
 
     /// What the launch reads to decide whether this process syncs.
