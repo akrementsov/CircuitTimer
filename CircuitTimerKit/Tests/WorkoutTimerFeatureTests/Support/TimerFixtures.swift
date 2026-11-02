@@ -481,3 +481,24 @@ struct WatchAnswer: Equatable, Sendable {
     let requestID: Int
     let publication: WatchRunPublication?
 }
+
+extension WorkoutTimerFeature.PendingActivityControl {
+    /// A card command admitted when `clock` read its instant: the start every `TestClock` shares by default.
+    static func card(
+        _ id: Int,
+        _ result: LiveActivityControlResult,
+        activityRevision: Int = 0,
+        activityResult: LiveActivityControlResult? = nil,
+        notificationRevision: Int = 0,
+        at clock: TestClock<Duration> = TestClock()
+    ) -> Self {
+        Self(
+            source: .liveActivity(requestID: id),
+            result: result,
+            admittedAt: MonotonicInstant(now: clock),
+            activityRevision: activityRevision,
+            activityResult: activityResult,
+            notificationRevision: notificationRevision
+        )
+    }
+}

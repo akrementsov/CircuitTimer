@@ -22,7 +22,7 @@ struct TimerActivitySettlementTests {
         var state = WorkoutTimerFeature.State.fixture(.running, schedule: schedule, elapsed: backward ? 3 : 1)
         state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: rejection != .notReady, generation: 7)
         if rejection == .busy {
-            state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 16, result: .stale)
+            state.activityControls?.pending = .card(16, .stale)
             state.notifications.revision = 2
         }
         let timer = TimerHarness(state)
@@ -62,7 +62,7 @@ struct TimerActivitySettlementTests {
                 $0.activityControls?.pending?.activityRevision = 1
                 $0.activityControls?.pending?.notificationRevision = 2
             } else if rejection != .notReady {
-                $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: 1)
+                $0.activityControls?.pending = .card(17, .stale, activityRevision: 1, at: timer.clock)
             }
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
             $0.followHealth(at: timer.now)
@@ -96,9 +96,7 @@ struct TimerActivitySettlementTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         state.notifications.revision = 1
         state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, generation: 8)
-        state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(
-            id: 17, result: .applied, activityRevision: 1, activityResult: .applied, notificationRevision: 1
-        )
+        state.activityControls?.pending = .card(17, .applied, activityRevision: 1, activityResult: .applied, notificationRevision: 1)
         // A changed preference needs a newer window before the admitted command can be acknowledged.
         state.$isSoundOn = SharedReader(value: true)
         let timer = TimerHarness(state, signals: true, notifications: true)

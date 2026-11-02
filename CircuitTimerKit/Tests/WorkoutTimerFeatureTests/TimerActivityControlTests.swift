@@ -42,7 +42,7 @@ struct TimerActivityControlTests {
         timer.store.dependencies.liveActivity.requestHandled = { _, _, result in acknowledgements.continuation.yield(result) }
         let revision = activity.revisionsTaken.value + 1
         await timer.send(.internal(.activityRequestReceived(.init(id: 17, command: .resume, generation: oldGeneration)))) {
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: revision)
+            $0.activityControls?.pending = .card(17, .stale, activityRevision: revision, at: timer.clock)
         }
         await timer.receive(.internal(.activitySynchronized(revision: revision, .init(outcome: .applied)))) {
             $0.activityControls?.pending = nil
@@ -87,7 +87,7 @@ struct TimerActivityControlTests {
             $0.requestedAwake = true
             $0.awakeRevision = context == .resumeCountdown ? 1 : 3
             $0.activityControls?.generation = 8
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .applied, activityRevision: 1, at: timer.clock)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
             $0.followHealth(at: timer.now)
         }
@@ -136,9 +136,7 @@ struct TimerActivityControlTests {
             $0.requestedAwake = command == .resume
             $0.awakeRevision = command == .pause ? 2 : 3
             $0.activityControls?.generation = 8
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(
-                id: 17, result: .applied, activityRevision: 1, notificationRevision: 1
-            )
+            $0.activityControls?.pending = .card(17, .applied, activityRevision: 1, notificationRevision: 1, at: runningTimer.clock)
             $0.notifications.projection = $0.notificationProjection(at: origin, language: "en")
             $0.notifications.revision = 1
             $0.notifications.lastAttempt = MonotonicInstant(now: runningTimer.clock)
@@ -185,7 +183,7 @@ struct TimerActivityControlTests {
             return commands.stream
         }
         let subscription = await timer.store.send(.view(.activityTask)) {
-            $0.activityControls = WorkoutTimerFeature.ActivityControlState()
+            $0.activityControls = WorkoutTimerFeature.ActivityControlState(isActivitySubscribed: true)
             $0.followHealth(at: timer.now)
         }
         await timer.appearRunning()
@@ -240,7 +238,7 @@ struct TimerActivityControlTests {
             return LiveActivitySyncResult(outcome: revision == 1 ? firstOutcome : .applied)
         }
         await timer.send(.internal(.activityRequestReceived(.init(id: 17, command: .resume, generation: 6)))) {
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .stale, activityRevision: 1, at: timer.clock)
         }
         let first = WorkoutTimerFeature.Action.internal(.activitySynchronized(revision: 1, .init(outcome: firstOutcome)))
         if firstOutcome == .failed {
@@ -272,7 +270,7 @@ struct TimerActivityControlTests {
         _ = timer.recordActivity()
         let acknowledgements = recordAcknowledgements(timer)
         await timer.send(.internal(.activityRequestReceived(.init(id: 17, command: command, generation: 7)))) {
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .stale, activityRevision: 1, at: timer.clock)
         }
         await timer.receive(.internal(.activitySynchronized(revision: 1, .init(outcome: .applied)))) {
             $0.activityControls?.pending = nil

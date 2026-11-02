@@ -36,7 +36,7 @@ struct TimerActivityTeardownTests {
         let request = try #require(await iterator.next())
         var state = WorkoutTimerFeature.State.fixture(.finished)
         state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, generation: 8)
-        state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: request.id, result: .applied, activityRevision: 2)
+        state.activityControls?.pending = .card(request.id, .applied, activityRevision: 2)
         let timer = TimerHarness(state)
         let activity = timer.recordActivity()
         let end = timer.store.dependencies.liveActivity.end
