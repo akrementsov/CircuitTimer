@@ -38,6 +38,8 @@ public final class ManualClock: Clock, Sendable {
         var sleepers: [Sleeper] = []
         var sleepCount = 0
         var waiters: [SleepWaiter] = []
+        /// Wait for a number of sleeps started in all, cancelled or woken ones included.
+        var startWaiters: [SleepWaiter] = []
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -61,8 +63,11 @@ public final class ManualClock: Clock, Sendable {
             state.sleepCount += 1
             state.sleepers.append(Sleeper(number: state.sleepCount, deadline: deadline, wake: wake))
             let pending = state.sleepers.count
+            let started = state.sleepCount
             let ready = state.waiters.filter { $0.pending <= pending }.map(\.continuation)
+                + state.startWaiters.filter { $0.pending <= started }.map(\.continuation)
             state.waiters.removeAll { $0.pending <= pending }
+            state.startWaiters.removeAll { $0.pending <= started }
             return (state.sleepCount, ready)
         }
         for continuation in ready {
@@ -97,6 +102,22 @@ public final class ManualClock: Clock, Sendable {
                 guard state.sleepers.count < pending else { return true }
 
                 state.waiters.append(SleepWaiter(pending: pending, continuation: continuation))
+                return false
+            }
+            if isReady {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Returns once `total` sleeps have started since the clock was made, whether they still wait or not: a test that
+    /// expects a new sleep after one that was cancelled waits for the new one, not for a count the old one may hold.
+    public func waitForStartedSleeps(_ total: Int) async {
+        await withCheckedContinuation { continuation in
+            let isReady = state.withLock { state in
+                guard state.sleepCount < total else { return true }
+
+                state.startWaiters.append(SleepWaiter(pending: total, continuation: continuation))
                 return false
             }
             if isReady {
