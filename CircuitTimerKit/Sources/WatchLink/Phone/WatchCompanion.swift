@@ -1,14 +1,16 @@
 import Foundation
 import os
+import WorkoutActivity
 import WorkoutDomain
 
 /// The iPhone's side of the link, one per process. It answers the watch's requests from the newest published state,
 /// also in a process a request launched, which has no `Store` and has not read the workouts: such a process answers
 /// that it knows no catalog, and the list reaches the watch when the app publishes it. A request about a running
-/// workout goes to its timer first, so a reply confirms a run only after its timer settled and published it.
+/// workout goes to its timer first, so a reply confirms a run only after its timer settled and published it. A command
+/// goes to the timer the same way and is answered once, with what the timer did and the state it published.
 actor WatchCompanion {
     /// How long a request waits for the timer, counted from its arrival; then the reply says the run is not live.
-    static let refreshWait: Duration = .seconds(5)
+    static let timerWait: Duration = .seconds(5)
 
     private struct Subscription {
         let id: Int
@@ -22,6 +24,7 @@ actor WatchCompanion {
     }
 
     private let ledger: PublicationLedger
+    private let commands = CommandGate()
     private let transport: LinkTransport
     private let now: @Sendable () -> Date
     private let clock: any Clock<Duration>
@@ -86,8 +89,9 @@ actor WatchCompanion {
         push(await ledger.end(owner: owner, at: now()), withCatalog: false)
     }
 
-    /// Stops every publication synchronously, for termination.
+    /// Stops every publication and every command synchronously, for termination.
     nonisolated func closeGate() {
+        commands.close()
         ledger.closeGate()
     }
 
@@ -126,6 +130,21 @@ actor WatchCompanion {
         await publishRun(revision: publication.revision, run: publication.run)
     }
 
+    /// The timer's answer to a command, after the syncs its rules wait for. A command still waiting gets it; one that
+    /// already gave up leaves the publication to this call.
+    func controlHandled(
+        owner: UUID,
+        requestID: Int,
+        result: LiveActivityControlResult,
+        publication: WatchRunPublication?
+    ) async {
+        if commands.answer(requestID: requestID, owner: owner, CommandAnswer(result: result, publication: publication)) {
+            return
+        }
+        guard let publication, publication.run.owner == owner else { return }
+        await publishRun(revision: publication.revision, run: publication.run)
+    }
+
     private func endRequests(of owner: UUID) {
         if let subscription = subscriptions[owner] {
             subscriptionEnded(owner: owner, subscriptionID: subscription.id)
@@ -140,6 +159,7 @@ actor WatchCompanion {
             tickets[id] = nil
             ticket.answer.give(nil)
         }
+        commands.endSubscription(owner: owner, subscriptionID: subscriptionID)
     }
 
     private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) {
@@ -169,6 +189,15 @@ actor WatchCompanion {
                 case let .refresh(knownCatalogDigest):
                     let state = await refreshState(knownCatalogDigest: knownCatalogDigest, arrival: arrival)
                     reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .state(state))
+                case let .control(owner, command, generation, knownCatalogDigest):
+                    let (result, state) = await commandState(
+                        owner: owner,
+                        command: command,
+                        generation: generation,
+                        knownCatalogDigest: knownCatalogDigest,
+                        arrival: arrival
+                    )
+                    reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .control(result, state))
             }
         } else {
             reply = .unreadable
@@ -182,9 +211,9 @@ actor WatchCompanion {
     }
 
     /// The reply to a refresh: live only when the run's own timer answered and its publication was numbered within
-    /// `refreshWait` of the request's arrival.
+    /// `timerWait` of the request's arrival.
     private func refreshState(knownCatalogDigest: String?, arrival: MonotonicInstant) async -> PhoneState {
-        let notLive = { self.ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: nil, at: self.now()) }
+        let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
         // A request whose 5 s already passed before its task ran goes to no timer.
         guard remaining(since: arrival) > .zero, let owner = ledger.runOwner(), let subscription = subscriptions[owner] else {
             return notLive()
@@ -213,7 +242,63 @@ actor WatchCompanion {
         let publication = await answer.wait(timeout: remaining(since: arrival), clock: clock, otherwise: nil)
         tickets[requestID] = nil
         guard let publication, publication.run.owner == owner else { return notLive() }
+        return await liveState(owner: owner, publication: publication, knownCatalogDigest: knownCatalogDigest, arrival: arrival)
+    }
 
+    /// The reply to a command. `applied` and `stale` come only with the live state the timer published for them;
+    /// without it in time the iPhone does not know what the watch should show, so the result is `timedOut`. A command
+    /// the timer may have applied is never answered as refused.
+    private func commandState(
+        owner requested: UUID,
+        command: LiveActivityCommand,
+        generation: Int,
+        knownCatalogDigest: String?,
+        arrival: MonotonicInstant
+    ) async -> (WatchControlResult, PhoneState) {
+        let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
+        guard remaining(since: arrival) > .zero, let owner = ledger.runOwner(), owner == requested,
+              !ledger.isEnded(owner), let subscription = subscriptions[owner] else {
+            return (.unavailable, notLive())
+        }
+
+        requestSerial += 1
+        let request = WatchControlRequest(id: requestSerial, kind: .command(command, generation: generation))
+        let answer: OneAnswer<CommandAnswer?>
+        switch commands.admit(request, owner: owner, subscriptionID: subscription.id, into: subscription.continuation) {
+            case let .admitted(admitted):
+                answer = admitted
+            case .closed:
+                return (.unavailable, notLive())
+            case .dropped:
+                // The timer did not get it, but it lives: the watch asks again instead of reporting a failure.
+                Logger.watchLink.notice("A command did not fit the timer's request buffer")
+                return (.timedOut, notLive())
+            case .terminated:
+                subscriptionEnded(owner: owner, subscriptionID: subscription.id)
+                return (.unavailable, notLive())
+        }
+        guard let given = await answer.wait(timeout: remaining(since: arrival), clock: clock, otherwise: nil) else {
+            commands.withdraw(requestID: request.id)
+            Logger.watchLink.notice("The timer did not answer a command within its wait")
+            return (.timedOut, notLive())
+        }
+        let result = WatchControlResult(given.result)
+        let isApplied = result == .applied || result == .stale
+        guard let publication = given.publication, publication.run.owner == owner else {
+            return (isApplied ? .unavailable : result, notLive())
+        }
+        let state = await liveState(owner: owner, publication: publication, knownCatalogDigest: knownCatalogDigest, arrival: arrival)
+        return (isApplied && !state.isRunLive ? .timedOut : result, state)
+    }
+
+    /// Numbers the timer's publication and replies with it: live only if the ledger holds it, or a newer one of the
+    /// same timer, within the request's wait.
+    private func liveState(
+        owner: UUID,
+        publication: WatchRunPublication,
+        knownCatalogDigest: String?,
+        arrival: MonotonicInstant
+    ) async -> PhoneState {
         // The publication is numbered before the reply, so the reply carries its own number; the write may outlive
         // the wait, which then answers as not live.
         let published = OneAnswer<Bool>()
@@ -228,7 +313,7 @@ actor WatchCompanion {
         // A wait with nothing left returns what was already given, so the bound is checked again after it.
         guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false),
               remaining(since: arrival) > .zero else {
-            return notLive()
+            return notLive(knownCatalogDigest: knownCatalogDigest)
         }
         // Live only if the ledger holds this publication or a newer one of the same timer, checked as the reply is
         // built: content a refused write left behind is not this answer's run.
@@ -239,8 +324,13 @@ actor WatchCompanion {
         )
     }
 
+    /// The newest state, read under the ledger's lock without waiting for its queue.
+    private func notLive(knownCatalogDigest: String?) -> PhoneState {
+        ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: nil, at: now())
+    }
+
     private func remaining(since arrival: MonotonicInstant) -> Duration {
-        max(.zero, Self.refreshWait - (arrival.duration(toNowOf: clock) ?? Self.refreshWait))
+        max(.zero, Self.timerWait - (arrival.duration(toNowOf: clock) ?? Self.timerWait))
     }
 
     private static func decodeRequest(_ data: Data) -> WatchRequestEnvelope? {

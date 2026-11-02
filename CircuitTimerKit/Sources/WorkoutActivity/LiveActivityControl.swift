@@ -12,7 +12,7 @@ public struct LiveActivityNotice: Equatable, Sendable {
     }
 }
 
-public enum LiveActivityCommand: Equatable, Sendable {
+public enum LiveActivityCommand: String, Codable, Equatable, Sendable {
     case pause
     case resume
 }

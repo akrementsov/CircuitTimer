@@ -11,7 +11,13 @@ extension WorkoutTimerFeature {
         let publication = canPublish ? watchPublication(state, at: now) : nil
         if case let .internal(.watchRequestReceived(request)) = action {
             return .run { [watchCompanion, id = state.id] _ in
-                await watchCompanion.refreshHandled(id, request.id, publication)
+                switch request.kind {
+                    case .refresh:
+                        await watchCompanion.refreshHandled(id, request.id, publication)
+                    case .command:
+                        // The timer applies no command from the watch yet.
+                        await watchCompanion.controlHandled(id, request.id, .unavailable, publication)
+                }
             }
         }
         guard let publication else { return .none }

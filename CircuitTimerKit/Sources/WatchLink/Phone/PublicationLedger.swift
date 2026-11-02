@@ -398,8 +398,8 @@ final class PublicationLedger: @unchecked Sendable {
         return [.loaded(refused.prefix(refused.entries.count / 2)), .unavailable(.tooLarge)]
     }
 
-    /// Whether the state fits in the longest way it travels: a reply's envelope with the largest number and a full
-    /// digest. The context and a message carry the state alone, which is smaller.
+    /// Whether the state fits in the longest way it travels: a command's reply envelope with the longest result, the
+    /// largest number and a full digest. A refresh's reply, the context and a message carry less around the same state.
     private static func fits(
         catalog: CatalogState?,
         run: WatchRun?,
@@ -417,13 +417,15 @@ final class PublicationLedger: @unchecked Sendable {
             isRunLive: run != nil
         )
         do {
-            let reply = WatchReplyEnvelope(requestID: processID, reply: .state(probe))
+            let reply = WatchReplyEnvelope(requestID: processID, reply: .control(longestResult, probe))
             return try WireCoding.encode(reply).count <= limit
         } catch {
             Logger.watchLink.error("A state did not encode: \(String(reflecting: error), privacy: .public)")
             return false
         }
     }
+
+    private static let longestResult = WatchControlResult.allCases.max { $0.rawValue.count < $1.rawValue.count } ?? .unavailable
 
     private static func digest(of catalog: CatalogState) -> String? {
         do {
