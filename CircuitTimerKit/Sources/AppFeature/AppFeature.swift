@@ -537,38 +537,6 @@ public struct AppFeature: Sendable {
         return write(mutation)
     }
 
-    private func write(_ mutation: ListMutation) -> Effect<Action> {
-        .run { [workoutStorage] send in
-            do {
-                let outcome = switch mutation {
-                    case let .delete(id): try await workoutStorage.delete(id: id)
-                    case let .insert(workout, anchor): try await workoutStorage.insert(workout: workout, after: anchor)
-                    case let .reorder(ids): try await workoutStorage.reorder(ids: ids)
-                }
-                await send(.internal(.mutationFinished(outcome)))
-            } catch is CancellationError {
-                // Only the root store going away cancels a write, and the queue goes with it.
-                return
-            } catch {
-                Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
-                await send(.internal(.mutationFailed))
-            }
-        }
-    }
-
-    private func duplicate(_ workout: Workout) -> Workout {
-        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
-        copy.trainingRounds = workout.trainingRounds
-        copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
-        copy.pauseAfterTraining = workout.pauseAfterTraining
-        for section in WorkoutSectionKind.allCases {
-            copy[section] = workout[section].map { stage in
-                Stage(id: uuid(), name: stage.name, duration: stage.duration, intensity: stage.intensity)
-            }
-        }
-        return copy
-    }
-
     private func destinationDismissed(_ state: inout State) -> Effect<Action> {
         switch state.destination {
             case let .timer(timer):
@@ -627,6 +595,41 @@ public struct AppFeature: Sendable {
             state.needsReload = true
         }
         return .none
+    }
+}
+
+// List writes, apart from the type body to keep it within the length limit.
+extension AppFeature {
+    private func write(_ mutation: ListMutation) -> Effect<Action> {
+        .run { [workoutStorage] send in
+            do {
+                let outcome = switch mutation {
+                    case let .delete(id): try await workoutStorage.delete(id: id)
+                    case let .insert(workout, anchor): try await workoutStorage.insert(workout: workout, after: anchor)
+                    case let .reorder(ids): try await workoutStorage.reorder(ids: ids)
+                }
+                await send(.internal(.mutationFinished(outcome)))
+            } catch is CancellationError {
+                // Only the root store going away cancels a write, and the queue goes with it.
+                return
+            } catch {
+                Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
+                await send(.internal(.mutationFailed))
+            }
+        }
+    }
+
+    private func duplicate(_ workout: Workout) -> Workout {
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
+        copy.trainingRounds = workout.trainingRounds
+        copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
+        copy.pauseAfterTraining = workout.pauseAfterTraining
+        for section in WorkoutSectionKind.allCases {
+            copy[section] = workout[section].map { stage in
+                Stage(id: uuid(), name: stage.name, duration: stage.duration, intensity: stage.intensity)
+            }
+        }
+        return copy
     }
 }
 

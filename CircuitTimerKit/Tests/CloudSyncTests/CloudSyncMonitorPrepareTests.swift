@@ -39,27 +39,30 @@ struct CloudSyncMonitorPrepareTests {
 
     @Test
     func test_prepareDecision_concurrentCallsShareOneWaitAndACancelledCallerNeverDecides() async {
-        let inputs = InputsGate()
-        let calls = LockIsolated(0)
-        let harness = MonitorHarness(prepareInputs: {
-            calls.withValue { $0 += 1 }
-            await inputs.wait()
-        })
+        // Serial, so the cancelled caller has run before the test checks that nothing decided.
+        await withMainSerialExecutor {
+            let inputs = InputsGate()
+            let calls = LockIsolated(0)
+            let harness = MonitorHarness(prepareInputs: {
+                calls.withValue { $0 += 1 }
+                await inputs.wait()
+            })
 
-        let cancelled = Task { await harness.monitor.prepareDecision() }
-        let waiting = Task { await harness.monitor.prepareDecision() }
-        await inputs.untilWaiting()
-        cancelled.cancel()
-        await Task.megaYield()
-        #expect(harness.preferenceReads.value == 0)
+            let cancelled = Task { await harness.monitor.prepareDecision() }
+            let waiting = Task { await harness.monitor.prepareDecision() }
+            await inputs.untilWaiting()
+            cancelled.cancel()
+            await Task.megaYield()
+            #expect(harness.preferenceReads.value == 0)
 
-        inputs.open()
-        await cancelled.value
-        await waiting.value
-        await harness.monitor.prepareDecision()
+            inputs.open()
+            await cancelled.value
+            await waiting.value
+            await harness.monitor.prepareDecision()
 
-        #expect(calls.value == 1)
-        #expect(harness.preferenceReads.value == 1)
+            #expect(calls.value == 1)
+            #expect(harness.preferenceReads.value == 1)
+        }
     }
 }
 

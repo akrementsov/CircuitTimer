@@ -19,27 +19,30 @@ struct EntitlementMonitorTests {
 
     @Test
     func test_firstUse_fromACancelledCaller_startsOneListenerAndOneRead() async throws {
-        let caller = Task { [monitor] in
-            withUnsafeCurrentTask { $0?.cancel() }
-            return monitor.currentStatus
-        }
-        #expect(await caller.value == .unknown)
-        _ = monitor.changes()
-        _ = monitor.currentStatus
+        // Serial, so every task the monitor started has run before the test checks what it did not do.
+        try await withMainSerialExecutor {
+            let caller = Task { [monitor] in
+                withUnsafeCurrentTask { $0?.cancel() }
+                return monitor.currentStatus
+            }
+            #expect(await caller.value == .unknown)
+            _ = monitor.changes()
+            _ = monitor.currentStatus
 
-        let read = try await store.nextRead()
-        let statuses = monitor.changes()
-        #expect(await statuses.next() == .unknown)
-        read.answer.resume(returning: true)
+            let read = try await store.nextRead()
+            let statuses = monitor.changes()
+            #expect(await statuses.next() == .unknown)
+            read.answer.resume(returning: true)
 
-        #expect(await statuses.next() == .full)
-        while store.listenersStarted.value == 0 {
-            await Task.yield()
+            #expect(await statuses.next() == .full)
+            while store.listenersStarted.value == 0 {
+                await Task.yield()
+            }
+            await Task.megaYield()
+            #expect(store.readsStarted.value == 1)
+            #expect(store.listenersStarted.value == 1)
+            store.finish()
         }
-        await Task.megaYield()
-        #expect(store.readsStarted.value == 1)
-        #expect(store.listenersStarted.value == 1)
-        store.finish()
     }
 
     @Test
@@ -191,32 +194,38 @@ struct EntitlementMonitorTests {
 
     @Test
     func test_olderRead_answeringAfterANewerOne_publishesNothing() async throws {
-        let statuses = monitor.changes()
-        #expect(await statuses.next() == .unknown)
-        let older = try await store.nextRead()
-        store.sendUpdate()
-        let newer = try await store.nextRead()
+        // Serial, so every task the monitor started has run before the test checks what it did not do.
+        try await withMainSerialExecutor {
+            let statuses = monitor.changes()
+            #expect(await statuses.next() == .unknown)
+            let older = try await store.nextRead()
+            store.sendUpdate()
+            let newer = try await store.nextRead()
 
-        newer.answer.resume(returning: true)
-        #expect(await statuses.next() == .full)
-        older.answer.resume(returning: false)
-        await Task.megaYield()
+            newer.answer.resume(returning: true)
+            #expect(await statuses.next() == .full)
+            older.answer.resume(returning: false)
+            await Task.megaYield()
 
-        #expect(monitor.currentStatus == .full)
-        #expect(await statuses.takeBuffered() == nil)
-        store.finish()
+            #expect(monitor.currentStatus == .full)
+            #expect(await statuses.takeBuffered() == nil)
+            store.finish()
+        }
     }
 
     @Test
     func test_readStartedBeforeAPurchase_answeringFree_keepsFull() async throws {
-        let read = try await store.nextReadAfterStart(monitor)
+        // Serial, so every task the monitor started has run before the test checks what it did not do.
+        try await withMainSerialExecutor {
+            let read = try await store.nextReadAfterStart(monitor)
 
-        _ = try await monitor.purchase()
-        read.answer.resume(returning: false)
-        await Task.megaYield()
+            _ = try await monitor.purchase()
+            read.answer.resume(returning: false)
+            await Task.megaYield()
 
-        #expect(monitor.currentStatus == .full)
-        store.finish()
+            #expect(monitor.currentStatus == .full)
+            store.finish()
+        }
     }
 
     @Test
