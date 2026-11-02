@@ -34,11 +34,24 @@ struct WatchRunView: View {
         screen.display
     }
 
-    private var card: some View {
+    /// The digits show only while the iPhone's confirmation holds: the timeline redraws the card at `digitsUntil`, and
+    /// the screen and VoiceOver read the same answer for the same date.
+    @ViewBuilder private var card: some View {
+        if let from = screen.digitsFrom, let until = screen.digitsUntil {
+            // The first entry is already past, so the timeline draws at once; the second hides the digits.
+            TimelineView(.explicit([min(from, until), until])) { context in
+                stageCard(showsDigits: screen.showsDigits(at: context.date))
+            }
+        } else {
+            stageCard(showsDigits: false)
+        }
+    }
+
+    private func stageCard(showsDigits: Bool) -> some View {
         VStack(alignment: .leading, spacing: .zero) {
             switch display.clock {
                 case let .counting(range):
-                    digits { WatchClockText(range: range) }
+                    digits(showsDigits) { WatchClockText(range: range) }
                     headline
                 case .pauseGlyph:
                     // The glyph stands beside the word, so the time left fits under them.
@@ -47,7 +60,7 @@ struct WatchRunView: View {
                         headline
                     }
                     if case let .fixed(remaining) = display.islandClock {
-                        digits {
+                        digits(showsDigits) {
                             Text(verbatim: remaining.clockText(.timerRemaining))
                                 .font(.token(.runningStageClock))
                         }
@@ -70,13 +83,13 @@ struct WatchRunView: View {
         // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(display.headline))
-        .accessibilityValue(spokenTime)
+        .accessibilityValue(spokenTime(showsDigits))
         .accessibilityAddTraits(.updatesFrequently)
     }
 
-    /// The time the card shows, for VoiceOver; nothing without a lease, as on screen.
-    private var spokenTime: Text {
-        guard screen.digitsUntil != nil else { return Text(verbatim: "") }
+    /// The time the card shows, for VoiceOver; nothing when the screen shows none.
+    private func spokenTime(_ showsDigits: Bool) -> Text {
+        guard showsDigits else { return Text(verbatim: "") }
         switch display.clock {
             case let .counting(range):
                 return Text(timerInterval: range, countsDown: true, showsHours: false)
@@ -118,18 +131,10 @@ struct WatchRunView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Shown only while the iPhone's confirmation holds: the timeline redraws at `digitsUntil` and hides them then.
-    /// Without them a hidden reading keeps their place, so the cards do not jump when they go and come back.
-    @ViewBuilder private func digits(@ViewBuilder _ content: @escaping () -> some View) -> some View {
-        if let from = screen.digitsFrom, let until = screen.digitsUntil {
-            // The first entry is already past, so the timeline draws at once; the second hides the digits.
-            TimelineView(.explicit([min(from, until), until])) { context in
-                if screen.showsDigits(at: context.date) {
-                    content()
-                } else {
-                    digitsPlace
-                }
-            }
+    /// Without the digits a hidden reading keeps their place, so the cards do not jump when they go and come back.
+    @ViewBuilder private func digits(_ showsDigits: Bool, @ViewBuilder _ content: () -> some View) -> some View {
+        if showsDigits {
+            content()
         } else {
             digitsPlace
         }
