@@ -1,5 +1,6 @@
 import CloudSync
 import ComposableArchitecture
+import Purchases
 import TimerPreferences
 
 /// The Settings tab: its own navigation stack with About and the legal pages.
@@ -23,7 +24,10 @@ public struct SettingsFeature: Sendable {
         @Shared(.backgroundNotifications) public var isBackgroundNotificationsOn = true
         /// Read when the app launches; a change shows a footnote until the next launch applies it.
         @Shared(.iCloudSync) public var isICloudSyncOn = true
-        var cloudSyncStatus: CloudSyncStatus?
+        public internal(set) var cloudSyncStatus: CloudSyncStatus?
+        /// iCloud sync is part of the full version; the rows under it buy or restore it. The app keeps it current from
+        /// its one subscription.
+        public var fullVersion: FullVersionStatus = .unknown
         public internal(set) var path = StackState<Path.State>()
 
         public init() {}
@@ -34,9 +38,19 @@ public struct SettingsFeature: Sendable {
         }
     }
 
+    /// What the user asked of the full version; the app shows the purchase sheet for it.
+    public enum FullVersionRequest: Equatable, Sendable {
+        case buy
+        /// Restores at once.
+        case restore
+        /// The locked iCloud switch: the sheet says why.
+        case iCloudSync
+    }
+
     public enum Action: ViewAction, Equatable, Sendable {
         case view(View)
         case `internal`(Internal)
+        case delegate(Delegate)
         case path(StackActionOf<Path>)
 
         @CasePathable
@@ -48,6 +62,9 @@ public struct SettingsFeature: Sendable {
             case vibrationToggled(Bool)
             case speechToggled(Bool)
             case iCloudSyncToggled(Bool)
+            case lockedICloudSyncTapped
+            case buyTapped
+            case restoreTapped
             case aboutTapped
             case legalDocumentTapped(LegalDocument)
         }
@@ -55,6 +72,11 @@ public struct SettingsFeature: Sendable {
         @CasePathable
         public enum Internal: Equatable, Sendable {
             case cloudSyncStatusChanged(CloudSyncStatus)
+        }
+
+        @CasePathable
+        public enum Delegate: Equatable, Sendable {
+            case fullVersionRequested(FullVersionRequest)
         }
     }
 
@@ -75,7 +97,7 @@ public struct SettingsFeature: Sendable {
                 case let .internal(.cloudSyncStatusChanged(status)):
                     state.cloudSyncStatus = status
                     return .none
-                case .path:
+                case .delegate, .path:
                     return .none
             }
         }
@@ -104,6 +126,13 @@ public struct SettingsFeature: Sendable {
             case let .iCloudSyncToggled(value):
                 state.$isICloudSyncOn.withLock { $0 = value }
                 return .none
+            case .lockedICloudSyncTapped:
+                // The switch keeps its stored value: bought later, sync is on as the user left it.
+                return .send(.delegate(.fullVersionRequested(.iCloudSync)))
+            case .buyTapped:
+                return .send(.delegate(.fullVersionRequested(.buy)))
+            case .restoreTapped:
+                return .send(.delegate(.fullVersionRequested(.restore)))
             case .aboutTapped:
                 state.path.append(.about(version: appVersion.shortVersion()))
                 return .none

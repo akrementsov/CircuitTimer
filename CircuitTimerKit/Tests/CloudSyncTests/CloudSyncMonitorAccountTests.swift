@@ -21,6 +21,7 @@ struct CloudSyncMonitorAccountTests {
         problem: CloudSyncProblem?
     ) async throws {
         let harness = MonitorHarness()
+        _ = harness.monitor.mirroredContainer()
         let statuses = harness.monitor.status()
         _ = await statuses.next()
 

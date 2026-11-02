@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import DesignSystem
 import Foundation
+import PurchaseFeature
 import SettingsFeature
 import SwiftUI
 import UITestContract
@@ -52,6 +53,12 @@ public struct AppView: View {
         .fullScreenCover(item: $store.scope(\.$destination, action: \.destination).timer) { timerStore in
             WorkoutTimerStack(store: timerStore)
                 .onAppear { send(.timerCoverAppeared) }
+        }
+        // What waited for the sheet, a write error or the saved-run question, shows only after it has gone.
+        .sheet(item: $store.scope(\.$destination, action: \.destination).purchase) {
+            send(.purchaseSheetDismissed)
+        } content: { purchaseStore in
+            PurchaseView(store: purchaseStore)
         }
     }
 

@@ -16,7 +16,11 @@ struct MonitorHarness: Sendable {
     let accounts = AccountReads()
     let monitor: CloudSyncMonitor
 
-    init(preference isOn: Bool = true, container: String? = Self.container) {
+    init(
+        preference isOn: Bool = true,
+        container: String? = Self.container,
+        prepareInputs: @escaping @Sendable () async -> Void = {}
+    ) {
         let preference = LockIsolated(isOn)
         let preferenceReads = preferenceReads
         let containerReads = containerReads
@@ -32,7 +36,8 @@ struct MonitorHarness: Sendable {
                 containerReads.withValue { $0 += 1 }
                 return container
             },
-            accountStatus: { try await accounts.status(of: $0) }
+            accountStatus: { try await accounts.status(of: $0) },
+            prepareInputs: prepareInputs
         )
     }
 
@@ -43,6 +48,7 @@ struct MonitorHarness: Sendable {
     /// Opens the store mirroring and returns once the first account read has been answered and applied, so no read
     /// is left in flight.
     func openMirroring(answer: CKAccountStatus = .available, sourceLocation: SourceLocation = #_sourceLocation) async throws {
+        _ = monitor.mirroredContainer()
         let statuses = monitor.status()
         _ = await statuses.next()
         monitor.storeOpened(isMirroring: true)

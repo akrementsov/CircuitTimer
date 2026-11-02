@@ -1,5 +1,6 @@
 import CloudSync
 import ComposableArchitecture
+import Purchases
 
 extension SettingsFeature {
     func observeCloudSyncStatus() -> Effect<Action> {
@@ -13,9 +14,19 @@ extension SettingsFeature {
 }
 
 extension SettingsFeature.State {
-    /// What the iCloud switch says under it: a change waiting for the next launch first, then that workouts stay on
-    /// the device, then why sync does not work. A failed open shows while the switch stays on, since nothing waits then.
+    /// What the iCloud switch says under it. Without the full version: that sync is part of it, and whether the store
+    /// still mirrors until the next launch, as after a refund. With it: a change waiting for the next launch first, then
+    /// that workouts stay on the device, then why sync does not work. A failed open shows while the switch stays on,
+    /// since nothing waits then. Nothing while StoreKit has not answered.
     var cloudSyncFootnote: String? {
+        switch fullVersion {
+            case .unknown:
+                return nil
+            case .free:
+                return cloudSyncStatus?.isMirroring == true ? "settings.iCloud.lockedUntilRelaunch" : "settings.iCloud.locked"
+            case .full:
+                break
+        }
         guard let cloudSyncStatus else { return nil }
         guard isICloudSyncOn == cloudSyncStatus.isRequested else { return "settings.iCloud.relaunch" }
         guard isICloudSyncOn else { return "settings.iCloud.localOnly" }

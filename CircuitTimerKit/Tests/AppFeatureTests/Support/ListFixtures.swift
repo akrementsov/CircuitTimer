@@ -6,6 +6,7 @@ import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
 import Foundation
+import Purchases
 import WatchLink
 import WorkoutActivity
 import WorkoutDomain
@@ -14,6 +15,8 @@ import WorkoutHealth
 func loaded(_ workouts: [Workout]) -> AppFeature.State {
     var state = AppFeature.State()
     state.workouts = .loaded(IdentifiedArray(uniqueElements: workouts))
+    // Bought, so the tests of adding and duplicating keep meaning what they did before the free limit.
+    state.fullVersion = .full
     return state
 }
 
@@ -48,6 +51,7 @@ func makeStore(
         $0.liveActivity = .previewValue
         $0.cues = .previewValue
         $0.cloudSync = .previewValue
+        $0.purchases = .previewValue
         $0.workoutHealth = .previewValue
         $0.backgroundNotifications.removeOrphans = { true }
         $0.backgroundNotifications.end = { _ in }

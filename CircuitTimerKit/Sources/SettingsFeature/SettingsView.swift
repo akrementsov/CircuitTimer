@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import DesignSystem
+import Purchases
 import SwiftUI
 import UITestContract
 
@@ -39,11 +40,18 @@ public struct SettingsView: View {
                     isOn: Binding(get: { store.isKeepScreenOn }, set: { send(.keepScreenOnToggled($0)) })
                 )
                 .accessibilityIdentifier(AccessibilityID.Settings.keepScreenOn)
-                SettingsSwitchCard(
-                    title: Text("settings.iCloud.toggle", bundle: .module),
-                    isOn: Binding(get: { store.isICloudSyncOn }, set: { send(.iCloudSyncToggled($0)) })
-                )
-                .accessibilityIdentifier(AccessibilityID.Settings.iCloudSync)
+                if store.fullVersion == .full {
+                    SettingsSwitchCard(
+                        title: Text("settings.iCloud.toggle", bundle: .module),
+                        isOn: Binding(get: { store.isICloudSyncOn }, set: { send(.iCloudSyncToggled($0)) })
+                    )
+                    .accessibilityIdentifier(AccessibilityID.Settings.iCloudSync)
+                } else {
+                    SettingsLockedSwitchCard(title: Text("settings.iCloud.toggle", bundle: .module)) {
+                        send(.lockedICloudSyncTapped)
+                    }
+                    .accessibilityIdentifier(AccessibilityID.Settings.iCloudSync)
+                }
                 if let footnote = store.cloudSyncFootnote {
                     Text(LocalizedStringKey(footnote), bundle: .module)
                         .font(.token(.footnote))
@@ -51,6 +59,7 @@ public struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, .token(spacing: .m))
                 }
+                fullVersionRows
                 Button {
                     send(.aboutTapped)
                 } label: {
@@ -73,6 +82,38 @@ public struct SettingsView: View {
         .tint(.text(.primary))
         .task { send(.task) }
     }
+
+    /// Buy and Restore until the full version is owned, then one row that says so; nothing while StoreKit has not
+    /// answered.
+    @ViewBuilder
+    private var fullVersionRows: some View {
+        switch store.fullVersion {
+            case .unknown:
+                EmptyView()
+            case .free:
+                Button {
+                    send(.buyTapped)
+                } label: {
+                    SettingsCard(Text("settings.purchase.buy", bundle: .module), style: .active)
+                }
+                .buttonStyle(.settingsCard)
+                .accessibilityIdentifier(AccessibilityID.Settings.buyFullVersion)
+                Button {
+                    send(.restoreTapped)
+                } label: {
+                    SettingsCard(Text("settings.purchase.restore", bundle: .module), style: .active)
+                }
+                .buttonStyle(.settingsCard)
+                .accessibilityIdentifier(AccessibilityID.Settings.restorePurchases)
+            case .full:
+                SettingsCard(
+                    Text("settings.purchase.fullVersion", bundle: .module),
+                    value: Text("settings.purchase.purchased", bundle: .module),
+                    style: .inactive
+                )
+                .accessibilityIdentifier(AccessibilityID.Settings.fullVersionPurchased)
+        }
+    }
 }
 
 /// Previews name screens through this enum: a `#Preview` body cannot see the `Path.State` cases the macro generates.
@@ -83,8 +124,9 @@ private enum PreviewScreen {
 }
 
 @MainActor
-private func previewStore(_ screen: PreviewScreen) -> StoreOf<SettingsFeature> {
+private func previewStore(_ screen: PreviewScreen, fullVersion: FullVersionStatus = .full) -> StoreOf<SettingsFeature> {
     var state = SettingsFeature.State()
+    state.fullVersion = fullVersion
     switch screen {
         case .settings:
             break
@@ -99,6 +141,11 @@ private func previewStore(_ screen: PreviewScreen) -> StoreOf<SettingsFeature> {
 
 #Preview("Settings") {
     SettingsView(store: previewStore(.settings))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Settings: locked") {
+    SettingsView(store: previewStore(.settings, fullVersion: .free))
         .preferredColorScheme(.dark)
 }
 

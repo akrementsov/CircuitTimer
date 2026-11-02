@@ -16,6 +16,9 @@ extension DesignSystem.Token {
         case fieldTitle
         /// 17 pt on the body style; the title of a full-width action button.
         case button
+        /// 28 pt bold on the title style; the title of a sheet such as the purchase screen. `title` is taken by
+        /// `ActivityTypography`, and `.token(.title)` would be ambiguous.
+        case sheetTitle
 
         fileprivate var textStyle: (swiftUI: Font.TextStyle, uiKit: UIFont.TextStyle) {
             switch self {
@@ -25,6 +28,8 @@ extension DesignSystem.Token {
                     (.caption, .caption1)
                 case .button:
                     (.body, .body)
+                case .sheetTitle:
+                    (.title, .title1)
             }
         }
 
@@ -34,7 +39,7 @@ extension DesignSystem.Token {
                     (.semibold, .semibold)
                 case .icon:
                     (.light, .light)
-                case .fieldTitle:
+                case .fieldTitle, .sheetTitle:
                     (.bold, .bold)
                 case .body, .footnote, .button:
                     (.regular, .regular)

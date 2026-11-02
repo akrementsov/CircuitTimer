@@ -2,6 +2,7 @@
 
 import Dependencies
 import Foundation
+import Purchases
 import Sharing
 import Testing
 import UITestContract
@@ -72,6 +73,34 @@ struct AppScenarioTests {
             #expect(defaults.bool(forKey: key))
             #expect(UserDefaults.standard.object(forKey: key) == nil)
         }
+    }
+
+    @Test(arguments: AppScenario.allCases)
+    func test_prepare_liveContext_ownsTheFullVersionInMemoryUnlessFree(scenario: AppScenario) {
+        withScenario(scenario) {
+            @Dependency(\.purchases) var purchases
+
+            #expect(purchases.currentStatus() == (scenario == .twoWorkoutsFree ? .free : .full))
+        }
+    }
+
+    @Test
+    func test_purchaseScenario_free_purchaseOrRestoreUnlocksInMemoryAndPublishesFull() async throws {
+        let bought = PurchaseClient.scenario(status: .free)
+        var statuses = await bought.changes().makeAsyncIterator()
+        #expect(await statuses.next() == .free)
+
+        #expect(try await bought.purchase() == .purchased)
+
+        #expect(await statuses.next() == .full)
+        #expect(bought.currentStatus() == .full)
+        #expect(await bought.refreshStatus(.seconds(1)) == .full)
+        var later = await bought.changes().makeAsyncIterator()
+        #expect(await later.next() == .full)
+
+        let restored = PurchaseClient.scenario(status: .free)
+        #expect(try await restored.restore() == .restored)
+        #expect(restored.currentStatus() == .full)
     }
 
     private func withScenario<R>(_ scenario: AppScenario, operation: () throws -> R) rethrows -> R {

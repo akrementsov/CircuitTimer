@@ -4,6 +4,8 @@ import CloudSync
 import ComposableArchitecture
 import Foundation
 import os
+import PurchaseFeature
+import Purchases
 import SettingsFeature
 import SwiftUI
 import TimerPreferences
@@ -28,6 +30,7 @@ public struct AppFeature: Sendable {
         @ReducerCaseIgnored
         case permissionStalled(AlertState<PermissionStallChoice>)
         case timer(WorkoutTimerFeature)
+        case purchase(PurchaseFeature)
 
         @CasePathable
         public enum Action: Equatable, Sendable {
@@ -35,6 +38,7 @@ public struct AppFeature: Sendable {
             case resumeRun(ResumeRunChoice)
             case permissionStalled(PermissionStallChoice)
             case timer(WorkoutTimerFeature.Action)
+            case purchase(PurchaseFeature.Action)
         }
     }
 
@@ -103,6 +107,12 @@ public struct AppFeature: Sendable {
         var startGeneration = 0
         var isSceneActive = true
         var isNotificationCleanupStalled = false
+        /// Whether this Apple ID owns the full version, as the purchases client publishes it.
+        public internal(set) var fullVersion: FullVersionStatus = .unknown
+        /// The purchase sheet someone asked for; shown once nothing else is in the way.
+        var purchaseRequest: PurchaseFeature.Entry?
+        /// A write failed while the purchase sheet was up; its alert shows once the sheet has gone.
+        var hasPendingMutationAlert = false
 
         public init() {}
 
@@ -139,6 +149,8 @@ public struct AppFeature: Sendable {
             case workoutMovedUp(Workout.ID)
             case workoutMovedDown(Workout.ID)
             case timerCoverAppeared
+            /// The purchase sheet has left the screen, however it was closed.
+            case purchaseSheetDismissed
             case scenePhaseChanged(ScenePhase)
             case notificationCleanupRetryTapped
         }
@@ -167,6 +179,9 @@ public struct AppFeature: Sendable {
             case healthAccessQueried(generation: Int, HealthAccess?)
             case healthPermissionAnswered(generation: Int, succeeded: Bool)
             case healthStalled(generation: Int)
+            case fullVersionChanged(FullVersionStatus)
+            /// Sent after the purchase sheet or an alert has gone: what waited for a free presentation may show now.
+            case presentationFreed
         }
     }
 
@@ -179,6 +194,7 @@ public struct AppFeature: Sendable {
         case notificationPermissionStall
         case notificationCleanup
         case healthPermission
+        case fullVersion
         case healthStall
     }
 
@@ -191,6 +207,7 @@ public struct AppFeature: Sendable {
     @Dependency(\.cues) private var cues
     @Dependency(\.date) var date
     @Dependency(\.liveActivity) private var liveActivity
+    @Dependency(\.purchases) var purchases
     @Dependency(\.timerSession) private var timerSession
     @Dependency(\.uuid) var uuid
     @Dependency(\.watchCompanion) var watchCompanion
@@ -222,14 +239,23 @@ public struct AppFeature: Sendable {
                         resumeRunChosen(choice, &state)
                     case let .destination(.presented(.permissionStalled(choice))):
                         permissionStallChosen(choice, &state)
+                    case .destination(.presented(.purchase(.delegate(.closeRequested)))):
+                        purchaseCloseRequested(&state)
                     case .destination(.dismiss):
                         destinationDismissed(&state)
+                    case let .settings(.delegate(.fullVersionRequested(request))):
+                        fullVersionRequested(request, &state)
                     case .destination, .path, .settings:
                         .none
                 }
             }
             .ifLet(\.$destination, action: \.destination)
             .forEach(\.path, action: \.path)
+            // Before the start intent's check: a sheet shown here cancels a Start waiting for permission in the same
+            // pass, so a late permission answer never replaces the sheet.
+            Reduce { state, action in
+                presentRequestedPurchase(after: action, &state)
+            }
             Reduce { state, _ in
                 guard let intent = state.startIntent else { return .none }
                 guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
@@ -252,6 +278,8 @@ public struct AppFeature: Sendable {
                 state.workouts = .loading
                 return .merge(
                     readRunRecord(&state),
+                    prepareCloudSyncDecision(),
+                    observeFullVersion(),
                     cleanupNotifications(),
                     endLiveActivityOrphans(),
                     endHealthOrphans(),
@@ -308,6 +336,11 @@ public struct AppFeature: Sendable {
                     case var .loaded(workouts) = state.workouts,
                     let index = workouts.index(id: id)
                 else { return .none }
+                // Counted on the list as the user sees it, so a quick second tap meets the first copy.
+                guard !isAtFreeWorkoutLimit(state) else {
+                    state.purchaseRequest = .limit(.workoutLimit)
+                    return .none
+                }
 
                 let copy = duplicate(workouts[index])
                 workouts.insert(copy, at: index + 1)
@@ -342,7 +375,12 @@ public struct AppFeature: Sendable {
                 return sceneChanged(phase, &state)
             case .notificationCleanupRetryTapped:
                 return cleanupNotifications(reportSuccess: true)
+            case .purchaseSheetDismissed:
+                return showWhatWaitedForPresentation(&state)
             case .timerCoverAppeared:
+                // A workout came between a write that failed under the purchase sheet and its alert; the list has been
+                // read again since, so the alert would only puzzle.
+                state.hasPendingMutationAlert = false
                 if case .presenting = state.runRestore { state.runRestore = .resolved }
                 state.isTimerCoverUp = true
                 // Under the cover, so the pop is not seen; closing the timer lands on the list.
@@ -375,6 +413,10 @@ public struct AppFeature: Sendable {
                 return healthPermissionAnswered(succeeded: succeeded, generation: generation, &state)
             case let .healthStalled(generation):
                 return healthStalled(generation: generation, &state)
+            case let .fullVersionChanged(status):
+                return fullVersionChanged(status, &state)
+            case .presentationFreed:
+                return showWhatWaitedForPresentation(&state)
             case let .workoutsLoaded(stored):
                 state.isReloading = false
                 // A write made on the shown list during the reload may be missing from what was read: read again once
@@ -424,16 +466,7 @@ public struct AppFeature: Sendable {
                 // A reload still in flight presents it when it lands.
                 return state.isReloading ? .none : presentDeferredScreen(&state)
             case .mutationFailed:
-                // Later writes were derived from a list that storage did not accept; drop them and resync.
-                state.pendingMutations = []
-                state.needsReload = false
-                state.deferredScreen = nil
-                // A presented timer is never replaced: it would close without ending its session. No write starts under
-                // the cover yet, so this guard is defensive; the reload still resyncs the list.
-                if state.destination?.is(\.timer) != true {
-                    state.destination = .alert(.mutationFailed)
-                }
-                return loadWorkouts(&state)
+                return mutationFailed(&state)
             case let .runRecordLoaded(stored):
                 return runRecordLoaded(stored, &state)
             case let .runRecordLoadingFailed(failure):
@@ -474,36 +507,6 @@ public struct AppFeature: Sendable {
         return presentDeferredScreen(&state)
     }
 
-    private func presentDeferredScreen(_ state: inout State) -> Effect<Action> {
-        guard let request = state.deferredScreen else { return .none }
-
-        // A request that cannot open now is dropped rather than kept for a surprise later.
-        state.deferredScreen = nil
-        // An empty stack also drops a second tap made while the editor is being pushed, and an empty destination
-        // one made while the timer is being presented.
-        guard state.destination == nil, state.path.isEmpty, state.selectedTab == .workouts else { return .none }
-
-        switch request {
-            case .create:
-                state.path.append(
-                    .editor(
-                        WorkoutEditorFeature.State(
-                            newWorkoutID: uuid(),
-                            warmUpStageID: uuid(),
-                            trainingStageID: uuid(),
-                            coolDownStageID: uuid()
-                        )
-                    )
-                )
-            case let .open(id):
-                // The workout may be gone by now; then there is nothing to show.
-                guard case let .loaded(workouts) = state.workouts, let workout = workouts[id: id] else { return .none }
-
-                state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
-        }
-        return .none
-    }
-
     /// Activities of an earlier process show a run this launch has not continued; a continued run starts its own.
     private func endLiveActivityOrphans() -> Effect<Action> {
         .run { [liveActivity] _ in
@@ -532,38 +535,6 @@ public struct AppFeature: Sendable {
         guard state.pendingMutations.count == 1 else { return .none }
 
         return write(mutation)
-    }
-
-    private func write(_ mutation: ListMutation) -> Effect<Action> {
-        .run { [workoutStorage] send in
-            do {
-                let outcome = switch mutation {
-                    case let .delete(id): try await workoutStorage.delete(id: id)
-                    case let .insert(workout, anchor): try await workoutStorage.insert(workout: workout, after: anchor)
-                    case let .reorder(ids): try await workoutStorage.reorder(ids: ids)
-                }
-                await send(.internal(.mutationFinished(outcome)))
-            } catch is CancellationError {
-                // Only the root store going away cancels a write, and the queue goes with it.
-                return
-            } catch {
-                Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
-                await send(.internal(.mutationFailed))
-            }
-        }
-    }
-
-    private func duplicate(_ workout: Workout) -> Workout {
-        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
-        copy.trainingRounds = workout.trainingRounds
-        copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
-        copy.pauseAfterTraining = workout.pauseAfterTraining
-        for section in WorkoutSectionKind.allCases {
-            copy[section] = workout[section].map { stage in
-                Stage(id: uuid(), name: stage.name, duration: stage.duration, intensity: stage.intensity)
-            }
-        }
-        return copy
     }
 
     private func destinationDismissed(_ state: inout State) -> Effect<Action> {
@@ -600,10 +571,15 @@ public struct AppFeature: Sendable {
             case .resumeRun:
                 // Gone without a choice: this launch moves on, and the record stays, so the next launch asks again.
                 state.runRestore = .resolved
-                return .none
+                return scheduleWhatWaited(state)
             case .permissionStalled:
                 return .send(.internal(.notificationPermissionWait))
-            case .alert, nil:
+            case .purchase:
+                // The sheet's `onDismiss` follows once it has left the screen.
+                return .none
+            case .alert:
+                return scheduleWhatWaited(state)
+            case nil:
                 return .none
         }
     }
@@ -619,6 +595,41 @@ public struct AppFeature: Sendable {
             state.needsReload = true
         }
         return .none
+    }
+}
+
+// List writes and duplication, apart from the type body to keep it within the length limit.
+extension AppFeature {
+    private func write(_ mutation: ListMutation) -> Effect<Action> {
+        .run { [workoutStorage] send in
+            do {
+                let outcome = switch mutation {
+                    case let .delete(id): try await workoutStorage.delete(id: id)
+                    case let .insert(workout, anchor): try await workoutStorage.insert(workout: workout, after: anchor)
+                    case let .reorder(ids): try await workoutStorage.reorder(ids: ids)
+                }
+                await send(.internal(.mutationFinished(outcome)))
+            } catch is CancellationError {
+                // Only the root store going away cancels a write, and the queue goes with it.
+                return
+            } catch {
+                Self.logger.error("Failed to write a list change: \(String(reflecting: error), privacy: .public)")
+                await send(.internal(.mutationFailed))
+            }
+        }
+    }
+
+    private func duplicate(_ workout: Workout) -> Workout {
+        var copy = Workout(id: uuid(), name: String(localized: "workouts.duplicate.name \(workout.displayName)", bundle: .module))
+        copy.trainingRounds = workout.trainingRounds
+        copy.pauseAfterWarmUp = workout.pauseAfterWarmUp
+        copy.pauseAfterTraining = workout.pauseAfterTraining
+        for section in WorkoutSectionKind.allCases {
+            copy[section] = workout[section].map { stage in
+                Stage(id: uuid(), name: stage.name, duration: stage.duration, intensity: stage.intensity)
+            }
+        }
+        return copy
     }
 }
 

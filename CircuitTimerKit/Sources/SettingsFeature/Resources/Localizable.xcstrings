@@ -113,6 +113,70 @@
         }
       }
     },
+    "settings.iCloud.locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is part of the full version. Workouts are stored only on this device."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация входит в полную версию. Тренировки хранятся только на этом устройстве."
+          }
+        }
+      }
+    },
+    "settings.iCloud.locked.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part of the full version"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Входит в полную версию"
+          }
+        }
+      }
+    },
+    "settings.iCloud.locked.value" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выкл."
+          }
+        }
+      }
+    },
+    "settings.iCloud.lockedUntilRelaunch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud sync is part of the full version. It turns off after you reopen the app."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Синхронизация входит в полную версию. Она выключится после перезапуска приложения."
+          }
+        }
+      }
+    },
     "settings.iCloud.noAccount" : {
       "localizations" : {
         "en" : {
@@ -221,6 +285,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Фоновые уведомления"
+          }
+        }
+      }
+    },
+    "settings.purchase.buy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buy the App"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Купить приложение"
+          }
+        }
+      }
+    },
+    "settings.purchase.fullVersion" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Version"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Полная версия"
+          }
+        }
+      }
+    },
+    "settings.purchase.purchased" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Куплена"
+          }
+        }
+      }
+    },
+    "settings.purchase.restore" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Purchases"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Восстановить покупки"
           }
         }
       }

@@ -2,6 +2,8 @@ import CloudKit
 import Dependencies
 import DependenciesMacros
 import Foundation
+import os
+import Purchases
 import Sharing
 
 /// Whether this launch syncs workouts through iCloud, and how that goes.
@@ -9,8 +11,11 @@ import Sharing
 public struct CloudSyncClient: Sendable {
     // The defaults are what the unimplemented `testValue` returns after reporting the call.
 
+    /// Waits, once per process, for what the launch decision needs (the full version, at most a second), then decides.
+    /// A cancelled caller still waits for it, and a cancellation never decides.
+    public var prepareDecision: @Sendable () async -> Void = {}
     /// The CloudKit container the store mirrors to in this launch, or `nil` to keep it on the device. The first call
-    /// decides; the same answer follows until the app is launched again.
+    /// decides, unless `prepareDecision` already has; the same answer follows until the app is launched again.
     public var mirroredContainer: @Sendable () -> String? = { nil }
     /// How the store actually opened, which can differ from the decision when mirroring failed to open.
     public var storeOpened: @Sendable (_ isMirroring: Bool) -> Void
@@ -31,18 +36,46 @@ public enum CloudKitContainerID {
     }
 }
 
+extension CloudSyncClient {
+    /// The launch's decision waits for StoreKit, at most a second, only when this launch could mirror at all: with the
+    /// switch off, or in a build without a container, the store stays on the device whatever StoreKit says.
+    static func waitForStoreKit(
+        isICloudSyncOn: Bool,
+        containerID: String?,
+        refreshStatus: (Duration) async -> FullVersionStatus
+    ) async {
+        guard isICloudSyncOn, containerID != nil else { return }
+
+        if await refreshStatus(.seconds(1)) == .unknown {
+            CloudSyncMonitor.logger.error("StoreKit did not answer in time; this launch keeps workouts on the device")
+        }
+    }
+}
+
 extension CloudSyncClient: DependencyKey {
     public static let liveValue: Self = {
         let monitor = CloudSyncMonitor(
             notificationCenter: .default,
             preference: {
+                // iCloud sync is part of the full version.
                 @SharedReader(.iCloudSync) var isICloudSyncOn
-                return isICloudSyncOn
+                @Dependency(\.purchases) var purchases
+                return isICloudSyncOn && purchases.currentStatus() == .full
             },
             containerID: { CloudKitContainerID.inMainBundle() },
-            accountStatus: { try await CKContainer(identifier: $0).accountStatus() }
+            accountStatus: { try await CKContainer(identifier: $0).accountStatus() },
+            prepareInputs: {
+                @SharedReader(.iCloudSync) var isICloudSyncOn
+                @Dependency(\.purchases) var purchases
+                await waitForStoreKit(
+                    isICloudSyncOn: isICloudSyncOn,
+                    containerID: CloudKitContainerID.inMainBundle(),
+                    refreshStatus: { await purchases.refreshStatus($0) }
+                )
+            }
         )
         return Self(
+            prepareDecision: { await monitor.prepareDecision() },
             mirroredContainer: { monitor.mirroredContainer() },
             storeOpened: { monitor.storeOpened(isMirroring: $0) },
             status: { monitor.status() },
@@ -52,6 +85,7 @@ extension CloudSyncClient: DependencyKey {
 
     /// Keeps the store on the device and reports nothing: a preview has no iCloud.
     public static let previewValue = Self(
+        prepareDecision: {},
         mirroredContainer: { nil },
         storeOpened: { _ in },
         status: { AsyncStream { $0.finish() } },
