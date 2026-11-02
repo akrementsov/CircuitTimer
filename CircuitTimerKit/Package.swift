@@ -300,6 +300,7 @@ let package = Package(
         .testTarget(
             name: "WatchRemoteFeatureTests",
             dependencies: [
+                "TestSupport",
                 "WatchLink",
                 "WatchRemoteFeature",
                 "WorkoutActivity",

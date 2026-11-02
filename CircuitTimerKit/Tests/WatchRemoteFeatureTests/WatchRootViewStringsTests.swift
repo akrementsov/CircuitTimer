@@ -6,7 +6,12 @@ import Testing
 @Suite
 struct WatchRootViewStringsTests {
     // `WatchRootView` reads these keys; a key the catalog lost comes back from the bundle unchanged.
-    @Test(arguments: ["watch.noCatalog.title", "watch.noCatalog.message"])
+    @Test(arguments: [
+        "watch.noCatalog.title", "watch.noCatalog.message",
+        "watch.run.next", "watch.run.waiting", "watch.run.stage.work", "watch.run.stage.rest", "watch.run.stage.pause",
+        "watch.run.getReady", "watch.run.finished", "watch.run.openPhone", "watch.run.tooLarge.title",
+        "watch.run.tooLarge.message",
+    ])
     func test_watchRootViewString_englishAndRussian_isTranslatedInBoth(key: String) throws {
         let english = try Self.string(key, language: "en")
         let russian = try Self.string(key, language: "ru")
