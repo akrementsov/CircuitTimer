@@ -43,10 +43,10 @@ struct WatchRunView: View {
         }
     }
 
-    /// Under a lease its first entry is already past, so the timeline draws at once, and the second hides the digits;
-    /// without one there is nothing to redraw for.
+    /// The first entry is always past, so the timeline draws at once, as SwiftUI documents for a past date; under a
+    /// lease the second hides the digits.
     private var digitsSchedule: [Date] {
-        guard let from = screen.digitsFrom, let until = screen.digitsUntil else { return [] }
+        guard let from = screen.digitsFrom, let until = screen.digitsUntil else { return [.distantPast] }
         return [min(from, until), until]
     }
 
