@@ -586,6 +586,9 @@ struct WatchRemoteFeatureRunTests {
         await retrying.store.send(Self.answered(9, runState(sequence: 3, run: runningRun(), live: false)))
         #expect(retrying.state.refresh.isRetryScheduled)
         await retrying.store.send(.view(.scenePhaseChanged(.background)))
+        #expect(!retrying.state.refresh.isRetryScheduled)
+        // From here the store is exhaustive: a `runRetryDue` that still fired would fail the test as unexpected.
+        retrying.store.exhaustivity = .on
         await retrying.advance(seconds: 60)
         #expect(retrying.requests == 1)
     }

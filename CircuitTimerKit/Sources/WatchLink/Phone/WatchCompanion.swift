@@ -185,7 +185,10 @@ actor WatchCompanion {
     /// `refreshWait` of the request's arrival.
     private func refreshState(knownCatalogDigest: String?, arrival: MonotonicInstant) async -> PhoneState {
         let notLive = { self.ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: nil, at: self.now()) }
-        guard let owner = ledger.runOwner(), let subscription = subscriptions[owner] else { return notLive() }
+        // A request whose 5 s already passed before its task ran goes to no timer.
+        guard remaining(since: arrival) > .zero, let owner = ledger.runOwner(), let subscription = subscriptions[owner] else {
+            return notLive()
+        }
 
         requestSerial += 1
         let requestID = requestSerial
@@ -222,7 +225,9 @@ actor WatchCompanion {
             published.give(true)
             push(outcome, withCatalog: false)
         }
-        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false) else {
+        // A wait with nothing left returns what was already given, so the bound is checked again after it.
+        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false),
+              remaining(since: arrival) > .zero else {
             return notLive()
         }
         // Live only if the ledger holds this publication or a newer one of the same timer, checked as the reply is
