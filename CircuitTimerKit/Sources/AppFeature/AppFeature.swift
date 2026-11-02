@@ -598,7 +598,7 @@ public struct AppFeature: Sendable {
     }
 }
 
-// List writes, apart from the type body to keep it within the length limit.
+// List writes and duplication, apart from the type body to keep it within the length limit.
 extension AppFeature {
     private func write(_ mutation: ListMutation) -> Effect<Action> {
         .run { [workoutStorage] send in

@@ -19,7 +19,7 @@ The store mirrors to iCloud only with the full version. The launch decides once 
 
 - **Settings.** The tab reads the status `AppFeature` follows, so a buyer never sees the lock on its first frame. Without the full version the iCloud switch is a locked button (a lock next to its title, the switch drawn off) that opens the purchase sheet, and two rows offer «Buy the App» and «Restore Purchases»; Restore opens the sheet and restores at once. With it, the switch works as before and one row says «Full Version — Purchased». While StoreKit has not answered, neither rows nor footnote show.
 - **The workout list.** «+» and Duplicate open the sheet once the list shows two workouts; the «+» looks as always. Stored workouts stay visible, editable and playable whatever their number.
-- **The Apple Watch app** (CT-6-2, after CT-9): the iPhone sends the watch nothing and ignores its commands without the full version; the watch says to buy it on the iPhone.
+- **The Apple Watch app** (CT-6-2): without the full version the iPhone will send the watch nothing and ignore its commands, and the watch will say to buy it on the iPhone. Until then the iPhone publishes its workouts to the watch whatever the status.
 
 ## The purchase sheet
 
