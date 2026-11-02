@@ -4,6 +4,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import TestSupport
 import WorkoutActivity
 import WorkoutHealth
 
@@ -13,19 +14,19 @@ struct ProcessTeardownTests {
 
     /// A clock whose sleep fails at once with an error that is not cancellation.
     private struct FailingClock: Clock {
-        let base = TestClock<Duration>()
+        let base = ManualClock()
 
-        var now: TestClock<Duration>.Instant { base.now }
+        var now: ManualClock.Instant { base.now }
         var minimumResolution: Duration { base.minimumResolution }
 
-        func sleep(until deadline: TestClock<Duration>.Instant, tolerance: Duration?) async throws {
+        func sleep(until deadline: ManualClock.Instant, tolerance: Duration?) async throws {
             throw FakeError()
         }
     }
 
     private let calls = LockIsolated<[String]>([])
     private let healthEnds = LockIsolated<[Date]>([])
-    private let clock = TestClock<Duration>()
+    private let clock = ManualClock()
     private let activityGate = Gate()
     private let notificationGate = Gate()
     private static let date = Date(timeIntervalSince1970: 1_000)
@@ -61,8 +62,8 @@ struct ProcessTeardownTests {
 
     @Test
     func test_run_endsCardsAndNotificationsTogetherThenHealthLastWithTheDate() async {
-        let activityStarted = LockIsolated(false)
-        let notificationsStarted = LockIsolated(false)
+        let activityStarted = Observed(false)
+        let notificationsStarted = Observed(false)
         let teardown = teardown(
             endActivities: { [activityGate] in
                 activityStarted.setValue(true)
@@ -75,9 +76,9 @@ struct ProcessTeardownTests {
             clock: clock
         )
         let running = Task { await teardown.run(at: Self.date) }
-        await Task.megaYield()
-        #expect(activityStarted.value)
-        #expect(notificationsStarted.value)
+        // Both start before either finishes: each waits at its gate, which only the test opens.
+        await activityStarted.wait { $0 }
+        await notificationsStarted.wait { $0 }
         #expect(healthEnds.value.isEmpty)
 
         activityGate.open()
@@ -95,12 +96,13 @@ struct ProcessTeardownTests {
             clock: clock
         )
         let running = Task { await teardown.run(at: Self.date) }
-        await Task.megaYield()
+        // Each limit sleeps on the clock; advancing before both sleep would wake neither.
+        await clock.waitForSleeps(2)
 
-        await clock.advance(by: ProcessTeardown.notificationBarrier)
+        clock.advance(by: ProcessTeardown.notificationBarrier)
         #expect(healthEnds.value.isEmpty)
         // Both limits count from the same start, so the card's limit ends the wait, not the sum of the two.
-        await clock.advance(by: ProcessTeardown.liveActivityLimit - ProcessTeardown.notificationBarrier)
+        clock.advance(by: ProcessTeardown.liveActivityLimit - ProcessTeardown.notificationBarrier)
         await running.value
         #expect(healthEnds.value == [Self.date])
 

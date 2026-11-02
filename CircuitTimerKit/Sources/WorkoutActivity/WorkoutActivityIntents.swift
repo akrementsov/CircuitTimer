@@ -1,6 +1,9 @@
-import AppIntents
 import Dependencies
 import Foundation
+
+// iOS only: `LiveActivityIntent` is unavailable on watchOS.
+#if os(iOS)
+import AppIntents
 
 public struct WorkoutActivityIntents: AppIntentsPackage {}
 
@@ -122,3 +125,4 @@ private enum ControlError: LocalizedError {
         }
     }
 }
+#endif

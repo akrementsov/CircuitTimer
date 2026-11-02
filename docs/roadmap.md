@@ -45,13 +45,14 @@ Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the wa
   - [ ] Create the full version in App Store Connect and check purchases in the sandbox: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
   - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
 - [ ] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
-  - [ ] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
-  - [ ] A [probe tag](apple-watch.md#probe-tag) after CT-9-1: TestFlight accepts the build with the watch app
-  - [ ] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
+  - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
+  - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
   - [ ] **CT-9-3** — the running stage and its time on the watch, shown only while the iPhone confirms them
   - [ ] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules
   - [ ] **CT-9-5** — Start from the watch through the iPhone's usual Start
+  - [ ] One [TestFlight tag](apple-watch.md#testflight-tag-at-the-end-of-ct-9) after CT-9-5: the cloud signing and TestFlight accept the watch app
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
 - [x] **CT-13** — the timer's stage list at accessibility text sizes: a stage's name wraps, with its time under it, instead of being cut to a few letters
+- [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together once on CI (run 41304027831): the shared state held the reducer's write, the `UserDefaults` suite the value before it. Not reproduced locally; the checks now report the suite on a mismatch

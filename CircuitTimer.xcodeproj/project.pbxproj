@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C7A10000000000000000000C /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000000E /* AppFeature */; };
+		C7A1000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A1000000000000000000E1 /* WatchLink */; };
 		C7A100000000000000000030 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A100000000000000000031 /* BackgroundNotifications */; };
 		C7A10000000000000000004C /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 		C7A10000000000000000004D /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004B /* DesignSystem */; };
@@ -24,6 +25,7 @@
 		C7A300000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000091 /* CloudSync */; };
 		C7A3000000000000000000C0 /* Purchases in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000C1 /* Purchases */; };
 		C7A3000000000000000000C2 /* PurchaseFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000C3 /* PurchaseFeature */; };
+		C7A3000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000E1 /* WatchLink */; };
 		C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A300000000000000000072 /* WorkoutEditorFeature */; };
 		C7A3000000000000000000A0 /* SettingsFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000A1 /* SettingsFeature */; };
 		C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A3000000000000000000B1 /* WorkoutTimerFeature */; };
@@ -37,6 +39,7 @@
 		C7A400000000000000000067 /* BackgroundNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000068 /* BackgroundNotifications */; };
 		C7A400000000000000000090 /* CloudSync in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000091 /* CloudSync */; };
 		C7A4000000000000000000C0 /* Purchases in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000C1 /* Purchases */; };
+		C7A4000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000E1 /* WatchLink */; };
 		C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A400000000000000000072 /* WorkoutEditorFeature */; };
 		C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B1 /* WorkoutTimerFeature */; };
 		C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B3 /* WorkoutActivity */; };
@@ -45,6 +48,7 @@
 		C7A4000000000000000000B8 /* BackgroundExecution in Frameworks */ = {isa = PBXBuildFile; productRef = C7A4000000000000000000B9 /* BackgroundExecution */; };
 		C7A100000000000000000064 /* WorkoutActivity in Frameworks */ = {isa = PBXBuildFile; productRef = C7A10000000000000000004A /* WorkoutActivity */; };
 		C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */ = {isa = PBXBuildFile; productRef = C7A500000000000000000002 /* WatchRemoteFeature */; };
+		C7A5000000000000000000E0 /* WatchLink in Frameworks */ = {isa = PBXBuildFile; productRef = C7A5000000000000000000E1 /* WatchLink */; };
 		C7A500000000000000000003 /* CircuitTimerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C7A500000000000000000004 /* CircuitTimerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -203,6 +207,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7A10000000000000000000C /* AppFeature in Frameworks */,
+				C7A1000000000000000000E0 /* WatchLink in Frameworks */,
 				C7A100000000000000000064 /* WorkoutActivity in Frameworks */,
 				C7A100000000000000000030 /* BackgroundNotifications in Frameworks */,
 				C7A100000000000000000052 /* AppScenarios in Frameworks */,
@@ -246,6 +251,7 @@
 				C7A300000000000000000090 /* CloudSync in Frameworks */,
 				C7A3000000000000000000C0 /* Purchases in Frameworks */,
 				C7A3000000000000000000C2 /* PurchaseFeature in Frameworks */,
+				C7A3000000000000000000E0 /* WatchLink in Frameworks */,
 				C7A300000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A3000000000000000000A0 /* SettingsFeature in Frameworks */,
 				C7A3000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
@@ -266,6 +272,7 @@
 				C7A400000000000000000067 /* BackgroundNotifications in Frameworks */,
 				C7A400000000000000000090 /* CloudSync in Frameworks */,
 				C7A4000000000000000000C0 /* Purchases in Frameworks */,
+				C7A4000000000000000000E0 /* WatchLink in Frameworks */,
 				C7A400000000000000000073 /* WorkoutEditorFeature in Frameworks */,
 				C7A4000000000000000000B0 /* WorkoutTimerFeature in Frameworks */,
 				C7A4000000000000000000B2 /* WorkoutActivity in Frameworks */,
@@ -280,6 +287,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7A500000000000000000001 /* WatchRemoteFeature in Frameworks */,
+				C7A5000000000000000000E0 /* WatchLink in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -357,6 +365,7 @@
 			name = CircuitTimer;
 			packageProductDependencies = (
 				C7A10000000000000000000E /* AppFeature */,
+				C7A1000000000000000000E1 /* WatchLink */,
 				C7A10000000000000000004A /* WorkoutActivity */,
 				C7A100000000000000000031 /* BackgroundNotifications */,
 				C7A100000000000000000053 /* AppScenarios */,
@@ -409,6 +418,7 @@
 			name = CircuitTimerWatch;
 			packageProductDependencies = (
 				C7A500000000000000000002 /* WatchRemoteFeature */,
+				C7A5000000000000000000E1 /* WatchLink */,
 			);
 			productName = CircuitTimerWatch;
 			productReference = C7A500000000000000000004 /* CircuitTimerWatch.app */;
@@ -477,6 +487,7 @@
 				C7A300000000000000000091 /* CloudSync */,
 				C7A3000000000000000000C1 /* Purchases */,
 				C7A3000000000000000000C3 /* PurchaseFeature */,
+				C7A3000000000000000000E1 /* WatchLink */,
 				C7A300000000000000000072 /* WorkoutEditorFeature */,
 				C7A3000000000000000000A1 /* SettingsFeature */,
 				C7A3000000000000000000B1 /* WorkoutTimerFeature */,
@@ -510,6 +521,7 @@
 				C7A400000000000000000068 /* BackgroundNotifications */,
 				C7A400000000000000000091 /* CloudSync */,
 				C7A4000000000000000000C1 /* Purchases */,
+				C7A4000000000000000000E1 /* WatchLink */,
 				C7A400000000000000000072 /* WorkoutEditorFeature */,
 				C7A4000000000000000000B1 /* WorkoutTimerFeature */,
 				C7A4000000000000000000B3 /* WorkoutActivity */,
@@ -1092,6 +1104,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = AppFeature;
 		};
+		C7A1000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 		C7A100000000000000000031 /* BackgroundNotifications */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BackgroundNotifications;
@@ -1143,6 +1156,7 @@
 		};
 		C7A3000000000000000000C1 /* Purchases */ = {isa = XCSwiftPackageProductDependency; productName = Purchases; };
 		C7A3000000000000000000C3 /* PurchaseFeature */ = {isa = XCSwiftPackageProductDependency; productName = PurchaseFeature; };
+		C7A3000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 		C7A300000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A3000000000000000000A1 /* SettingsFeature */ = {isa = XCSwiftPackageProductDependency; productName = SettingsFeature; };
 		C7A40000000000000000005D /* SnapshotCapture */ = {
@@ -1167,6 +1181,7 @@
 			productName = CloudSync;
 		};
 		C7A4000000000000000000C1 /* Purchases */ = {isa = XCSwiftPackageProductDependency; productName = Purchases; };
+		C7A4000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 		C7A400000000000000000072 /* WorkoutEditorFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutEditorFeature; };
 		C7A3000000000000000000B1 /* WorkoutTimerFeature */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutTimerFeature; };
 		C7A3000000000000000000B3 /* WorkoutActivity */ = {isa = XCSwiftPackageProductDependency; productName = WorkoutActivity; };
@@ -1182,6 +1197,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = WatchRemoteFeature;
 		};
+		C7A5000000000000000000E1 /* WatchLink */ = {isa = XCSwiftPackageProductDependency; productName = WatchLink; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C7A100000000000000000001 /* Project object */;

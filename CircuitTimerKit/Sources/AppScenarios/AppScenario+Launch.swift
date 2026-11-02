@@ -7,6 +7,7 @@ import Purchases
 import SettingsFeature
 import Sharing
 import UITestContract
+import WatchLink
 import WorkoutActivity
 import WorkoutEditorFeature
 import WorkoutHealth
@@ -40,6 +41,8 @@ extension AppScenario {
         dependencies.workoutRunRecord = .previewValue
         dependencies.backgroundNotifications = .previewValue
         dependencies.liveActivity = .previewValue
+        dependencies.watchCompanion = .previewValue
+        dependencies.phoneCompanion = .previewValue
         dependencies.workoutHealth = .previewValue
         dependencies.cues = .previewValue
         dependencies.timerSession = .previewValue

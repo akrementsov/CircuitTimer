@@ -74,7 +74,7 @@ struct WorkoutListScreen: Screen {
     func moveWorkout(_ name: String, onto destination: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
         let source = row(name, file: file, line: line)
         let target = row(destination, file: file, line: line)
-        source.press(forDuration: 0.6, thenDragTo: target, withVelocity: .fast, thenHoldForDuration: 0)
+        source.press(forDuration: rowLiftHold, thenDragTo: target, withVelocity: .fast, thenHoldForDuration: 0)
         return self
     }
 
@@ -83,7 +83,7 @@ struct WorkoutListScreen: Screen {
             .waitUntilHittable("The workout to move", file: file, line: line)
         let edge = app.scrollViews.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
         source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.6, thenDragTo: edge, withVelocity: .fast, thenHoldForDuration: 3)
+            .press(forDuration: rowLiftHold, thenDragTo: edge, withVelocity: .fast, thenHoldForDuration: 3)
         return self
     }
 

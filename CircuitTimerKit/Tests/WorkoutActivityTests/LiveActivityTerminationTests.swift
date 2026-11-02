@@ -3,11 +3,12 @@
 import Dependencies
 import Foundation
 import Testing
+import TestSupport
 
 @Suite(.timeLimit(.minutes(1)))
 struct LiveActivityTerminationTests {
     private let fake = FakeTransport()
-    private let clock = TestClock<Duration>()
+    private let clock = ManualClock()
     private let gate = TerminationGate()
     private let coordinator: LiveActivityCoordinator
     private static let owner = UUID(fixture: 1)
@@ -63,7 +64,7 @@ struct LiveActivityTerminationTests {
         fake.endGate.setValue(drain)
         let ending = Task { await endAll() }
         await drain.entered.next()
-        await Task.megaYield()
+        await fake.calls.wait { $0.contains(.endEvery) }
         #expect(fake.calls.value.contains(.endEvery))
         #expect(!fake.calls.value.contains(.endEveryAgain))
 
@@ -85,9 +86,7 @@ struct LiveActivityTerminationTests {
         #expect(!fake.calls.value.contains(.endEveryAgain))
 
         secondPass.open()
-        while !fake.calls.value.contains(.endEveryAgain) {
-            await Task.megaYield()
-        }
+        await fake.calls.wait { $0.contains(.endEveryAgain) }
     }
 
     @Test
@@ -116,11 +115,12 @@ struct LiveActivityTerminationTests {
         early.complete()
         await early.wait()
 
+        // The timed wait sleeps on the clock once it waits, which shows the completion comes after it.
         let late = CompletionSignal()
-        let waiting = Task { await late.wait() }
-        await Task.megaYield()
+        let waiting = Task { await late.wait(timeout: .seconds(1), clock: clock) }
+        await clock.waitForSleeps()
         late.complete()
-        await waiting.value
+        #expect(await waiting.value)
 
         let never = CompletionSignal()
         let cancelled = Task { await never.wait() }

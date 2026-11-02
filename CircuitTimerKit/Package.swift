@@ -28,6 +28,7 @@ let package = Package(
         .library(name: "WorkoutStorage", targets: ["WorkoutStorage"]),
         .library(name: "WorkoutEditorFeature", targets: ["WorkoutEditorFeature"]),
         .library(name: "WorkoutTimerFeature", targets: ["WorkoutTimerFeature"]),
+        .library(name: "WatchLink", targets: ["WatchLink"]),
         .library(name: "WatchRemoteFeature", targets: ["WatchRemoteFeature"]),
         .library(name: "SettingsFeature", targets: ["SettingsFeature"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
@@ -55,6 +56,7 @@ let package = Package(
                 "Purchases",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -69,6 +71,7 @@ let package = Package(
         .testTarget(
             name: "AppFeatureTests",
             dependencies: [
+                "TestSupport",
                 "TimerPreferences",
                 "BackgroundNotifications",
                 "BackgroundExecution",
@@ -76,6 +79,7 @@ let package = Package(
                 "AppFeature",
                 "Purchases",
                 "SettingsFeature",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",
@@ -96,6 +100,7 @@ let package = Package(
                 "Purchases",
                 "SettingsFeature",
                 "UITestContract",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutEditorFeature",
@@ -140,6 +145,7 @@ let package = Package(
             name: "BackgroundNotificationsTests",
             dependencies: [
                 "BackgroundNotifications",
+                "TestSupport",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
@@ -273,10 +279,31 @@ let package = Package(
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
+        // Clocks and values that tests wait on without yielding; linked by test targets only, so it is no product.
+        .target(
+            name: "TestSupport",
+            swiftSettings: strictSettings
+        ),
+        // The channel between the iPhone app and the watch app: its wire format, the WatchConnectivity bridge and the
+        // clients of both sides. Builds for iOS and watchOS.
+        .target(
+            name: "WatchLink",
+            dependencies: [
+                "WorkoutActivity",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
         // The watch app's screens. Builds for iOS too, so its tests run in `make test` on the iPhone simulator.
         .target(
             name: "WatchRemoteFeature",
-            dependencies: ["DesignSystem"],
+            dependencies: [
+                "DesignSystem",
+                "WatchLink",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
@@ -303,8 +330,22 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+            name: "WatchLinkTests",
+            dependencies: [
+                "TestSupport",
+                "WatchLink",
+                "WorkoutDomain",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
             name: "WatchRemoteFeatureTests",
-            dependencies: ["WatchRemoteFeature"],
+            dependencies: [
+                "WatchLink",
+                "WatchRemoteFeature",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(
@@ -343,6 +384,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutActivityTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -357,6 +399,7 @@ let package = Package(
         .testTarget(
             name: "WorkoutHealthTests",
             dependencies: [
+                "TestSupport",
                 "WorkoutHealth",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],

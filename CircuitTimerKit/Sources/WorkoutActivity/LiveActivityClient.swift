@@ -2,17 +2,8 @@ import Dependencies
 import DependenciesMacros
 import Foundation
 
-/// Whether the timer should warn that its activity cannot be shown. A newer state of the
-/// coordinator always has a larger serial, whatever order the results reach the reducer in.
-public struct LiveActivityNotice: Equatable, Sendable {
-    public let serial: Int
-    public let isFailing: Bool
-
-    public init(serial: Int, isFailing: Bool) {
-        self.serial = serial
-        self.isFailing = isFailing
-    }
-}
+// iOS only: its live value runs the coordinator, which needs ActivityKit.
+#if os(iOS)
 
 /// The Live Activity of each timer owner: one activity per owner, started on the first sync
 /// that iOS allows and kept in step with the newest revision.
@@ -128,3 +119,4 @@ extension DependencyValues {
         set { self[LiveActivityClient.self] = newValue }
     }
 }
+#endif
