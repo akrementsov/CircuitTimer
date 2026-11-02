@@ -48,7 +48,7 @@ Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the wa
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
   - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
   - [x] **CT-9-3** — the running stage and its time on the watch, shown only while the iPhone confirms them
-  - [ ] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules
+  - [x] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules
   - [ ] **CT-9-5** — Start from the watch through the iPhone's usual Start
   - [ ] One [TestFlight tag](apple-watch.md#testflight-tag-at-the-end-of-ct-9) after CT-9-5: the cloud signing and TestFlight accept the watch app
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):

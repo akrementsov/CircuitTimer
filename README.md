@@ -15,7 +15,7 @@ An interval and circuit training timer for iPhone. A workout is a warm-up, a tra
 - A full-screen timer that keeps its progress across backgrounding and relaunches.
 - Tones, haptics, spoken stage names and background notifications, each with its own switch in Settings.
 - A Live Activity on the Lock Screen and in the Dynamic Island, with Pause/Resume on the card. On iOS 26 and later a Health workout session keeps a running timer alive, so closing the app removes its card and notifications; the timer's workout is saved to Apple Health without its pauses.
-- An Apple Watch app that shows the iPhone's workouts and its running workout, whose time counts only while the iPhone confirms it; Pause/Resume and Start from the watch come next ([Apple Watch](docs/apple-watch.md)).
+- An Apple Watch app that shows the iPhone's workouts and its running workout, whose time counts only while the iPhone confirms it, with Pause and Resume; Start from the watch comes next ([Apple Watch](docs/apple-watch.md)).
 - A one-time purchase of the full version with StoreKit 2 unlocks iCloud sync and more than two workouts, and will unlock the Apple Watch app ([Purchases](docs/purchases.md)).
 - A swipe on a tab's root switches tabs; the interface is in English and Russian.
 
@@ -170,7 +170,7 @@ Not drawn: the editor, the timer and the watch app's feature also import `Workou
 | `WorkoutTimerFeature` | The full-screen timer: countdowns, progress by round, cues, background notifications, the saved run, the Live Activity, the run on the watch, a Health workout session on iOS 26 and later and the run's track for the workout it saves |
 | `SettingsFeature` | The signal, Keep screen on and iCloud sync switches; About with the version from `AppVersionClient`; legal pages |
 | `DesignSystem` | Tokens, the League Gothic stage clock, cards, the caption plate, swipe plaques and drag reorder; builds for watchOS too |
-| `WatchRemoteFeature` | The Apple Watch app: the iPhone's workout list, its running workout and the state of the link; the `CircuitTimerWatch` target embedded in the iPhone app shows it ([Apple Watch](docs/apple-watch.md)) |
+| `WatchRemoteFeature` | The Apple Watch app: the iPhone's workout list, its running workout with Pause and Resume, and the state of the link; the `CircuitTimerWatch` target embedded in the iPhone app shows it ([Apple Watch](docs/apple-watch.md)) |
 | `WatchLink` | The WatchConnectivity channel between the iPhone app and the watch app: the wire format, its order rules and both sides' clients |
 | `WorkoutStorage` | `WorkoutStorageClient` (struct of closures, in memory for previews): SwiftData mirrored to iCloud when sync is on; the saved run file |
 | `CloudSync` | The sync switch, the launch's mirroring decision, account and import/export status |
