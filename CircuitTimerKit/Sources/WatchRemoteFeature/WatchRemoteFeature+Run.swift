@@ -101,11 +101,12 @@ extension WatchRemoteFeature {
     }
 
     /// A set clock moves the stage's end in wall time: the wait for it is counted again from the new date, and a stage
-    /// the move ended asks as its own end would.
+    /// the move ended asks as its own end would. A stage that already ended stays ended until new content, so a clock
+    /// set back brings no time back; in the background nothing waits, and `.active` schedules the end again.
     func systemClockChanged(_ state: inout State) -> Effect<Action> {
-        guard let shown = state.run else { return .none }
+        guard state.isSceneActive, state.run?.isStageOver == false else { return .none }
         let stageEnd = scheduleStageEnd(&state)
-        guard !shown.isStageOver, state.run?.isStageOver == true else { return stageEnd }
+        guard state.run?.isStageOver == true else { return stageEnd }
         return .merge(stageEnd, askForRun(&state))
     }
 

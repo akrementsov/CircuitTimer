@@ -243,4 +243,38 @@ struct WatchRemoteFeatureRunSceneTests {
         #expect(harness.requests == requests + 1)
         await harness.finish()
     }
+
+    /// A stage that already ended stays ended when the clock is set back: its time does not come back.
+    @Test
+    func test_systemClockChanged_setBackAfterTheStageEnded_keepsItEnded() async throws {
+        let harness = RunHarness()
+        await harness.confirm(runningRun(stage: "A", endsIn: 3))
+        await harness.advance(seconds: 3)
+        await harness.store.receive(\.internal.stageEnded)
+        harness.wall.withValue { $0 = $0.addingTimeInterval(-60) }
+
+        await harness.store.send(.view(.systemClockChanged))
+
+        #expect(harness.state.run?.isStageOver == true)
+        let screen = try #require(harness.screen())
+        #expect(!screen.showsDigits(at: harness.now))
+        await harness.finish()
+    }
+
+    /// In the background a set clock schedules no stage end: leaving cancelled it, and `.active` schedules it again.
+    @Test
+    func test_systemClockChanged_inTheBackground_schedulesNoStageEnd() async {
+        let harness = RunHarness()
+        await harness.confirm(runningRun(stage: "A", endsIn: 3))
+        await harness.store.send(.view(.scenePhaseChanged(.background)))
+
+        await harness.store.send(.view(.systemClockChanged))
+        // A stage end that fired would wait as a received action, and the next send fails until it is handled.
+        harness.store.exhaustivity = .on
+        await harness.advance(seconds: 3)
+        await harness.store.send(.internal(.stageEnded(generation: 0)))
+
+        harness.store.exhaustivity = .off
+        await harness.finish()
+    }
 }
