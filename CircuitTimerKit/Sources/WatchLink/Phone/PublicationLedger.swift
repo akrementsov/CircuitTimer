@@ -42,6 +42,9 @@ final class PublicationLedger: @unchecked Sendable {
     /// The catalog's candidates from its newest publication, in the order a refused write falls back. Every state
     /// starts from them, so a run that needs a shorter catalog does not shorten the list for later states.
     private var catalogCandidates: [CatalogState?] = [nil]
+    /// How many leading candidates WatchConnectivity refused as too large since the catalog was published, the run
+    /// ended or the watch changed: later states skip them instead of encoding and offering them again.
+    private var refusedCandidates = 0
     /// The owner whose run does not fit in a transfer; its runs are not published until it ends.
     private var tooLargeOwner: UUID?
 
@@ -72,7 +75,9 @@ final class PublicationLedger: @unchecked Sendable {
         await onQueue {
             guard self.prepared?.run?.owner == owner || self.tooLargeOwner == owner else { return .skipped }
             self.tooLargeOwner = nil
-            return self.commit(self.catalogCandidates, run: nil, at: now)
+            // Without the run the list may fit whole again.
+            self.refusedCandidates = 0
+            return self.commit(self.candidates, run: nil, at: now)
         }
     }
 
@@ -90,7 +95,7 @@ final class PublicationLedger: @unchecked Sendable {
                 return .skipped
             }
             self.tooLargeOwner = nil
-            return self.commit(self.catalogCandidates, run: nil, at: now, isTerminal: true)
+            return self.commit(self.candidates, run: nil, at: now, isTerminal: true)
         }
     }
 
@@ -112,7 +117,7 @@ final class PublicationLedger: @unchecked Sendable {
         guard !isGateClosed, let prepared, !isWritten else { return nil }
         if let owner = prepared.run?.owner, !isOpen(for: owner) {
             // The owner ended before its own section ran: the state without its run replaces it.
-            return numbered(commit(catalogCandidates, run: nil, at: prepared.publishedAt))
+            return numbered(commit(candidates, run: nil, at: prepared.publishedAt))
         }
         switch write(prepared) {
             case .written:
@@ -121,6 +126,7 @@ final class PublicationLedger: @unchecked Sendable {
             case .pending:
                 return nil
             case .tooLarge:
+                noteRefused(prepared.catalog)
                 let catalogs: [CatalogState?] = prepared.catalog.map(Self.fallbacks) ?? [nil]
                 return numbered(commit(catalogs, run: prepared.run, at: prepared.publishedAt))
         }
@@ -138,7 +144,10 @@ final class PublicationLedger: @unchecked Sendable {
     /// The user switched to another watch: the context belongs to the watch it was written for, so the newest state
     /// is written again once the session for the new one activates.
     func watchChanged() {
-        queue.async { self.isWritten = false }
+        queue.async {
+            self.isWritten = false
+            self.refusedCandidates = 0
+        }
     }
 
     /// The owner of the run the newest decided state carries.
@@ -204,6 +213,7 @@ final class PublicationLedger: @unchecked Sendable {
         guard revision > catalogRevision else { return .skipped }
         catalogRevision = revision
         catalogCandidates = Self.fitted(catalog, processID: processID, at: now)
+        refusedCandidates = 0
         return commit(catalogCandidates, run: prepared?.run, at: now)
     }
 
@@ -222,7 +232,18 @@ final class PublicationLedger: @unchecked Sendable {
             guard tooLargeOwner != run.owner else { return .skipped }
             self.tooLargeOwner = nil
         }
-        return commit(catalogCandidates, run: run, runRevision: revision, at: now)
+        return commit(candidates, run: run, runRevision: revision, at: now)
+    }
+
+    private func noteRefused(_ catalog: CatalogState?) {
+        if let index = catalogCandidates.firstIndex(of: catalog), index >= refusedCandidates {
+            refusedCandidates = index + 1
+        }
+    }
+
+    /// The catalog's candidates without those WatchConnectivity already refused; the last one always stays.
+    private var candidates: [CatalogState?] {
+        Array(catalogCandidates.dropFirst(min(refusedCandidates, catalogCandidates.count - 1)))
     }
 
     /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large; the run is dropped and
@@ -286,6 +307,7 @@ final class PublicationLedger: @unchecked Sendable {
                     adopt(state, isWritten: false, runRevision: runRevision)
                     return .pending(state)
                 case .tooLarge:
+                    noteRefused(catalog)
                     continue
             }
         }
