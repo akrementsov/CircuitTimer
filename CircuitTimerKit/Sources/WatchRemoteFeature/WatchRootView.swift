@@ -32,12 +32,16 @@ public struct WatchRootView: View {
         }
     }
 
-    /// The list's title, or during a workout its name, as the iPhone timer's header shows it.
+    /// The list's title, or during a workout its name, as the iPhone timer's header shows it; none while a workout too
+    /// large to travel runs, whose name the watch does not know.
     private var title: Text {
-        if case let .run(screen) = store.screen {
-            Text(screen.display.title)
-        } else {
-            Text("watch.list.title", bundle: .module)
+        switch store.screen {
+            case let .run(screen):
+                Text(screen.display.title)
+            case .notice(.runTooLarge):
+                Text(verbatim: "")
+            case .update, .list, .empty, .unavailable, .notice:
+                Text("watch.list.title", bundle: .module)
         }
     }
 

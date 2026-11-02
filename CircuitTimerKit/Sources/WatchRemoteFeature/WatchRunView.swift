@@ -2,17 +2,20 @@ import DesignSystem
 import Foundation
 import SwiftUI
 import WorkoutActivity
-import WorkoutDomain
 
-/// The workout running on the iPhone, drawn like the iPhone timer's cards: the running stage's clock and name on its
-/// stage colour, the next stage on a dark card under it. The workout's name is the screen's title. The digits count by
-/// themselves only until `digitsUntil`; the timeline hides them then even if no action arrives.
+/// The workout running on the iPhone, drawn like the iPhone timer's cards, aligned to the leading edge: the running
+/// stage's clock and name on its stage colour, the next stage on a dark card under it. The workout's name is the
+/// screen's title. The digits count by themselves only until `digitsUntil`; the timeline hides them then even if no
+/// action arrives.
+///
+/// The text stops growing at `maxTextSize`, as the iPhone's card titles do, so on a 41 mm watch a stage whose name
+/// takes one line keeps the next stage on screen; a longer name or a note scrolls.
 struct WatchRunView: View {
     let screen: WatchRemoteFeature.State.RunScreen
 
     var body: some View {
         ScrollView {
-            VStack(spacing: .token(spacing: .xs)) {
+            VStack(alignment: .leading, spacing: .token(spacing: .xs)) {
                 card
                 if let next = display.next {
                     nextCard(next)
@@ -21,15 +24,18 @@ struct WatchRunView: View {
                     noteText(note)
                 }
             }
+            .dynamicTypeSize(...Self.maxTextSize)
         }
     }
+
+    private static let maxTextSize = DynamicTypeSize.xLarge
 
     private var display: WorkoutActivityDisplay {
         screen.display
     }
 
     private var card: some View {
-        VStack(spacing: .zero) {
+        VStack(alignment: .leading, spacing: .zero) {
             switch display.clock {
                 case let .counting(range):
                     digits { WatchClockText(range: range) }
@@ -56,24 +62,27 @@ struct WatchRunView: View {
             }
         }
         .foregroundStyle(display.tone.ink)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, .token(spacing: .xs))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, .token(spacing: .s))
         .padding(.vertical, .token(spacing: .s))
         .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        // One element, as on the iPhone: the stage's name, then its time.
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     private var headline: some View {
         Text(display.headline)
             .font(.token(.runningStageName))
             .textCase(.uppercase)
-            .multilineTextAlignment(.center)
+            .multilineTextAlignment(.leading)
             .lineLimit(2)
-            .minimumScaleFactor(0.6)
+            .accessibilitySortPriority(1)
     }
 
     /// As on the iPhone: what comes next, without its length, which starts only when the running stage ends.
     private func nextCard(_ next: WorkoutActivityDisplay.Next) -> some View {
-        VStack(spacing: .zero) {
+        VStack(alignment: .leading, spacing: .zero) {
             Text("watch.run.next", bundle: .module)
                 .font(.token(.note))
                 .foregroundStyle(.text(.secondary))
@@ -82,26 +91,37 @@ struct WatchRunView: View {
                 .font(.token(.nextStageName))
                 .foregroundStyle(.text(.primary))
                 .textCase(.uppercase)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
                 .lineLimit(2)
-                .minimumScaleFactor(0.6)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, .token(spacing: .xs))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, .token(spacing: .s))
         .padding(.vertical, .token(spacing: .xs))
         .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     /// Shown only while the iPhone's confirmation holds: the timeline redraws at `digitsUntil` and hides them then.
+    /// Without them a hidden reading keeps their place, so the cards do not jump when they go and come back.
     @ViewBuilder private func digits(@ViewBuilder _ content: @escaping () -> some View) -> some View {
         if let from = screen.digitsFrom, let until = screen.digitsUntil {
             // The first entry is already past, so the timeline draws at once; the second hides the digits.
             TimelineView(.explicit([min(from, until), until])) { context in
                 if screen.showsDigits(at: context.date) {
                     content()
+                } else {
+                    digitsPlace
                 }
             }
+        } else {
+            digitsPlace
         }
+    }
+
+    private var digitsPlace: some View {
+        Text(verbatim: "2:22")
+            .font(.token(.runningStageClock))
+            .hidden()
     }
 
     private func glyph(_ name: String) -> some View {
