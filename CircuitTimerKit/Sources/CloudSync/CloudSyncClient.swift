@@ -36,6 +36,22 @@ public enum CloudKitContainerID {
     }
 }
 
+extension CloudSyncClient {
+    /// The launch's decision waits for StoreKit, at most a second, only when this launch could mirror at all: with the
+    /// switch off, or in a build without a container, the store stays on the device whatever StoreKit says.
+    static func waitForStoreKit(
+        isICloudSyncOn: Bool,
+        containerID: String?,
+        refreshStatus: (Duration) async -> FullVersionStatus
+    ) async {
+        guard isICloudSyncOn, containerID != nil else { return }
+
+        if await refreshStatus(.seconds(1)) == .unknown {
+            CloudSyncMonitor.logger.error("StoreKit did not answer in time; this launch keeps workouts on the device")
+        }
+    }
+}
+
 extension CloudSyncClient: DependencyKey {
     public static let liveValue: Self = {
         let monitor = CloudSyncMonitor(
@@ -49,14 +65,13 @@ extension CloudSyncClient: DependencyKey {
             containerID: { CloudKitContainerID.inMainBundle() },
             accountStatus: { try await CKContainer(identifier: $0).accountStatus() },
             prepareInputs: {
-                // With the switch off the store stays local whatever StoreKit says.
                 @SharedReader(.iCloudSync) var isICloudSyncOn
-                guard isICloudSyncOn else { return }
-
                 @Dependency(\.purchases) var purchases
-                if await purchases.refreshStatus(.seconds(1)) == .unknown {
-                    CloudSyncMonitor.logger.error("StoreKit did not answer in time; this launch keeps workouts on the device")
-                }
+                await waitForStoreKit(
+                    isICloudSyncOn: isICloudSyncOn,
+                    containerID: CloudKitContainerID.inMainBundle(),
+                    refreshStatus: { await purchases.refreshStatus($0) }
+                )
             }
         )
         return Self(

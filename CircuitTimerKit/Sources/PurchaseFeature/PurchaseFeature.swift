@@ -50,10 +50,22 @@ public struct PurchaseFeature: Sendable {
         case limit(Reason)
     }
 
+    /// What unlocking the full version means for iCloud sync, as the app knew it when it showed the sheet. The sheet
+    /// covers Settings, so the switch cannot change while it is up.
+    public enum ICloudOutlook: Equatable, Sendable {
+        /// The switch is on and this launch keeps workouts on the device: sync starts at the next launch.
+        case startsNextLaunch
+        /// The store already mirrors, as after a refund and a new purchase in one process.
+        case alreadySyncing
+        case off
+    }
+
     /// What the main button's state needs said beside it.
     enum Note: Equatable, Sendable {
         /// The sheet's purchase or restore unlocked the full version; iCloud follows at the next launch.
         case iCloudNextLaunch
+        /// The same, with the iCloud switch off.
+        case iCloudOff
         case pending
         case unavailable
     }
@@ -75,6 +87,7 @@ public struct PurchaseFeature: Sendable {
     @ObservableState
     public struct State: Equatable, Sendable {
         public let entry: Entry
+        public let iCloudOutlook: ICloudOutlook
         var offer: Offer = .loading
         var operation: Operation?
         var status: FullVersionStatus = .unknown
@@ -89,8 +102,9 @@ public struct PurchaseFeature: Sendable {
         var hasStarted = false
         @Presents var destination: Destination.State?
 
-        public init(entry: Entry) {
+        public init(entry: Entry, iCloudOutlook: ICloudOutlook = .startsNextLaunch) {
             self.entry = entry
+            self.iCloudOutlook = iCloudOutlook
         }
 
         var reason: Reason? {
@@ -114,7 +128,13 @@ public struct PurchaseFeature: Sendable {
         }
 
         var note: Note? {
-            if isShowingSuccess { return .iCloudNextLaunch }
+            if isShowingSuccess {
+                return switch iCloudOutlook {
+                    case .startsNextLaunch: .iCloudNextLaunch
+                    case .alreadySyncing: nil
+                    case .off: .iCloudOff
+                }
+            }
             if isPending { return .pending }
             if offer == .unavailable { return .unavailable }
             return nil

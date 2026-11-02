@@ -249,6 +249,7 @@ extension PurchaseFeature.Note {
     fileprivate var textKey: LocalizedStringKey {
         switch self {
             case .iCloudNextLaunch: "purchase.note.iCloudNextLaunch"
+            case .iCloudOff: "purchase.note.iCloudOff"
             case .pending: "purchase.note.pending"
             case .unavailable: "purchase.note.unavailable"
         }

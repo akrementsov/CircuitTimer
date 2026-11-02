@@ -176,6 +176,25 @@ struct EntitlementMonitorTests {
         store.finish()
     }
 
+    @Test
+    func test_restore_cancelledCaller_readAnsweringFree_publishesNothing() async throws {
+        try await store.nextReadAfterStart(monitor).answer.resume(returning: true)
+        while monitor.currentStatus != .full {
+            await Task.yield()
+        }
+        let restore = Task { [monitor] in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await monitor.restore()
+        }
+
+        // A cancelled walk of the entitlements may end early with nothing found.
+        try await store.nextRead().answer.resume(returning: false)
+        _ = try await restore.value
+
+        #expect(monitor.currentStatus == .full)
+        store.finish()
+    }
+
     // MARK: - Transaction updates and order
 
     @Test(arguments: [(false, true), (true, false)])

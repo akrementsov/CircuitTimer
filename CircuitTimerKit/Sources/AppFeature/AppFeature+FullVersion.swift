@@ -56,7 +56,7 @@ extension AppFeature {
         switch state.destination {
             case nil:
                 state.purchaseRequest = nil
-                state.destination = .purchase(PurchaseFeature.State(entry: entry))
+                state.destination = .purchase(PurchaseFeature.State(entry: entry, iCloudOutlook: iCloudOutlook(state)))
             case .timer:
                 // The user went on with a workout; a sheet after it would come out of nowhere.
                 Self.logger.notice("Dropped a purchase sheet request under the timer")
@@ -66,6 +66,14 @@ extension AppFeature {
                 break
         }
         return .none
+    }
+
+    /// What a purchase in the sheet will mean for iCloud, so its thanks say only what is true. A status not read yet
+    /// counts as a store on the device, which a purchase leaves so until the next launch.
+    private func iCloudOutlook(_ state: State) -> PurchaseFeature.ICloudOutlook {
+        guard state.settings.isICloudSyncOn else { return .off }
+
+        return state.settings.cloudSyncStatus?.isMirroring == true ? .alreadySyncing : .startsNextLaunch
     }
 
     /// The question about a saved run is asked, answered or not coming: a failed first load cannot ask it until a

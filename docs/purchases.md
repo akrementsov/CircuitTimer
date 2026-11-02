@@ -1,6 +1,6 @@
 # Purchases
 
-One non-consumable in-app purchase, the full version (`com.akrementsov.circuittimer.fullversion`), unlocks iCloud sync of workouts, more than two workouts and, once CT-9 has shipped it, the Apple Watch app. It is a one-time purchase with Family Sharing on. The price is always the App Store's `displayPrice` in the user's storefront; nothing in the app names an amount.
+One non-consumable in-app purchase, the full version (`com.akrementsov.circuittimer.fullversion`), unlocks iCloud sync of workouts, more than two workouts and, from CT-6-2, the Apple Watch app. It is a one-time purchase with Family Sharing on. The price is always the App Store's `displayPrice` in the user's storefront; nothing in the app names an amount.
 
 ## How the app knows
 
@@ -13,7 +13,7 @@ One non-consumable in-app purchase, the full version (`com.akrementsov.circuitti
 
 ## iCloud and the launch
 
-The store mirrors to iCloud only with the full version. The launch decides once per process: with the switch on, `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
+The store mirrors to iCloud only with the full version. The launch decides once per process: with the switch on and a container, `CloudSyncClient.prepareDecision()` waits for StoreKit for at most a second, in a task no caller can cut short, while the saved run is read; the store then opens once with the answer ([iCloud sync](icloud-sync.md)). When StoreKit does not answer in time, the launch keeps workouts on the device; the full version still unlocks the rest of the app as soon as it arrives, and iCloud at the next launch. A purchase and a refund likewise reach iCloud at the next launch, and the screens say so.
 
 ## Where the app asks
 
@@ -33,7 +33,7 @@ The store mirrors to iCloud only with the full version. The launch decides once 
 | Purchasing, restoring | A spinner on that button, the other dimmed, the close button and the swipe disabled |
 | Waiting for approval | Ask to Buy or another approval: a note and a dimmed «Waiting for Approval»; the sheet may close, and the approval unlocks the app later |
 | App Store unavailable | A note and «Try Again» |
-| Purchased | «Thank You!», the features with checkmarks, a note that iCloud starts at the next launch, «Done» |
+| Purchased | «Thank You!», the features with checkmarks, «Done», and a note on iCloud as the app knew it when it showed the sheet: sync starts at the next launch with the switch on; turn it on in Settings with the switch off; none when the store already mirrors (a refund and a new purchase in one process) |
 
 Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» when Screen Time or a profile forbids them, «No Purchases Found» when a restore finds nothing, «Couldn't Restore Purchases» for a failed restore. «Couldn't Verify the Purchase» (StoreKit could not verify a transaction) and «Couldn't Confirm the Purchase» (StoreKit reported success but the status did not say `full` within 3 seconds) offer Restore Purchases; a full version that arrives later still shows «Thank You!». A full version that arrives from elsewhere while the sheet is open, such as through Family Sharing, closes it. A write error or a saved run that waited for the sheet shows after it has left the screen.
 
@@ -42,6 +42,7 @@ Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» 
 - The free limit is enforced where the user creates, not in storage: an import from iCloud after the check, or a new-workout editor opened at one workout that saves after an import or a refund, can leave a third workout.
 - After a refund the store keeps mirroring until the next launch; Settings says sync turns off after a relaunch.
 - A buyer whose StoreKit does not answer within a second at launch, such as offline, keeps workouts on the device until the next launch.
+- The entitlement is a verified transaction of the product without a `revocationDate`; `ownershipType` is not checked separately, as bought and Family-Shared are its only values today.
 
 ## Trying it locally
 

@@ -369,6 +369,22 @@
         }
       }
     },
+    "purchase.note.iCloudOff" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To sync your workouts, turn on iCloud sync in Settings."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Чтобы синхронизировать тренировки, включите синхронизацию с iCloud в Настройках."
+          }
+        }
+      }
+    },
     "purchase.note.pending" : {
       "localizations" : {
         "en" : {

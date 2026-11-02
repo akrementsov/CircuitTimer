@@ -122,7 +122,10 @@ final class EntitlementMonitor: Sendable {
         let isNewest = state.withValue { state in
             guard state.latestRead == read else { return false }
 
-            state.publish(isEntitled ? .full : .free)
+            // A cancelled caller's walk of the entitlements may have ended early and found nothing.
+            if !Task.isCancelled {
+                state.publish(isEntitled ? .full : .free)
+            }
             return true
         }
         return (isEntitled, isNewest)

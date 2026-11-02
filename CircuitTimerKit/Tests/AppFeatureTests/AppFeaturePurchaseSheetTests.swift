@@ -1,6 +1,8 @@
 @testable import AppFeature
+@testable import SettingsFeature
 @testable import WorkoutEditorFeature
 
+import CloudSync
 import ComposableArchitecture
 import Foundation
 import PurchaseFeature
@@ -58,6 +60,34 @@ struct AppFeaturePurchaseSheetTests {
         let store = makeStore(state)
 
         await store.send(.settings(.delegate(.fullVersionRequested(.buy)))) { $0.purchaseRequest = .browse }
+    }
+
+    @Test(arguments: ["off", "mirroring", "local", "unread"])
+    func test_request_opensTheSheetWithWhatAPurchaseMeansForICloud(sync: String) async {
+        // Its own preferences: the test context's are shared by the arguments running in parallel.
+        let defaults = UserDefaults.inMemory
+        let state = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            var state = freeVersion([workout])
+            state.settings.$isICloudSyncOn.withLock { $0 = sync != "off" }
+            switch sync {
+                case "mirroring": state.settings.cloudSyncStatus = CloudSyncStatus(isRequested: false, isMirroring: true, problem: nil)
+                case "local", "off": state.settings.cloudSyncStatus = CloudSyncStatus(isRequested: false, isMirroring: false, problem: nil)
+                default: break
+            }
+            return state
+        }
+        let outlook: PurchaseFeature.ICloudOutlook = switch sync {
+            case "off": .off
+            case "mirroring": .alreadySyncing
+            default: .startsNextLaunch
+        }
+        let store = makeStore(state) { $0.defaultAppStorage = defaults }
+
+        await store.send(.settings(.delegate(.fullVersionRequested(.buy)))) {
+            $0.destination = .purchase(PurchaseFeature.State(entry: .browse, iCloudOutlook: outlook))
+        }
     }
 
     @Test

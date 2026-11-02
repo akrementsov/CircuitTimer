@@ -24,7 +24,7 @@ public struct SettingsFeature: Sendable {
         @Shared(.backgroundNotifications) public var isBackgroundNotificationsOn = true
         /// Read when the app launches; a change shows a footnote until the next launch applies it.
         @Shared(.iCloudSync) public var isICloudSyncOn = true
-        var cloudSyncStatus: CloudSyncStatus?
+        public internal(set) var cloudSyncStatus: CloudSyncStatus?
         /// iCloud sync is part of the full version; the rows under it buy or restore it. The app keeps it current from
         /// its one subscription.
         public var fullVersion: FullVersionStatus = .unknown

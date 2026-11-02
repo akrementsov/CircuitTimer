@@ -199,9 +199,17 @@ struct PurchaseFeatureOutcomeTests {
         #expect(sheet().note == nil)
         #expect(sheet(operation: .purchasing).note == nil)
 
-        var unlocked = sheet(status: .full)
-        unlocked.didUnlockHere = true
-        #expect(unlocked.note == .iCloudNextLaunch)
+        let notes: [(PurchaseFeature.ICloudOutlook, PurchaseFeature.Note?)] = [
+            (.startsNextLaunch, .iCloudNextLaunch),
+            (.alreadySyncing, nil),
+            (.off, .iCloudOff),
+        ]
+        for (outlook, note) in notes {
+            var unlocked = PurchaseFeature.State(entry: .browse, iCloudOutlook: outlook)
+            unlocked.status = .full
+            unlocked.didUnlockHere = true
+            #expect(unlocked.note == note, "\(outlook)")
+        }
 
         var pending = sheet()
         pending.isPending = true
