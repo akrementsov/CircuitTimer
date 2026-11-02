@@ -35,16 +35,19 @@ struct WatchRunView: View {
     }
 
     /// The digits show only while the iPhone's confirmation holds: the timeline redraws the card at `digitsUntil`, and
-    /// the screen and VoiceOver read the same answer for the same date.
-    @ViewBuilder private var card: some View {
-        if let from = screen.digitsFrom, let until = screen.digitsUntil {
-            // The first entry is already past, so the timeline draws at once; the second hides the digits.
-            TimelineView(.explicit([min(from, until), until])) { context in
-                stageCard(showsDigits: screen.showsDigits(at: context.date))
-            }
-        } else {
-            stageCard(showsDigits: false)
+    /// the screen and VoiceOver read the same answer for the same date. One timeline in every state keeps the card the
+    /// same view, so VoiceOver's focus stays on it when a lease opens or ends.
+    private var card: some View {
+        TimelineView(.explicit(digitsSchedule)) { context in
+            stageCard(showsDigits: screen.showsDigits(at: context.date))
         }
+    }
+
+    /// Under a lease its first entry is already past, so the timeline draws at once, and the second hides the digits;
+    /// without one there is nothing to redraw for.
+    private var digitsSchedule: [Date] {
+        guard let from = screen.digitsFrom, let until = screen.digitsUntil else { return [] }
+        return [min(from, until), until]
     }
 
     private func stageCard(showsDigits: Bool) -> some View {
