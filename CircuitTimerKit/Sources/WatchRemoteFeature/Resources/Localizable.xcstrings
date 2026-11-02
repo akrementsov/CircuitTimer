@@ -390,13 +390,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Next"
+            "value" : "Next stage"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Далее"
+            "value" : "Следующий этап"
           }
         }
       }

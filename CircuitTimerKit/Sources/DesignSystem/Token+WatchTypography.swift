@@ -8,8 +8,6 @@ extension DesignSystem.Token {
     public enum WatchTypography: Sendable {
         /// The running stage's clock.
         case runningStageClock
-        /// The next stage's duration.
-        case nextStageClock
         /// The running stage's name.
         case runningStageName
         /// The next stage's name.
@@ -33,8 +31,6 @@ extension Font {
         switch style {
             case .runningStageClock:
                 StageClockText.Face.current.font(size: 56)
-            case .nextStageClock:
-                StageClockText.Face.current.font(size: 22)
             case .runningStageName:
                 .system(.headline, weight: .heavy)
             case .nextStageName:

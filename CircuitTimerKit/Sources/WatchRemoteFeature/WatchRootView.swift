@@ -20,7 +20,7 @@ public struct WatchRootView: View {
     public var body: some View {
         NavigationStack {
             content
-                .navigationTitle(Text("watch.list.title", bundle: .module))
+                .navigationTitle(title)
         }
         .background(.surface(.screen))
         .preferredColorScheme(.dark)
@@ -29,6 +29,15 @@ public struct WatchRootView: View {
         .onChange(of: isLuminanceReduced, initial: true) { _, isReduced in send(.luminanceChanged(isReduced: isReduced)) }
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemClockDidChange)) { _ in
             send(.systemClockChanged)
+        }
+    }
+
+    /// The list's title, or during a workout its name, as the iPhone timer's header shows it.
+    private var title: Text {
+        if case let .run(screen) = store.screen {
+            Text(screen.display.title)
+        } else {
+            Text("watch.list.title", bundle: .module)
         }
     }
 

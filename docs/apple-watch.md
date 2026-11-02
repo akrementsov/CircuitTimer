@@ -4,7 +4,7 @@ The watch app is a remote for the iPhone timer: the workout runs on the iPhone, 
 
 ## What it does now (CT-9-3)
 
-The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, as the Live Activity does: the workout's name, the stage, its time and the stage that comes next; paused, «Get ready» and «Done» read as on the card. The rows and the run do nothing yet: Pause and Resume and Start from the watch follow in CT-9-4 and CT-9-5 ([roadmap](roadmap.md)).
+The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. The rows and the run do nothing yet: Pause and Resume and Start from the watch follow in CT-9-4 and CT-9-5 ([roadmap](roadmap.md)).
 
 The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked; raising the wrist shows it again, or asks once.
 

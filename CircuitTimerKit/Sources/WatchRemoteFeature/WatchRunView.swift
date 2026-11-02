@@ -4,8 +4,9 @@ import SwiftUI
 import WorkoutActivity
 import WorkoutDomain
 
-/// The workout running on the iPhone, drawn like its Live Activity card. The digits count by themselves only until
-/// `digitsUntil`; the timeline hides them then even if no action arrives.
+/// The workout running on the iPhone, drawn like the iPhone timer's cards: the running stage's clock and name on its
+/// stage colour, the next stage on a dark card under it. The workout's name is the screen's title. The digits count by
+/// themselves only until `digitsUntil`; the timeline hides them then even if no action arrives.
 struct WatchRunView: View {
     let screen: WatchRemoteFeature.State.RunScreen
 
@@ -14,7 +15,7 @@ struct WatchRunView: View {
             VStack(spacing: .token(spacing: .xs)) {
                 card
                 if let next = display.next {
-                    nextRow(next)
+                    nextCard(next)
                 }
                 if let note = screen.note {
                     noteText(note)
@@ -28,62 +29,67 @@ struct WatchRunView: View {
     }
 
     private var card: some View {
-        VStack(alignment: .leading, spacing: .token(spacing: .xxs)) {
-            Text(display.title)
-                .font(.token(.note))
-                .lineLimit(1)
-            Text(display.headline)
-                .font(.token(.runningStageName))
-                .lineLimit(2)
-            clock
-        }
-        .foregroundStyle(display.tone.ink)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.token(spacing: .s))
-        .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-    }
-
-    @ViewBuilder private var clock: some View {
-        switch display.clock {
-            case let .counting(range):
-                digits { WatchClockText(range: range) }
-            case .pauseGlyph:
-                HStack(spacing: .token(spacing: .xs)) {
-                    glyph("pause.fill")
+        VStack(spacing: .zero) {
+            switch display.clock {
+                case let .counting(range):
+                    digits { WatchClockText(range: range) }
+                    headline
+                case .pauseGlyph:
+                    // The glyph stands beside the word, so the time left fits under them.
+                    HStack(spacing: .token(spacing: .xs)) {
+                        glyph("pause.fill")
+                        headline
+                    }
                     if case let .fixed(remaining) = display.islandClock {
                         digits {
                             Text(verbatim: remaining.clockText(.timerRemaining))
                                 .font(.token(.runningStageClock))
                         }
                     }
-                }
-            case .finishedGlyph:
-                glyph("checkmark")
-            case .fixed, .none:
-                EmptyView()
+                case .finishedGlyph:
+                    HStack(spacing: .token(spacing: .xs)) {
+                        glyph("checkmark")
+                        headline
+                    }
+                case .fixed, .none:
+                    headline
+            }
         }
+        .foregroundStyle(display.tone.ink)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, .token(spacing: .xs))
+        .padding(.vertical, .token(spacing: .s))
+        .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
     }
 
-    private func nextRow(_ next: WorkoutActivityDisplay.Next) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("watch.run.next", bundle: .module)
-                    .font(.token(.note))
-                    .foregroundStyle(.text(.secondary))
-                Text(next.label)
-                    .font(.token(.nextStageName))
-                    .foregroundStyle(next.tone.accent)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: .token(spacing: .xs))
-            if let duration = next.clock.duration {
-                digits {
-                    Text(verbatim: duration.clockText(.timerRemaining))
-                        .font(.token(.nextStageClock))
-                        .foregroundStyle(.text(.primary))
-                }
-            }
+    private var headline: some View {
+        Text(display.headline)
+            .font(.token(.runningStageName))
+            .textCase(.uppercase)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.6)
+    }
+
+    /// As on the iPhone: what comes next, without its length, which starts only when the running stage ends.
+    private func nextCard(_ next: WorkoutActivityDisplay.Next) -> some View {
+        VStack(spacing: .zero) {
+            Text("watch.run.next", bundle: .module)
+                .font(.token(.note))
+                .foregroundStyle(.text(.secondary))
+                .lineLimit(1)
+            Text(next.label)
+                .font(.token(.nextStageName))
+                .foregroundStyle(.text(.primary))
+                .textCase(.uppercase)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, .token(spacing: .xs))
+        .padding(.vertical, .token(spacing: .xs))
+        .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
     }
 
     /// Shown only while the iPhone's confirmation holds: the timeline redraws at `digitsUntil` and hides them then.
@@ -146,20 +152,6 @@ struct WatchClockText: View {
     }
 }
 
-private extension WorkoutActivityDisplay.Clock {
-    /// A next stage's length, which the watch shows still: it starts only when the running stage ends.
-    var duration: Duration? {
-        switch self {
-            case let .counting(range):
-                range.upperBound.elapsed(since: range.lowerBound)
-            case let .fixed(duration):
-                duration
-            case .pauseGlyph, .finishedGlyph, .none:
-                nil
-        }
-    }
-}
-
 extension Text {
     init(_ title: WorkoutActivityDisplay.Title) {
         switch title {
@@ -202,14 +194,5 @@ extension WorkoutActivityDisplay.Tone {
     /// Text on `fill`.
     var ink: Color {
         self == .dark ? .text(.primary) : .text(.onAccent)
-    }
-
-    /// A next stage's name on the screen's black.
-    var accent: Color {
-        switch self {
-            case .work: .stage(.work)
-            case .rest: .stage(.rest)
-            case .dark: .text(.primary)
-        }
     }
 }
