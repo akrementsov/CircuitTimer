@@ -142,6 +142,7 @@ struct WatchCompanionRunTests {
         await clock.waitForStartedSleeps(1)
         clock.advance(by: .seconds(4))
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
 
         await companion.refreshHandled(
@@ -255,6 +256,7 @@ struct WatchCompanionRunTests {
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
         link.snapshot.withValue { $0.canPublish = true }
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         let events = try #require(link.events.value)
 

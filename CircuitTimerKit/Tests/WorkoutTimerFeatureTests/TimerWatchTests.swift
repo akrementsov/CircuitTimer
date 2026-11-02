@@ -65,6 +65,8 @@ struct TimerWatchTests {
             WatchAnswer(owner: timerID, requestID: 7, publication: WatchRunPublication(revision: 1, run: run)),
         ])
         #expect(timer.watch.published.value.isEmpty)
+        // A paused run has nothing to settle: no new clock loop, and the exhaustive store saw no state change.
+        #expect(timer.store.state.clockGeneration == 1)
     }
 
     @Test(arguments: [false, true])

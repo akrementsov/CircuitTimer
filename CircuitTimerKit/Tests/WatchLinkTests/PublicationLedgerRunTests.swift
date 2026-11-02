@@ -382,6 +382,7 @@ struct PublicationLedgerRunTests {
         let ledger = ledger
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         let held = Task { await ledger.publish(revision: 1, catalog: Self.four, at: linkNow) }
         await gate.started.wait { $0 }
@@ -405,6 +406,7 @@ struct PublicationLedgerRunTests {
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         link.refusals.setValue([FakeLink.tooLarge])
         let publication = Task { await ledger.publishRun(revision: 2, run: makeRun(stage: "A2"), at: linkNow) }
@@ -418,6 +420,8 @@ struct PublicationLedgerRunTests {
         #expect(!written.contains { $0.run == makeRun(stage: "A2") })
         #expect(written.last?.run == nil)
         #expect(written.last?.catalog == Self.four)
+        // No state the ledger took on carries A2 either.
+        #expect(ledger.reply(knownCatalogDigest: nil, answeredBy: nil, at: linkNow).run == nil)
         // The refused candidate took a number of its own, so the written numbers increase but skip it.
         #expect(written.map(\.sequence) == written.map(\.sequence).sorted())
         #expect(Set(written.map(\.sequence)).count == written.count)
@@ -427,6 +431,7 @@ struct PublicationLedgerRunTests {
     func test_closeGate_whileASectionIsQueued_numbersNothingButTheTerminalState() async throws {
         let ledger = ledger
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         let held = Task { await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow) }
         await gate.started.wait { $0 }
@@ -446,6 +451,7 @@ struct PublicationLedgerRunTests {
     func test_heldWrite_queuedRunsNumberInQueueOrder_andReplyDoesNotWait() async throws {
         let ledger = ledger
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         let first = Task { await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow) }
         await gate.started.wait { $0 }
@@ -469,6 +475,7 @@ struct PublicationLedgerRunTests {
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.snapshot.withValue { $0.canPublish = true }
         let gate = WriteGate()
+        defer { gate.open() }
         link.gate.setValue(gate)
         let publication = Task { await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow) }
         await gate.started.wait { $0 }

@@ -6,7 +6,7 @@ The watch app is a remote for the iPhone timer: the workout runs on the iPhone, 
 
 The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. The rows and the run do nothing yet: Pause and Resume and Start from the watch follow in CT-9-4 and CT-9-5 ([roadmap](roadmap.md)).
 
-The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked; raising the wrist shows it again, or asks once.
+The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked about the run, though a retry of the list after a failure still asks; raising the wrist shows the time again, or asks once.
 
 The list updates when the workouts change on the iPhone. When the watch has no fresh list, it says why:
 
@@ -90,4 +90,4 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] A stage of 10 minutes or more: the clock is as wide as `22:22` and no digit is cut off.
 - [ ] Editing the workout list on the iPhone during a workout: the watch keeps showing the run.
 - [ ] Relaunching the watch app during a workout shows the run.
-- [ ] A frozen watch screen (O4): the time is gone by the end of the confirmation, at most 10 seconds after the last request.
+- [ ] A watch screen that does not redraw (O4): note when the time disappears after the confirmation ends; the accepted limit is that it goes at the next redraw.

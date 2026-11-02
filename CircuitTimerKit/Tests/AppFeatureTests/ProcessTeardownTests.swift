@@ -83,9 +83,10 @@ struct ProcessTeardownTests {
     }
 
     @Test
-    func test_run_endsCardsAndNotificationsTogetherThenHealthLastWithTheDate() async {
+    func test_run_endsCardsNotificationsAndTheWatchTogetherThenHealthLastWithTheDate() async {
         let activityStarted = Observed(false)
         let notificationsStarted = Observed(false)
+        let watchStarted = Observed(false)
         let teardown = teardown(
             endActivities: { [activityGate] in
                 activityStarted.setValue(true)
@@ -95,16 +96,22 @@ struct ProcessTeardownTests {
                 notificationsStarted.setValue(true)
                 await notificationGate.wait()
             },
+            finishWatch: { [watchGate] in
+                watchStarted.setValue(true)
+                await watchGate.wait()
+            },
             clock: clock
         )
         let running = Task { await teardown.run(at: Self.date) }
-        // Both start before either finishes: each waits at its gate, which only the test opens.
+        // All three start before any finishes: each waits at its gate, which only the test opens.
         await activityStarted.wait { $0 }
         await notificationsStarted.wait { $0 }
+        await watchStarted.wait { $0 }
         #expect(healthEnds.value.isEmpty)
 
         activityGate.open()
         notificationGate.open()
+        watchGate.open()
         await running.value
 
         #expect(healthEnds.value == [Self.date])

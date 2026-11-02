@@ -157,8 +157,9 @@ final class RunHarness {
         return screen
     }
 
+    /// Stops tracking whatever effects are left, if any.
     func finish() async {
-        await store.skipInFlightEffects()
+        await store.skipInFlightEffects(strict: false)
     }
 }
 

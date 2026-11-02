@@ -144,13 +144,20 @@ struct WatchRemoteFeatureRunTests {
     }
 
     @Test
-    func test_statusOutOfReach_dropsTheLease() async {
-        let harness = RunHarness(.showing(runningRun(), lease: true))
+    func test_statusOutOfReach_dropsTheLease_andBackInReachResetsTheFailuresAndAsks() async {
+        var state = State.showing(runningRun(), lease: true)
+        state.refresh.failures = 2
+        let harness = RunHarness(state)
 
         await harness.store.send(.internal(.event(.status(unreachable))))
 
         #expect(harness.state.lease == nil)
         #expect(harness.screen()?.note == .unreachable)
+
+        await harness.store.send(.internal(.event(.status(reachable))))
+        #expect(harness.state.refresh.failures == 0)
+        #expect(harness.requests == 2)
+        await harness.finish()
     }
 
     // MARK: The screen
@@ -257,6 +264,11 @@ struct WatchRemoteFeatureRunTests {
 
         #expect(harness.state.runGeneration == 1)
         #expect(harness.state.run == WatchRemoteFeature.ShownRun(run: run, isLive: true))
+
+        await harness.store.send(.internal(.event(.context(runState(sequence: 4, run: run, live: false)))))
+        #expect(harness.state.runGeneration == 1)
+        #expect(harness.state.run == WatchRemoteFeature.ShownRun(run: run, isLive: false))
+        await harness.finish()
     }
 
     @Test
@@ -327,14 +339,15 @@ struct WatchRemoteFeatureRunTests {
     }
 
     /// F11: a reply the order rejects confirms only the exact content shown under a live state of the same process.
-    @Test(arguments: [true, false])
-    func test_overtakenLiveReply_sameContent_opensTheLeaseOnlyUnderALiveState(shownLive: Bool) async {
-        let run = runningRun(stage: "A")
-        let harness = RunHarness(.showing(run, sequence: 3, live: shownLive, inFlight: true))
+    @Test(arguments: [(true, "A", true), (false, "A", false), (true, "B", false)])
+    func test_overtakenLiveReply_opensTheLeaseOnlyForTheSameContentUnderALiveState(
+        shownLive: Bool, answeredStage: String, opens: Bool
+    ) async {
+        let harness = RunHarness(.showing(runningRun(stage: "A"), sequence: 3, live: shownLive, inFlight: true))
 
-        await harness.store.send(Self.answered(9, runState(sequence: 2, run: run)))
+        await harness.store.send(Self.answered(9, runState(sequence: 2, run: runningRun(stage: answeredStage))))
 
-        #expect((harness.state.lease != nil) == shownLive)
+        #expect((harness.state.lease != nil) == opens)
         await harness.finish()
     }
 
@@ -376,6 +389,32 @@ struct WatchRemoteFeatureRunTests {
         await harness.finish()
     }
 
+    /// An iPhone that keeps answering «not live» is asked after 5, 10, then 20 s; a confirmation resets the count.
+    @Test
+    func test_notLiveReplies_backOff5_10_20_andAConfirmationResetsThem() async {
+        let run = runningRun(endsIn: 600)
+        let harness = RunHarness(.showing(run, inFlight: true))
+        await harness.store.send(Self.answered(9, runState(sequence: 3, run: run, live: false)))
+        var sequence = 4
+        for (failures, delay) in [(1, 5.0), (2, 10.0), (3, 20.0)] {
+            #expect(harness.state.refresh.failures == failures)
+            let requests = harness.requests
+            await harness.advance(seconds: delay - 0.1)
+            #expect(harness.requests == requests)
+            await harness.advance(seconds: 0.1)
+            await harness.store.receive(\.internal.runRetryDue)
+            #expect(harness.requests == requests + 1)
+            let notLive = failures < 3
+            await harness.replies.answer(runState(sequence: sequence, run: run, live: !notLive))
+            await harness.store.receive(\.internal.refreshAnswered)
+            sequence += 1
+        }
+
+        #expect(harness.state.refresh.failures == 0)
+        #expect(harness.state.lease != nil)
+        await harness.finish()
+    }
+
     @Test
     func test_retryDelay_growsFromFiveToTwentySeconds() {
         #expect((1...5).map { WatchRemoteFeature.retryDelay(afterFailures: $0) } == [
@@ -394,6 +433,13 @@ struct WatchRemoteFeatureRunTests {
 
         #expect(harness.state.refresh.isRetryScheduled)
         #expect(harness.requests == 0)
+
+        // Its own generation after the retry was dropped does nothing either.
+        var dropped = State.showing(runningRun())
+        dropped.refresh.runRetryGeneration = 2
+        let unscheduled = RunHarness(dropped)
+        await unscheduled.store.send(.internal(.runRetryDue(generation: 2)))
+        #expect(unscheduled.requests == 0)
     }
 
     /// A failed request drops the run's renewal and waits for its retry; the lease shows its digits until its end.
@@ -433,6 +479,13 @@ struct WatchRemoteFeatureRunTests {
 
     @Test
     func test_wristLowered_hidesTheDigitsAndStopsTheRenewal() async {
+        var due = State.showing(runningRun(), lease: true, inFlight: true)
+        due.refresh.isRenewalDue = true
+        let lowered = RunHarness(due)
+        await lowered.store.send(.view(.luminanceChanged(isReduced: true)))
+        #expect(!lowered.state.refresh.isRenewalDue)
+        await lowered.finish()
+
         let harness = RunHarness()
         await harness.confirm(runningRun())
 
@@ -527,6 +580,14 @@ struct WatchRemoteFeatureRunTests {
 
         #expect(harness.requests == 1)
         #expect(harness.state.run?.isStageOver == false)
+
+        // The run's retry scheduled before leaving is gone too.
+        let retrying = RunHarness(.showing(runningRun(), inFlight: true))
+        await retrying.store.send(Self.answered(9, runState(sequence: 3, run: runningRun(), live: false)))
+        #expect(retrying.state.refresh.isRetryScheduled)
+        await retrying.store.send(.view(.scenePhaseChanged(.background)))
+        await retrying.advance(seconds: 60)
+        #expect(retrying.requests == 1)
     }
 
     @Test
@@ -539,6 +600,7 @@ struct WatchRemoteFeatureRunTests {
         await harness.store.send(.view(.scenePhaseChanged(.background)))
         let generation = harness.state.runGeneration
         await harness.store.send(.view(.scenePhaseChanged(.active)))
+        await harness.store.receive(\.internal.statusRead)
 
         #expect(harness.state.runGeneration == generation + 1)
         #expect(harness.state.lease == nil)

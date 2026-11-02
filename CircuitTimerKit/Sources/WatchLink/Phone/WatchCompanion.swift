@@ -55,7 +55,9 @@ actor WatchCompanion {
                     case .watchChanged:
                         ledger.watchChanged()
                     case let .request(data, ticket):
-                        group.addTask { await self.answer(data, through: ticket) }
+                        // The 5 s count from here, not from when the answering task gets to run.
+                        let arrival = MonotonicInstant(now: clock)
+                        group.addTask { await self.answer(data, through: ticket, arrival: arrival) }
                     case .context, .message:
                         // The watch sends neither.
                         Logger.watchLink.error("The iPhone received a context or a message from the watch")
@@ -159,8 +161,7 @@ actor WatchCompanion {
         }
     }
 
-    private func answer(_ data: Data, through ticket: ReplyTicket) async {
-        let arrival = MonotonicInstant(now: clock)
+    private func answer(_ data: Data, through ticket: ReplyTicket, arrival: MonotonicInstant) async {
         let reply: WatchReplyEnvelope
         if WireCoding.schemaVersion(of: data) == WatchLinkSchema.version,
            let envelope = Self.decodeRequest(data) {
