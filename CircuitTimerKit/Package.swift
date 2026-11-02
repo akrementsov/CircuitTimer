@@ -199,6 +199,16 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
+        .testTarget(
+            name: "PurchaseFeatureTests",
+            dependencies: [
+                "PurchaseFeature",
+                "Purchases",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
             name: "PurchasesTests",
             dependencies: [
                 "Purchases",
