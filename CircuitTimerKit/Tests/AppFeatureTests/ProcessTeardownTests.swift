@@ -72,6 +72,16 @@ struct ProcessTeardownTests {
         #expect(calls.value == ["notifications", "liveActivity", "health", "watch"])
     }
 
+    /// The gates close synchronously; the watch's last state is written only in `run(at:)`.
+    @Test
+    func test_begin_writesNothingOnTheWatch() {
+        let written = LockIsolated(false)
+
+        teardown(finishWatch: { written.setValue(true) }, clock: clock).begin()
+
+        #expect(!written.value)
+    }
+
     @Test
     func test_run_endsCardsAndNotificationsTogetherThenHealthLastWithTheDate() async {
         let activityStarted = Observed(false)
@@ -114,7 +124,8 @@ struct ProcessTeardownTests {
 
         clock.advance(by: ProcessTeardown.notificationBarrier)
         #expect(healthEnds.value.isEmpty)
-        // Both limits count from the same start, so the card's limit ends the wait, not the sum of the two.
+        // The limits count from the same start, so the card's limit ends the wait, not their sum, and the watch's write,
+        // held past its own limit, does not hold Health either.
         clock.advance(by: ProcessTeardown.liveActivityLimit - ProcessTeardown.notificationBarrier)
         await running.value
         #expect(healthEnds.value == [Self.date])

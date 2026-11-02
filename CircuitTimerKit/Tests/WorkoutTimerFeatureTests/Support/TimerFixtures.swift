@@ -305,10 +305,7 @@ final class TimerHarness {
                 watch.published.withValue { $0.append(WatchRunPublication(revision: revision, run: run)) }
             }
             $0.watchCompanion.end = { owner in calls.withValue { $0.append(.endWatch(owner: owner)) } }
-            $0.watchCompanion.controlRequests = { owner in
-                watch.subscriptions.withValue { $0.append(owner) }
-                return watch.requests
-            }
+            $0.watchCompanion.controlRequests = { owner in watch.subscribe(owner) }
             $0.watchCompanion.refreshHandled = { owner, requestID, publication in
                 watch.answers.withValue { $0.append(WatchAnswer(owner: owner, requestID: requestID, publication: publication)) }
             }
@@ -452,25 +449,30 @@ extension WorkoutTimerFeature.State {
     }
 }
 
-/// The watch link as the timer sees it: what it published, answered and subscribed to; `request(_:)` sends a request.
+/// The watch link as the timer sees it: what it published, answered and subscribed to. Each subscription gets a
+/// stream of its own, as from the link; `request(_:)` sends a request to the newest one.
 final class TimerWatch: Sendable {
     let revisions = LockIsolated(0)
     let published = LockIsolated<[WatchRunPublication]>([])
     let answers = LockIsolated<[WatchAnswer]>([])
     let subscriptions = LockIsolated<[UUID]>([])
-    let requests: AsyncStream<WatchControlRequest>
-    private let continuation: AsyncStream<WatchControlRequest>.Continuation
+    private let continuations = LockIsolated<[AsyncStream<WatchControlRequest>.Continuation]>([])
 
-    init() {
-        (requests, continuation) = AsyncStream.makeStream()
+    func subscribe(_ owner: UUID) -> AsyncStream<WatchControlRequest> {
+        let (stream, continuation) = AsyncStream.makeStream(of: WatchControlRequest.self)
+        subscriptions.withValue { $0.append(owner) }
+        continuations.withValue { $0.append(continuation) }
+        return stream
     }
 
     func request(_ id: Int) {
-        continuation.yield(WatchControlRequest(id: id, kind: .refresh))
+        continuations.value.last?.yield(WatchControlRequest(id: id, kind: .refresh))
     }
 
     func finish() {
-        continuation.finish()
+        for continuation in continuations.value {
+            continuation.finish()
+        }
     }
 }
 
