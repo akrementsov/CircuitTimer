@@ -291,6 +291,7 @@ let package = Package(
             dependencies: [
                 "TestSupport",
                 "WatchLink",
+                "WorkoutActivity",
                 "WorkoutDomain",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
