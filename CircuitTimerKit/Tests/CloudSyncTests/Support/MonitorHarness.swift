@@ -16,7 +16,11 @@ struct MonitorHarness: Sendable {
     let accounts = AccountReads()
     let monitor: CloudSyncMonitor
 
-    init(preference isOn: Bool = true, container: String? = Self.container) {
+    init(
+        preference isOn: Bool = true,
+        container: String? = Self.container,
+        prepareInputs: @escaping @Sendable () async -> Void = {}
+    ) {
         let preference = LockIsolated(isOn)
         let preferenceReads = preferenceReads
         let containerReads = containerReads
@@ -33,7 +37,7 @@ struct MonitorHarness: Sendable {
                 return container
             },
             accountStatus: { try await accounts.status(of: $0) },
-            prepareInputs: {}
+            prepareInputs: prepareInputs
         )
     }
 
