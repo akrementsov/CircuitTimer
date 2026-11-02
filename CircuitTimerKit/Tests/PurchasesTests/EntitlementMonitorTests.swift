@@ -142,11 +142,13 @@ struct EntitlementMonitorTests {
 
     @Test(arguments: [(true, RestoreOutcome.restored), (false, .nothingFound)])
     func test_restore_afterASync_answersByTheEntitlement(isEntitled: Bool, outcome: RestoreOutcome) async throws {
-        let initial = try startedRead()
+        // The first read has taken its number before the restore starts, so the restore's read is the newest.
+        let initial = try await store.nextReadAfterStart(monitor)
         let restore = Task { [monitor] in try await monitor.restore() }
-        try await initial.answer()
+        let restoreRead = try await store.nextRead()
+        initial.answer.resume(returning: false)
 
-        try await store.nextRead().answer.resume(returning: isEntitled)
+        restoreRead.answer.resume(returning: isEntitled)
 
         #expect(try await restore.value == outcome)
         #expect(monitor.currentStatus == (isEntitled ? .full : .free))

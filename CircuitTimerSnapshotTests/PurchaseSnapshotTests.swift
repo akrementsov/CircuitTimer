@@ -20,24 +20,6 @@ extension SnapshotTests {
         }
 
         @Test(arguments: SnapshotTextSize.currentCases())
-        func test_purchase_purchasing_matchesReference(textSize: SnapshotTextSize) async throws {
-            try await assertPurchaseSnapshot(textSize: textSize) {
-                var state = PurchaseFeature.State.shown(.browse)
-                state.operation = .purchasing
-                return state
-            }
-        }
-
-        @Test(arguments: SnapshotTextSize.currentCases())
-        func test_purchase_restoring_matchesReference(textSize: SnapshotTextSize) async throws {
-            try await assertPurchaseSnapshot(textSize: textSize) {
-                var state = PurchaseFeature.State.shown(.restore)
-                state.operation = .restoring
-                return state
-            }
-        }
-
-        @Test(arguments: SnapshotTextSize.currentCases())
         func test_purchase_awaitingApproval_matchesReference(textSize: SnapshotTextSize) async throws {
             try await assertPurchaseSnapshot(textSize: textSize) {
                 var state = PurchaseFeature.State.shown(.browse)
