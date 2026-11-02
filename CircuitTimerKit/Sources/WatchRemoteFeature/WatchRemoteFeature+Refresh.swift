@@ -110,6 +110,10 @@ extension WatchRemoteFeature {
         let run: Effect<Action>
         if confirms, state.run != nil {
             state.refresh.failures = 0
+            if state.commandNote?.note == .checking {
+                // The confirmation shows what the iPhone did.
+                state.commandNote = nil
+            }
             let lease = openLease(from: request, &state)
             // New content whose stage already ended asks at once; the same content waits for the renewal, so clocks
             // that disagree by a little do not make a request per reply.

@@ -13,6 +13,7 @@ import WorkoutActivity
 /// cards follows the user's text size.
 struct WatchRunView: View {
     let screen: WatchRemoteFeature.State.RunScreen
+    let onControl: () -> Void
 
     var body: some View {
         ScrollView {
@@ -21,6 +22,7 @@ struct WatchRunView: View {
                 if let next = display.next {
                     nextCard(next)
                 }
+                control
                 if let note = screen.note {
                     noteText(note)
                 }
@@ -135,6 +137,44 @@ struct WatchRunView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// Under the cards, full width. Without a confirmation the button's place stays, hidden from sight and VoiceOver, so
+    /// nothing moves when it comes back.
+    @ViewBuilder private var control: some View {
+        switch screen.controlSlot {
+            case .none:
+                EmptyView()
+            case .reserved:
+                if let command = display.control {
+                    controlButton(command, isEnabled: false)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+                }
+            case let .button(control):
+                controlButton(control.command, isEnabled: control.isEnabled)
+        }
+    }
+
+    private func controlButton(_ command: LiveActivityCommand, isEnabled: Bool) -> some View {
+        Button(action: onControl) {
+            HStack(spacing: .token(spacing: .xs)) {
+                Image(systemName: command == .pause ? "pause.fill" : "play.fill")
+                    .accessibilityHidden(true)
+                if command == .pause {
+                    Text("watch.run.control.pause", bundle: .module)
+                } else {
+                    Text("watch.run.control.resume", bundle: .module)
+                }
+            }
+            .font(.token(.control))
+            .foregroundStyle(isEnabled ? .text(.primary) : .text(.secondary))
+            .frame(maxWidth: .infinity, minHeight: .token(size: .watchControl))
+            .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .dynamicTypeSize(...Self.maxCardTextSize)
+    }
+
     /// Without the digits a hidden `template` keeps their place, so the cards do not jump when they go and come back.
     @ViewBuilder private func digits(
         _ showsDigits: Bool,
@@ -165,6 +205,12 @@ struct WatchRunView: View {
                     Text("watch.link.unreachable.title", bundle: .module)
                 case .unlock:
                     Text("watch.link.unlock.title", bundle: .module)
+                case .commandChecking:
+                    Text("watch.run.command.checking", bundle: .module)
+                case .commandChanged:
+                    Text("watch.run.command.changed", bundle: .module)
+                case .commandFailed:
+                    Text("watch.run.command.failed", bundle: .module)
             }
         }
         .font(.token(.note))
