@@ -77,11 +77,17 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] Many workouts and one very long name: the list is cut with its note.
 - [ ] iOS 26 with Health, iPhone locked: stages change on the watch as they go, and a pause on the iPhone shows on the watch within about a second. Note whether «Waiting for iPhone…» shows at a stage's end.
 - [ ] iOS 17.5, iPhone app in the background: at a stage's end the time hides and comes back within seconds; 20 minutes of a workout do not exhaust the background launches; note the iPhone's battery use and the record writes the renewal causes.
-- [ ] Bluetooth off on the iPhone during a stage: «iPhone isn't connected» at once, no time.
+- [ ] Bluetooth off on the iPhone during a stage: «iPhone isn't connected» at once, no time; 10 seconds later still no time, also after raising the wrist.
 - [ ] Always On, and a watch without it: wrist lowered — no time; raised within 3 seconds — the time at once; after 15 seconds — one request, then the time.
 - [ ] Return to Clock, by default and with «After 1 hour».
 - [ ] The watch's and the iPhone's times differ by at most a second.
 - [ ] Closing the timer: an open watch shows the list at once, a closed one when it opens. A swipe in the App Switcher on iOS 26 does the same; a force quit on iOS 17.5 leaves the run without time until a request, then the list.
 - [ ] Continue of a saved run shows the run on the watch.
-- [ ] A workout with very long stage names: «A workout is running on your iPhone» until it closes, then the list.
+- [ ] A workout with very long stage names: «A workout is running on your iPhone», without a title, until it closes, then the list.
 - [ ] The run's screen in English and Russian and at the largest text size.
+- [ ] VoiceOver on the run's screen: the stage card reads as one element, the stage's name and then its time; without the iPhone's confirmation it reads no time, and its focus stays on the card when the confirmation comes and goes.
+- [ ] A 41 mm watch and a stage whose name takes one line: the next stage shows under it without scrolling; a long name shows whole and scrolls.
+- [ ] A stage of 10 minutes or more: the clock is as wide as `22:22` and no digit is cut off.
+- [ ] Editing the workout list on the iPhone during a workout: the watch keeps showing the run.
+- [ ] Relaunching the watch app during a workout shows the run.
+- [ ] A frozen watch screen (O4): the time is gone by the end of the confirmation, at most 10 seconds after the last request.
