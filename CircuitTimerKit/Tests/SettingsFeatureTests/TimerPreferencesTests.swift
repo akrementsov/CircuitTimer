@@ -11,6 +11,7 @@ struct TimerPreferencesTests {
     func test_backgroundNotifications_defaultOn_persistsIndependently() async {
         let defaults = UserDefaults.inMemory
         let trace = TimerPreferenceTrace(defaults, label: #function)
+        defer { withExtendedLifetime(trace) {} }
         let store = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
@@ -39,6 +40,7 @@ struct TimerPreferencesTests {
     func test_backgroundNotificationsToggled_on_persistsWithoutEffects() async {
         let defaults = UserDefaults.inMemory
         let trace = TimerPreferenceTrace(defaults, label: #function)
+        defer { withExtendedLifetime(trace) {} }
         defaults.set(false, forKey: "signalBackgroundNotifications")
         let store = withDependencies {
             $0.defaultAppStorage = defaults
@@ -62,6 +64,7 @@ struct TimerPreferencesTests {
     func test_keepScreenOnToggled_disabled_persistsWithoutChangingSignals() async {
         let defaults = UserDefaults.inMemory
         let trace = TimerPreferenceTrace(defaults, label: #function)
+        defer { withExtendedLifetime(trace) {} }
         let store = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
@@ -90,6 +93,7 @@ struct TimerPreferencesTests {
     func test_toggle_eachSignal_persistsIndependently() async {
         let defaults = UserDefaults.inMemory
         let trace = TimerPreferenceTrace(defaults, label: #function)
+        defer { withExtendedLifetime(trace) {} }
         let store = withDependencies {
             $0.defaultAppStorage = defaults
         } operation: {
@@ -142,14 +146,18 @@ struct TimerPreferencesTests {
         trace: TimerPreferenceTrace,
         sourceLocation: SourceLocation = #_sourceLocation
     ) {
-        trace.mark("direct read key=\(key) value=\(String(describing: defaults.object(forKey: key)))")
+        let stored = defaults.object(forKey: key)
+        trace.mark("direct read key=\(key) value=\(String(describing: stored))")
         let preferences = defaults.dictionaryRepresentation()
             .filter { $0.key.hasPrefix("signal") || $0.key.hasPrefix("timer") || $0.key == "iCloudSync" }
             .sorted { $0.key < $1.key }
             .map { "\($0.key)=\($0.value)" }
+        if stored as? Bool != expected {
+            Attachment.record(trace.report, named: "CT16-\(key).txt", sourceLocation: sourceLocation)
+        }
         #expect(
-            defaults.object(forKey: key) as? Bool == expected,
-            "\(key): shared state holds \(shared); the suite holds \(preferences.joined(separator: ", ")); trace: \(trace.report)",
+            stored as? Bool == expected,
+            "\(key): shared state holds \(shared); the suite holds \(preferences.joined(separator: ", ")); full trace: CT16-\(key).txt attachment",
             sourceLocation: sourceLocation
         )
     }

@@ -2,10 +2,12 @@ import ComposableArchitecture
 import Foundation
 import os
 
+// KVO may call back on the writing thread. Metadata is immutable, UserDefaults is
+// thread-safe, and LockIsolated protects the only mutable state: the event buffer.
 final class TimerPreferenceTrace: NSObject, @unchecked Sendable {
     private static let keys = [
         "signalSound", "signalVibration", "signalSpokenStageNames",
-        "signalBackgroundNotifications", "timerKeepScreenOn",
+        "signalBackgroundNotifications", "timerKeepScreenOn", "iCloudSync",
     ]
     private static let logger = Logger(subsystem: "CircuitTimer.CT16", category: "suite")
 
