@@ -76,11 +76,11 @@ struct AppScenarioTests {
     }
 
     @Test(arguments: AppScenario.allCases)
-    func test_prepare_liveContext_ownsTheFullVersionInMemory(scenario: AppScenario) {
+    func test_prepare_liveContext_ownsTheFullVersionInMemoryUnlessFree(scenario: AppScenario) {
         withScenario(scenario) {
             @Dependency(\.purchases) var purchases
 
-            #expect(purchases.currentStatus() == .full)
+            #expect(purchases.currentStatus() == (scenario == .twoWorkoutsFree ? .free : .full))
         }
     }
 

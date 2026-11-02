@@ -24,6 +24,14 @@ struct WorkoutListScreen: Screen {
         return EditorScreen(app, file: file, line: line)
     }
 
+    /// At the free limit «+» opens the purchase sheet instead of the editor.
+    func tapAddAtFreeLimit(file: StaticString = #filePath, line: UInt = #line) -> PurchaseScreen<Self> {
+        addButton
+            .waitUntilHittable("The workout list's Add button", file: file, line: line)
+            .tap()
+        return PurchaseScreen(app, file: file, line: line)
+    }
+
     func tapSettings(file: StaticString = #filePath, line: UInt = #line) -> SettingsScreen {
         app.tabBars.buttons["Settings"]
             .waitUntilHittable("The Settings tab", file: file, line: line)

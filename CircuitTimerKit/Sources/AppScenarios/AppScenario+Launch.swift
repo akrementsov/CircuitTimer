@@ -27,6 +27,11 @@ extension AppScenario {
         return scenario
     }
 
+    /// Bought, so every scenario shows the app as it was before the purchase existed, except one that says otherwise.
+    var fullVersion: FullVersionStatus {
+        self == .twoWorkoutsFree ? .free : .full
+    }
+
     /// Sets every dependency the app reaches, so a scenario touches neither the device's workouts, run record and
     /// preferences, nor notifications, Live Activities, Health, audio, background time or the real clock.
     /// `make lint` fails when a client, key or storage strategy is added without a line here.
@@ -42,8 +47,7 @@ extension AppScenario {
         dependencies.saveTip = .previewValue
         dependencies.appVersion = .init(shortVersion: { ScenarioFixture.appVersion })
         dependencies.cloudSync = .previewValue
-        // Bought, so every existing test sees the app as before the purchase existed; a locked scenario says so.
-        dependencies.purchases = .scenario(status: .full)
+        dependencies.purchases = .scenario(status: fullVersion)
         dependencies.defaultAppStorage = .inMemory
         dependencies.uuid = .incrementing
         // Never advanced: a started timer stands still on its first countdown digit.

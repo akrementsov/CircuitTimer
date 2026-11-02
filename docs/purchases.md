@@ -45,7 +45,7 @@ Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» 
 
 ## Trying it locally
 
-`Configs/CircuitTimer.storekit` holds the product for runs from Xcode (the `CircuitTimer` scheme's Run › Options › StoreKit Configuration). Debug › StoreKit › Manage Transactions refunds, approves or declines Ask to Buy and deletes transactions. The file is not synced with App Store Connect. UI test scenarios and snapshots never reach StoreKit: scenarios own the full version by default (`PurchaseClient.scenario(status: .full)`).
+`Configs/CircuitTimer.storekit` holds the product for runs from Xcode (the `CircuitTimer` scheme's Run › Options › StoreKit Configuration). Debug › StoreKit › Manage Transactions refunds, approves or declines Ask to Buy and deletes transactions. The file is not synced with App Store Connect. UI test scenarios and snapshots never reach StoreKit: scenarios own the full version (`PurchaseClient.scenario(status: .full)`), except `twoWorkoutsFree`, which starts without it at the free limit and buys it in memory. The sheet's snapshots draw `PurchaseView` as the window's root.
 
 ## App Store Connect checklist (owner)
 
