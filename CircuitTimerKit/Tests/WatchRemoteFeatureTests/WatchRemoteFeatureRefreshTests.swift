@@ -21,7 +21,7 @@ struct WatchRemoteFeatureRefreshTests {
             WatchRemoteFeature()
         } withDependencies: {
             $0.uuid = .incrementing
-            $0.continuousClock = TestClock()
+            $0.continuousClock = TestClock<Duration>()
             $0.phoneCompanion.send = { _, request in
                 sent.requests.withValue { $0.append(request) }
                 try await Task.never()
@@ -31,8 +31,10 @@ struct WatchRemoteFeatureRefreshTests {
 
         await store.send(.internal(.event(.status(reachable)))) {
             $0.link = reachable
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0))
+            $0.refresh.lastSerial = 1
             $0.refresh.retryGeneration = 1
+            $0.refresh.runRetryGeneration = 1
         }
         await store.send(.internal(.statusRead(reachable)))
 
@@ -279,7 +281,7 @@ struct WatchRemoteFeatureRefreshTests {
 
         await store.send(.internal(.statusRead(reachable)))
         await store.send(.internal(.refreshTimedOut(sentID: UUID(watch: 42))))
-        #expect(store.state.refresh.inFlight == UUID(0))
+        #expect(store.state.refresh.inFlight?.id == UUID(0))
         await clock.advance(by: .seconds(10))
         await store.receive(\.internal.refreshTimedOut)
         #expect(store.state.problem == .failed)
@@ -314,7 +316,7 @@ struct WatchRemoteFeatureRefreshTests {
 
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.receive(\.internal.statusRead)
-        #expect(store.state.refresh.inFlight == UUID(0))
+        #expect(store.state.refresh.inFlight?.id == UUID(0))
         await store.send(.view(.scenePhaseChanged(.background)))
         #expect(store.state.refresh.inFlight == nil)
         let late = phoneState(sequence: 1, catalog: .loaded(watchCatalog("Late")), digest: "L")
@@ -324,7 +326,7 @@ struct WatchRemoteFeatureRefreshTests {
 
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.receive(\.internal.statusRead)
-        #expect(store.state.refresh.inFlight == UUID(1))
+        #expect(store.state.refresh.inFlight?.id == UUID(1))
         #expect(sent.requests.value.count == 2)
         await store.skipInFlightEffects()
     }

@@ -4,6 +4,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import WatchLink
 import WorkoutActivity
 import WorkoutDomain
 import WorkoutHealth
@@ -21,6 +22,7 @@ struct TimerNotificationReducerTests {
         let syncGate = AsyncStream<Void>.makeStream()
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
@@ -65,6 +67,7 @@ struct TimerNotificationReducerTests {
         let calls = LockIsolated(0)
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.backgroundNotifications.access = {
@@ -92,6 +95,7 @@ struct TimerNotificationReducerTests {
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
@@ -129,6 +133,7 @@ struct TimerNotificationReducerTests {
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
@@ -175,6 +180,7 @@ struct TimerNotificationReducerTests {
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = DateGenerator { wall.value }
             $0.continuousClock = clock
@@ -218,6 +224,7 @@ struct TimerNotificationReducerTests {
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
@@ -266,6 +273,7 @@ struct TimerNotificationReducerTests {
         state.$isBackgroundNotificationsOn = SharedReader(value: false)
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
         }
@@ -282,6 +290,7 @@ struct TimerNotificationReducerTests {
         state.notifications.projection = state.notificationProjection(at: origin, language: "en")
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock
@@ -455,6 +464,7 @@ struct TimerNotificationReducerTests {
         let plans = LockIsolated<[[ScheduledNotification]]>([])
         let store = TestStore(initialState: state.followingHealth(at: origin)) { WorkoutTimerFeature() } withDependencies: {
             $0.liveActivity = .previewValue
+            $0.watchCompanion = .previewValue
             $0.workoutHealth = .previewValue
             $0.date = .constant(origin)
             $0.continuousClock = clock

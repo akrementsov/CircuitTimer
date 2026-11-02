@@ -301,6 +301,8 @@ let package = Package(
             dependencies: [
                 "WatchLink",
                 "WatchRemoteFeature",
+                "WorkoutActivity",
+                "WorkoutDomain",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
             ],
             swiftSettings: strictSettings
@@ -366,6 +368,7 @@ let package = Package(
             dependencies: [
                 "BackgroundNotifications",
                 "BackgroundExecution",
+                "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",
                 "WorkoutHealth",

@@ -117,7 +117,7 @@ struct TimerLiveActivityTests {
         }
         await timer.store.finish()
 
-        #expect(timer.calls.value == [.end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [.endWatch(owner: timerID), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
         // Neither record completion nor late readiness may publish after the owner ended.
         #expect(timer.store.state.activityControls?.generation == 0)
         #expect(activity.syncs.value.isEmpty)
@@ -145,7 +145,9 @@ struct TimerLiveActivityTests {
         }
         await timer.store.finish()
 
-        #expect(timer.calls.value == [.awake(false, 2), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [
+            .awake(false, 2), .endWatch(owner: timerID), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss,
+        ])
         #expect(timer.store.state.activityControls?.generation == 1)
         // The close and its record write sync; the finish choice returns early.
         #expect(activity.syncs.value.map(\.revision) == [1, 2])

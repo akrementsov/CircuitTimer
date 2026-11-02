@@ -28,22 +28,24 @@ struct PublicationLedgerTests {
     @Test
     func test_reply_nothingPublishedSameOrOtherDigest_answersUnknownConfirmationOrState() async throws {
         let ledger = ledger
-        let unknown = await ledger.reply(knownCatalogDigest: "X", at: linkNow)
+        let unknown = ledger.reply(knownCatalogDigest: "X", answeredBy: nil, at: linkNow)
         #expect(unknown.sequence == 0)
         #expect(unknown.catalog == nil)
         #expect(unknown.catalogDigest == nil)
+        #expect(unknown.run == nil)
+        #expect(!unknown.isRunLive)
 
         let published = Date(timeIntervalSinceReferenceDate: 700_000_000)
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: published)
         let digest = try WatchCatalog.digest(of: .loaded(makeCatalog(1)))
 
-        let confirmation = await ledger.reply(knownCatalogDigest: digest, at: linkNow)
+        let confirmation = ledger.reply(knownCatalogDigest: digest, answeredBy: nil, at: linkNow)
         #expect(confirmation.catalog == nil)
         #expect(confirmation.catalogDigest == digest)
         #expect(confirmation.sequence == 1)
         #expect(confirmation.publishedAt == linkNow)
 
-        let full = await ledger.reply(knownCatalogDigest: "old", at: linkNow)
+        let full = ledger.reply(knownCatalogDigest: "old", answeredBy: nil, at: linkNow)
         #expect(full.catalog == .loaded(makeCatalog(1)))
         #expect(full.sequence == 1)
         // The iPhone answers for the list now, not when it published it.
@@ -51,7 +53,7 @@ struct PublicationLedgerTests {
     }
 
     @Test
-    func test_publish_catalogs_cutToTheEnvelopeLimit() async throws {
+    func test_publish_catalogs_cutToTheEnvelopeLimitLessTheRunReserve() async throws {
         let ledger = ledger
         let large = makeCatalog(200) { "Workout \($0) " + String(repeating: "x", count: 400) }
         _ = await ledger.publish(revision: 1, catalog: .loaded(large), at: linkNow)
@@ -67,9 +69,10 @@ struct PublicationLedgerTests {
         #expect(cut.isTruncated)
         #expect(cut.entries.count < 200)
         #expect(cut.entries == Array(large.entries.prefix(cut.entries.count)))
-        // The cut is the largest prefix whose longest reply fits: one more workout would not.
-        #expect(try Self.longestReplySize(of: cut) <= WatchLinkSchema.envelopeLimit)
-        #expect(try Self.longestReplySize(of: large.prefix(cut.entries.count + 1)) > WatchLinkSchema.envelopeLimit)
+        // The cut is the largest prefix whose longest reply fits with room for a run: one more workout would not.
+        let limit = WatchLinkSchema.envelopeLimit - WatchLinkSchema.runReserve
+        #expect(try Self.longestReplySize(of: cut) <= limit)
+        #expect(try Self.longestReplySize(of: large.prefix(cut.entries.count + 1)) > limit)
         #expect(written[1].catalog == .unavailable(.tooLarge))
         #expect(written[2].catalog == .loaded(WatchCatalog(entries: [])))
     }
@@ -127,7 +130,7 @@ struct PublicationLedgerTests {
 
         #expect(outcome == .skipped)
         #expect(link.contexts.value.count == 1)
-        let reply = await ledger.reply(knownCatalogDigest: nil, at: linkNow)
+        let reply = ledger.reply(knownCatalogDigest: nil, answeredBy: nil, at: linkNow)
         #expect(reply.catalog == .loaded(makeCatalog(1)))
     }
 
@@ -168,7 +171,7 @@ struct PublicationLedgerTests {
         _ = await ledger.writeLatest()
         #expect(link.contexts.value.count == 1)
 
-        await ledger.watchChanged()
+        ledger.watchChanged()
         _ = await ledger.writeLatest()
 
         let written = try link.writtenStates()
@@ -207,7 +210,7 @@ struct PublicationLedgerTests {
         #expect(half.catalog == .loaded(makeCatalog(4).prefix(2)))
         #expect(older == .skipped)
         #expect(try link.writtenStates() == [half])
-        let reply = await ledger.reply(knownCatalogDigest: nil, at: linkNow)
+        let reply = ledger.reply(knownCatalogDigest: nil, answeredBy: nil, at: linkNow)
         #expect(reply.catalog == half.catalog)
     }
 

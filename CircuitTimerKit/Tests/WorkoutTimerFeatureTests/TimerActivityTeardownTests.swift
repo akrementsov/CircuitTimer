@@ -57,6 +57,6 @@ struct TimerActivityTeardownTests {
         #expect(await iterator.next() == nil)
         #expect(ended.value == ["rendered"])
         #expect(activity.syncs.value.isEmpty)
-        #expect(timer.calls.value == [.end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
+        #expect(timer.calls.value == [.endWatch(owner: timerID), .end(owner: timerID), .endLiveActivity(owner: timerID), .dismiss])
     }
 }

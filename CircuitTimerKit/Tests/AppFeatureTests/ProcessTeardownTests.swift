@@ -5,6 +5,7 @@ import ComposableArchitecture
 import Foundation
 import Testing
 import TestSupport
+import WatchLink
 import WorkoutActivity
 import WorkoutHealth
 
@@ -29,6 +30,7 @@ struct ProcessTeardownTests {
     private let clock = ManualClock()
     private let activityGate = Gate()
     private let notificationGate = Gate()
+    private let watchGate = Gate()
     private static let date = Date(timeIntervalSince1970: 1_000)
 
     /// Waits for `gate` in a task of its own, so cancelling the caller does not end the wait.
@@ -39,6 +41,7 @@ struct ProcessTeardownTests {
     private func teardown(
         endActivities: @escaping @Sendable () async -> Void = {},
         finishNotifications: @escaping @Sendable () async -> Void = {},
+        finishWatch: @escaping @Sendable () async -> Void = {},
         clock: any Clock<Duration>
     ) -> ProcessTeardown {
         var notifications = BackgroundNotificationClient()
@@ -50,14 +53,23 @@ struct ProcessTeardownTests {
         var health = WorkoutHealthClient()
         health.beginTermination = { calls.withValue { $0.append("health") } }
         health.endAll = { date in healthEnds.withValue { $0.append(date) } }
-        return ProcessTeardown(notifications: notifications, liveActivity: liveActivity, health: health, clock: clock)
+        var watch = WatchCompanionClient()
+        watch.beginTermination = { calls.withValue { $0.append("watch") } }
+        watch.finishTermination = finishWatch
+        return ProcessTeardown(
+            notifications: notifications,
+            liveActivity: liveActivity,
+            health: health,
+            watch: watch,
+            clock: clock
+        )
     }
 
     @Test
     func test_begin_closesEveryGateSynchronously() {
         teardown(clock: clock).begin()
 
-        #expect(calls.value == ["notifications", "liveActivity", "health"])
+        #expect(calls.value == ["notifications", "liveActivity", "health", "watch"])
     }
 
     @Test
@@ -93,11 +105,12 @@ struct ProcessTeardownTests {
         let teardown = teardown(
             endActivities: { [activityGate] in await Self.ignoringCancellation(activityGate) },
             finishNotifications: { [notificationGate] in await Self.ignoringCancellation(notificationGate) },
+            finishWatch: { [watchGate] in await Self.ignoringCancellation(watchGate) },
             clock: clock
         )
         let running = Task { await teardown.run(at: Self.date) }
-        // Each limit sleeps on the clock; advancing before both sleep would wake neither.
-        await clock.waitForSleeps(2)
+        // Each limit sleeps on the clock, the watch's too; advancing before they all sleep would wake none.
+        await clock.waitForSleeps(3)
 
         clock.advance(by: ProcessTeardown.notificationBarrier)
         #expect(healthEnds.value.isEmpty)
@@ -108,6 +121,7 @@ struct ProcessTeardownTests {
 
         activityGate.open()
         notificationGate.open()
+        watchGate.open()
     }
 
     @Test

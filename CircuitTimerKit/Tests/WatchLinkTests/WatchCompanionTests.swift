@@ -14,7 +14,8 @@ struct WatchCompanionTests {
         let companion = WatchCompanion(
             ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
             transport: transport,
-            now: { linkNow }
+            now: { linkNow },
+            clock: TestClock()
         )
         let events = transport.events()
         Task { await companion.run(events) }
@@ -98,8 +99,8 @@ struct WatchCompanionTests {
         let events = try #require(link.events.value)
 
         events.yield(.activated)
-        // A request queued behind the activation answers once it is handled.
-        _ = await ask(try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: 7), request: .refresh(knownCatalogDigest: nil))))
+        // The write runs on the ledger's queue, and its fallback reaches the watch from there.
+        await link.messages.wait { $0.count == 2 }
 
         #expect(try link.sentStates().map(\.catalog) == [.loaded(makeCatalog(4)), .loaded(makeCatalog(4).prefix(2))])
         #expect(try link.sentStates().last == link.writtenStates().last)
@@ -114,9 +115,10 @@ struct WatchCompanionTests {
         events.yield(.activated)
         events.yield(.watchChanged)
         events.yield(.activated)
-        // A request queued behind the events answers once they are handled.
-        _ = await ask(try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: 7), request: .refresh(knownCatalogDigest: nil))))
+        // The writes enter the ledger's queue in the order of the events: the first activation finds the state
+        // written, the change of watch forgets that, the second activation writes it again.
+        await link.contexts.wait { $0.count == 2 }
 
-        #expect(link.contexts.value.count == 2)
+        #expect(try link.writtenStates()[1] == link.writtenStates()[0])
     }
 }

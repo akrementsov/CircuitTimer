@@ -46,7 +46,8 @@ struct WatchRemoteFeatureOutcomeTests {
         var state = WatchRemoteFeature.State()
         state.link = reachable
         state.isSceneActive = true
-        state.refresh.inFlight = current
+        state.refresh.inFlight = .sent(current)
+        state.refresh.lastSerial = 1
         state.refresh.needsRefresh = needsRefresh
         return state
     }
@@ -80,7 +81,7 @@ struct WatchRemoteFeatureOutcomeTests {
         await store.send(outcome.action(for: Self.current))
 
         if outcome.spendsNeedsRefresh {
-            #expect(store.state.refresh.inFlight == UUID(0))
+            #expect(store.state.refresh.inFlight?.id == UUID(0))
             #expect(!store.state.refresh.needsRefresh)
             #expect(sent.requests.value.count == 1)
             await store.skipInFlightEffects()
@@ -113,14 +114,14 @@ struct WatchRemoteFeatureOutcomeTests {
     func test_reason_requestInFlightIPhoneOutOfReach_setsTheFlag() async {
         let sent = SentRequests()
         var state = stateShowing(watchCatalog("Morning"), digest: "A")
-        state.refresh.inFlight = Self.current
+        state.refresh.inFlight = .sent(Self.current)
         state.link = unreachable
         let store = Self.heldStore(state, sent: sent)
         store.exhaustivity = .off
 
         await store.send(.internal(.event(.message(phoneState(sequence: 2, digest: "B")))))
 
-        #expect(store.state.refresh.inFlight == Self.current)
+        #expect(store.state.refresh.inFlight?.id == Self.current)
         #expect(store.state.refresh.needsRefresh)
         #expect(sent.requests.value.isEmpty)
     }
@@ -136,13 +137,19 @@ struct WatchRemoteFeatureOutcomeTests {
             $0.refresh.inFlight = nil
             $0.refresh.failures = 1
             $0.refresh.retryGeneration = 1
+            $0.refresh.isRetryScheduled = true
             $0.problem = .unreachable
         }
         await store.send(.internal(.statusRead(reachable))) {
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0), serial: 2)
+            $0.refresh.lastSerial = 2
             $0.refresh.retryGeneration = 2
+            $0.refresh.runRetryGeneration = 1
+            $0.refresh.isRetryScheduled = false
         }
         await clock.advance(by: .seconds(5))
+        // The request's renewal comes due; without a run it asks nothing.
+        await store.receive(\.internal.renewalDue)
         await store.send(.view(.scenePhaseChanged(.background))) {
             $0.isSceneActive = false
             $0.refresh.inFlight = nil
@@ -160,8 +167,10 @@ struct WatchRemoteFeatureOutcomeTests {
         await store.send(.internal(.retryDue(2)))
         #expect(sent.requests.value.isEmpty)
         await store.send(.internal(.retryDue(3))) {
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0), serial: 2)
+            $0.refresh.lastSerial = 2
             $0.refresh.retryGeneration = 4
+            $0.refresh.runRetryGeneration = 1
         }
 
         #expect(sent.requests.value.count == 1)
@@ -198,8 +207,10 @@ struct WatchRemoteFeatureOutcomeTests {
         let store = makeWatchStore(state, sent: sent, clock: clock)
 
         await store.send(.internal(.statusRead(reachable))) {
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0))
+            $0.refresh.lastSerial = 1
             $0.refresh.retryGeneration = 1
+            $0.refresh.runRetryGeneration = 1
         }
         await store.receive(\.internal.refreshAnswered) {
             $0.refresh.inFlight = nil
@@ -208,6 +219,8 @@ struct WatchRemoteFeatureOutcomeTests {
             $0.catalog = .init(lastLoaded: watchCatalog("Morning"), updatedAt: later)
         }
         await clock.advance(by: .seconds(10))
+        // The renewal, five seconds after the send, finds no run to ask about; the timeout never comes.
+        await store.receive(\.internal.renewalDue)
     }
 
     @Test
@@ -254,8 +267,10 @@ struct WatchRemoteFeatureOutcomeTests {
         let store = makeWatchStore(state, sent: sent)
 
         await store.send(.internal(.statusRead(reachable))) {
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0))
+            $0.refresh.lastSerial = 1
             $0.refresh.retryGeneration = 1
+            $0.refresh.runRetryGeneration = 1
         }
         await Task.megaYield()
         await store.send(.view(.scenePhaseChanged(.background))) {
@@ -303,7 +318,7 @@ struct WatchRemoteFeatureOutcomeTests {
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.receive(\.internal.event)
 
-        #expect(store.state.refresh.inFlight == Self.current)
+        #expect(store.state.refresh.inFlight?.id == Self.current)
         #expect(sent.requests.value.isEmpty)
     }
 
@@ -319,8 +334,10 @@ struct WatchRemoteFeatureOutcomeTests {
         await store.send(.view(.scenePhaseChanged(.active)))
         await store.receive(\.internal.event) {
             $0.link = reachable
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0), serial: 2)
+            $0.refresh.lastSerial = 2
             $0.refresh.retryGeneration = 1
+            $0.refresh.runRetryGeneration = 1
         }
 
         #expect(sent.requests.value.count == 1)
@@ -343,8 +360,10 @@ struct WatchRemoteFeatureOutcomeTests {
             $0.problem = nil
         }
         await store.receive(\.internal.statusRead) {
-            $0.refresh.inFlight = UUID(0)
+            $0.refresh.inFlight = .sent(UUID(0))
+            $0.refresh.lastSerial = 1
             $0.refresh.retryGeneration = 1
+            $0.refresh.runRetryGeneration = 1
         }
 
         #expect(sent.requests.value.count == 1)

@@ -3,6 +3,7 @@
 import Foundation
 import Testing
 import WatchLink
+import WorkoutDomain
 
 @Suite
 struct WatchRemoteFeatureScreenTests {
@@ -20,7 +21,9 @@ struct WatchRemoteFeatureScreenTests {
         state.catalog = catalog
         state.problem = problem
         state.refresh.hasAnswered = hasAnswered
-        state.refresh.inFlight = inFlight ? UUID(watch: 1) : nil
+        state.refresh.inFlight = inFlight
+            ? WatchRemoteFeature.RefreshRequest(id: UUID(watch: 1), serial: 1, sentAt: MonotonicInstant(now: ContinuousClock()))
+            : nil
         return state
     }
 
