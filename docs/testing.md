@@ -18,6 +18,16 @@ The main commands, `make test`, `make test-ui` and `make test-snapshots`, are in
 | `make test-snapshot TEST=<function>` | Locally compares one snapshot variant; defaults to English and `large` text |
 | `make record-snapshot TEST=<function>` | Locally records that variant if needed, then compares it again |
 
+## Stored-preference diagnostics (CT-16)
+
+CI run [41304027831](https://github.com/akrementsov/CircuitTimer/actions/runs/41304027831) had six failed direct `UserDefaults` checks in all four `TimerPreferencesTests`. Their `TestStore.send` expectations and recreated states had no reported issue. The failing code predates the expanded `expectStored` diagnostic.
+
+The local investigation on 2026-11-02 used the same iPhone 17 / iOS 27.0 runtime build, 24A434, and the pinned Sharing 2.10.1. Four isolated tests, one full baseline and five full diagnostic runs passed. Each full run had 1,062 passes and 11 expected failures. One diagnostic run observed only the test suites; four also traced a separate copy of Sharing. The mismatch was not reproduced, so CT-16 remains open and no persistence workaround was added. Instrumentation can change timing; these successful runs do not exclude the original failure.
+
+`TimerPreferenceTrace` keeps the framework's `UserDefaults.inMemory` creation and the direct assertions. On a mismatch, `expectStored` includes the suite's object identity, its name when the runtime exposes that diagnostic metadata, and the ordered KVO changes with old/new values, test boundaries and call stacks. The recorder belongs to one test, protects its events and removes its observations when released. Its `CircuitTimer.CT16` unified logs can also be collected during a diagnostic run. Missing KVO events do not by themselves prove that a write used another store or explain a failed write.
+
+Source tracing confirmed synchronous `UserDefaults.set` calls within the process, including the save after a `TestStore` assertion closure. Recreating state with the same shared key reused its live reference; it is not an independent read of persistent storage. The temporary changes to Sharing were restored and are not part of the test harness. Keep the direct suite assertions and investigate a new mismatch before changing suite construction, adding waits or serializing these tests.
+
 ## UI tests
 
 ### How to add a UI test
