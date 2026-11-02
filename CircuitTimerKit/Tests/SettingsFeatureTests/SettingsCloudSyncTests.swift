@@ -3,6 +3,7 @@
 import CloudSync
 import ComposableArchitecture
 import Foundation
+import Purchases
 import Testing
 
 /// The switch, the status of this launch and the footnote they give.
@@ -120,6 +121,51 @@ struct SettingsCloudSyncTests {
         state.fullVersion = .full
 
         #expect(state.cloudSyncFootnote == footnoteCase.footnote)
+    }
+
+    @Test(arguments: [true, false])
+    func test_lockedSwitchBuyAndRestore_sendTheirRequestsAndKeepTheStoredSwitch(isOn: Bool) async {
+        let defaults = UserDefaults.inMemory
+        defaults.set(isOn, forKey: "iCloudSync")
+        let store = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            var state = SettingsFeature.State()
+            state.fullVersion = .free
+            return TestStore(initialState: state) { SettingsFeature() }
+        }
+
+        await store.send(.view(.lockedICloudSyncTapped))
+        await store.receive(.delegate(.fullVersionRequested(.iCloudSync)))
+        await store.send(.view(.buyTapped))
+        await store.receive(.delegate(.fullVersionRequested(.buy)))
+        await store.send(.view(.restoreTapped))
+        await store.receive(.delegate(.fullVersionRequested(.restore)))
+
+        #expect(defaults.object(forKey: "iCloudSync") as? Bool == isOn)
+        #expect(store.state.isICloudSyncOn == isOn)
+    }
+
+    @Test(arguments: [
+        (FullVersionStatus.unknown, syncStatus(true, true, .noAccount), nil),
+        (.unknown, nil, nil),
+        (.free, syncStatus(true, true, nil), "settings.iCloud.lockedUntilRelaunch"),
+        (.free, syncStatus(true, false, nil), "settings.iCloud.locked"),
+        (.free, syncStatus(false, false, .noAccount), "settings.iCloud.locked"),
+        (.free, nil, "settings.iCloud.locked"),
+    ] as [(FullVersionStatus, CloudSyncStatus?, String?)])
+    func test_cloudSyncFootnote_withoutTheFullVersion_saysItIsLockedOrNothingUntilStoreKitAnswers(
+        status: FullVersionStatus,
+        syncStatus: CloudSyncStatus?,
+        footnote: String?
+    ) {
+        var state = withDependencies {
+            $0.defaultAppStorage = UserDefaults.inMemory
+        } operation: { SettingsFeature.State() }
+        state.cloudSyncStatus = syncStatus
+        state.fullVersion = status
+
+        #expect(state.cloudSyncFootnote == footnote)
     }
 
     /// What the launch reads to decide whether this process syncs.

@@ -111,6 +111,7 @@ let package = Package(
             name: "AppScenariosTests",
             dependencies: [
                 "AppScenarios",
+                "Purchases",
                 "UITestContract",
                 "WorkoutDomain",
                 "WorkoutStorage",
@@ -199,7 +200,6 @@ let package = Package(
             swiftSettings: strictSettings
         ),
         .testTarget(
-        .testTarget(
             name: "PurchaseFeatureTests",
             dependencies: [
                 "PurchaseFeature",
@@ -209,6 +209,7 @@ let package = Package(
             ],
             swiftSettings: strictSettings
         ),
+        .testTarget(
             name: "PurchasesTests",
             dependencies: [
                 "Purchases",
@@ -310,6 +311,7 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "CloudSync",
+                "Purchases",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
