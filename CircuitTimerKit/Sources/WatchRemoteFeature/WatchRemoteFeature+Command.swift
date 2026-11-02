@@ -34,8 +34,9 @@ extension WatchRemoteFeature {
     }
 
     func controlButtonTapped(_ state: inout State) -> Effect<Action> {
+        // A tap after the stage's end, before its `stageEnded` arrives, would pause a stage the watch does not show.
         guard case let .run(screen) = state.screen, case let .button(control) = screen.controlSlot, control.isEnabled,
-              let shown = state.run else { return .none }
+              date() < control.until, let shown = state.run else { return .none }
         let id = uuid()
         state.command = CommandRequest(id: id, owner: shown.run.owner, command: control.command)
         state.commandNote = nil

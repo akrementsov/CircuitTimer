@@ -244,10 +244,11 @@ public struct WorkoutTimerFeature: Sendable {
             let awake = syncScreenAwake(&state)
             let notifications = syncNotifications(&state, after: action, at: now)
             let activity = syncLiveActivity(&state, after: action, at: now)
-            let watch = syncWatch(&state, after: action, at: now)
+            let publication = watchPublication(state, at: now)
+            let watch = syncWatch(state, after: action, publication: publication)
             let health = startHealthSession(state, after: action, at: now)
             let track = syncHealthTrack(&state, at: now)
-            let control = finishActivityControl(&state, at: now)
+            let control = finishActivityControl(&state, publication: publication)
             return .merge(signals, awake, notifications, activity, watch, health, track, control)
         }
     }
@@ -323,7 +324,8 @@ public struct WorkoutTimerFeature: Sendable {
                         return handleControl(command, generation: generation, from: .watch(requestID: request.id), &state, at: now)
                 }
             case .watchCommandStallLimitReached:
-                // Nothing to change: the pass's end releases the watch's stalled command once its drain is done.
+                // Only a pass: its end measures the pending command's own admission, so the action of an earlier
+                // command decides nothing, and releases the watch's stalled command once its drain is done.
                 return .none
             case let .activitySynchronized(revision, result):
                 activitySynchronized(revision: revision, result: result, &state)

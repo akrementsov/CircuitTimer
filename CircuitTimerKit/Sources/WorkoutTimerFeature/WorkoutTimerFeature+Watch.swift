@@ -6,9 +6,7 @@ import WorkoutActivity
 extension WorkoutTimerFeature {
     /// Runs after every action, like the Live Activity's sync: the watch link drops a run it already published. A
     /// request from the watch is answered with the run settled for it, which the link numbers before it replies.
-    func syncWatch(_ state: inout State, after action: Action, at now: Date) -> Effect<Action> {
-        let canPublish = state.clockGeneration > 0 && !state.isClosing
-        let publication = canPublish ? watchPublication(state, at: now) : nil
+    func syncWatch(_ state: State, after action: Action, publication: WatchRunPublication?) -> Effect<Action> {
         // A command is answered with its result by `finishActivityControl`; this pass publishes as usual.
         if case let .internal(.watchRequestReceived(request)) = action, case .refresh = request.kind {
             return .run { [watchCompanion, id = state.id] _ in
@@ -31,7 +29,10 @@ extension WorkoutTimerFeature {
         .cancellable(id: CancelID.watchRequests, cancelInFlight: true)
     }
 
-    func watchPublication(_ state: State, at now: Date) -> WatchRunPublication {
+    /// The run as this pass publishes it, once: the watch's ack carries the same publication. `nil` before the clock
+    /// started and while closing.
+    func watchPublication(_ state: State, at now: Date) -> WatchRunPublication? {
+        guard state.clockGeneration > 0, !state.isClosing else { return nil }
         let run = WatchRun(
             owner: state.id,
             attributes: WorkoutActivityAttributes(workoutName: state.workoutName),

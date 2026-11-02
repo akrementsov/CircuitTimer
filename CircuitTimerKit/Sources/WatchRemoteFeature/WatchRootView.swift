@@ -324,6 +324,14 @@ extension WorkoutActivityAttributes.Phase {
     return previewView(state)
 }
 
+#Preview("Run, a command waiting while its confirmation ran out") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning, confirmed: false)
+    if let owner = state.run?.run.owner {
+        state.command = .init(id: UUID(uuid: (8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)), owner: owner, command: .pause)
+    }
+    return previewView(state)
+}
+
 #Preview("Run, checking on iPhone without a confirmation") {
     var state = WatchRemoteFeature.State.previewRun(.previewRunning, confirmed: false)
     if let run = state.run?.run {

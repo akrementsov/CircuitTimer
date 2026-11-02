@@ -285,7 +285,8 @@ actor WatchCompanion {
         let result = WatchControlResult(given.result)
         let isApplied = result == .applied || result == .stale
         guard let publication = given.publication, publication.run.owner == owner else {
-            return (isApplied ? .unavailable : result, notLive())
+            // A timer that applied the command and closed before publishing: the watch cannot be told what it did.
+            return (isApplied ? .timedOut : result, notLive())
         }
         let state = await liveState(owner: owner, publication: publication, knownCatalogDigest: knownCatalogDigest, arrival: arrival)
         return (isApplied && !state.isRunLive ? .timedOut : result, state)

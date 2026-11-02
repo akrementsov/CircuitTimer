@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import WatchLink
 import WorkoutActivity
 import WorkoutDomain
 
@@ -30,8 +31,14 @@ extension WorkoutTimerFeature {
     struct PendingActivityControl: Equatable, Sendable {
         let source: ControlSource
         let result: LiveActivityControlResult
-        /// When it was admitted, on `continuousClock`: past `stallLimit` it counts as stalled.
+        /// When it was admitted, on `continuousClock`: past `stallLimit` it counts as stalled. The clock counts the time
+        /// the app was suspended too (iOS 17–25), so a command held across a suspension counts as stalled at once on
+        /// return; it only stops waiting sooner and refuses the next command as unavailable.
         let admittedAt: MonotonicInstant
+        /// The watch's command scheduled its stall limit once it outlived the pass that admitted it.
+        var isStallScheduled = false
+        /// Its stall was logged, so a stuck drain logs once rather than per refused command.
+        var isStallLogged = false
         var activityRevision = 0
         var activityResult: LiveActivityControlResult?
         var notificationRevision = 0
@@ -120,7 +127,12 @@ extension WorkoutTimerFeature {
         }
         if let pending = state.activityControls?.pending {
             // A second command never runs while the first is held; once that one stalls, it is not worth retrying.
-            state.controlRefusal = ControlRefusal(source: source, result: isStalled(pending) ? .unavailable : .busy)
+            let isStalled = isStalled(pending)
+            if isStalled, !pending.isStallLogged {
+                state.activityControls?.pending?.isStallLogged = true
+                Self.logger.notice("A held command outlived its stall limit; later commands are unavailable until it ends")
+            }
+            state.controlRefusal = ControlRefusal(source: source, result: isStalled ? .unavailable : .busy)
             return mustSync ? syncClock(&state, at: now) : .none
         }
 
@@ -145,18 +157,7 @@ extension WorkoutTimerFeature {
             result: result,
             admittedAt: MonotonicInstant(now: clock)
         )
-        let applied: Effect<Action> = result == .applied || mustSync ? syncClock(&state, at: now) : .none
-        guard case let .watch(requestID) = source else { return applied }
-
-        // The watch's command stops waiting after the limit even if nothing else happens on the screen.
-        return .merge(
-            applied,
-            .run { [clock] send in
-                try await clock.sleep(for: LiveActivityControlTiming.stallLimit)
-                await send(.internal(.watchCommandStallLimitReached(requestID: requestID)))
-            }
-            .cancellable(id: CancelID.controlStall, cancelInFlight: true)
-        )
+        return result == .applied || mustSync ? syncClock(&state, at: now) : .none
     }
 
     /// The card's commands need its subscription; the watch's need only a started clock and an open screen.
@@ -197,24 +198,39 @@ extension WorkoutTimerFeature {
     /// a card that is off, swiped away or not syncing does not change what the timer did. Past the stall limit the
     /// watch's command stops waiting for the notifications and is dropped without an answer once its drain is done;
     /// the link already answered the watch that it does not know.
-    func finishActivityControl(_ state: inout State, at now: Date) -> Effect<Action> {
+    func finishActivityControl(_ state: inout State, publication: WatchRunPublication?) -> Effect<Action> {
         var effects: [Effect<Action>] = []
         if let refusal = state.controlRefusal {
             state.controlRefusal = nil
-            effects.append(acknowledgeControl(refusal.source, result: refusal.result, state, at: now))
+            effects.append(acknowledgeControl(refusal.source, result: refusal.result, state, publication: publication))
         }
         guard var pending = state.activityControls?.pending else { return .merge(effects) }
 
         pending.notificationRevision = state.notifications.revision
         let isWatch = if case .watch = pending.source { true } else { false }
-        if isWatch, pending.activityResult == nil, !state.syncsLiveActivity {
-            // No drain is running for it: the card cannot be shown or is not subscribed.
+        if isWatch, pending.activityResult == nil, pending.activityRevision == 0, !state.syncsLiveActivity {
+            // No drain was started for it: the card cannot be shown or is not subscribed. A drain already started,
+            // also one whose subscription ended since, still answers and is waited for.
             pending.activityResult = .unavailable
         }
-        state.activityControls?.pending = pending
         let isStalledWatch = isWatch && isStalled(pending)
         guard pending.activityResult != nil,
               isStalledWatch || state.notifications.completedRevision >= pending.notificationRevision else {
+            guard case let .watch(requestID) = pending.source, !pending.isStallScheduled else {
+                state.activityControls?.pending = pending
+                return .merge(effects)
+            }
+            // The watch's command outlived its pass: it stops waiting after the limit even if nothing else happens.
+            pending.isStallScheduled = true
+            state.activityControls?.pending = pending
+            let limit = pending.admittedAt.duration(toNowOf: clock).map { LiveActivityControlTiming.stallLimit - $0 }
+            effects.append(
+                .run { [clock] send in
+                    try await clock.sleep(for: max(.zero, limit ?? .zero))
+                    await send(.internal(.watchCommandStallLimitReached(requestID: requestID)))
+                }
+                .cancellable(id: CancelID.controlStall, cancelInFlight: true)
+            )
             return .merge(effects)
         }
 
@@ -232,16 +248,16 @@ extension WorkoutTimerFeature {
             case .watch:
                 pending.result
         }
-        effects.append(acknowledgeControl(pending.source, result: result, state, at: now))
+        effects.append(acknowledgeControl(pending.source, result: result, state, publication: publication))
         return .merge(effects)
     }
 
-    /// Answers only the command's own source; the watch also gets the run as published after this pass.
+    /// Answers only the command's own source; the watch also gets the run this pass published.
     func acknowledgeControl(
         _ source: ControlSource,
         result: LiveActivityControlResult,
         _ state: State,
-        at now: Date
+        publication: WatchRunPublication?
     ) -> Effect<Action> {
         switch source {
             case let .liveActivity(requestID):
@@ -249,7 +265,6 @@ extension WorkoutTimerFeature {
                     await liveActivity.requestHandled(owner, requestID, result)
                 }
             case let .watch(requestID):
-                let publication = state.clockGeneration > 0 && !state.isClosing ? watchPublication(state, at: now) : nil
                 return .run { [watchCompanion, owner = state.id] _ in
                     await watchCompanion.controlHandled(owner, requestID, result, publication)
                 }

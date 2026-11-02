@@ -60,9 +60,11 @@ extension WatchRemoteFeature.State {
 
     struct RunControl: Equatable {
         let command: LiveActivityCommand
+        /// False while a command to this timer waits for its reply.
         let isEnabled: Bool
-        /// A command to this timer waits for its reply.
-        let isWaiting: Bool
+        /// When the button must be gone: the lease's end, or the running stage's end if it comes first. The screen's
+        /// timeline hides it then, before any action arrives, and a tap after it sends nothing.
+        let until: Date
     }
 
     /// A screen for a watch without any list.
@@ -143,7 +145,7 @@ extension WatchRemoteFeature.State {
             digitsFrom: digitsUntil == nil ? nil : lease?.openedAt,
             digitsUntil: digitsUntil,
             note: runNote(shown, hasDigits: digitsUntil != nil),
-            controlSlot: controlSlot(shown, command: display.control)
+            controlSlot: controlSlot(shown, shownCommand: display.control)
         )
     }
 
@@ -167,12 +169,17 @@ extension WatchRemoteFeature.State {
         return isMissingDigits ? .waiting : nil
     }
 
-    private func controlSlot(_ shown: WatchRemoteFeature.ShownRun, command: LiveActivityCommand?) -> ControlSlot {
-        guard let command else { return .none }
+    private func controlSlot(_ shown: WatchRemoteFeature.ShownRun, shownCommand: LiveActivityCommand?) -> ControlSlot {
+        guard let shownCommand else { return .none }
         // The digits' own condition: a confirmation, a stage that has not ended, the wrist raised.
-        guard lease != nil, !shown.isStageOver, !isLuminanceReduced else { return .reserved }
-        let isWaiting = self.command?.owner == shown.run.owner
-        return .button(RunControl(command: command, isEnabled: !isWaiting && isSceneActive, isWaiting: isWaiting))
+        guard let lease, !shown.isStageOver, !isLuminanceReduced else { return .reserved }
+        let until = if case let .running(running) = shown.run.content.phase {
+            min(lease.deadline, running.stageEnd)
+        } else {
+            lease.deadline
+        }
+        let isWaiting = command?.owner == shown.run.owner
+        return .button(RunControl(command: shownCommand, isEnabled: !isWaiting && isSceneActive, until: until))
     }
 
     private func statusLine(updatedAt: Date) -> StatusLine? {

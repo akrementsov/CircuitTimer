@@ -144,13 +144,24 @@ struct WatchRunView: View {
             case .none:
                 EmptyView()
             case .reserved:
-                if let command = display.control {
-                    controlButton(command, isEnabled: false)
-                        .opacity(0)
-                        .accessibilityHidden(true)
-                }
+                reservedControl
             case let .button(control):
-                controlButton(control.command, isEnabled: control.isEnabled)
+                // Gone at the stage's or the lease's end even if no action redraws the screen then.
+                TimelineView(.explicit([.distantPast, control.until])) { context in
+                    if context.date < control.until {
+                        controlButton(control.command, isEnabled: control.isEnabled)
+                    } else {
+                        reservedControl
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder private var reservedControl: some View {
+        if let command = display.control {
+            controlButton(command, isEnabled: false)
+                .opacity(0)
+                .accessibilityHidden(true)
         }
     }
 
