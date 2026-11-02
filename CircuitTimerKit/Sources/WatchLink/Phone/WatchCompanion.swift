@@ -221,12 +221,16 @@ actor WatchCompanion {
             published.give(true)
             push(outcome, withCatalog: false)
         }
-        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false),
-              ledger.latestRun() == publication.run else {
-            // Too slow, or the ledger kept other content, such as after a refused write: not this answer's run.
+        guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false) else {
             return notLive()
         }
-        return ledger.reply(knownCatalogDigest: knownCatalogDigest, answeredBy: owner, at: now())
+        // Live only if the ledger holds this publication or a newer one of the same timer, checked as the reply is
+        // built: content a refused write left behind is not this answer's run.
+        return ledger.reply(
+            knownCatalogDigest: knownCatalogDigest,
+            answeredBy: (owner: owner, revision: publication.revision),
+            at: now()
+        )
     }
 
     private func remaining(since arrival: MonotonicInstant) -> Duration {

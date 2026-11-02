@@ -25,8 +25,9 @@ extension WatchRemoteFeature {
         let serial: Int
         /// When that request was sent; it decides the lease's end.
         let sentAt: MonotonicInstant
-        /// When the lease opened, in wall time: the screen's timeline starts there.
-        let openedAt: Date
+        /// When the lease opened, in wall time: the screen's timeline starts there. A wall clock moved back moves it
+        /// back too, so the timeline's first entry is never in the future.
+        var openedAt: Date
         /// The lease's end in wall time, only for the screen to hide the digits on its own; every action computes it
         /// again from `sentAt`, so a wall clock moved meanwhile moves it back where it belongs.
         var deadline: Date
@@ -56,7 +57,9 @@ extension WatchRemoteFeature {
             state.lease = nil
             return
         }
-        state.lease?.deadline = date().adding(Self.confirmationLease - elapsed)
+        let now = date()
+        state.lease?.deadline = now.adding(Self.confirmationLease - elapsed)
+        state.lease?.openedAt = min(lease.openedAt, now)
     }
 
     /// Takes the run of an accepted state. A newer state without a live timer, or with another owner's run, revokes
@@ -167,11 +170,13 @@ extension WatchRemoteFeature {
             return .cancel(id: CancelID.renewal)
         }
         guard wasReduced, needsRenewal(state) else { return .none }
-        // The renewal counts from the newest request: the one in flight, or the one whose reply opened the lease.
-        let anchor = state.refresh.inFlight.map { ($0.serial, $0.sentAt) } ?? state.lease.map { ($0.serial, $0.sentAt) }
+        // The renewal counts from the request in flight, or the one whose reply opened the lease. It names the newest
+        // serial, which a later request whose reply asked nothing may have taken.
+        let anchor = state.refresh.inFlight?.sentAt ?? state.lease?.sentAt
         let isStageOver = state.run?.isStageOver == true
-        if let (serial, sentAt) = anchor, let elapsed = sentAt.duration(toNowOf: clock), elapsed < Self.leaseRenewal,
+        if let anchor, let elapsed = anchor.duration(toNowOf: clock), elapsed < Self.leaseRenewal,
            !isStageOver || state.refresh.inFlight != nil {
+            let serial = state.refresh.lastSerial
             let remaining = Self.leaseRenewal - elapsed
             return .run { [clock] send in
                 try await clock.sleep(for: remaining)

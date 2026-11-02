@@ -21,6 +21,9 @@ final class PublicationLedger: @unchecked Sendable {
     private struct Shared: Sendable {
         /// The newest numbered state whose write was decided: written, or pending.
         var latest: PhoneState?
+        /// The revision of the run `latest` carries: the timer's own publication of it, or a newer one of the same
+        /// content.
+        var latestRunRevision: Int?
         var endedOwners: Set<UUID> = []
         var isGateClosed = false
     }
@@ -36,6 +39,9 @@ final class PublicationLedger: @unchecked Sendable {
     /// The newest numbered state, written or not.
     private var prepared: PhoneState?
     private var isWritten = false
+    /// The catalog's candidates from its newest publication, in the order a refused write falls back. Every state
+    /// starts from them, so a run that needs a shorter catalog does not shorten the list for later states.
+    private var catalogCandidates: [CatalogState?] = [nil]
     /// The owner whose run does not fit in a transfer; its runs are not published until it ends.
     private var tooLargeOwner: UUID?
 
@@ -66,7 +72,7 @@ final class PublicationLedger: @unchecked Sendable {
         await onQueue {
             guard self.prepared?.run?.owner == owner || self.tooLargeOwner == owner else { return .skipped }
             self.tooLargeOwner = nil
-            return self.commit([self.prepared?.catalog], run: nil, at: now)
+            return self.commit(self.catalogCandidates, run: nil, at: now)
         }
     }
 
@@ -84,7 +90,7 @@ final class PublicationLedger: @unchecked Sendable {
                 return .skipped
             }
             self.tooLargeOwner = nil
-            return self.commit([prepared.catalog], run: nil, at: now, isTerminal: true)
+            return self.commit(self.catalogCandidates, run: nil, at: now, isTerminal: true)
         }
     }
 
@@ -106,7 +112,7 @@ final class PublicationLedger: @unchecked Sendable {
         guard !isGateClosed, let prepared, !isWritten else { return nil }
         if let owner = prepared.run?.owner, !isOpen(for: owner) {
             // The owner ended before its own section ran: the state without its run replaces it.
-            return numbered(commit([prepared.catalog], run: nil, at: prepared.publishedAt))
+            return numbered(commit(catalogCandidates, run: nil, at: prepared.publishedAt))
         }
         switch write(prepared) {
             case .written:
@@ -140,25 +146,25 @@ final class PublicationLedger: @unchecked Sendable {
         shared.withLock { $0.latest?.run?.owner }
     }
 
-    /// The run the newest decided state carries.
-    func latestRun() -> WatchRun? {
-        shared.withLock { $0.latest?.run }
-    }
-
     func isEnded(_ owner: UUID) -> Bool {
         shared.withLock { $0.endedOwners.contains(owner) }
     }
 
     /// The state to answer a request with, without waiting for the queue: the catalog only if the watch's digest
-    /// differs. The run is live only when its own timer answered: `answeredBy` is that timer's owner, still open. A
-    /// process that has published nothing knows no catalog and says so with a `nil` digest.
-    func reply(knownCatalogDigest: String?, answeredBy owner: UUID?, at now: Date) -> PhoneState {
+    /// differs. The run is live only when its own timer answered: `answeredBy` is that timer's owner, still open, and
+    /// the revision it answered with; the state must carry that publication or a newer one of the same timer, never an
+    /// older one a refused write left. A process that has published nothing knows no catalog and says so with a `nil`
+    /// digest.
+    func reply(knownCatalogDigest: String?, answeredBy answer: (owner: UUID, revision: Int)?, at now: Date) -> PhoneState {
         shared.withLock { shared in
             guard let latest = shared.latest else {
                 return PhoneState(processID: processID, sequence: 0, publishedAt: now, catalog: nil, catalogDigest: nil)
             }
-            let isRunLive = owner.map { owner in
-                latest.run?.owner == owner && !shared.isGateClosed && !shared.endedOwners.contains(owner)
+            let isRunLive = answer.map { answer in
+                latest.run?.owner == answer.owner
+                    && (shared.latestRunRevision ?? .min) >= answer.revision
+                    && !shared.isGateClosed
+                    && !shared.endedOwners.contains(answer.owner)
             } ?? false
             // Answered now: the iPhone still had this list when it answered, whether it sends the list or confirms it.
             return PhoneState(
@@ -197,7 +203,8 @@ final class PublicationLedger: @unchecked Sendable {
     private func publishCatalogOnQueue(revision: Int, catalog: CatalogState, at now: Date) -> PublishOutcome {
         guard revision > catalogRevision else { return .skipped }
         catalogRevision = revision
-        return commit(Self.fitted(catalog, processID: processID, at: now), run: prepared?.run, at: now)
+        catalogCandidates = Self.fitted(catalog, processID: processID, at: now)
+        return commit(catalogCandidates, run: prepared?.run, at: now)
     }
 
     private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
@@ -205,15 +212,17 @@ final class PublicationLedger: @unchecked Sendable {
         runRevision = revision
         // The timer publishes after every action: the same run costs no encoding, written or not; a write that did
         // not happen is written again on activation or a status change.
-        if run == prepared?.run { return .skipped }
+        if run == prepared?.run {
+            shared.withLock { $0.latestRunRevision = revision }
+            return .skipped
+        }
         if let tooLargeOwner {
             // A run that did not fit stays hidden until its owner ends, so the watch does not flicker between stages
             // whose names fit and stages whose names do not.
             guard tooLargeOwner != run.owner else { return .skipped }
             self.tooLargeOwner = nil
         }
-        let catalogs: [CatalogState?] = prepared?.catalog.map { [$0] + Self.fallbacks(after: $0) } ?? [nil]
-        return commit(catalogs, run: run, at: now)
+        return commit(catalogCandidates, run: run, runRevision: revision, at: now)
     }
 
     /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large; the run is dropped and
@@ -221,6 +230,7 @@ final class PublicationLedger: @unchecked Sendable {
     private func commit(
         _ catalogs: [CatalogState?],
         run: WatchRun?,
+        runRevision: Int? = nil,
         at now: Date,
         isTerminal: Bool = false
     ) -> PublishOutcome {
@@ -249,7 +259,15 @@ final class PublicationLedger: @unchecked Sendable {
                prepared.isRunTooLarge == (tooLargeOwner != nil) {
                 return .skipped
             }
-            sequence += 1
+            // Numbered under the lock that marks owners ended and closes the gate: a state is numbered before the
+            // mark, and the owner's end section replaces it, or not at all.
+            let isNumbered = shared.withLock { shared in
+                guard isTerminal || !shared.isGateClosed else { return false }
+                if let run, shared.endedOwners.contains(run.owner) { return false }
+                self.sequence += 1
+                return true
+            }
+            guard isNumbered else { return .skipped }
             let state = PhoneState(
                 processID: processID,
                 sequence: sequence,
@@ -262,10 +280,10 @@ final class PublicationLedger: @unchecked Sendable {
             )
             switch write(state, isTerminal: isTerminal) {
                 case .written:
-                    adopt(state, isWritten: true)
+                    adopt(state, isWritten: true, runRevision: runRevision)
                     return .written(state)
                 case .pending:
-                    adopt(state, isWritten: false)
+                    adopt(state, isWritten: false, runRevision: runRevision)
                     return .pending(state)
                 case .tooLarge:
                     continue
@@ -274,17 +292,24 @@ final class PublicationLedger: @unchecked Sendable {
         if let run, isOpen(for: run.owner) {
             // No catalog fits with the run, or WatchConnectivity refused every one: the run does not travel at all.
             markTooLarge(run.owner)
-            return commit([catalogs.last.flatMap { $0 }], run: nil, at: now, isTerminal: isTerminal)
+            return commit(catalogs, run: nil, at: now, isTerminal: isTerminal)
         }
         // Even `.unavailable(.tooLarge)` was refused, which a payload of a few hundred bytes should never be. The
         // context still holds the previous state, so replies keep answering with it rather than contradict it.
         return .skipped
     }
 
-    private func adopt(_ state: PhoneState, isWritten: Bool) {
+    private func adopt(_ state: PhoneState, isWritten: Bool, runRevision: Int? = nil) {
         prepared = state
         self.isWritten = isWritten
-        shared.withLock { $0.latest = state }
+        shared.withLock { shared in
+            shared.latest = state
+            if state.run == nil {
+                shared.latestRunRevision = nil
+            } else if let runRevision {
+                shared.latestRunRevision = runRevision
+            }
+        }
     }
 
     private func markTooLarge(_ owner: UUID) {
