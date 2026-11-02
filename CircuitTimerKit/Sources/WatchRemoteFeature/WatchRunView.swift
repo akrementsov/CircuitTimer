@@ -8,8 +8,9 @@ import WorkoutActivity
 /// screen's title. The digits count by themselves only until `digitsUntil`; the timeline hides them then even if no
 /// action arrives.
 ///
-/// The text stops growing at `maxTextSize`, as the iPhone's card titles do, so on a 41 mm watch a stage whose name
-/// takes one line keeps the next stage on screen; a longer name or a note scrolls.
+/// The cards' text stops growing at `maxCardTextSize`, as the iPhone's card titles do, so on a 41 mm watch a stage
+/// whose name takes one line keeps the next stage on screen; a longer name shows whole and scrolls. The note under the
+/// cards follows the user's text size.
 struct WatchRunView: View {
     let screen: WatchRemoteFeature.State.RunScreen
 
@@ -24,11 +25,10 @@ struct WatchRunView: View {
                     noteText(note)
                 }
             }
-            .dynamicTypeSize(...Self.maxTextSize)
         }
     }
 
-    private static let maxTextSize = DynamicTypeSize.xLarge
+    private static let maxCardTextSize = DynamicTypeSize.xLarge
 
     private var display: WorkoutActivityDisplay {
         screen.display
@@ -66,9 +66,26 @@ struct WatchRunView: View {
         .padding(.horizontal, .token(spacing: .s))
         .padding(.vertical, .token(spacing: .s))
         .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-        // One element, as on the iPhone: the stage's name, then its time.
-        .accessibilityElement(children: .combine)
+        .dynamicTypeSize(...Self.maxCardTextSize)
+        // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(display.headline))
+        .accessibilityValue(spokenTime)
         .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    /// The time the card shows, for VoiceOver; nothing without a lease, as on screen.
+    private var spokenTime: Text {
+        guard screen.digitsUntil != nil else { return Text(verbatim: "") }
+        switch display.clock {
+            case let .counting(range):
+                return Text(timerInterval: range, countsDown: true, showsHours: false)
+            case .pauseGlyph:
+                guard case let .fixed(remaining) = display.islandClock else { return Text(verbatim: "") }
+                return Text(verbatim: remaining.clockText(.timerRemaining))
+            case .finishedGlyph, .fixed, .none:
+                return Text(verbatim: "")
+        }
     }
 
     private var headline: some View {
@@ -76,8 +93,7 @@ struct WatchRunView: View {
             .font(.token(.runningStageName))
             .textCase(.uppercase)
             .multilineTextAlignment(.leading)
-            .lineLimit(2)
-            .accessibilitySortPriority(1)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// As on the iPhone: what comes next, without its length, which starts only when the running stage ends.
@@ -92,12 +108,13 @@ struct WatchRunView: View {
                 .foregroundStyle(.text(.primary))
                 .textCase(.uppercase)
                 .multilineTextAlignment(.leading)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, .token(spacing: .s))
         .padding(.vertical, .token(spacing: .xs))
         .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        .dynamicTypeSize(...Self.maxCardTextSize)
         .accessibilityElement(children: .combine)
     }
 
