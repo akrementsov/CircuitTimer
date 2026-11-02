@@ -35,7 +35,21 @@ public enum AccessibilityID {
         public static let backgroundNotifications = "settings.backgroundNotifications"
         public static let keepScreenOn = "settings.keepScreenOn"
         public static let iCloudSync = "settings.iCloudSync"
+        public static let buyFullVersion = "settings.buyFullVersion"
+        public static let restorePurchases = "settings.restorePurchases"
+        public static let fullVersionPurchased = "settings.fullVersionPurchased"
         public static let about = "settings.about"
+    }
+
+    public enum Purchase {
+        public static let close = "purchase.close"
+        public static let buy = "purchase.buy"
+        public static let restore = "purchase.restore"
+        public static let retry = "purchase.retry"
+        public static let done = "purchase.done"
+        public static let reason = "purchase.reason"
+        public static let pending = "purchase.pending"
+        public static let purchased = "purchase.purchased"
     }
 
     public enum About {

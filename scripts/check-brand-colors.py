@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Fails when an asset that mirrors the `Brand` colour token differs from it.
+"""Fails when an asset that mirrors the `Brand` colour token differs from it, or a copy of the launch logo from it.
 
 AGENTS.md (core rule 3) keeps one universal value per colour, and the app's and the watch app's `AccentColor` repeat
-`Brand`. Each must hold exactly one universal colour without appearances, in the same colour space, and every
+`Brand`; DesignSystem's `AppLogo.svg` is a byte-for-byte copy of the launch screen's `LaunchLogo.svg`. Each must hold exactly one universal colour without appearances, in the same colour space, and every
 component must match `Brand`'s on the 0–255 scale: Xcode writes a component as a fraction ("0.906"), as hex ("0xE7")
 or as an integer ("231"). Run with `python3 -I`; it uses the standard library only and finds the repository from its
 own place.
@@ -18,6 +18,8 @@ MIRRORS = (
     "CircuitTimerWatch/Assets.xcassets/AccentColor.colorset/Contents.json",
 )
 COMPONENTS = ("red", "green", "blue", "alpha")
+LOGO = "CircuitTimer/Assets.xcassets/LaunchLogo.imageset/LaunchLogo.svg"
+LOGO_COPIES = ("CircuitTimerKit/Sources/DesignSystem/Resources/Images.xcassets/AppLogo.imageset/AppLogo.svg",)
 
 
 class Mismatch(Exception):
@@ -71,6 +73,19 @@ def main(root):
         if mirror != brand:
             failures.append(f"{path}: {mirror[0]} {mirror[1]} (red, green, blue, alpha), not Brand's {brand[0]} "
                             f"{brand[1]}; change them together (AGENTS.md, core rule 3)")
+    try:
+        logo = (root / LOGO).read_bytes()
+    except OSError as error:
+        failures.append(f"{LOGO}: {error}")
+        logo = None
+    for path in LOGO_COPIES:
+        try:
+            copy = (root / path).read_bytes()
+        except OSError as error:
+            failures.append(f"{path}: {error}")
+            continue
+        if logo is not None and copy != logo:
+            failures.append(f"{path}: not an exact copy of {LOGO}; change them together (AGENTS.md, core rule 3)")
     for failure in failures:
         print(f"check-brand-colors: {failure}", file=sys.stderr)
     return 1 if failures else 0

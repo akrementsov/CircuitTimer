@@ -5,7 +5,8 @@ import Foundation
 import os
 
 /// Decides once per launch whether the workouts store mirrors to iCloud, and follows what CloudKit reports about it:
-/// the account, import and export failures, and finished imports that may have changed the store.
+/// the account, import and export failures, and finished imports that may have changed the store. The decision is taken
+/// when the store opens, after `prepareDecision` has waited for what it needs; subscribing never decides.
 final class CloudSyncMonitor: Sendable {
     enum EventKind: Hashable, Sendable {
         case setup
@@ -15,6 +16,8 @@ final class CloudSyncMonitor: Sendable {
 
     private struct State {
         var decision: (isRequested: Bool, container: String?)?
+        /// Waits for the decision's inputs, then decides; one per process.
+        var preparation: Task<Void, Never>?
         var isMirroring: Bool?
         var accountProblem: CloudSyncProblem?
         /// Tells the latest account read from an older one that answers late.
@@ -58,24 +61,48 @@ final class CloudSyncMonitor: Sendable {
         }
     }
 
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "CloudSync")
+    static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "CloudSync")
 
     private let notificationCenter: NotificationCenter
     private let preference: @Sendable () -> Bool
     private let containerID: @Sendable () -> String?
     private let accountStatus: @Sendable (String) async throws -> CKAccountStatus
+    private let prepareInputs: @Sendable () async -> Void
     private let state = LockIsolated(State())
 
     init(
         notificationCenter: NotificationCenter,
         preference: @escaping @Sendable () -> Bool,
         containerID: @escaping @Sendable () -> String?,
-        accountStatus: @escaping @Sendable (String) async throws -> CKAccountStatus
+        accountStatus: @escaping @Sendable (String) async throws -> CKAccountStatus,
+        prepareInputs: @escaping @Sendable () async -> Void
     ) {
         self.notificationCenter = notificationCenter
         self.preference = preference
         self.containerID = containerID
         self.accountStatus = accountStatus
+        self.prepareInputs = prepareInputs
+    }
+
+    /// Waits, once per process, for what the decision reads, then decides. The wait and the decision run in a task of
+    /// their own: a cancelled caller still waits for it, and a cancellation never decides.
+    func prepareDecision() async {
+        let preparation: Task<Void, Never>? = state.withValue { state in
+            guard state.decision == nil else { return nil }
+
+            if let preparation = state.preparation {
+                return preparation
+            }
+            // The decision must not be cut short by a cancelled caller; it serves the whole process.
+            // swiftlint:disable:next no_unstructured_task
+            let preparation = Task { [self] in
+                await prepareInputs()
+                decide()
+            }
+            state.preparation = preparation
+            return preparation
+        }
+        await preparation?.value
     }
 
     /// The container this launch mirrors to, or `nil` to keep the store local. The first call decides; a later
@@ -93,14 +120,16 @@ final class CloudSyncMonitor: Sendable {
         refreshAccountIfMirroring(announcesChange: false)
     }
 
-    /// The current status, then every change of it.
+    /// The current status once the launch has decided, then every change of it. A subscriber that comes before the
+    /// decision gets its first status from it.
     func status() -> AsyncStream<CloudSyncStatus> {
-        decide()
         let (stream, continuation) = AsyncStream.makeStream(of: CloudSyncStatus.self, bufferingPolicy: .bufferingNewest(1))
         let id = state.withValue { state in
             state.nextSubscriber += 1
             state.statusSubscribers[state.nextSubscriber] = continuation
-            continuation.yield(state.status)
+            if state.decision != nil {
+                continuation.yield(state.status)
+            }
             return state.nextSubscriber
         }
         continuation.onTermination = { [weak self] _ in
@@ -111,7 +140,6 @@ final class CloudSyncMonitor: Sendable {
 
     /// One element whenever the store may hold what another device wrote, or lost what an account change removed.
     func remoteChanges() -> AsyncStream<Void> {
-        decide()
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         let id = state.withValue { state in
             state.nextSubscriber += 1
@@ -137,6 +165,7 @@ final class CloudSyncMonitor: Sendable {
             if decision.container != nil {
                 observe()
             }
+            state.publishStatus()
             return (decision, true)
         }
         if isNew, decision.isRequested, decision.container == nil {

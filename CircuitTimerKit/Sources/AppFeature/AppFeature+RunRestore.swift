@@ -114,6 +114,8 @@ extension AppFeature {
     /// scene session in both cases, so nothing tells them apart.
     func resolveRestore(_ state: inout State) -> Effect<Action> {
         guard case let .found(stored) = state.runRestore, case let .loaded(workouts) = state.workouts else { return .none }
+        // A purchase sheet opened while the first load had failed; the question waits for it to close.
+        guard state.destination?.is(\.purchase) != true else { return .none }
 
         state.runRestore = .resolved
         let record = stored.record
@@ -169,7 +171,7 @@ extension AppFeature {
         switch choice {
             case .finish:
                 state.runRestore = .resolved
-                return discardRunRecord(reportingFailure: true)
+                return .merge(discardRunRecord(reportingFailure: true), scheduleWhatWaited(state))
             case .resume:
                 // Request the cover from a later action, after the presentation reducer clears the chosen alert.
                 return .run { send in

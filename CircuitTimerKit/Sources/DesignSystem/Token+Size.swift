@@ -23,6 +23,8 @@ extension DesignSystem.Token {
         case activityCompactClock = 44
         /// Width of the clock in the minimal Dynamic Island.
         case activityMinimalClock = 36
+        /// Width of the app's logo on the purchase screen; its height follows the logo's proportions.
+        case logo = 96
 
         /// Minimum side of the Live Activity's Pause/Resume target, also 44 pt.
         public static let activityControl = Self.activityCompactClock

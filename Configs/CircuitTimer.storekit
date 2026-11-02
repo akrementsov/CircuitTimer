@@ -1,0 +1,38 @@
+{
+  "identifier" : "C7A60001",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : true,
+      "internalID" : "C7A60002",
+      "localizations" : [
+        {
+          "description" : "iCloud sync, more than two workouts and the Apple Watch app.",
+          "displayName" : "Full Version",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Синхронизация через iCloud, больше двух тренировок и приложение для Apple Watch.",
+          "displayName" : "Полная версия",
+          "locale" : "ru"
+        }
+      ],
+      "productID" : "com.akrementsov.circuittimer.fullversion",
+      "referenceName" : "Full Version",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

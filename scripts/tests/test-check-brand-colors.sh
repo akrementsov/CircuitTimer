@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
-# Tests scripts/check-brand-colors.py on a tree of the three colour sets that passes, each case changing one of them.
+# Tests scripts/check-brand-colors.py on a tree of the three colour sets and the two logos that passes, each case
+# changing one of them.
 # The script finds the repository by its own place, so the tree gets a copy of it.
 . "$(dirname "$0")/lib.sh"
 
 brand=CircuitTimerKit/Sources/DesignSystem/Resources/Colors.xcassets/Brand.colorset/Contents.json
 app_accent=CircuitTimer/Assets.xcassets/AccentColor.colorset/Contents.json
 watch_accent=CircuitTimerWatch/Assets.xcassets/AccentColor.colorset/Contents.json
+launch_logo=CircuitTimer/Assets.xcassets/LaunchLogo.imageset/LaunchLogo.svg
+app_logo=CircuitTimerKit/Sources/DesignSystem/Resources/Images.xcassets/AppLogo.imageset/AppLogo.svg
+
+# logo FILE [FILL]: writes a one-path SVG, by default in Brand's colour.
+logo() {
+	mkdir -p "$(dirname "$work/tree/$1")"
+	printf '<svg viewBox="0 0 2 2" xmlns="http://www.w3.org/2000/svg"><path d="M0 0H2V2Z" fill="%s"/></svg>\n' "${2:-#E7FE54}" > "$work/tree/$1"
+}
 
 # colour_set FILE [RED [COLOUR_SPACE]]: writes a colour set of one universal sRGB colour, by default Brand's.
 colour_set() {
@@ -33,6 +42,8 @@ tree() {
 	colour_set "$brand"
 	colour_set "$app_accent"
 	colour_set "$watch_accent"
+	logo "$launch_logo"
+	logo "$app_logo"
 }
 
 check() {
@@ -112,6 +123,31 @@ rm "$work/tree/$brand"
 check
 expect_status 1
 expect_in "$work/out" "check-brand-colors: $brand: "
+expect_not_in "$work/out" "Traceback"
+
+describe "a logo copy that differs from the launch logo"
+tree
+logo "$app_logo" "#FFFFFF"
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_logo: not an exact copy of $launch_logo"
+expect_not_in "$work/out" "Traceback"
+
+describe "the launch logo missing"
+tree
+rm "$work/tree/$launch_logo"
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $launch_logo: "
+expect_not_in "$work/out" "not an exact copy"
+expect_not_in "$work/out" "Traceback"
+
+describe "a missing logo copy"
+tree
+rm "$work/tree/$app_logo"
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_logo: "
 expect_not_in "$work/out" "Traceback"
 
 finish

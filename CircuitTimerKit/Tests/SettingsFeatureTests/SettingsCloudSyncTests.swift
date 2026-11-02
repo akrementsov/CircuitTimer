@@ -3,6 +3,7 @@
 import CloudSync
 import ComposableArchitecture
 import Foundation
+import Purchases
 import Testing
 
 /// The switch, the status of this launch and the footnote they give.
@@ -35,6 +36,29 @@ private let footnoteCases: [CloudSyncFootnoteCase] = [
     CloudSyncFootnoteCase(true, syncStatus(true, true, .temporarilyUnavailable), "settings.iCloud.unavailable"),
     CloudSyncFootnoteCase(true, syncStatus(true, true, .quotaExceeded), "settings.iCloud.quotaExceeded"),
     CloudSyncFootnoteCase(true, syncStatus(true, true, .syncFailed), "settings.iCloud.failed"),
+]
+
+/// Without the full version: what StoreKit said, the status of this launch and the footnote they give.
+struct LockedFootnoteCase: Sendable {
+    let fullVersion: FullVersionStatus
+    let status: CloudSyncStatus?
+    let footnote: String?
+
+    init(_ fullVersion: FullVersionStatus, _ status: CloudSyncStatus?, _ footnote: String?) {
+        self.fullVersion = fullVersion
+        self.status = status
+        self.footnote = footnote
+    }
+}
+
+/// Nothing until StoreKit answers; then the lock, and whether this launch still mirrors until the next one.
+private let lockedFootnoteCases: [LockedFootnoteCase] = [
+    LockedFootnoteCase(.unknown, syncStatus(true, true, .noAccount), nil),
+    LockedFootnoteCase(.unknown, nil, nil),
+    LockedFootnoteCase(.free, syncStatus(true, true, nil), "settings.iCloud.lockedUntilRelaunch"),
+    LockedFootnoteCase(.free, syncStatus(true, false, nil), "settings.iCloud.locked"),
+    LockedFootnoteCase(.free, syncStatus(false, false, .noAccount), "settings.iCloud.locked"),
+    LockedFootnoteCase(.free, nil, "settings.iCloud.locked"),
 ]
 
 @MainActor
@@ -117,6 +141,43 @@ struct SettingsCloudSyncTests {
         } operation: { SettingsFeature.State() }
         state.$isICloudSyncOn.withLock { $0 = footnoteCase.isOn }
         state.cloudSyncStatus = footnoteCase.status
+        state.fullVersion = .full
+
+        #expect(state.cloudSyncFootnote == footnoteCase.footnote)
+    }
+
+    @Test(arguments: [true, false])
+    func test_lockedSwitchBuyAndRestore_sendTheirRequestsAndKeepTheStoredSwitch(isOn: Bool) async {
+        let defaults = UserDefaults.inMemory
+        defaults.set(isOn, forKey: "iCloudSync")
+        let store = withDependencies {
+            $0.defaultAppStorage = defaults
+        } operation: {
+            var state = SettingsFeature.State()
+            state.fullVersion = .free
+            return TestStore(initialState: state) { SettingsFeature() }
+        }
+
+        await store.send(.view(.lockedICloudSyncTapped))
+        await store.receive(.delegate(.fullVersionRequested(.iCloudSync)))
+        await store.send(.view(.buyTapped))
+        await store.receive(.delegate(.fullVersionRequested(.buy)))
+        await store.send(.view(.restoreTapped))
+        await store.receive(.delegate(.fullVersionRequested(.restore)))
+
+        #expect(defaults.object(forKey: "iCloudSync") as? Bool == isOn)
+        #expect(store.state.isICloudSyncOn == isOn)
+    }
+
+    @Test(arguments: lockedFootnoteCases)
+    func test_cloudSyncFootnote_withoutTheFullVersion_saysItIsLockedOrNothingUntilStoreKitAnswers(
+        _ footnoteCase: LockedFootnoteCase
+    ) {
+        var state = withDependencies {
+            $0.defaultAppStorage = UserDefaults.inMemory
+        } operation: { SettingsFeature.State() }
+        state.cloudSyncStatus = footnoteCase.status
+        state.fullVersion = footnoteCase.fullVersion
 
         #expect(state.cloudSyncFootnote == footnoteCase.footnote)
     }

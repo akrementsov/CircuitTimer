@@ -1,7 +1,8 @@
 import DesignSystem
 import SwiftUI
 
-/// A legacy settings cell: a full-width rounded card with up to two lines of text and no accessory.
+/// A legacy settings cell: a full-width rounded card with up to two lines of text and, optionally, a value at the
+/// trailing edge.
 struct SettingsCard: View {
     enum Style {
         case active
@@ -10,22 +11,31 @@ struct SettingsCard: View {
     }
 
     let title: Text
+    let value: Text?
     let style: Style
 
-    init(_ title: Text, style: Style) {
+    init(_ title: Text, value: Text? = nil, style: Style) {
         self.title = title
+        self.value = value
         self.style = style
     }
 
     var body: some View {
-        title
-            .font(.token(.body))
-            .lineLimit(2)
-            .truncationMode(.tail)
-            .foregroundStyle(foreground)
-            .padding(.token(spacing: .l))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(background, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        HStack(spacing: .token(spacing: .m)) {
+            title
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .foregroundStyle(foreground)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let value {
+                value
+                    .foregroundStyle(.text(.secondary))
+            }
+        }
+        .font(.token(.body))
+        .padding(.token(spacing: .l))
+        .background(background, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private var foreground: Color {

@@ -13,6 +13,8 @@ extension AppScenario {
                 []
             case .oneWorkout:
                 [.legDay]
+            case .twoWorkoutsFree:
+                [.legDay, .legDayCopy(2)]
             case .threeWorkouts:
                 [.legDay, .legDayCopy(2), .legDayCopy(3)]
             case .manyWorkouts:

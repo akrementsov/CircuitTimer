@@ -48,6 +48,31 @@ struct SettingsScreen: Screen {
         return self
     }
 
+    /// Without the full version the iCloud switch is one button that reads as off, whatever is stored.
+    @discardableResult
+    func assertICloudSyncLocked(file: StaticString = #filePath, line: UInt = #line) -> Self {
+        app.buttons.matching(identifier: AccessibilityID.Settings.iCloudSync)
+            .assertSingle("The locked iCloud sync card", file: file, line: line)
+            .waitUntilValue("The locked iCloud sync card", is: "Off", file: file, line: line)
+        XCTAssertFalse(app.switches[AccessibilityID.Settings.iCloudSync].exists, "An iCloud sync switch", file: file, line: line)
+        return self
+    }
+
+    func tapLockedICloudSync(file: StaticString = #filePath, line: UInt = #line) -> PurchaseScreen<Self> {
+        app.buttons[AccessibilityID.Settings.iCloudSync]
+            .waitUntilHittable("The locked iCloud sync card", file: file, line: line)
+            .tap()
+        return PurchaseScreen(app, file: file, line: line)
+    }
+
+    @discardableResult
+    func assertFullVersionPurchased(file: StaticString = #filePath, line: UInt = #line) -> Self {
+        app.descendants(matching: .any)[AccessibilityID.Settings.fullVersionPurchased]
+            .waitUntilExists("The Full Version row", file: file, line: line)
+        XCTAssertFalse(app.buttons[AccessibilityID.Settings.buyFullVersion].exists, "The Buy the App row", file: file, line: line)
+        return self
+    }
+
     func tapAbout(file: StaticString = #filePath, line: UInt = #line) -> AboutScreen {
         app.buttons[AccessibilityID.Settings.about]
             .waitUntilHittable("The About button", file: file, line: line)

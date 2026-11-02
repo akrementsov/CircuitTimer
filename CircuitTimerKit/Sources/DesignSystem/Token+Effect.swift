@@ -6,6 +6,8 @@ extension DesignSystem.Token {
         case pressed = 0.8
         /// The original button's shadow: the screen color at half opacity.
         case buttonShadow = 0.5
+        /// A text button that cannot be tapped right now, such as Restore while a purchase runs.
+        case disabled = 0.4
     }
 
     public enum ShadowRadius: CGFloat, Sendable, CaseIterable {

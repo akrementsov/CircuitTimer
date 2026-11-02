@@ -5,6 +5,8 @@ public enum AppScenario: String, CaseIterable, Sendable {
     case oneWorkout
     case threeWorkouts
     case manyWorkouts
+    /// Two workouts without the full version: the free limit reached, iCloud sync locked.
+    case twoWorkoutsFree
 }
 
 /// The launch environment that selects a scenario.

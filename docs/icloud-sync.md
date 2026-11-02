@@ -4,9 +4,11 @@ Workouts, their stages and the list order sync through the user's private CloudK
 
 ## How a launch decides
 
-- `CloudSyncClient.mirroredContainer()` decides once per process, on the first call, from the iCloud sync switch (`@Shared(.iCloudSync)`, key `iCloudSync`, on by default) and the container the app's Info.plist names (`CTCloudKitContainerIdentifier`, from `CT_CLOUDKIT_CONTAINER` in `Configs/App.xcconfig`).
+- iCloud sync is part of the full version (CT-6, [purchases](purchases.md)). The store mirrors only when the iCloud sync switch (`@Shared(.iCloudSync)`, key `iCloudSync`, on by default) is on, the app owns the full version and the app's Info.plist names a container (`CTCloudKitContainerIdentifier`, from `CT_CLOUDKIT_CONTAINER` in `Configs/App.xcconfig`).
+- The decision is taken once per process. `CloudSyncClient.prepareDecision()` waits for StoreKit's answer about the full version for at most a second, in a task of its own, then decides (with the switch off, or in a build without a container, it does not wait: the answer is local anyway); nothing about the purchase is stored on the device. `AppFeature` starts it at launch beside the saved run's read, and `WorkoutStorageClient` waits for it before every operation, so the store opens once, with the final answer. A cancelled caller still waits, and a cancellation never decides. When StoreKit does not answer in time the launch keeps the store on the device and logs an error; a full version that arrives later unlocks the rest of the app at once and iCloud at the next launch.
+- `status()` and `remoteChanges()` never decide: a status subscriber gets its first status from the decision, or at once when the decision exists.
 - `WorkoutStoreProvider.live()` opens the same file `Workouts.store` with `.private(container)` or `.none`. If opening with CloudKit throws, it logs a fault and opens the file on the device; only a store that fails both ways is a list error. It then reports `storeOpened(isMirroring:)`.
-- An open `ModelContainer` cannot change its mirroring, so a change of the switch applies at the next launch. Until then Settings asks to close and reopen the app.
+- An open `ModelContainer` cannot change its mirroring, so a change of the switch, a purchase and a refund apply to iCloud at the next launch. Until then Settings asks to close and reopen the app.
 - Without an iCloud account the store still opens with `.private` and works on the device; signing in later should start syncing without a relaunch (a device check below).
 - Unsigned builds (`make build-app`, UI tests, snapshots) pass `CT_CLOUDKIT_CONTAINER=`: they carry no entitlement, and creating a `CKContainer` without it traps the process. Their store stays on the device. With the switch on, a run of such a build logs a fault and Settings says sync does not work: expected there, and in a signed build the same footnote means the container is missing.
 
@@ -71,7 +73,7 @@ Run on 2026-10-21/22 with a throwaway build, before the store code was written.
 
 ## Device checklist
 
-On the owner's iPhones on iOS 17 and 26.5, one Apple ID, builds of the same kind:
+On the owner's iPhones on iOS 17 and 26.5, one Apple ID, builds of the same kind. The store mirrors only with the full version, so first buy it on each device and relaunch: through `Configs/CircuitTimer.storekit` in a Debug build run from Xcode, or with a sandbox account in TestFlight.
 
 - [ ] An update from a CT-2 store: the sample shows once and no hidden-records footnote appears; the store migrates on iOS 17 too.
 - [ ] Create, edit, reorder and delete on one device appear on the other while its list stays open and active (E3b). If an import arrives without its event, the list needs a bounded refresh while active; if no import arrives at all, the owner decides.

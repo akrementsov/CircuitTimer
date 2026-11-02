@@ -18,6 +18,8 @@ let package = Package(
         .library(name: "BackgroundExecution", targets: ["BackgroundExecution"]),
         .library(name: "BackgroundNotifications", targets: ["BackgroundNotifications"]),
         .library(name: "CloudSync", targets: ["CloudSync"]),
+        .library(name: "Purchases", targets: ["Purchases"]),
+        .library(name: "PurchaseFeature", targets: ["PurchaseFeature"]),
         .library(name: "WorkoutDomain", targets: ["WorkoutDomain"]),
         .library(name: "WorkoutActivity", targets: ["WorkoutActivity"]),
         .library(name: "WorkoutHealth", targets: ["WorkoutHealth"]),
@@ -50,6 +52,8 @@ let package = Package(
                 "BackgroundExecution",
                 "CloudSync",
                 "DesignSystem",
+                "PurchaseFeature",
+                "Purchases",
                 "SettingsFeature",
                 "UITestContract",
                 "WatchLink",
@@ -73,6 +77,7 @@ let package = Package(
                 "BackgroundExecution",
                 "CloudSync",
                 "AppFeature",
+                "Purchases",
                 "SettingsFeature",
                 "WatchLink",
                 "WorkoutActivity",
@@ -92,6 +97,7 @@ let package = Package(
                 "BackgroundExecution",
                 "BackgroundNotifications",
                 "CloudSync",
+                "Purchases",
                 "SettingsFeature",
                 "UITestContract",
                 "WatchLink",
@@ -110,6 +116,7 @@ let package = Package(
             name: "AppScenariosTests",
             dependencies: [
                 "AppScenarios",
+                "Purchases",
                 "UITestContract",
                 "WorkoutDomain",
                 "WorkoutStorage",
@@ -152,6 +159,7 @@ let package = Package(
             name: "SettingsFeature",
             dependencies: [
                 "CloudSync",
+                "Purchases",
                 "TimerPreferences",
                 "DesignSystem",
                 "UITestContract",
@@ -163,6 +171,7 @@ let package = Package(
         .target(
             name: "CloudSync",
             dependencies: [
+                "Purchases",
                 .product(name: "Dependencies", package: "swift-dependencies"),
                 .product(name: "DependenciesMacros", package: "swift-dependencies"),
                 .product(name: "Sharing", package: "swift-sharing"),
@@ -173,6 +182,43 @@ let package = Package(
             name: "CloudSyncTests",
             dependencies: [
                 "CloudSync",
+                .product(name: "Dependencies", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "PurchaseFeature",
+            dependencies: [
+                "DesignSystem",
+                "Purchases",
+                "UITestContract",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+            ],
+            resources: [.process("Resources")],
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "Purchases",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "PurchaseFeatureTests",
+            dependencies: [
+                "PurchaseFeature",
+                "Purchases",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "DependenciesTestSupport", package: "swift-dependencies"),
+            ],
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "PurchasesTests",
+            dependencies: [
+                "Purchases",
                 .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             swiftSettings: strictSettings
@@ -313,6 +359,7 @@ let package = Package(
             name: "SettingsFeatureTests",
             dependencies: [
                 "CloudSync",
+                "Purchases",
                 "TimerPreferences",
                 "SettingsFeature",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),

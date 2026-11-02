@@ -45,6 +45,7 @@ struct CloudSyncMonitorEventTests {
     @Test
     func test_handle_failedSetupBeforeStoreOpened_showsOnceMirroring() async throws {
         let harness = MonitorHarness()
+        _ = harness.monitor.mirroredContainer()
         let statuses = harness.monitor.status()
         _ = await statuses.next()
 

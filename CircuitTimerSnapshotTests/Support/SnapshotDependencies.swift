@@ -1,6 +1,7 @@
 import BackgroundNotifications
 import CloudSync
 import ComposableArchitecture
+import Purchases
 import WatchLink
 
 enum SnapshotDependencies {
@@ -8,6 +9,7 @@ enum SnapshotDependencies {
         dependencies.defaultAppStorage = .inMemory
         dependencies.backgroundNotifications.access = { .authorized }
         dependencies.cloudSync = .previewValue
+        dependencies.purchases = .previewValue
         dependencies.watchCompanion = .previewValue
         dependencies.continuousClock = TestClock()
     }

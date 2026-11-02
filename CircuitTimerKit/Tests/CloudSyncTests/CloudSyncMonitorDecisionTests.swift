@@ -114,6 +114,7 @@ struct CloudSyncMonitorDecisionTests {
     @Test
     func test_status_subscribers_getCurrentStatusFirstThenEachChange() async throws {
         let harness = MonitorHarness()
+        _ = harness.monitor.mirroredContainer()
         let first = harness.monitor.status()
         #expect(await first.next() == CloudSyncStatus(isRequested: true, isMirroring: nil, problem: nil))
 

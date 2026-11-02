@@ -32,6 +32,9 @@ struct TypographyTokenTests {
             case .button:
                 #expect(regular.pointSize == 17)
                 #expect(regular.weight == Self.resolvedWeight(.regular))
+            case .sheetTitle:
+                #expect(regular.pointSize == 28)
+                #expect(regular.weight == Self.resolvedWeight(.bold))
         }
         #expect(accessibility.pointSize > regular.pointSize)
     }

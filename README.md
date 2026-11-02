@@ -11,11 +11,12 @@ An interval and circuit training timer for iPhone. A workout is a warm-up, a tra
   <img src="docs/images/lock-screen.jpg" width="200" alt="The Live Activity on the Lock Screen">
 </p>
 
-- A workout list and editor, stored with SwiftData and synced between the user's devices through iCloud.
+- A workout list and editor, stored with SwiftData and, with the full version, synced between the user's devices through iCloud.
 - A full-screen timer that keeps its progress across backgrounding and relaunches.
 - Tones, haptics, spoken stage names and background notifications, each with its own switch in Settings.
 - A Live Activity on the Lock Screen and in the Dynamic Island, with Pause/Resume on the card. On iOS 26 and later a Health workout session keeps a running timer alive, so closing the app removes its card and notifications; the timer's workout is saved to Apple Health without its pauses.
 - An Apple Watch app that shows the iPhone's workouts and its running workout, whose time counts only while the iPhone confirms it; Pause/Resume and Start from the watch come next ([Apple Watch](docs/apple-watch.md)).
+- A one-time purchase of the full version with StoreKit 2 unlocks iCloud sync and more than two workouts, and will unlock the Apple Watch app ([Purchases](docs/purchases.md)).
 - A swipe on a tab's root switches tabs; the interface is in English and Russian.
 
 The repository is also a showcase of how I build iOS apps: a small domain core with explicit contracts, TCA features on top, and tooling that keeps every commit green. Delivered milestones, what comes next and the release checklist are in the [roadmap](docs/roadmap.md).
@@ -26,6 +27,7 @@ The repository is also a showcase of how I build iOS apps: a small domain core w
 - **Feature boundaries.** TCA features that never import each other, composed in one root: [Architecture](#architecture) and [AGENTS.md](AGENTS.md).
 - **The Live Activity.** Pause/Resume from the Lock Screen and the Dynamic Island; a command from an outdated card is ignored: [Live Activity](docs/live-activity.md).
 - **iCloud sync.** One visible copy per workout on every device, deletions that stay deleted: [iCloud sync](docs/icloud-sync.md).
+- **Purchases.** StoreKit 2 without a stored flag; the launch decides iCloud once, after StoreKit answers: [Purchases](docs/purchases.md).
 - **Tests.** Unit, UI and snapshot tests, and `make verify-clean` before every merge: [Testing](#testing).
 
 ## Stack
