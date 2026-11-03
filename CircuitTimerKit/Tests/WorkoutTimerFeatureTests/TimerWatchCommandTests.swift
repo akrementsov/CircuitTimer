@@ -1,5 +1,6 @@
 @testable import WorkoutTimerFeature
 
+import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
@@ -27,20 +28,21 @@ struct TimerWatchCommandTests {
         _ state: WorkoutTimerFeature.State,
         generation: Int = 3,
         cardReady: Bool = false,
-        isEnding: Bool = false
+        isEnding: Bool = false,
+        notifications: Bool = false
     ) -> TimerHarness {
         var state = state
         state.activityControls = WorkoutTimerFeature.ActivityControlState(
             isReady: cardReady, isEnding: isEnding, generation: generation
         )
-        let timer = TimerHarness(state)
+        let timer = TimerHarness(state, notifications: notifications)
         timer.store.exhaustivity = .off
         return timer
     }
 
     /// The card's acknowledgements, which a watch command must never send.
-    private static func recordCardAcknowledgements(_ timer: TimerHarness) -> LockIsolated<[LiveActivityControlResult]> {
-        let results = LockIsolated<[LiveActivityControlResult]>([])
+    private static func recordCardAcknowledgements(_ timer: TimerHarness) -> Observed<[LiveActivityControlResult]> {
+        let results = Observed<[LiveActivityControlResult]>([])
         timer.store.dependencies.liveActivity.requestHandled = { _, _, result in
             results.withValue { $0.append(result) }
         }
@@ -72,6 +74,11 @@ struct TimerWatchCommandTests {
             }
         }
 
+        /// Drains started from now on wait again; those already answered stay answered.
+        func holdFromNow() {
+            outcomes.withValue { $0.fromNow = nil }
+        }
+
         /// Ends every drain still waiting, so no effect outlives the test.
         func release() {
             outcomes.withValue { $0.fromNow = $0.fromNow ?? .superseded }
@@ -90,6 +97,28 @@ struct TimerWatchCommandTests {
             return LiveActivitySyncResult(outcome: outcomes.byRevision[revision] ?? outcomes.fromNow ?? .failed)
         }
         return drains
+    }
+
+    /// A timer whose run has background notifications to schedule.
+    private static func notifying(_ phase: TimerPhase) -> WorkoutTimerFeature.State {
+        var state = WorkoutTimerFeature.State.fixture(phase)
+        state.notifications.access = .authorized
+        state.$isSoundOn = SharedReader(value: false)
+        state.notifications.projection = state.notificationProjection(at: origin, language: "en")
+        return state
+    }
+
+    /// The notifications' syncs wait until the test lets them finish with `report`.
+    private static func holdNotifications(
+        _ timer: TimerHarness,
+        report: NotificationSyncReport = NotificationSyncReport()
+    ) -> Observed<Bool> {
+        let finished = Observed(false)
+        timer.store.dependencies.backgroundNotifications.sync = { _, _, _ in
+            await finished.wait { $0 }
+            return report
+        }
+        return finished
     }
 
     enum Applied: CaseIterable, Sendable {
@@ -354,5 +383,186 @@ struct TimerWatchCommandTests {
         drains.answerFromNow(.applied)
         await timer.watch.controls.wait { !$0.isEmpty }
         await timer.cancelClockLoop()
+    }
+
+    /// The watch's command goes through the same pass as the card's: the same assertions and the same record write.
+    @Test
+    func test_watchCommand_takesTheSameAssertionsAndWriteAsTheCardsCommand() async {
+        let card = Self.harness(.fixture(.running), cardReady: true)
+        Self.holdDrains(card).answerFromNow(.applied)
+        await card.store.send(.internal(.activityRequestReceived(.init(id: 17, command: .pause, generation: 3))))
+        let watch = Self.harness(.fixture(.running), cardReady: true)
+        Self.holdDrains(watch).answerFromNow(.applied)
+        await watch.store.send(Self.command(9, .pause))
+
+        #expect(watch.assertions.value.count == card.assertions.value.count)
+        #expect(!watch.assertions.value.isEmpty)
+        #expect(watch.store.state.run == card.store.state.run)
+        // The record each pass asked for is the one written.
+        await card.store.receive(\.internal.recordWritten)
+        await watch.store.receive(\.internal.recordWritten)
+        #expect(!watch.writes.value.isEmpty)
+        #expect(watch.writes.value.first == card.writes.value.first)
+        await card.cancelClockLoop()
+        await watch.cancelClockLoop()
+    }
+
+    /// The watch's command waits for the notifications its pass required, like the card's, and a partial failure
+    /// leaves it applied.
+    @Test
+    func test_watchCommand_waitsForTheNotifications_andStaysAppliedWhenSomeFail() async {
+        let timer = Self.harness(Self.notifying(.paused), notifications: true)
+        let notifications = Self.holdNotifications(timer, report: NotificationSyncReport(failed: 1))
+
+        await timer.store.send(Self.command(9, .resume))
+        #expect(timer.store.state.snapshot.status == .running)
+        #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 9))
+        #expect(timer.watch.controls.value.isEmpty)
+        notifications.setValue(true)
+        await timer.watch.controls.wait { !$0.isEmpty }
+
+        #expect(timer.watch.controls.value.map(\.result) == [.applied])
+        // The store's state takes the actions its effects sent only as the test receives them.
+        await timer.store.skipReceivedActions(strict: false)
+        #expect(timer.store.state.notifications.hasSchedulingFailed)
+        await timer.cancelClockLoop()
+    }
+
+    /// A watch command whose drain answered but whose notifications hang is released at the stall limit without an
+    /// answer; one millisecond before it, finishing notifications still answer it.
+    @Test(arguments: [false, true])
+    func test_watchCommand_withItsNotificationsPending_isReleasedOnlyAtTheStallLimit(reachesTheLimit: Bool) async {
+        let timer = Self.harness(Self.notifying(.running), cardReady: true, notifications: true)
+        let drains = Self.holdDrains(timer)
+        let notifications = Self.holdNotifications(timer)
+        drains.answerFromNow(.applied)
+
+        await timer.store.send(Self.command(9, .pause))
+        while let pending = timer.store.state.activityControls?.pending, pending.activityResult == nil {
+            await timer.store.receive(\.internal.activitySynchronized)
+        }
+        #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 9))
+
+        if reachesTheLimit {
+            await timer.clock.advance(by: LiveActivityControlTiming.stallLimit)
+            await timer.store.receive(\.internal.watchCommandStallLimitReached)
+            #expect(timer.store.state.activityControls?.pending == nil)
+            #expect(timer.watch.controls.value.isEmpty)
+            notifications.setValue(true)
+        } else {
+            await timer.clock.advance(by: LiveActivityControlTiming.stallLimit - .milliseconds(1))
+            notifications.setValue(true)
+            await timer.watch.controls.wait { !$0.isEmpty }
+            #expect(timer.watch.controls.value.map(\.result) == [.applied])
+        }
+        await timer.cancelClockLoop()
+    }
+
+    /// The watch's commands need no card, but a closing timer that the watch subscribes first starts ending.
+    @Test
+    func test_watchTask_ofAClosingTimer_createsTheControlsEnding() async {
+        var state = WorkoutTimerFeature.State.fixture(.running)
+        state.isClosing = true
+        let timer = TimerHarness(state)
+        timer.store.exhaustivity = .off
+
+        await timer.store.send(.view(.watchTask))
+
+        #expect(timer.store.state.activityControls?.isEnding == true)
+        await timer.store.skipInFlightEffects(strict: false)
+    }
+
+    /// The card's command is held first: the watch's is `busy`, and the card is not answered for it.
+    @Test
+    func test_watchCommand_whileACardCommandIsHeld_isBusy() async {
+        let timer = Self.harness(.fixture(.running), cardReady: true)
+        let drains = Self.holdDrains(timer)
+        let card = Self.recordCardAcknowledgements(timer)
+
+        await timer.store.send(.internal(.activityRequestReceived(.init(id: 17, command: .pause, generation: 3))))
+        await drains.started.wait { !$0.isEmpty }
+        await timer.store.send(Self.command(9, .resume, generation: 4))
+        await timer.watch.controls.wait { !$0.isEmpty }
+
+        #expect(timer.watch.controls.value.map(\.result) == [.busy])
+        #expect(timer.store.state.activityControls?.pending?.source == .liveActivity(requestID: 17))
+        // The card gets its own answer once its drain does, and nothing for the watch's command.
+        drains.answerFromNow(.applied)
+        await card.wait { !$0.isEmpty }
+        #expect(card.value == [.applied])
+        #expect(timer.watch.controls.value.count == 1)
+        await timer.cancelClockLoop()
+    }
+
+    /// After a command is answered, the stall action of that command decides nothing for the next one.
+    @Test
+    func test_lateStallAction_ofAnAnsweredCommand_doesNotReleaseTheNextOne() async {
+        let timer = Self.harness(.fixture(.running), cardReady: true)
+        let drains = Self.holdDrains(timer)
+        drains.answerFromNow(.applied)
+        await timer.store.send(Self.command(9, .pause))
+        await timer.watch.controls.wait { !$0.isEmpty }
+        await timer.store.skipReceivedActions(strict: false)
+        #expect(timer.store.state.activityControls?.pending == nil)
+
+        drains.holdFromNow()
+        await timer.store.send(Self.command(10, .resume, generation: 4))
+        await timer.store.send(.internal(.watchCommandStallLimitReached(requestID: 9)))
+
+        #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 10))
+        #expect(timer.watch.controls.value.map(\.requestID) == [9])
+        drains.release()
+        await timer.store.skipInFlightEffects(strict: false)
+    }
+
+    /// The stall limit counts from the command's admission: a later pass while it is held does not postpone it.
+    @Test
+    func test_watchCommand_stallLimit_countsFromTheAdmission_throughLaterPasses() async {
+        let timer = Self.harness(.fixture(.running), cardReady: true)
+        let drains = Self.holdDrains(timer)
+        await timer.store.send(Self.command(9, .pause))
+        await drains.started.wait { !$0.isEmpty }
+
+        await timer.clock.advance(by: .seconds(4))
+        await timer.store.send(.view(.notificationPreferencesChanged))
+        await timer.clock.advance(by: LiveActivityControlTiming.stallLimit - .seconds(4))
+        await timer.store.receive(\.internal.watchCommandStallLimitReached)
+
+        #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 9))
+        drains.release()
+        await timer.store.skipInFlightEffects(strict: false)
+    }
+
+    /// A watch command already past the stall limit when its wait is scheduled stops waiting at once.
+    @Test
+    func test_watchCommand_pastTheStallLimitWhenItsWaitIsScheduled_stopsWaitingAtOnce() async {
+        var state = WorkoutTimerFeature.State.fixture(.paused)
+        // Admitted at the test clock's start, which every fresh test clock shares.
+        state.activityControls = WorkoutTimerFeature.ActivityControlState(
+            isReady: true,
+            generation: 4,
+            pending: WorkoutTimerFeature.PendingActivityControl(
+                source: .watch(requestID: 9), result: .applied, admittedAt: MonotonicInstant(now: TestClock<Duration>())
+            )
+        )
+        let timer = TimerHarness(state)
+        timer.store.exhaustivity = .off
+        let drains = Self.holdDrains(timer)
+        await timer.clock.advance(by: LiveActivityControlTiming.stallLimit + .seconds(1))
+
+        await timer.store.send(.view(.notificationPreferencesChanged))
+        await drains.started.wait { !$0.isEmpty }
+        #expect(timer.store.state.activityControls?.pending?.isStallScheduled == true)
+        await timer.clock.advance()
+        await timer.store.receive(\.internal.watchCommandStallLimitReached)
+
+        // Its drain hangs, so it stays held; once the drain ends it is released without an answer.
+        #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 9))
+        drains.answerFromNow(.applied)
+        while timer.store.state.activityControls?.pending != nil {
+            await timer.store.receive(\.internal.activitySynchronized)
+        }
+        #expect(timer.watch.controls.value.isEmpty)
+        await timer.store.skipInFlightEffects(strict: false)
     }
 }

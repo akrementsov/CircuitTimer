@@ -136,19 +136,22 @@ struct WatchRemoteCommandTests {
         case afterItsEnd
         case waiting
         case noLease
+        case noRun
     }
 
     @Test(arguments: Untappable.allCases)
     func test_tap_whenTheControlCannotBeUsed_sendsNothing(untappable: Untappable) async {
         let endsIn: Double = untappable == .afterItsEnd ? 5 : 30
-        let harness = RunHarness(.showing(runningRun(endsIn: endsIn), lease: untappable != .noLease))
+        var state = State.showing(runningRun(endsIn: endsIn), lease: untappable != .noLease)
+        if untappable == .noRun { state.run = nil }
+        let harness = RunHarness(state)
         switch untappable {
             case .afterItsEnd:
                 // The stage ended under a live lease, before its `stageEnded` arrived.
                 harness.wall.withValue { $0 = earlier.addingTimeInterval(endsIn) }
             case .waiting:
                 await harness.store.send(.view(.controlButtonTapped))
-            case .noLease:
+            case .noLease, .noRun:
                 break
         }
         let sentBefore = harness.state.command
@@ -241,12 +244,14 @@ struct WatchRemoteCommandTests {
     @Test
     func test_reply_sameProcess_carriesOrRevokesTheLease_neverOpensOne() async throws {
         let paused = heldRun(.paused(heldStage))
-        let live = Self.harness()
+        // A reply is the iPhone's answer, as a refresh's is.
+        let live = RunHarness(.showing(runningRun(), lease: true), hasAnswered: false)
         let liveID = try await Self.tap(live)
         await live.store.send(.internal(.commandAnswered(
             sentID: liveID, Self.controlReply(liveID, .applied, runState(sequence: 3, run: paused))
         )))
         #expect(live.state.command == nil)
+        #expect(live.state.refresh.hasAnswered)
         #expect(live.state.run?.run == paused)
         #expect(live.state.lease != nil)
         #expect(live.state.commandNote == nil)
@@ -388,11 +393,14 @@ struct WatchRemoteCommandTests {
     func test_commandTimeout_endsTheCommandWithChecking_andAsksOnceWithoutALease() async throws {
         let harness = RunHarness(.showing(runningRun(endsIn: 600), lease: true))
         await harness.advance(seconds: 5)
-        _ = try await Self.tap(harness)
+        let id = try await Self.tap(harness)
+        await harness.replies.waiting.wait { $0.contains(id) }
         let requestsBefore = harness.requests
 
         await harness.advance(seconds: 10)
         await harness.store.receive(\.internal.commandTimedOut)
+        // The send that never answered is cancelled, synchronously with the action.
+        #expect(!harness.replies.waiting.value.contains(id))
 
         #expect(harness.state.command == nil)
         #expect(harness.state.commandNote?.note == .checking)
@@ -475,6 +483,12 @@ struct WatchRemoteCommandTests {
         if isRefreshInFlight {
             #expect(harness.requests == requestsBefore)
             #expect(harness.state.refresh.needsRefresh)
+            // The refresh in flight answers; the reason it kept asks once after it.
+            await harness.store.send(.internal(.refreshAnswered(
+                sentID: UUID(watch: 9), reply(UUID(watch: 9), runState(sequence: 3, run: runningRun()))
+            )))
+            #expect(harness.requests == requestsBefore + 1)
+            #expect(!harness.state.refresh.needsRefresh)
         } else {
             #expect(harness.requests == requestsBefore + 1)
         }
@@ -521,6 +535,7 @@ struct WatchRemoteCommandTests {
     func test_background_dropsTheCommandAndItsNote_andALateReplyChangesNothing() async throws {
         let harness = Self.harness()
         let id = try await Self.tap(harness)
+        await harness.replies.waiting.wait { $0.contains(id) }
         await harness.store.send(.view(.scenePhaseChanged(.background)))
 
         #expect(harness.state.command == nil)
@@ -530,7 +545,12 @@ struct WatchRemoteCommandTests {
             sentID: id, Self.controlReply(id, .stale, runState(sequence: 3, run: runningRun(stage: "Other")))
         )))
         #expect(harness.state == before)
-        await harness.finish()
+        // Both of the command's effects were cancelled: the send stopped waiting with the leaving, and past the
+        // command's timeout nothing arrives, which an exhaustive store would report.
+        #expect(!harness.replies.waiting.value.contains(id))
+        harness.store.exhaustivity = .on
+        await harness.advance(seconds: 10)
+        await harness.store.finish()
     }
 }
 

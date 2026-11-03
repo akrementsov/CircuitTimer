@@ -114,9 +114,10 @@ final class RunHarness {
     let sent = LockIsolated<[WatchRequest]>([])
     let store: TestStoreOf<WatchRemoteFeature>
 
-    init(_ state: WatchRemoteFeature.State? = nil) {
+    /// `hasAnswered: false` for a watch the iPhone has not answered yet.
+    init(_ state: WatchRemoteFeature.State? = nil, hasAnswered: Bool = true) {
         var initial = state ?? stateShowing(watchCatalog("Morning"), digest: "A")
-        initial.refresh.hasAnswered = true
+        initial.refresh.hasAnswered = hasAnswered
         let (clock, wall, replies, sent) = (clock, wall, replies, sent)
         store = TestStore(initialState: initial) {
             WatchRemoteFeature()

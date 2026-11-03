@@ -151,7 +151,8 @@ actor WatchCompanion {
         }
     }
 
-    private func subscriptionEnded(owner: UUID, subscriptionID: Int) {
+    /// Also what a replaced stream's late termination calls; internal so tests can make that call at a known point.
+    func subscriptionEnded(owner: UUID, subscriptionID: Int) {
         guard subscriptions[owner]?.id == subscriptionID else { return }
         subscriptions[owner]?.continuation.finish()
         subscriptions[owner] = nil
@@ -247,8 +248,9 @@ actor WatchCompanion {
 
     /// The reply to a command. `applied` and `stale` come only with the live state the timer published for them;
     /// without it in time the iPhone does not know what the watch should show, so the result is `timedOut`. A command
-    /// the timer may have applied is never answered as refused.
-    private func commandState(
+    /// the timer may have applied is never answered as refused. Internal so a test can pass an arrival already past the
+    /// wait, which no event can order before the task starts.
+    func commandState(
         owner requested: UUID,
         command: LiveActivityCommand,
         generation: Int,

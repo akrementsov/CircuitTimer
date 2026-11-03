@@ -5,6 +5,7 @@ import Foundation
 import Testing
 import TestSupport
 import WorkoutActivity
+import WorkoutDomain
 
 /// A Pause or Resume from the watch: it goes to the run's timer through `CommandGate`, is answered once within 5 s of
 /// its arrival, and says `applied` or `stale` only with the live state the timer published for it.
@@ -146,6 +147,30 @@ struct WatchCompanionCommandTests {
         #expect(!reply.state.isRunLive)
     }
 
+    /// A command whose 5 s ran out before its task started reaches no timer: the watch is told it was not applied.
+    @Test
+    func test_command_arrivedPastItsWaitBeforeItsTaskRan_isUnavailable_andNeverReachesTheTimer() async throws {
+        var (companion, requests) = await running()
+        let arrival = MonotonicInstant(now: clock)
+        clock.advance(by: WatchCompanion.timerWait)
+
+        let (result, state) = await companion.commandState(
+            owner: owner(1), command: .pause, generation: 3, knownCatalogDigest: nil, arrival: arrival
+        )
+
+        #expect(result == .unavailable)
+        #expect(!state.isRunLive)
+        // It took no number and no place in the timer's stream: the next command, of another kind, is the first the timer
+        // reads.
+        let later = Task { try await command(8, .resume, generation: 5) }
+        let next = try #require(await requests.next())
+        #expect(next.id == 1)
+        #expect(next.kind == .command(.resume, generation: 5))
+        await clock.waitForStartedSleeps(1)
+        clock.advance(by: WatchCompanion.timerWait)
+        _ = try await later.value
+    }
+
     enum Unconfirmed: CaseIterable, Sendable {
         case appliedWithoutPublication
         case staleWithoutPublication
@@ -217,7 +242,7 @@ struct WatchCompanionCommandTests {
     func test_command_timersBufferFull_timesOutWithoutReachingIt() async throws {
         let companion = start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
-        let requests = await companion.controlRequests(owner: owner(1))
+        var requests = await companion.controlRequests(owner: owner(1)).makeAsyncIterator()
         try await withThrowingTaskGroup(of: Void.self) { group in
             // The buffer keeps four refreshes nobody reads; the command does not fit.
             for number in 1...4 {
@@ -235,10 +260,18 @@ struct WatchCompanionCommandTests {
 
             #expect(reply.result == .timedOut)
             #expect(!reply.state.isRunLive)
+            // The buffer holds the refreshes' numbers 1–4, so the command took 5.
+            var buffered: [Int] = []
+            for _ in 1...4 {
+                buffered.append(try #require(await requests.next()).id)
+            }
+            #expect(buffered == [1, 2, 3, 4])
+            // No ticket waits for it: an answer by its number only publishes.
+            await companion.controlHandled(owner: owner(1), requestID: 5, result: .applied, publication: Self.publication())
+            #expect(try link.writtenStates().last?.run == makeRun(stage: "A2"))
             clock.advance(by: WatchCompanion.timerWait)
             try await group.waitForAll()
         }
-        _ = requests
     }
 
     @Test
@@ -287,6 +320,10 @@ struct WatchCompanionCommandTests {
         #expect(!reply.state.isRunLive)
         let next = try await command(2)
         #expect(next.result == .unavailable)
+        // The ledger's gate closed with it: a later publication writes nothing.
+        let written = try link.writtenStates().count
+        await companion.publishRun(revision: 5, run: makeRun(stage: "A5"))
+        #expect(try link.writtenStates().count == written)
     }
 
     /// A replaced subscription answers the old one's command as unknown; the new one takes the next command, and the
@@ -299,8 +336,9 @@ struct WatchCompanionCommandTests {
 
         var newRequests = await companion.controlRequests(owner: owner(1)).makeAsyncIterator()
         let oldReply = try await old.value
-        // The old stream's termination callback runs on its own task; it must find the new subscription untouched.
         #expect(await oldRequests.next() == nil)
+        // The old stream's termination callback runs on its own task, at no known point: make its call here.
+        await companion.subscriptionEnded(owner: owner(1), subscriptionID: 1)
         let new = Task { try await command(2) }
         let newRequest = try #require(await newRequests.next())
         await companion.controlHandled(owner: owner(1), requestID: newRequest.id, result: .applied, publication: Self.publication())
@@ -309,6 +347,44 @@ struct WatchCompanionCommandTests {
         let newReply = try await new.value
         #expect(newReply.result == .applied)
         #expect(newReply.state.isRunLive)
+    }
+
+    /// The timer answers a command its ended subscription already answered as unknown: its own run is published, a
+    /// run of another timer is not, and the watch got one reply.
+    @Test
+    func test_lateAnswer_afterTheSubscriptionEnded_publishesOnlyItsOwnersRun() async throws {
+        var (companion, requests) = await running()
+        let pending = Task { try await command(1) }
+        let request = try #require(await requests.next())
+        _ = await companion.controlRequests(owner: owner(1))
+        let reply = try await pending.value
+        #expect(reply.result == .timedOut)
+
+        await companion.controlHandled(owner: owner(1), requestID: request.id, result: .applied, publication: Self.publication(owner: 2))
+        #expect(try link.writtenStates().last?.run == makeRun(stage: "A1"))
+        await companion.controlHandled(owner: owner(1), requestID: request.id, result: .applied, publication: Self.publication())
+        #expect(try link.writtenStates().last?.run == makeRun(stage: "A2"))
+        #expect(reply.answers.value.count == 1)
+    }
+
+    /// Two commands wait together: each reply goes back to its own request, whatever order the timer answers in.
+    @Test
+    func test_twoCommands_eachAnswerReachesItsOwnRequest() async throws {
+        var (companion, requests) = await running()
+        let first = Task { try await command(1) }
+        let firstRequest = try #require(await requests.next())
+        let second = Task { try await command(2, .resume, generation: 4) }
+        let secondRequest = try #require(await requests.next())
+
+        await companion.controlHandled(owner: owner(1), requestID: secondRequest.id, result: .stale, publication: Self.publication())
+        await companion.controlHandled(owner: owner(1), requestID: firstRequest.id, result: .busy, publication: Self.publication())
+
+        let secondReply = try await second.value
+        let firstReply = try await first.value
+        #expect(secondReply.requestID == UUID(link: 2))
+        #expect(secondReply.result == .stale)
+        #expect(firstReply.requestID == UUID(link: 1))
+        #expect(firstReply.result == .busy)
     }
 
     @Test
@@ -324,6 +400,8 @@ struct WatchCompanionCommandTests {
         let refreshRequest = try #require(await requests.next())
         let pending = Task { try await command(2) }
         let commandRequest = try #require(await requests.next())
+        // Refreshes and commands take their numbers from one counter, so the timer never sees one twice.
+        #expect(commandRequest.id == refreshRequest.id + 1)
 
         await companion.controlHandled(owner: owner(1), requestID: commandRequest.id, result: .busy, publication: Self.publication())
         await companion.refreshHandled(owner: owner(1), requestID: refreshRequest.id, publication: Self.publication(3, stage: "A3"))
