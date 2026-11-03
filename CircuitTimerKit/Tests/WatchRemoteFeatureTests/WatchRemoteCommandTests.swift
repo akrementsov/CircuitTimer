@@ -323,6 +323,23 @@ struct WatchRemoteCommandTests {
         await harness.finish()
     }
 
+    /// A newer message of the same timer overtook the command's reply: the outcome is not about the content shown.
+    @Test
+    func test_reply_overtakenByNewerContentOfTheSameTimer_showsNoNote() async throws {
+        let harness = Self.harness()
+        let id = try await Self.tap(harness)
+        await harness.store.send(.internal(.event(.message(runState(sequence: 4, run: runningRun(stage: "Next"))))))
+
+        await harness.store.send(.internal(.commandAnswered(
+            sentID: id, Self.controlReply(id, .stale, runState(sequence: 3, run: runningRun()))
+        )))
+
+        #expect(harness.state.command == nil)
+        #expect(harness.state.run?.run == runningRun(stage: "Next"))
+        #expect(harness.state.commandNote == nil)
+        await harness.finish()
+    }
+
     enum Envelope: CaseIterable, Sendable {
         case unreadable
         case anotherRequestsID

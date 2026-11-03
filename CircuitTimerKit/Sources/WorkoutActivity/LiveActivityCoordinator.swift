@@ -494,6 +494,7 @@ extension LiveActivityCoordinator {
         guard let ticket = owners[id]?.control, ticket.request.id == requestID else { return }
 
         owners[id]?.control = nil
+        owners[id]?.loggedStallID = nil
         ticket.complete(result)
     }
 

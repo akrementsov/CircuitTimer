@@ -210,13 +210,14 @@ extension WorkoutTimerFeature {
         let isWatch = if case .watch = pending.source { true } else { false }
         if isWatch, pending.activityResult == nil, pending.activityRevision == 0, !state.syncsLiveActivity {
             // No drain was started for it: the card cannot be shown or is not subscribed. A drain already started,
-            // also one whose subscription ended since, still answers and is waited for.
+            // also one whose subscription ended since, still answers and is waited for. `activityRevision` is set by
+            // `syncLiveActivity`, which the second reducer runs before this in the same pass; keep that order.
             pending.activityResult = .unavailable
         }
         let isStalledWatch = isWatch && isStalled(pending)
         guard pending.activityResult != nil,
               isStalledWatch || state.notifications.completedRevision >= pending.notificationRevision else {
-            guard case let .watch(requestID) = pending.source, !pending.isStallScheduled else {
+            guard case .watch = pending.source, !pending.isStallScheduled else {
                 state.activityControls?.pending = pending
                 return .merge(effects)
             }
@@ -227,7 +228,7 @@ extension WorkoutTimerFeature {
             effects.append(
                 .run { [clock] send in
                     try await clock.sleep(for: max(.zero, limit ?? .zero))
-                    await send(.internal(.watchCommandStallLimitReached(requestID: requestID)))
+                    await send(.internal(.watchCommandStallLimitReached))
                 }
                 .cancellable(id: CancelID.controlStall, cancelInFlight: true)
             )

@@ -37,7 +37,16 @@ struct TimerWatchCommandTests {
         )
         let timer = TimerHarness(state, notifications: notifications)
         timer.store.exhaustivity = .off
+        forbidCardAcknowledgements(timer)
         return timer
+    }
+
+    /// A watch command never answers the card: any acknowledgement the card gets is recorded as an issue, unless the
+    /// test records the card's own with `recordCardAcknowledgements`.
+    private static func forbidCardAcknowledgements(_ timer: TimerHarness) {
+        timer.store.dependencies.liveActivity.requestHandled = { _, requestID, result in
+            Issue.record("The card was answered \(result) for request \(requestID)")
+        }
     }
 
     /// The card's acknowledgements, which a watch command must never send.
@@ -200,6 +209,7 @@ struct TimerWatchCommandTests {
         state.isClosing = false
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
+        Self.forbidCardAcknowledgements(timer)
         let subscriptions = LockIsolated(0)
         timer.store.dependencies.liveActivity.requests = { _ in
             subscriptions.withValue { $0 += 1 }
@@ -359,7 +369,7 @@ struct TimerWatchCommandTests {
 
         await timer.store.send(Self.command(9, .pause))
         await drains.started.wait { !$0.isEmpty }
-        await timer.store.send(.internal(.watchCommandStallLimitReached(requestID: 1)))
+        await timer.store.send(.internal(.watchCommandStallLimitReached))
         drains.answerFromNow(.applied)
         await timer.watch.controls.wait { !$0.isEmpty }
         #expect(timer.watch.controls.value.map(\.result) == [.applied])
@@ -389,6 +399,7 @@ struct TimerWatchCommandTests {
     @Test
     func test_watchCommand_takesTheSameAssertionsAndWriteAsTheCardsCommand() async {
         let card = Self.harness(.fixture(.running), cardReady: true)
+        _ = Self.recordCardAcknowledgements(card)
         Self.holdDrains(card).answerFromNow(.applied)
         await card.store.send(.internal(.activityRequestReceived(.init(id: 17, command: .pause, generation: 3))))
         let watch = Self.harness(.fixture(.running), cardReady: true)
@@ -465,6 +476,7 @@ struct TimerWatchCommandTests {
         state.isClosing = true
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
+        Self.forbidCardAcknowledgements(timer)
 
         await timer.store.send(.view(.watchTask))
 
@@ -507,7 +519,7 @@ struct TimerWatchCommandTests {
 
         drains.holdFromNow()
         await timer.store.send(Self.command(10, .resume, generation: 4))
-        await timer.store.send(.internal(.watchCommandStallLimitReached(requestID: 9)))
+        await timer.store.send(.internal(.watchCommandStallLimitReached))
 
         #expect(timer.store.state.activityControls?.pending?.source == .watch(requestID: 10))
         #expect(timer.watch.controls.value.map(\.requestID) == [9])
@@ -547,6 +559,7 @@ struct TimerWatchCommandTests {
         )
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
+        Self.forbidCardAcknowledgements(timer)
         let drains = Self.holdDrains(timer)
         await timer.clock.advance(by: LiveActivityControlTiming.stallLimit + .seconds(1))
 

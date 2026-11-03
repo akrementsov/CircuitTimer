@@ -60,6 +60,8 @@ extension WatchRemoteFeature {
                     await send(.internal(.commandFailed(sentID: id, .failed)))
                 }
             }
+            // One command waits at a time. A tap on another timer's button replaces a command still waiting for the
+            // previous timer: its reply would change nothing anyway, its state comes again as a message or a refresh.
             .cancellable(id: CancelID.command, cancelInFlight: true),
             .run { [clock] send in
                 try await clock.sleep(for: Self.commandTimeout)
@@ -103,6 +105,8 @@ extension WatchRemoteFeature {
         } else {
             state.refresh.hasAnswered = true
             received = receive(phoneState, from: .reply, &state)
+            // A newer message of the same timer may have overtaken the reply: its outcome is not about that content.
+            let isAboutShownRun = phoneState.run == state.run?.run
             let note: CommandNote? = switch result {
                 case .applied:
                     nil
@@ -113,7 +117,9 @@ extension WatchRemoteFeature {
                 case .timedOut:
                     .checking
             }
-            showOutcome(note, of: command, &state)
+            if isAboutShownRun {
+                showOutcome(note, of: command, &state)
+            }
         }
         return .merge(ended, received, askAfterCommand(&state))
     }

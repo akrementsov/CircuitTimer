@@ -181,7 +181,7 @@ public struct WorkoutTimerFeature: Sendable {
             case activitySynchronized(revision: Int, LiveActivitySyncResult)
             case watchRequestReceived(WatchControlRequest)
             /// The watch's pending command with this request ID reached `LiveActivityControlTiming.stallLimit`.
-            case watchCommandStallLimitReached(requestID: Int)
+            case watchCommandStallLimitReached
         }
     }
 
@@ -324,7 +324,7 @@ public struct WorkoutTimerFeature: Sendable {
                         return handleControl(command, generation: generation, from: .watch(requestID: request.id), &state, at: now)
                 }
             case .watchCommandStallLimitReached:
-                // Only a pass: its end measures the pending command's own admission, so the action of an earlier
+                // Only a pass: its end measures the pending command's own admission, so a late action of an earlier
                 // command decides nothing, and releases the watch's stalled command once its drain is done.
                 return .none
             case let .activitySynchronized(revision, result):
