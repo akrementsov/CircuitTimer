@@ -2,11 +2,20 @@
 
 The watch app is a remote for the iPhone timer: the workout runs on the iPhone, and without it the watch app does not work. It needs watchOS 10 or later and ships inside the iPhone app. CT-9 delivers it in slices; this page grows with them. The implementation rules are in [AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9), [Module map](../AGENTS.md#module-map) and [Delivery](../AGENTS.md#delivery); change this file together with them.
 
-## What it does now (CT-9-3)
+## What it does now (CT-9-4)
 
-The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. The rows and the run do nothing yet: Pause and Resume and Start from the watch follow in CT-9-4 and CT-9-5 ([roadmap](roadmap.md)).
+The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. The rows do nothing yet: Start from the watch follows in CT-9-5 ([roadmap](roadmap.md)).
 
-The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked about the run, though the list's own reasons still ask (a retry after a failure, the iPhone back in reach, a state the order asks to confirm); raising the wrist shows the time again, or asks once.
+The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked about the run, though the list's own reasons still ask (a retry after a failure, the iPhone back in reach, a state the order asks to confirm, a command's reply from another iPhone process); raising the wrist shows the time again, or asks once.
+
+While the iPhone confirms the time, a Pause or Resume button stands under the cards; the iPhone's timer applies it as it applies the Live Activity's button, also with Live Activities off. Without a confirmation, at a stage's end and with the wrist lowered the button is gone, its place kept. Its outcome:
+
+| Outcome | The watch shows |
+|---|---|
+| Applied | the paused or running workout |
+| The workout changed on the iPhone first (a pause from the card, a stage the watch had not shown as ended) | the iPhone's workout and «The workout changed on iPhone» |
+| The iPhone is busy with another command, or cannot take one | «Couldn't. Try on iPhone» |
+| No answer, or the link failed after sending | «Checking on iPhone…» until the next confirmation shows what the iPhone did |
 
 The list updates when the workouts change on the iPhone. When the watch has no fresh list, it says why:
 
@@ -27,6 +36,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 - The watch app asks the iPhone for its current state when it opens or comes back to the front (lowering and raising the wrist does not count), when the iPhone becomes reachable, and after a failure, again after 5, 10 and 20 seconds, then every 20 seconds while the watch app is open and the iPhone in reach. Once the iPhone answers, the watch does not ask again until the next of these reasons; an unchanged list is confirmed by its digest without being sent again.
 - A request from the watch can launch the iPhone app in the background. That process answers at once but has not read the workouts, so it says it knows no list; the list comes when the iPhone app loads it.
 - The iPhone's timer publishes its run with the list after every change, into the context and to a reachable watch as a message. A request from the watch goes to the running timer, which settles the run, and only its answer confirms the time; the watch counts the 10 seconds from when it sent that request. A context or a message shows the run, but never confirms its time.
+- Pause and Resume go to the running timer the same way, as a request of their own; the timer applies them by the Live Activity's rules (the content the watch showed must be current) and answers once its card and notifications have caught up. The reply carries the run as published then; it keeps a confirmation going but never starts one.
 - Closing the timer, or the system ending the iPhone app, removes the run from what the watch receives; the watch then shows the list again.
 
 ## How it is built and shipped
@@ -59,6 +69,14 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - The time shown includes the difference between the iPhone's and the watch's clocks.
 - Out of reach, the last run shows without its time; after the iPhone app died without ending its run, the run stays until a new iPhone process answers.
 - A workout whose names do not fit in a transfer, even with a shorter list, is not shown on the watch until its timer closes, another workout starts or the iPhone app ends. Since CT-9-3 the list is cut to 60,000 − 8,192 bytes, leaving room for a running workout. A workout larger than that room may show a shorter list on the watch while it runs, and the list comes back whole when it ends.
+- A command that got no answer may have applied: the watch says «Checking on iPhone…» and shows what the next confirmation brings. An answer the iPhone could not confirm in time (a slow card or notification update, a timer that closed, the iPhone app ending) hides the time and the button until the next confirmation.
+- While a command waits, the time shown keeps counting under its confirmation, at most 10 seconds from the last one; if the confirmation runs out meanwhile, the button goes and the outcome shows as a note.
+- A Pause sent from a stage the iPhone has already left pauses the iPhone's current stage: the command is fenced only by changes of the run's phase, as the Live Activity's button is.
+- A command that did not fit the iPhone timer's request queue reads as «Checking on iPhone…» although it never arrived.
+- Commands from the watch and the Live Activity at the same moment: one of them gets «Couldn't». A card update stuck on the iPhone for over 10 seconds makes every later command «Couldn't» until it ends.
+- A reply from another iPhone process is not shown; the watch asks for the state at most once per state, also with the wrist lowered, and a request already in flight may be followed by one more. A command during the run's renewal may cost one extra request too.
+- Leaving the watch app, or closing the timer, while a command waits shows no outcome. A command the iPhone app had already taken when the system ended it reads as «Checking on iPhone…» and may have applied.
+- The full version will gate the watch app in CT-6-2; Pause and Resume are not gated yet.
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
 ## Device checklist
@@ -90,4 +108,14 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] A stage of 10 minutes or more: the clock is as wide as `22:22` and no digit is cut off.
 - [ ] Editing the workout list on the iPhone during a workout: the watch keeps showing the run.
 - [ ] Relaunching the watch app during a workout shows the run.
+- [ ] Pause and Resume from the watch: iPhone open; iOS 26 with Health and the iPhone locked; iOS 17.5 with the iPhone app suspended. The card, the notifications and the Health workout follow the command.
+- [ ] Live Activities off, and separately a swiped-away card: Pause and Resume from the watch apply, without «Couldn't».
+- [ ] Pause on the card, then Pause on the watch before it updates: «The workout changed on iPhone».
+- [ ] Resume from the watch with the stage list, the close dialog and the resume 3-2-1 open on the iPhone.
+- [ ] The button goes at a stage's end and with the iPhone out of reach, comes back with the confirmation, and the cards do not move; «Get ready» and «Done» have no empty space for it.
+- [ ] Bluetooth off on the iPhone while a command waits: «Checking on iPhone…», then the outcome once it is back.
+- [ ] Always On: no button, VoiceOver does not read it, nothing is asked.
+- [ ] The button in English and Russian, at the largest text size and on a 41 mm watch.
+- [ ] iOS 26: swipe the iPhone app away in the App Switcher while a command waits.
+- [ ] Two quick taps on the Live Activity's button while its card is slow to update: the second says to try again shortly, after 10 seconds to check the timer in the app, and never applies.
 - [ ] A watch screen that does not redraw (O4): note when the time disappears after the confirmation ends; the accepted limit is that it goes at the next redraw.

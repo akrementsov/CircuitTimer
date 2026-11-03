@@ -31,9 +31,7 @@ struct TimerActivityLifecycleTests {
             $0.requestedAwake = false
             $0.awakeRevision = 2
             $0.activityControls?.generation = 8
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(
-                id: 17, result: manualPause ? .stale : .applied, activityRevision: 1
-            )
+            $0.activityControls?.pending = .card(17, manualPause ? .stale : .applied, activityRevision: 1, at: timer.clock)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
             $0.followHealth(at: timer.now)
         }
@@ -53,11 +51,9 @@ struct TimerActivityLifecycleTests {
     @Test
     func test_activityTask_liveSubscription_doesNotRegisterAgainOrResetPending() async {
         var state = WorkoutTimerFeature.State.fixture(.paused)
-        state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, generation: 7)
+        state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, isActivitySubscribed: true, generation: 7)
         state.notifications.revision = 2
-        state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(
-            id: 17, result: .applied, activityRevision: 1, activityResult: .applied, notificationRevision: 2
-        )
+        state.activityControls?.pending = .card(17, .applied, activityRevision: 1, activityResult: .applied, notificationRevision: 2)
         let timer = TimerHarness(state)
         _ = timer.recordActivity()
         timer.store.dependencies.liveActivity.requests = { _ in
@@ -83,9 +79,7 @@ struct TimerActivityLifecycleTests {
         )
         if admission == .busy {
             state.notifications.revision = 2
-            state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(
-                id: 16, result: .applied, notificationRevision: 2
-            )
+            state.activityControls?.pending = .card(16, .applied, notificationRevision: 2)
         }
         let timer = TimerHarness(state)
         _ = timer.recordActivity()
@@ -103,7 +97,7 @@ struct TimerActivityLifecycleTests {
         }
         await timer.store.finish()
         #expect(acknowledgements.value == [admission == .busy ? .busy : .unavailable])
-        #expect(timer.store.state.activityControls?.pending?.id == (admission == .busy ? 16 : nil))
+        #expect(timer.store.state.activityControls?.pending?.source == (admission == .busy ? .liveActivity(requestID: 16) : nil))
         #expect(timer.store.state.snapshot.status == .paused)
         #expect(timer.writes.value.isEmpty)
     }
@@ -112,7 +106,7 @@ struct TimerActivityLifecycleTests {
     func test_activityRequestsEnded_clearsReadinessAndReleasesOnlyAnExistingRequest(hasPending: Bool) async {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.activityControls = WorkoutTimerFeature.ActivityControlState(isReady: true, generation: 7)
-        if hasPending { state.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied) }
+        if hasPending { state.activityControls?.pending = .card(17, .applied) }
         let timer = TimerHarness(state)
         let activity = timer.recordActivity()
         let acknowledgements = recordAcknowledgements(timer)
@@ -153,7 +147,7 @@ struct TimerActivityLifecycleTests {
             $0.requestedAwake = true
             $0.awakeRevision = 3
             $0.activityControls?.generation = 8
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .applied, activityRevision: 1, at: timer.clock)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
             $0.followHealth(at: timer.now)
         }
@@ -195,7 +189,7 @@ struct TimerActivityLifecycleTests {
             $0.requestedAwake = command == .resume
             $0.awakeRevision = command == .pause ? 2 : 3
             $0.activityControls?.generation = 8
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .applied, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .applied, activityRevision: 1, at: timer.clock)
             $0.recordSync = .pending(revision: 1, record: WorkoutRunRecord(workoutID: $0.workoutID, run: $0.run))
             $0.followHealth(at: timer.now)
         }
@@ -221,7 +215,7 @@ struct TimerActivityLifecycleTests {
         let gate = holdActivitySync(timer)
         let acknowledgements = recordAcknowledgements(timer)
         let effect = await timer.store.send(.internal(.activityRequestReceived(.init(id: 17, command: .pause, generation: 7)))) {
-            $0.activityControls?.pending = WorkoutTimerFeature.PendingActivityControl(id: 17, result: .stale, activityRevision: 1)
+            $0.activityControls?.pending = .card(17, .stale, activityRevision: 1, at: timer.clock)
         }
         var arrivals = gate.entered.makeAsyncIterator()
         _ = await arrivals.next()

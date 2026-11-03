@@ -29,8 +29,10 @@ extension WatchRemoteFeature.State {
         /// When the digits must be gone: the lease's end, or the running stage's end if it comes first. `nil`: no
         /// digits now.
         let digitsUntil: Date?
-        /// Why there are no digits; `nil` when they show, with the wrist lowered, or once the workout is over.
+        /// Why there are no digits, or what became of a command; `nil` with neither, or once the workout is over.
         let note: RunNote?
+        /// Where Pause or Resume goes.
+        let controlSlot: ControlSlot
 
         func showsDigits(at date: Date) -> Bool {
             digitsUntil.map { date < $0 } ?? false
@@ -41,6 +43,28 @@ extension WatchRemoteFeature.State {
         case waiting
         case unreachable
         case unlock
+        case commandChecking
+        case commandChanged
+        case commandFailed
+    }
+
+    /// The control under the cards. It shows only while the iPhone confirms the time and the stage has not ended: a
+    /// command is fenced by the content it was sent from, which must be what the iPhone runs.
+    enum ControlSlot: Equatable {
+        /// The phase has no control: getting ready, or done.
+        case none
+        /// The control's place, kept empty so the cards do not move when it comes and goes.
+        case reserved
+        case button(RunControl)
+    }
+
+    struct RunControl: Equatable {
+        let command: LiveActivityCommand
+        /// False while a command to this timer waits for its reply.
+        let isEnabled: Bool
+        /// When the button must be gone: the lease's end, or the running stage's end if it comes first. The screen's
+        /// timeline hides it then, before any action arrives, and a tap after it sends nothing.
+        let until: Date
     }
 
     /// A screen for a watch without any list.
@@ -115,24 +139,47 @@ extension WatchRemoteFeature.State {
                     break
             }
         }
-        var note: RunNote?
-        if case .finished = content.phase {
-            note = nil
-        } else if digitsUntil == nil, !isLuminanceReduced, content.phase.hasDigits {
-            if link?.needsUnlock == true {
-                note = .unlock
-            } else if link?.canSend != true || problem == .unreachable {
-                note = .unreachable
-            } else {
-                note = .waiting
-            }
-        }
+        let display = WorkoutActivityDisplay(attributes: shown.run.attributes, content: content, isStale: false)
         return RunScreen(
-            display: WorkoutActivityDisplay(attributes: shown.run.attributes, content: content, isStale: false),
+            display: display,
             digitsFrom: digitsUntil == nil ? nil : lease?.openedAt,
             digitsUntil: digitsUntil,
-            note: note
+            note: runNote(shown, hasDigits: digitsUntil != nil),
+            controlSlot: controlSlot(shown, shownCommand: display.control)
         )
+    }
+
+    /// The link's reason comes first, then the command's outcome, then waiting for the iPhone.
+    private func runNote(_ shown: WatchRemoteFeature.ShownRun, hasDigits: Bool) -> RunNote? {
+        let content = shown.run.content
+        if case .finished = content.phase { return nil }
+        let isMissingDigits = !hasDigits && !isLuminanceReduced && content.phase.hasDigits
+        if isMissingDigits, link?.needsUnlock == true { return .unlock }
+        if isMissingDigits, link?.canSend != true || problem == .unreachable { return .unreachable }
+        if let shownNote = commandNote, shownNote.run == shown.run {
+            switch shownNote.note {
+                case .checking:
+                    return .commandChecking
+                case .changed:
+                    return .commandChanged
+                case .failed:
+                    return .commandFailed
+            }
+        }
+        return isMissingDigits ? .waiting : nil
+    }
+
+    private func controlSlot(_ shown: WatchRemoteFeature.ShownRun, shownCommand: LiveActivityCommand?) -> ControlSlot {
+        guard let shownCommand else { return .none }
+        // The digits' own condition: a confirmation, a stage that has not ended, the wrist raised.
+        guard let lease, !shown.isStageOver, !isLuminanceReduced else { return .reserved }
+        let until = if case let .running(running) = shown.run.content.phase {
+            min(lease.deadline, running.stageEnd)
+        } else {
+            lease.deadline
+        }
+        let isWaiting = command?.owner == shown.run.owner
+        return .button(RunControl(command: shownCommand, isEnabled: !isWaiting && isSceneActive, until: until))
     }
 
     private func statusLine(updatedAt: Date) -> StatusLine? {

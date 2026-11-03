@@ -28,6 +28,8 @@ extension DesignSystem.Token {
 
         /// Minimum side of the Live Activity's Pause/Resume target, also 44 pt.
         public static let activityControl = Self.activityCompactClock
+        /// Minimum height of the watch's Pause/Resume button, the same 44 pt target.
+        public static let watchControl = Self.activityCompactClock
     }
 }
 

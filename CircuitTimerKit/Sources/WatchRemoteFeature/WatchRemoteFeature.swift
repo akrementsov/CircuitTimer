@@ -27,6 +27,10 @@ public struct WatchRemoteFeature: Sendable {
         var isLuminanceReduced = false
         /// Ties a scheduled stage end to the content that scheduled it.
         var runGeneration = 0
+        /// The Pause or Resume waiting for its reply.
+        var command: CommandRequest?
+        /// What became of the last command, while the run it is about shows.
+        var commandNote: ShownCommandNote?
 
         public init() {}
     }
@@ -82,6 +86,7 @@ public struct WatchRemoteFeature: Sendable {
             case luminanceChanged(isReduced: Bool)
             /// The system clock was set; the reducer moves a lease's wall-clock end as every action does.
             case systemClockChanged
+            case controlButtonTapped
         }
 
         @CasePathable public enum Internal: Equatable, Sendable {
@@ -95,6 +100,9 @@ public struct WatchRemoteFeature: Sendable {
             case leaseExpired(serial: Int)
             case runRetryDue(generation: Int)
             case stageEnded(generation: Int)
+            case commandAnswered(sentID: UUID, WatchReplyEnvelope)
+            case commandFailed(sentID: UUID, PhoneLinkError)
+            case commandTimedOut(sentID: UUID)
         }
     }
 
@@ -107,6 +115,8 @@ public struct WatchRemoteFeature: Sendable {
         case lease
         case runRetry
         case stageEnd
+        case command
+        case commandTimeout
     }
 
     static let retryDelays: [Duration] = [.seconds(5), .seconds(10), .seconds(20)]
@@ -153,7 +163,12 @@ public struct WatchRemoteFeature: Sendable {
                 state.refresh.isRenewalDue = false
                 state.refresh.isRetryScheduled = false
                 state.lease = nil
+                // A command's outcome is not shown after a return: the next confirmation shows the run as it is.
+                state.command = nil
+                state.commandNote = nil
                 return .merge(
+                    .cancel(id: CancelID.command),
+                    .cancel(id: CancelID.commandTimeout),
                     .cancel(id: CancelID.retry),
                     .cancel(id: CancelID.refresh),
                     .cancel(id: CancelID.refreshTimeout),
@@ -193,6 +208,8 @@ public struct WatchRemoteFeature: Sendable {
                 return luminanceChanged(isReduced, &state)
             case .systemClockChanged:
                 return systemClockChanged(&state)
+            case .controlButtonTapped:
+                return controlButtonTapped(&state)
         }
     }
 
@@ -226,6 +243,12 @@ public struct WatchRemoteFeature: Sendable {
                 return requestRefresh(&state)
             case .renewalDue, .leaseExpired, .runRetryDue, .stageEnded:
                 return reduceRun(into: &state, action)
+            case let .commandAnswered(sentID, envelope):
+                return commandAnswered(sentID: sentID, envelope, &state)
+            case let .commandFailed(sentID, error):
+                return commandFailed(sentID: sentID, error, &state)
+            case let .commandTimedOut(sentID):
+                return commandTimedOut(sentID: sentID, &state)
         }
     }
 

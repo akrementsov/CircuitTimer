@@ -51,6 +51,8 @@ actor LiveActivityCoordinator {
         var endingActivityID: String?
         var subscription: Subscription?
         var control: ControlTicket?
+        /// The held command whose stall was already logged, so a stuck drain logs once, not once per tap.
+        var loggedStallID: Int?
         var applied: WorkoutActivityAttributes.ContentState?
         var wasSeen = false
         var isGone = false
@@ -383,14 +385,18 @@ extension LiveActivityCoordinator {
     }
 
     /// Admission outlives the intent's wait: a timeout must not admit another command while the
-    /// reducer is still applying the first. Each ticket has exactly one bounded waiter.
+    /// reducer is still applying the first. Each ticket has exactly one bounded waiter. Once the
+    /// command has been held for `stallLimit`, it still holds admission, but later intents learn
+    /// it is stuck instead of being told to try again.
     private final class ControlTicket: Sendable {
         let request: LiveActivityControlRequest
         let signal = CompletionSignal()
+        let isStalled: @Sendable () -> Bool
         private let response = OSAllocatedUnfairLock<LiveActivityControlResult?>(initialState: nil)
 
-        init(request: LiveActivityControlRequest) {
+        init(request: LiveActivityControlRequest, isStalled: @escaping @Sendable () -> Bool) {
             self.request = request
+            self.isStalled = isStalled
         }
 
         var result: LiveActivityControlResult? { response.withLock { $0 } }
@@ -437,11 +443,16 @@ extension LiveActivityCoordinator {
             return await endOrphan(activityID, clock: clock)
         }
         guard !owner.isEnding, let subscription = owner.subscription else { return .unavailable }
-        guard owner.control == nil else { return .busy }
+        if let held = owner.control {
+            return refusal(behind: held, of: id)
+        }
 
         controlSerial += 1
         let request = LiveActivityControlRequest(id: controlSerial, command: command, generation: generation)
-        let ticket = ControlTicket(request: request)
+        let ticket = ControlTicket(
+            request: request,
+            isStalled: Self.deadline(after: LiveActivityControlTiming.stallLimit, on: clock)
+        )
         owners[id]?.control = ticket
         switch subscription.continuation.yield(request) {
             case .enqueued:
@@ -466,10 +477,24 @@ extension LiveActivityCoordinator {
         return .timedOut
     }
 
+    /// A second command never runs while the first is held: `busy` while the first may still finish, `unavailable`
+    /// once its drain has stalled.
+    private func refusal(behind held: ControlTicket, of id: UUID) -> LiveActivityControlResult {
+        guard held.isStalled() else { return .busy }
+        if owners[id]?.loggedStallID != held.request.id {
+            owners[id]?.loggedStallID = held.request.id
+            Logger.liveActivity.notice(
+                "A live activity command has been held over \(LiveActivityControlTiming.stallLimit, privacy: .public); later commands are unavailable until its drain ends"
+            )
+        }
+        return .unavailable
+    }
+
     func requestHandled(owner id: UUID, requestID: Int, result: LiveActivityControlResult) {
         guard let ticket = owners[id]?.control, ticket.request.id == requestID else { return }
 
         owners[id]?.control = nil
+        owners[id]?.loggedStallID = nil
         ticket.complete(result)
     }
 

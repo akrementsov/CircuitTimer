@@ -2,6 +2,7 @@ import Dependencies
 import DependenciesMacros
 import Foundation
 import os
+import WorkoutActivity
 #if os(iOS)
 import WatchConnectivity
 #endif
@@ -31,6 +32,14 @@ public struct WatchCompanionClient: Sendable {
     /// The timer's answer to a request: its settled run, or `nil` when it cannot publish one. The run is published
     /// whether or not the request still waits.
     public var refreshHandled: @Sendable (_ owner: UUID, _ requestID: Int, _ publication: WatchRunPublication?) async -> Void
+    /// The timer's answer to a command, after the syncs its rules wait for: what it did and its run as published then,
+    /// or `nil` when it publishes none. The run is published whether or not the command still waits.
+    public var controlHandled: @Sendable (
+        _ owner: UUID,
+        _ requestID: Int,
+        _ result: LiveActivityControlResult,
+        _ publication: WatchRunPublication?
+    ) async -> Void
 }
 
 extension WatchCompanionClient: DependencyKey {
@@ -93,6 +102,14 @@ extension WatchCompanionClient: DependencyKey {
             },
             refreshHandled: { owner, requestID, publication in
                 await companion.value?.refreshHandled(owner: owner, requestID: requestID, publication: publication)
+            },
+            controlHandled: { owner, requestID, result, publication in
+                await companion.value?.controlHandled(
+                    owner: owner,
+                    requestID: requestID,
+                    result: result,
+                    publication: publication
+                )
             }
         )
         #else
@@ -111,7 +128,8 @@ extension WatchCompanionClient: DependencyKey {
                 misuse()
                 return AsyncStream { $0.finish() }
             },
-            refreshHandled: { _, _, _ in misuse() }
+            refreshHandled: { _, _, _ in misuse() },
+            controlHandled: { _, _, _, _ in misuse() }
         )
         #endif
     }()
@@ -126,7 +144,8 @@ extension WatchCompanionClient: DependencyKey {
         beginTermination: {},
         finishTermination: {},
         controlRequests: { _ in AsyncStream { $0.finish() } },
-        refreshHandled: { _, _, _ in }
+        refreshHandled: { _, _, _ in },
+        controlHandled: { _, _, _, _ in }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()

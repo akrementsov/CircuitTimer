@@ -6,6 +6,7 @@ import BackgroundNotifications
 import ComposableArchitecture
 import Foundation
 import Testing
+import TestSupport
 import WatchLink
 import WorkoutActivity
 import WorkoutHealth
@@ -306,8 +307,14 @@ final class TimerHarness {
             }
             $0.watchCompanion.end = { owner in calls.withValue { $0.append(.endWatch(owner: owner)) } }
             $0.watchCompanion.controlRequests = { owner in watch.subscribe(owner) }
+            $0.watchCompanion.controlHandled = { owner, requestID, result, publication in
+                watch.controls.withValue {
+                    $0.append(WatchControlAnswer(owner: owner, requestID: requestID, result: result, publication: publication))
+                }
+            }
             $0.watchCompanion.refreshHandled = { owner, requestID, publication in
                 watch.answers.withValue { $0.append(WatchAnswer(owner: owner, requestID: requestID, publication: publication)) }
+                watch.refreshed.setValue(true)
             }
             $0.timerSession = TimerSessionClient(
                 requestAwake: { owner, awake, revision in
@@ -455,6 +462,10 @@ final class TimerWatch: Sendable {
     let revisions = LockIsolated(0)
     let published = LockIsolated<[WatchRunPublication]>([])
     let answers = LockIsolated<[WatchAnswer]>([])
+    /// Set once a refresh was answered, so a test can wait for it.
+    let refreshed = Observed(false)
+    /// The timer's answers to the watch's commands, observed so a test can wait for one.
+    let controls = Observed<[WatchControlAnswer]>([])
     let subscriptions = LockIsolated<[UUID]>([])
     private let continuations = LockIsolated<[AsyncStream<WatchControlRequest>.Continuation]>([])
 
@@ -476,8 +487,36 @@ final class TimerWatch: Sendable {
     }
 }
 
+struct WatchControlAnswer: Equatable, Sendable {
+    let owner: UUID
+    let requestID: Int
+    let result: LiveActivityControlResult
+    let publication: WatchRunPublication?
+}
+
 struct WatchAnswer: Equatable, Sendable {
     let owner: UUID
     let requestID: Int
     let publication: WatchRunPublication?
+}
+
+extension WorkoutTimerFeature.PendingActivityControl {
+    /// A card command admitted when `clock` read its instant: the start every `TestClock` shares by default.
+    static func card(
+        _ id: Int,
+        _ result: LiveActivityControlResult,
+        activityRevision: Int = 0,
+        activityResult: LiveActivityControlResult? = nil,
+        notificationRevision: Int = 0,
+        at clock: TestClock<Duration> = TestClock()
+    ) -> Self {
+        Self(
+            source: .liveActivity(requestID: id),
+            result: result,
+            admittedAt: MonotonicInstant(now: clock),
+            activityRevision: activityRevision,
+            activityResult: activityResult,
+            notificationRevision: notificationRevision
+        )
+    }
 }

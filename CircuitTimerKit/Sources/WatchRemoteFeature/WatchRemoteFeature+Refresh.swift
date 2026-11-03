@@ -77,11 +77,21 @@ extension WatchRemoteFeature {
     func refreshAnswered(sentID: UUID, _ envelope: WatchReplyEnvelope, _ state: inout State) -> Effect<Action> {
         guard let request = finish(sentID, &state) else { return .none }
         let ended = Effect<Action>.cancel(id: CancelID.refreshTimeout)
-        guard case let .state(phoneState) = envelope.reply else {
-            // The iPhone could not read the request.
-            state.problem = .incompatible(Self.side(toUpdate: envelope.schemaVersion))
-            state.refresh.isRenewalDue = false
-            return ended
+        let phoneState: PhoneState
+        switch envelope.reply {
+            case let .state(answered):
+                phoneState = answered
+            case .control:
+                // Only a bug answers a refresh with a command's reply; asking again would not fix it.
+                Self.logger.error("The iPhone answered a refresh with a command's reply")
+                state.problem = .incompatible(.phone)
+                state.refresh.isRenewalDue = false
+                return ended
+            case nil:
+                // The iPhone could not read the request.
+                state.problem = .incompatible(Self.side(toUpdate: envelope.schemaVersion))
+                state.refresh.isRenewalDue = false
+                return ended
         }
         guard envelope.requestID == sentID else {
             // Only a bug answers with another request's ID; asking again would not fix it.
@@ -100,6 +110,10 @@ extension WatchRemoteFeature {
         let run: Effect<Action>
         if confirms, state.run != nil {
             state.refresh.failures = 0
+            if state.commandNote?.note == .checking {
+                // The confirmation shows what the iPhone did.
+                state.commandNote = nil
+            }
             let lease = openLease(from: request, &state)
             // New content whose stage already ended asks at once; the same content waits for the renewal, so clocks
             // that disagree by a little do not make a request per reply.

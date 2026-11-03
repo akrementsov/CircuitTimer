@@ -82,8 +82,11 @@ public struct WorkoutTimerFeature: Sendable {
         public internal(set) var hasRecordFailed = false
         /// Whether the Lock Screen cannot show the workout; the newest serial wins.
         public internal(set) var liveActivityNotice: LiveActivityNotice?
-        /// Exists for the timer stack's control subscription, independently of its clock loops.
+        /// The commands of the card and the watch, created by the first of their subscriptions, independently of the
+        /// clock loops.
         var activityControls: ActivityControlState?
+        /// A command refused in this pass, answered at its end.
+        var controlRefusal: ControlRefusal?
         /// Set once the screen starts closing, also before the control subscription exists.
         var isClosing = false
         /// What the run did, for its Health workout; the session saves the newest track it received.
@@ -177,6 +180,8 @@ public struct WorkoutTimerFeature: Sendable {
             case activityRequestReceived(LiveActivityControlRequest)
             case activitySynchronized(revision: Int, LiveActivitySyncResult)
             case watchRequestReceived(WatchControlRequest)
+            /// The watch's pending command with this request ID reached `LiveActivityControlTiming.stallLimit`.
+            case watchCommandStallLimitReached
         }
     }
 
@@ -186,6 +191,7 @@ public struct WorkoutTimerFeature: Sendable {
         case notificationAccess
         case activityRequests
         case watchRequests
+        case controlStall
     }
 
     /// The two clocks may disagree by this much before it counts as a jump of the wall clock.
@@ -238,10 +244,12 @@ public struct WorkoutTimerFeature: Sendable {
             let awake = syncScreenAwake(&state)
             let notifications = syncNotifications(&state, after: action, at: now)
             let activity = syncLiveActivity(&state, after: action, at: now)
-            let watch = syncWatch(&state, after: action, at: now)
+            let publication = watchPublication(state, at: now)
+            let watch = syncWatch(state, after: action, publication: publication)
             let health = startHealthSession(state, after: action, at: now)
             let track = syncHealthTrack(&state, at: now)
-            return .merge(signals, awake, notifications, activity, watch, health, track, finishActivityControl(&state))
+            let control = finishActivityControl(&state, publication: publication)
+            return .merge(signals, awake, notifications, activity, watch, health, track, control)
         }
     }
 
@@ -262,10 +270,12 @@ public struct WorkoutTimerFeature: Sendable {
 
                 return syncClock(&state, at: now)
             case .activityTask:
-                guard state.activityControls == nil else { return .none }
-                state.activityControls = ActivityControlState()
+                guard state.activityControls?.isActivitySubscribed != true else { return .none }
+                ensureControlState(&state)
+                state.activityControls?.isActivitySubscribed = true
                 return subscribeActivityRequests(state.id)
             case .watchTask:
+                ensureControlState(&state)
                 return subscribeWatchRequests(state.id)
             case .notificationPreferencesChanged:
                 return .none
@@ -291,15 +301,32 @@ public struct WorkoutTimerFeature: Sendable {
                 return advance(&state, at: now) ? syncClock(&state, at: now) : .none
             case .activityRequestsEnded:
                 state.activityControls?.isReady = false
-                guard let pending = state.activityControls?.pending else { return .none }
+                // Only the card's own command ends with its subscription; the watch's finishes without a drain.
+                guard let pending = state.activityControls?.pending, case .liveActivity = pending.source else { return .none }
                 state.activityControls?.pending = nil
-                return acknowledgeActivityRequest(state.id, requestID: pending.id, result: .unavailable)
+                state.controlRefusal = ControlRefusal(source: pending.source, result: .unavailable)
+                return .none
             case let .activityRequestReceived(request):
-                return handleActivityRequest(request, &state, at: date())
-            case .watchRequestReceived:
-                // The watch asks for the run as it is now: settle it; the second reducer answers with it.
+                return handleControl(
+                    request.command,
+                    generation: request.generation,
+                    from: .liveActivity(requestID: request.id),
+                    &state,
+                    at: date()
+                )
+            case let .watchRequestReceived(request):
                 let now = date()
-                return advance(&state, at: now) ? syncClock(&state, at: now) : .none
+                switch request.kind {
+                    case .refresh:
+                        // The watch asks for the run as it is now: settle it; the second reducer answers with it.
+                        return advance(&state, at: now) ? syncClock(&state, at: now) : .none
+                    case let .command(command, generation):
+                        return handleControl(command, generation: generation, from: .watch(requestID: request.id), &state, at: now)
+                }
+            case .watchCommandStallLimitReached:
+                // Only a pass: its end measures the pending command's own admission, so a late action of an earlier
+                // command decides nothing, and releases the watch's stalled command once its drain is done.
+                return .none
             case let .activitySynchronized(revision, result):
                 activitySynchronized(revision: revision, result: result, &state)
                 return .none

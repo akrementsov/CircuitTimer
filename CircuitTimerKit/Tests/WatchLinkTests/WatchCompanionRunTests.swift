@@ -102,7 +102,7 @@ struct WatchCompanionRunTests {
         _ = try #require(await requests.next())
 
         await clock.waitForStartedSleeps(1)
-        clock.advance(by: WatchCompanion.refreshWait)
+        clock.advance(by: WatchCompanion.timerWait)
 
         let state = try Self.state(of: try await pending.value.envelope)
         #expect(!state.isRunLive)
@@ -176,7 +176,7 @@ struct WatchCompanionRunTests {
             let fifth = try Self.state(of: try await refresh(5).envelope)
 
             #expect(!fifth.isRunLive)
-            clock.advance(by: WatchCompanion.refreshWait)
+            clock.advance(by: WatchCompanion.timerWait)
             for try await waited in group {
                 #expect(!waited.isRunLive)
             }

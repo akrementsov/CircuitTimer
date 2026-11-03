@@ -113,7 +113,9 @@ struct TimerWatchTests {
         state.destination = .closeConfirmation(.closeConfirmation(restart: nil))
         let timer = TimerHarness(state)
 
-        await timer.send(.view(.watchTask))
+        await timer.send(.view(.watchTask)) {
+            $0.activityControls = WorkoutTimerFeature.ActivityControlState()
+        }
         timer.watch.request(4)
         await timer.receive(.internal(.watchRequestReceived(WatchControlRequest(id: 4, kind: .refresh))))
         timer.watch.finish()
@@ -128,7 +130,9 @@ struct TimerWatchTests {
     func test_watchTask_again_replacesTheSubscription() async {
         let timer = TimerHarness(.fixture(.paused))
 
-        await timer.send(.view(.watchTask))
+        await timer.send(.view(.watchTask)) {
+            $0.activityControls = WorkoutTimerFeature.ActivityControlState()
+        }
         await timer.send(.view(.watchTask))
         timer.watch.request(5)
         await timer.receive(.internal(.watchRequestReceived(WatchControlRequest(id: 5, kind: .refresh))))

@@ -75,7 +75,7 @@ public struct WatchRootView: View {
             case let .notice(notice):
                 noticeView(notice)
             case let .run(screen):
-                WatchRunView(screen: screen)
+                WatchRunView(screen: screen) { send(.controlButtonTapped) }
         }
     }
 
@@ -195,6 +195,7 @@ extension WatchRemoteFeature.State {
             )
         }
         state.isLuminanceReduced = isLuminanceReduced
+        state.isSceneActive = true
         return state
     }
 }
@@ -313,6 +314,54 @@ extension WorkoutActivityAttributes.Phase {
 
 #Preview("Run, get ready") {
     previewView(.previewRun(.getReady(first: .init(stage: .init(kind: .work, name: "Burpees"), remainingMilliseconds: 45_000))))
+}
+
+#Preview("Run, Pause waiting for its reply") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning)
+    if let owner = state.run?.run.owner {
+        state.command = .init(id: UUID(uuid: (8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)), owner: owner, command: .pause)
+    }
+    return previewView(state)
+}
+
+#Preview("Run, a command waiting while its confirmation ran out") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning, confirmed: false)
+    if let owner = state.run?.run.owner {
+        state.command = .init(id: UUID(uuid: (8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)), owner: owner, command: .pause)
+    }
+    return previewView(state)
+}
+
+#Preview("Run, checking on iPhone without a confirmation") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning, confirmed: false)
+    if let run = state.run?.run {
+        state.commandNote = .init(note: .checking, run: run)
+    }
+    return previewView(state)
+}
+
+#Preview("Run, the workout changed on iPhone") {
+    var state = WatchRemoteFeature.State.previewRun(
+        .paused(.init(stage: .init(kind: .work, name: "Burpees"), remainingMilliseconds: 25_000))
+    )
+    if let run = state.run?.run {
+        state.commandNote = .init(note: .changed, run: run)
+    }
+    return previewView(state)
+}
+
+#Preview("Run, the command failed") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning)
+    if let run = state.run?.run {
+        state.commandNote = .init(note: .failed, run: run)
+    }
+    return previewView(state)
+}
+
+#Preview("Run, the stage ended") {
+    var state = WatchRemoteFeature.State.previewRun(.previewRunning)
+    state.run?.isStageOver = true
+    return previewView(state)
 }
 
 #Preview("Run, done") {

@@ -417,6 +417,7 @@ let package = Package(
             dependencies: [
                 "BackgroundNotifications",
                 "BackgroundExecution",
+                "TestSupport",
                 "WatchLink",
                 "WorkoutActivity",
                 "WorkoutDomain",

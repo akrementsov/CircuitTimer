@@ -10,7 +10,8 @@ struct WatchRootViewStringsTests {
         "watch.noCatalog.title", "watch.noCatalog.message",
         "watch.run.next", "watch.run.waiting", "watch.run.stage.work", "watch.run.stage.rest", "watch.run.stage.pause",
         "watch.run.getReady", "watch.run.finished", "watch.run.openPhone", "watch.run.tooLarge.title",
-        "watch.run.tooLarge.message",
+        "watch.run.tooLarge.message", "watch.run.control.pause", "watch.run.control.resume",
+        "watch.run.command.checking", "watch.run.command.changed", "watch.run.command.failed",
     ])
     func test_watchRootViewString_englishAndRussian_isTranslatedInBoth(key: String) throws {
         let english = try Self.string(key, language: "en")

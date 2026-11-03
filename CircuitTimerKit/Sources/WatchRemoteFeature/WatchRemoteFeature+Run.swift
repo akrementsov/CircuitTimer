@@ -69,7 +69,12 @@ extension WatchRemoteFeature {
         guard let run = phoneState.run else {
             state.run = nil
             state.lease = nil
+            state.commandNote = nil
             return .merge(.cancel(id: CancelID.stageEnd), .cancel(id: CancelID.lease))
+        }
+        if state.run?.run.owner != run.owner {
+            // Another timer: the last command's outcome is not about it.
+            state.commandNote = nil
         }
         if state.run?.run.owner != run.owner || !phoneState.isRunLive {
             state.lease = nil
@@ -165,7 +170,8 @@ extension WatchRemoteFeature {
                 guard generation == state.runGeneration else { return .none }
                 state.run?.isStageOver = true
                 return askForRun(&state)
-            case .event, .statusRead, .refreshAnswered, .refreshFailed, .refreshTimedOut, .retryDue:
+            case .event, .statusRead, .refreshAnswered, .refreshFailed, .refreshTimedOut, .retryDue, .commandAnswered,
+                 .commandFailed, .commandTimedOut:
                 return .none
         }
     }
