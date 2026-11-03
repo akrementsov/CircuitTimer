@@ -266,7 +266,7 @@ struct AppFeaturePurchaseSheetTests {
         state.path.append(.editor(editor))
         let editorID = try #require(state.path.ids.last)
         state.startGeneration = 1
-        state.startIntent = AppFeature.StartIntent(generation: 1, editorID: editorID, workout: workout)
+        state.startIntent = AppFeature.StartIntent(generation: 1, origin: .editor(editorID), workout: workout)
         let store = makeStore(state, notificationsEnabled: true)
 
         await store.send(.settings(.delegate(.fullVersionRequested(.buy)))) {

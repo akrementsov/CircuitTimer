@@ -9,14 +9,15 @@ extension AppFeature {
         case wait
     }
 
-    func prepareNotificationPermission(_ workout: Workout, editorID: StackElementID, _ state: inout State) -> Effect<Action> {
+    func prepareNotificationPermission(_ workout: Workout, origin: StartIntent.Origin, _ state: inout State) -> Effect<Action> {
         guard state.isBackgroundNotificationsOn, state.notificationAccess?.isDetermined != true else {
-            return prepareHealthPermission(workout, editorID: editorID, &state)
+            return prepareHealthPermission(workout, origin: origin, &state)
         }
-        state.startGeneration += 1
-        let generation = state.startGeneration
-        state.startIntent = StartIntent(generation: generation, editorID: editorID, workout: workout)
-        return readStartAccess(generation)
+        var intent = state.startIntent ?? StartIntent(generation: state.startGeneration + 1, origin: origin, workout: workout)
+        intent.stage = .notifications
+        state.startGeneration = intent.generation
+        state.startIntent = intent
+        return readStartAccess(intent.generation)
     }
 
     private func readStartAccess(_ generation: Int) -> Effect<Action> {
@@ -102,14 +103,14 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .notifications else {
             return .none
         }
-        guard state.destination == nil, isCurrentStart(intent.workout, editorID: intent.editorID, state) else {
+        guard state.destination == nil, isCurrentStart(intent.workout, origin: intent.origin, state) else {
             return cancelStartIntent(&state)
         }
         // An outstanding system prompt may still answer after Start now; it can update the cache,
         // but the intent has left this stage, so the answer cannot open a second timer.
         return .merge(
             .cancel(id: CancelID.notificationPermissionStall),
-            prepareHealthPermission(intent.workout, editorID: intent.editorID, &state)
+            prepareHealthPermission(intent.workout, origin: intent.origin, &state)
         )
     }
 

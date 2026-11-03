@@ -123,7 +123,7 @@ extension AppFeature {
     /// Start; the new version makes its late answer stale, so it no longer opens the timer.
     func refreshOpenWorkout(_ state: inout State) -> Effect<Action> {
         guard
-            state.startIntent == nil || state.startIntent?.hasStalled == true,
+            state.startIntent.map({ $0.origin.isWatch || $0.hasStalled }) ?? true,
             case let .loaded(workouts) = state.workouts,
             let id = state.path.ids.last,
             let editor = state.path[id: id, case: \.editor],

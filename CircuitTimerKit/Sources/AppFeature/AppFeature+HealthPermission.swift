@@ -6,12 +6,13 @@ import WorkoutHealth
 extension AppFeature {
     /// The Health stage of a first Start, after notifications. It never shows an alert of its own: whatever Health
     /// answers, or if it cannot be asked, the timer opens; only the workout session depends on the answer.
-    func prepareHealthPermission(_ workout: Workout, editorID: StackElementID, _ state: inout State) -> Effect<Action> {
+    func prepareHealthPermission(_ workout: Workout, origin: StartIntent.Origin, _ state: inout State) -> Effect<Action> {
+        if state.startIntent?.skipsHealth == true { return openTimer(workout, origin: origin, &state) }
         // An outstanding request still holds its sheet; asking again would only wait behind it.
         guard !state.isHealthRequestOutstanding, state.healthAccess != .unavailable, state.healthAccess != .determined
-        else { return openTimer(workout, editorID: editorID, &state) }
+        else { return openTimer(workout, origin: origin, &state) }
 
-        var intent = state.startIntent ?? StartIntent(generation: state.startGeneration + 1, editorID: editorID, workout: workout)
+        var intent = state.startIntent ?? StartIntent(generation: state.startGeneration + 1, origin: origin, workout: workout)
         intent.stage = .health
         state.startGeneration = intent.generation
         state.startIntent = intent
@@ -40,10 +41,10 @@ extension AppFeature {
             return .none
         }
         // A failed read is not cached, so the next Start reads again.
-        guard let access else { return openTimer(intent.workout, editorID: intent.editorID, &state) }
+        guard let access else { return openTimer(intent.workout, origin: intent.origin, &state) }
 
         state.healthAccess = access
-        guard access == .notDetermined else { return openTimer(intent.workout, editorID: intent.editorID, &state) }
+        guard access == .notDetermined else { return openTimer(intent.workout, origin: intent.origin, &state) }
 
         return requestHealthAccess(&state)
     }
@@ -93,7 +94,7 @@ extension AppFeature {
             return .none
         }
         state.startIntent?.hasStalled = true
-        state.path[id: intent.editorID, case: \.editor]?.cancelStart()
+        if case let .editor(editorID) = intent.origin { state.path[id: editorID, case: \.editor]?.cancelStart() }
         return .none
     }
 
@@ -105,7 +106,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .health else {
             return .none
         }
-        return openTimer(intent.workout, editorID: intent.editorID, &state)
+        return openTimer(intent.workout, origin: intent.origin, &state)
     }
 
     /// A Start that reached Health while the scene was inactive asks once it is active again; a sheet already showing,

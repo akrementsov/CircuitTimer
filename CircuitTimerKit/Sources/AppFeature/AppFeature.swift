@@ -258,7 +258,7 @@ public struct AppFeature: Sendable {
             }
             Reduce { state, _ in
                 guard let intent = state.startIntent else { return .none }
-                guard isCurrentStart(intent.workout, editorID: intent.editorID, state),
+                guard isCurrentStart(intent.workout, origin: intent.origin, state),
                       state.destination == nil || state.destination?.is(\.permissionStalled) == true
                 else { return cancelStartIntent(&state) }
                 return .none

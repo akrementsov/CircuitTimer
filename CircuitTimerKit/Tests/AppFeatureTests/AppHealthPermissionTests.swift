@@ -51,7 +51,7 @@ struct AppHealthPermissionTests {
     }
 
     private func intent(_ id: StackElementID, generation: Int = 1) -> AppFeature.StartIntent {
-        var intent = AppFeature.StartIntent(generation: generation, editorID: id, workout: workout)
+        var intent = AppFeature.StartIntent(generation: generation, origin: .editor(id), workout: workout)
         intent.stage = .health
         return intent
     }
@@ -114,7 +114,7 @@ struct AppHealthPermissionTests {
 
         await store.send(start(id)) {
             $0.startGeneration = 1
-            $0.startIntent = AppFeature.StartIntent(generation: 1, editorID: id, workout: self.workout)
+            $0.startIntent = AppFeature.StartIntent(generation: 1, origin: .editor(id), workout: self.workout)
         }
         await store.receive(\.internal.notificationAccessQueried) {
             $0.notificationAccess = .authorized
@@ -344,7 +344,7 @@ struct AppHealthPermissionTests {
         await store.send(.internal(.healthAccessQueried(generation: 1, .determined)))
 
         var notifications = state
-        notifications.startIntent = AppFeature.StartIntent(generation: 2, editorID: id, workout: workout)
+        notifications.startIntent = AppFeature.StartIntent(generation: 2, origin: .editor(id), workout: workout)
         let other = self.store(notifications)
         await other.send(.internal(.healthAccessQueried(generation: 2, .determined)))
     }
