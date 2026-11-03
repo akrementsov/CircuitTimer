@@ -10,12 +10,15 @@ public struct WatchCatalog: Codable, Equatable, Sendable {
         public let name: String
         public let totalMilliseconds: Int64
         public let isPlayable: Bool
+        /// The normalized schedule's structure, excluding workout and stage names.
+        public let scheduleFingerprint: String
 
-        public init(id: UUID, name: String, totalMilliseconds: Int64, isPlayable: Bool) {
+        public init(id: UUID, name: String, totalMilliseconds: Int64, isPlayable: Bool, scheduleFingerprint: String) {
             self.id = id
             self.name = name
             self.totalMilliseconds = totalMilliseconds
             self.isPlayable = isPlayable
+            self.scheduleFingerprint = scheduleFingerprint
         }
     }
 
@@ -30,7 +33,13 @@ public struct WatchCatalog: Codable, Equatable, Sendable {
 
     public init(workouts: [Workout]) {
         self.init(entries: workouts.map {
-            Entry(id: $0.id, name: $0.name, totalMilliseconds: $0.totalDuration.inMilliseconds, isPlayable: $0.isPlayable)
+            Entry(
+                id: $0.id,
+                name: $0.name,
+                totalMilliseconds: $0.totalDuration.inMilliseconds,
+                isPlayable: $0.isPlayable,
+                scheduleFingerprint: WorkoutSchedule(workout: $0).fingerprint
+            )
         })
     }
 

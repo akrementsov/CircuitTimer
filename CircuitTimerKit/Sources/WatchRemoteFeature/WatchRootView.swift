@@ -161,9 +161,27 @@ extension WatchRemoteFeature.State {
 
 extension WatchCatalog {
     static let preview = WatchCatalog(entries: [
-        .init(id: previewID(1), name: "Morning circuit", totalMilliseconds: 1_260_000, isPlayable: true),
-        .init(id: previewID(2), name: " ", totalMilliseconds: 600_000, isPlayable: true),
-        .init(id: previewID(3), name: "Tabata", totalMilliseconds: 240_000, isPlayable: true),
+        .init(
+            id: previewID(1),
+            name: "Morning circuit",
+            totalMilliseconds: 1_260_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
+        .init(
+            id: previewID(2),
+            name: " ",
+            totalMilliseconds: 600_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
+        .init(
+            id: previewID(3),
+            name: "Tabata",
+            totalMilliseconds: 240_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
     ])
 
     private static func previewID(_ last: UInt8) -> UUID {

@@ -7,6 +7,43 @@ import WorkoutDomain
 @Suite
 struct WireTests {
     @Test
+    func test_request_start_decodesChosenWorkout() throws {
+        let body = [
+            "workoutID": UUID(link: 1).uuidString,
+            "scheduleFingerprint": String(repeating: "0", count: 64),
+            "knownCatalogDigest": "catalog",
+        ]
+        let data = try JSONSerialization.data(withJSONObject: ["start": body])
+
+        let request = try WireCoding.decode(WatchRequest.self, from: data)
+        let encoded = try WireCoding.encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: [String: String]])
+
+        #expect(object["start"] == body)
+    }
+
+    @Test
+    func test_digest_redistributedStageDurations_changesDespiteTheSameTotal() throws {
+        let workout = Workout(
+            id: UUID(link: 1),
+            name: "Circuit",
+            training: [
+                Stage(id: UUID(link: 10), name: "Work", duration: .seconds(30), intensity: .work),
+                Stage(id: UUID(link: 11), name: "Rest", duration: .seconds(30), intensity: .rest),
+            ]
+        )
+        var changed = workout
+        changed.training[0].duration = .seconds(40)
+        changed.training[1].duration = .seconds(20)
+        let original = WatchCatalog(workouts: [workout])
+        let updated = WatchCatalog(workouts: [changed])
+
+        #expect(original.entries[0].totalMilliseconds == 60_000)
+        #expect(updated.entries[0].totalMilliseconds == 60_000)
+        #expect(try WatchCatalog.digest(of: .loaded(original)) != WatchCatalog.digest(of: .loaded(updated)))
+    }
+
+    @Test
     func test_catalogInit_workouts_keepsOrderRawNamesAndMilliseconds() {
         let blank = Workout(
             id: UUID(link: 1),
@@ -19,8 +56,20 @@ struct WireTests {
         let catalog = WatchCatalog(workouts: [blank, empty])
 
         #expect(catalog.entries == [
-            WatchCatalog.Entry(id: UUID(link: 1), name: "  ", totalMilliseconds: 180_000, isPlayable: true),
-            WatchCatalog.Entry(id: UUID(link: 2), name: "Rest day", totalMilliseconds: 0, isPlayable: false),
+            WatchCatalog.Entry(
+                id: UUID(link: 1),
+                name: "  ",
+                totalMilliseconds: 180_000,
+                isPlayable: true,
+                scheduleFingerprint: WorkoutSchedule(workout: blank).fingerprint
+            ),
+            WatchCatalog.Entry(
+                id: UUID(link: 2),
+                name: "Rest day",
+                totalMilliseconds: 0,
+                isPlayable: false,
+                scheduleFingerprint: WorkoutSchedule(workout: empty).fingerprint
+            ),
         ])
         #expect(!catalog.isTruncated)
     }

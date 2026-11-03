@@ -19,7 +19,13 @@ extension UUID {
 
 func watchCatalog(_ names: String...) -> WatchCatalog {
     WatchCatalog(entries: names.enumerated().map {
-        WatchCatalog.Entry(id: UUID(watch: $0.offset + 1), name: $0.element, totalMilliseconds: 60_000, isPlayable: true)
+        WatchCatalog.Entry(
+            id: UUID(watch: $0.offset + 1),
+            name: $0.element,
+            totalMilliseconds: 60_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        )
     })
 }
 

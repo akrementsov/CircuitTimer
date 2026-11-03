@@ -199,6 +199,12 @@ actor WatchCompanion {
                         arrival: arrival
                     )
                     reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .control(result, state))
+                case let .start(_, _, knownCatalogDigest):
+                    // Without an app subscriber there is no foreground Start flow to admit the request.
+                    reply = WatchReplyEnvelope(
+                        requestID: envelope.requestID,
+                        reply: .start(.openPhoneApp, notLive(knownCatalogDigest: knownCatalogDigest))
+                    )
             }
         } else {
             reply = .unreadable

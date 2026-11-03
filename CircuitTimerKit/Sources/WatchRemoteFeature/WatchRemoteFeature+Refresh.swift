@@ -81,7 +81,7 @@ extension WatchRemoteFeature {
         switch envelope.reply {
             case let .state(answered):
                 phoneState = answered
-            case .control:
+            case .control, .start:
                 // Only a bug answers a refresh with a command's reply; asking again would not fix it.
                 Self.logger.error("The iPhone answered a refresh with a command's reply")
                 state.problem = .incompatible(.phone)
