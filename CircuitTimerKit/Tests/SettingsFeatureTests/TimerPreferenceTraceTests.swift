@@ -38,7 +38,6 @@ struct TimerPreferenceTraceTests {
         let trace = TimerPreferenceTrace(defaults, label: key)
         defer { withExtendedLifetime(trace) {} }
 
-        // This preparatory write happens before any TestStore reads the suite.
         defaults.set(false, forKey: key)
         #expect(trace.report.contains(" KVO key=\(key) "))
         let before = defaults.object(forKey: key)
@@ -49,6 +48,7 @@ struct TimerPreferenceTraceTests {
 
         let change = try #require(trace.report.split(separator: "\n").last { $0.contains(" KVO key=\(key) ") })
         #expect(change.contains("old=\(String(describing: before)) new=\(String(describing: after)) "))
+        #expect(change.contains(" stack="))
         let beforeOtherKey = trace.report
         defaults.set(true, forKey: "unrelatedPreference")
         #expect(trace.report == beforeOtherKey)
@@ -66,7 +66,12 @@ struct TimerPreferenceTraceTests {
             returning: (reports: [String], writerIsMainThread: Bool?).self
         ) { group in
             group.addTask {
-                writePreferenceTraceChanges(in: defaults, to: trace)
+                await withCheckedContinuation { continuation in
+                    // TestStore redirects Swift tasks globally; GCD keeps this writer off main.
+                    DispatchQueue.global().async {
+                        continuation.resume(returning: writePreferenceTraceChanges(in: defaults, to: trace))
+                    }
+                }
             }
             for worker in 0..<4 {
                 group.addTask {

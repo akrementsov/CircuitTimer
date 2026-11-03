@@ -148,16 +148,18 @@ struct TimerPreferencesTests {
     ) {
         let stored = defaults.object(forKey: key)
         trace.mark("direct read key=\(key) value=\(String(describing: stored))")
-        let preferences = defaults.dictionaryRepresentation()
-            .filter { $0.key.hasPrefix("signal") || $0.key.hasPrefix("timer") || $0.key == "iCloudSync" }
-            .sorted { $0.key < $1.key }
-            .map { "\($0.key)=\($0.value)" }
+        var comment: Comment?
         if stored as? Bool != expected {
+            let preferences = defaults.dictionaryRepresentation()
+                .filter { $0.key.hasPrefix("signal") || $0.key.hasPrefix("timer") || $0.key == "iCloudSync" }
+                .sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value)" }
+            comment = "\(key): shared state holds \(shared); the suite holds \(preferences.joined(separator: ", ")); full trace: CT16-\(key).txt attachment"
             Attachment.record(trace.report, named: "CT16-\(key).txt", sourceLocation: sourceLocation)
         }
         #expect(
             stored as? Bool == expected,
-            "\(key): shared state holds \(shared); the suite holds \(preferences.joined(separator: ", ")); full trace: CT16-\(key).txt attachment",
+            comment,
             sourceLocation: sourceLocation
         )
     }
