@@ -40,6 +40,10 @@ public struct WatchCompanionClient: Sendable {
         _ result: LiveActivityControlResult,
         _ publication: WatchRunPublication?
     ) async -> Void
+    /// The app's Start requests; only one subscriber is active, independently of the timer's control channel.
+    public var startRequests: @Sendable () async -> AsyncStream<WatchStartRequest> = { AsyncStream { $0.finish() } }
+    /// Returns false after admission expired or the subscriber ended. True admits work, not delivery of the reply.
+    public var startHandled: @Sendable (_ requestID: Int, _ result: WatchStartResult) async -> Bool = { _, _ in false }
 }
 
 extension WatchCompanionClient: DependencyKey {
@@ -110,6 +114,13 @@ extension WatchCompanionClient: DependencyKey {
                     result: result,
                     publication: publication
                 )
+            },
+            startRequests: {
+                guard let started = companion.value else { return AsyncStream { $0.finish() } }
+                return await started.startRequests()
+            },
+            startHandled: { requestID, result in
+                await companion.value?.startHandled(requestID: requestID, result: result) ?? false
             }
         )
         #else
@@ -129,7 +140,15 @@ extension WatchCompanionClient: DependencyKey {
                 return AsyncStream { $0.finish() }
             },
             refreshHandled: { _, _, _ in misuse() },
-            controlHandled: { _, _, _, _ in misuse() }
+            controlHandled: { _, _, _, _ in misuse() },
+            startRequests: {
+                misuse()
+                return AsyncStream { $0.finish() }
+            },
+            startHandled: { _, _ in
+                misuse()
+                return false
+            }
         )
         #endif
     }()
@@ -145,7 +164,9 @@ extension WatchCompanionClient: DependencyKey {
         finishTermination: {},
         controlRequests: { _ in AsyncStream { $0.finish() } },
         refreshHandled: { _, _, _ in },
-        controlHandled: { _, _, _, _ in }
+        controlHandled: { _, _, _, _ in },
+        startRequests: { AsyncStream { $0.finish() } },
+        startHandled: { _, _ in false }
     )
     /// Declared explicitly so each endpoint a test forgets to override reports itself as unimplemented.
     public static let testValue = Self()
