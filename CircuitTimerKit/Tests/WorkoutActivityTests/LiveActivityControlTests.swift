@@ -129,6 +129,34 @@ struct LiveActivityControlTests {
         #expect(await next.value == .applied)
     }
 
+    /// A command held past `stallLimit` still holds the owner's admission until the timer acknowledges it; meanwhile a
+    /// later tap is told the control is unavailable rather than to try again, and is never admitted.
+    @Test
+    func test_deliver_heldCommandPastTheStallLimit_refusesUnavailable_andAdmitsNothingUntilItsAck() async throws {
+        let coordinator = LiveActivityCoordinator(transport: fake.transport)
+        let stream = await coordinator.requests(owner: Self.owner)
+        var iterator = stream.makeAsyncIterator()
+        await show(coordinator)
+        let delivery = Task { await deliver(coordinator) }
+        let request = try #require(await iterator.next())
+        await clock.waitForSleeps()
+        clock.advance(by: LiveActivityCoordinator.controlTimeout)
+        #expect(await delivery.value == .timedOut)
+
+        clock.advance(by: LiveActivityControlTiming.stallLimit - LiveActivityCoordinator.controlTimeout - .milliseconds(1))
+        #expect(await deliver(coordinator) == .busy)
+        clock.advance(by: .milliseconds(1))
+        #expect(await deliver(coordinator) == .unavailable)
+        #expect(await deliver(coordinator) == .unavailable)
+
+        await coordinator.requestHandled(owner: Self.owner, requestID: request.id, result: .applied)
+        let next = Task { await deliver(coordinator) }
+        let nextRequest = try #require(await iterator.next())
+        #expect(nextRequest.id != request.id)
+        await coordinator.requestHandled(owner: Self.owner, requestID: nextRequest.id, result: .applied)
+        #expect(await next.value == .applied)
+    }
+
     @Test
     func test_deliver_twoOwners_admitAndCompleteIndependently() async throws {
         let coordinator = LiveActivityCoordinator(transport: fake.transport)
