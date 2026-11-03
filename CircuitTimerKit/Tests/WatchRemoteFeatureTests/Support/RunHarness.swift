@@ -93,6 +93,15 @@ final class HeldReplies: Sendable {
         continuations.withValue { $0.removeValue(forKey: id) }?.resume(returning: envelope(id))
         return id
     }
+
+    /// Fails the oldest waiting request with `error`, once one waits; returns its ID.
+    @discardableResult
+    func fail(_ error: any Error) async -> UUID {
+        await waiting.wait { !$0.isEmpty }
+        let id = waiting.withValue { $0.removeFirst() }
+        continuations.withValue { $0.removeValue(forKey: id) }?.resume(throwing: error)
+        return id
+    }
 }
 
 /// A watch store over a list of digest `A`, in front and in reach, with a test clock, a movable wall clock and
