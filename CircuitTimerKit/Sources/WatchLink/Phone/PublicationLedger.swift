@@ -400,7 +400,7 @@ final class PublicationLedger: @unchecked Sendable {
 
     /// Whether the state fits in the longest way it travels: a command's reply envelope with the longest result, the
     /// largest number and a full digest. A refresh's reply, the context and a message carry less around the same state.
-    private static func fits(
+    static func fits(
         catalog: CatalogState?,
         run: WatchRun?,
         processID: UUID,
