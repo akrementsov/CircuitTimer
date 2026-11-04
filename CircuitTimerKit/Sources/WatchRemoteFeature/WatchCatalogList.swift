@@ -10,6 +10,7 @@ struct WatchCatalogList: View {
     let dimmed: UnavailableReason?
     let status: WatchRemoteFeature.State.StatusLine?
     var startNote: WatchRemoteFeature.StartNote?
+    let isSelectionEnabled: Bool
     let onSelect: (UUID) -> Void
 
     var body: some View {
@@ -27,9 +28,10 @@ struct WatchCatalogList: View {
                 }
                 ForEach(catalog.entries) { entry in
                     Button { onSelect(entry.id) } label: {
-                        WatchWorkoutRow(entry: entry, isDimmed: dimmed != nil)
+                        WatchWorkoutRow(entry: entry, isDimmed: dimmed != nil || !isSelectionEnabled)
                     }
                     .buttonStyle(.plain)
+                    .disabled(!isSelectionEnabled)
                     .accessibilityHint(Text("watch.workout.choose", bundle: .module))
                 }
                 if catalog.isTruncated {

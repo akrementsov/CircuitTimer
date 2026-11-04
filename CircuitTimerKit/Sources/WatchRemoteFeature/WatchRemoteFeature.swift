@@ -119,7 +119,7 @@ public struct WatchRemoteFeature: Sendable {
             case commandTimedOut(sentID: UUID)
             case startAnswered(sentID: UUID, WatchReplyEnvelope)
             case startFailed(sentID: UUID, PhoneLinkError)
-            case startTimedOut(sentID: UUID)
+            case startTimedOut(sentID: UUID, generation: Int)
         }
     }
 
@@ -282,8 +282,8 @@ public struct WatchRemoteFeature: Sendable {
                 return startAnswered(sentID: sentID, envelope, &state)
             case let .startFailed(sentID, error):
                 return startFailed(sentID: sentID, error, &state)
-            case let .startTimedOut(sentID):
-                guard state.start?.id == sentID else { return .none }
+            case let .startTimedOut(sentID, generation):
+                guard state.start?.id == sentID, state.start?.timeoutGeneration == generation else { return .none }
                 return stopStart(note: .checkPhone, &state)
         }
     }

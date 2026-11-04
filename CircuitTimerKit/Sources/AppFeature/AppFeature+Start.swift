@@ -76,9 +76,7 @@ extension AppFeature {
                       let editor = state.path[id: editorID, case: \.editor] else { return false }
                 return editor.phase == .viewing && editor.workout == workout
             case .watch:
-                guard state.pendingMutations.isEmpty, !state.needsReload, !state.isReloading,
-                      state.purchaseRequest == nil, !state.hasPendingMutationAlert,
-                      case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
+                guard case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
                       stored.isPlayable, WorkoutSchedule(workout: stored).fingerprint == WorkoutSchedule(workout: workout).fingerprint
                 else { return false }
                 return state.path.allSatisfy { element in
@@ -153,14 +151,19 @@ extension AppFeature {
     func sceneChanged(_ phase: ScenePhase, _ state: inout State) -> Effect<Action> {
         state.hasScenePhase = true
         state.isSceneActive = phase == .active
-        if let intent = state.startIntent, !startCanContinue(intent, state) { return cancelStartIntent(&state) }
-        guard phase == .active else {
-            return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
+        let startEffect: Effect<Action>
+        if let intent = state.startIntent, !startCanContinue(intent, state) {
+            startEffect = cancelStartIntent(&state)
+        } else if phase == .active, let intent = state.startIntent, intent.stage == .awaitingActiveScene {
+            startEffect = openTimer(intent.workout, origin: intent.origin, &state)
+        } else {
+            startEffect = .none
         }
-        if let intent = state.startIntent, intent.stage == .awaitingActiveScene {
-            return openTimer(intent.workout, origin: intent.origin, &state)
+        guard phase == .active else {
+            return .merge(startEffect, .cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
         }
         return .merge(
+            startEffect,
             permissionStallTimer(state),
             healthSceneActivated(&state),
             state.isNotificationCleanupStalled ? cleanupNotifications(reportSuccess: true) : .none

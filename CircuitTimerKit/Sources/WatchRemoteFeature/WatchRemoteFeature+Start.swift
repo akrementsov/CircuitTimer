@@ -17,6 +17,7 @@ extension WatchRemoteFeature {
         let id: UUID
         var beganAt: MonotonicInstant
         var stage = Stage.sending
+        var timeoutGeneration = 0
 
         var timeout: Duration { stage == .sending ? WatchRemoteFeature.startSendTimeout : WatchRemoteFeature.startRunTimeout }
     }
@@ -36,9 +37,11 @@ extension WatchRemoteFeature {
     }
 
     func workoutTapped(_ id: UUID, _ state: inout State) -> Effect<Action> {
-        guard case .list = state.screen, let entry = state.catalog?.lastLoaded?.entries.first(where: { $0.id == id }) else {
+        guard state.start == nil, case .list = state.screen,
+              let entry = state.catalog?.lastLoaded?.entries.first(where: { $0.id == id }) else {
             return .none
         }
+        state.startNote = nil
         state.path.removeAll()
         state.path.append(.selected(id: id, fingerprint: entry.scheduleFingerprint))
         return .none
@@ -81,13 +84,13 @@ extension WatchRemoteFeature {
             } catch {
                 Self.logger.error("A watch Start wait failed: \(String(reflecting: error), privacy: .public)")
             }
-            await send(.internal(.startTimedOut(sentID: request.id)))
+            await send(.internal(.startTimedOut(sentID: request.id, generation: request.timeoutGeneration)))
         }
         .cancellable(id: CancelID.startTimeout, cancelInFlight: true)
     }
 
     func startAnswered(sentID: UUID, _ envelope: WatchReplyEnvelope, _ state: inout State) -> Effect<Action> {
-        guard state.start?.id == sentID, state.start?.stage == .sending else {
+        guard let pending = state.start, pending.id == sentID, pending.stage == .sending else {
             Self.logger.notice("Ignored a late Start reply")
             return .none
         }
@@ -103,7 +106,12 @@ extension WatchRemoteFeature {
         guard state.run == nil, !state.isRunTooLarge else { return .merge(received, stopStart(note: nil, &state)) }
         switch result {
             case let .accepted(asksOnPhone):
-                let waiting = StartRequest(id: sentID, beganAt: MonotonicInstant(now: clock), stage: .waiting(asksOnPhone: asksOnPhone))
+                let waiting = StartRequest(
+                    id: sentID,
+                    beganAt: MonotonicInstant(now: clock),
+                    stage: .waiting(asksOnPhone: asksOnPhone),
+                    timeoutGeneration: pending.timeoutGeneration + 1
+                )
                 state.start = waiting
                 return .merge(received, .cancel(id: CancelID.startTimeout), startTimeout(waiting))
             case .openPhoneApp:

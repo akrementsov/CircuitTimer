@@ -15,7 +15,7 @@ An interval and circuit training timer for iPhone. A workout is a warm-up, a tra
 - A full-screen timer that keeps its progress across backgrounding and relaunches.
 - Tones, haptics, spoken stage names and background notifications, each with its own switch in Settings.
 - A Live Activity on the Lock Screen and in the Dynamic Island, with Pause/Resume on the card. On iOS 26 and later a Health workout session keeps a running timer alive, so closing the app removes its card and notifications; the timer's workout is saved to Apple Health without its pauses.
-- An Apple Watch app that shows the iPhone's workouts and its running workout, whose time counts only while the iPhone confirms it, with Start through the iPhone’s usual permissions flow, Pause and Resume ([Apple Watch](docs/apple-watch.md)).
+- An Apple Watch app that shows the iPhone's workouts and its running workout, whose time counts only while the iPhone confirms it, with Start through the iPhone's usual permissions flow, Pause and Resume ([Apple Watch](docs/apple-watch.md)).
 - A one-time purchase of the full version with StoreKit 2 unlocks iCloud sync and more than two workouts, and will unlock the Apple Watch app ([Purchases](docs/purchases.md)).
 - A swipe on a tab's root switches tabs; the interface is in English and Russian.
 

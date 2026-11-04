@@ -496,7 +496,7 @@ struct CommandGateTests {
 @Suite
 struct PublicationLedgerBudgetTests {
     @Test
-    func test_fits_aStateThatFitsACommandReplyButNotAStartReply_doesNotFit() throws {
+    func test_fits_matchesMaximumOfEveryControlAndStartReply() throws {
         let catalog: CatalogState = .loaded(makeCatalog(40))
         let probe = PhoneState(
             processID: UUID(link: 1),
@@ -527,5 +527,18 @@ struct PublicationLedgerBudgetTests {
         #expect(!fitsRefresh)
         #expect(!fitsCommand)
         #expect(fitsStart)
+
+        let startResults: [WatchStartResult] = [
+            .accepted(asksOnPhone: false), .accepted(asksOnPhone: true), .openPhoneApp, .busy,
+            .listUnavailable, .changed, .gone, .notPlayable,
+        ]
+        let replies = startResults.map { WatchReply.start($0, probe) }
+            + WatchControlResult.allCases.map { WatchReply.control($0, probe) }
+        let sizes = try replies.map {
+            try WireCoding.encode(WatchReplyEnvelope(requestID: UUID(link: 1), reply: $0)).count
+        }
+        let maximum = try #require(sizes.max())
+        #expect(!fits(maximum - 1))
+        #expect(fits(maximum))
     }
 }

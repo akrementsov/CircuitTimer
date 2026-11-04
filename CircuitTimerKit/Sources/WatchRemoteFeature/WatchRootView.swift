@@ -65,7 +65,9 @@ public struct WatchRootView: View {
                     message: Text("watch.link.update.message", bundle: .module)
                 )
             case let .list(catalog, dimmed, status):
-                WatchCatalogList(catalog: catalog, dimmed: dimmed, status: status, startNote: store.startStatus) { id in
+                WatchCatalogList(
+                    catalog: catalog, dimmed: dimmed, status: status, startNote: store.startStatus, isSelectionEnabled: store.start == nil
+                ) { id in
                     send(.workoutTapped(id))
                 }
             case let .empty(status):

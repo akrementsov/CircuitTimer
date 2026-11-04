@@ -427,7 +427,10 @@ final class PublicationLedger: @unchecked Sendable {
                 .gone,
                 .notPlayable,
             ]
-            let replies = [WatchReply.control(longestResult, probe)] + startResults.map { .start($0, probe) }
+            // Every variant has the same outer envelope and PhoneState: only this small subtree changes size.
+            let longestStart = try startResults.map { (result: $0, size: try WireCoding.encode($0).count) }
+                .max { $0.size < $1.size }?.result ?? .accepted(asksOnPhone: false)
+            let replies = [WatchReply.control(longestResult, probe), .start(longestStart, probe)]
             return try replies.allSatisfy {
                 try WireCoding.encode(WatchReplyEnvelope(requestID: processID, reply: $0)).count <= limit
             }

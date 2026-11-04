@@ -49,6 +49,7 @@ struct WatchStartOutcomeTests {
         await store.send(.internal(.startAnswered(sentID: UUID(0), envelope))) {
             _ = $0.order.receive(foreign, from: .message)
             $0.start?.stage = .waiting(asksOnPhone: false)
+            $0.start?.timeoutGeneration = 1
         }
         #expect(store.state.order.processID == UUID(watch: 101))
         #expect(store.state.lease == nil)

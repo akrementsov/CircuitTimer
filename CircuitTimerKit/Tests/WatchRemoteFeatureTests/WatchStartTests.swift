@@ -34,7 +34,10 @@ struct WatchStartTests {
         await store.send(.view(.startButtonTapped)) { $0.start = self.pending(clock) }
         await store.send(.path(.popFrom(id: selected))) { $0.path.removeAll() }
         await held.answer { id in WatchReplyEnvelope(requestID: id, reply: .start(.accepted(asksOnPhone: true), current)) }
-        await store.receive(\.internal.startAnswered) { $0.start?.stage = .waiting(asksOnPhone: true) }
+        await store.receive(\.internal.startAnswered) {
+            $0.start?.stage = .waiting(asksOnPhone: true)
+            $0.start?.timeoutGeneration = 1
+        }
         #expect(store.state.startStatus == .asksOnPhone)
         #expect(sent.requests.value == [
             .start(workoutID: UUID(watch: 1), scheduleFingerprint: catalog.entries[0].scheduleFingerprint, knownCatalogDigest: "A"),
@@ -56,7 +59,10 @@ struct WatchStartTests {
         let old = phoneState(sequence: 1, digest: "A")
         let envelope = WatchReplyEnvelope(requestID: UUID(0), reply: .start(.accepted(asksOnPhone: false), old))
 
-        await store.send(.internal(.startAnswered(sentID: UUID(0), envelope))) { $0.start?.stage = .waiting(asksOnPhone: false) }
+        await store.send(.internal(.startAnswered(sentID: UUID(0), envelope))) {
+            $0.start?.stage = .waiting(asksOnPhone: false)
+            $0.start?.timeoutGeneration = 1
+        }
         #expect(store.state.order.lastSequence == 5)
         #expect(store.state.lease == nil)
         await store.send(.view(.scenePhaseChanged(.background))) {
