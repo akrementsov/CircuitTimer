@@ -2,9 +2,9 @@
 
 The watch app is a remote for the iPhone timer: the workout runs on the iPhone, and without it the watch app does not work. It needs watchOS 10 or later and ships inside the iPhone app. CT-9 delivers it in slices; this page grows with them. The implementation rules are in [AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9), [Module map](../AGENTS.md#module-map) and [Delivery](../AGENTS.md#delivery); change this file together with them.
 
-## What it does now (CT-9-4)
+## What it does now (CT-9-5)
 
-The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. The rows do nothing yet: Start from the watch follows in CT-9-5 ([roadmap](roadmap.md)).
+The watch app shows the iPhone's workouts, in the iPhone's order, with their total time. While a workout runs on the iPhone, the watch shows it instead, drawn like the iPhone timer's cards: the workout's name as the screen's title, the stage's time and name on its colour, and the stage that comes next on a dark card; paused, «Get ready» and «Done» read as on the Live Activity. Choose a workout to open its Start screen; the workout runs on the iPhone through the same permissions flow as its own Start button.
 
 The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked about the run, though the list's own reasons still ask (a retry after a failure, the iPhone back in reach, a state the order asks to confirm, a command's reply from another iPhone process); raising the wrist shows the time again, or asks once.
 
@@ -29,6 +29,18 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 | The iPhone app was launched in the background and has not loaded its workouts | the last list under «Earlier list from … · Waiting for iPhone», or «Open CircuitTimer on your iPhone» |
 | The two apps speak different versions | «Update CircuitTimer on your iPhone» or «… on your watch» |
 | A workout runs whose names do not fit in a transfer | «A workout is running on your iPhone», until it closes |
+
+## Start from the watch
+
+Choose a workout, then tap Start. A selected workout is resolved from the current list: a new name appears immediately, while removal, unavailable data or a different schedule closes the selection. A list whose newer digest has arrived without its contents is waiting for confirmation: its selection says the list is updating, and Start is disabled. Being reachable alone does not confirm a catalog.
+
+The iPhone accepts a Start only after its root has subscribed and it has observed an active scene. Otherwise the watch asks to open CircuitTimer on the iPhone; a cold WatchConnectivity launch cannot start a workout invisibly. The app replies busy while a timer, presentation, purchase, draft, unresolved saved run, list mutation or iCloud reload is in the way. A missing, changed, unplayable or unavailable workout has its own message. No draft is discarded.
+
+Admission waits at most five seconds from arrival at the iPhone. The app creates an intent before answering accepted, and begins its usual notifications → Health flow only when the ticket confirms acceptance. This confirms admission, not physical delivery of the reply. The intent has thirty seconds from reducer acceptance, measured on the monotonic clock and checked at every callback and before opening. Inactive or background does not cancel an already accepted intent: opening waits for active, within the same original limit. Expiry removes the intent and its own alert, but cannot dismiss a system permission sheet. A late Health answer can update access without opening a timer. The watch's permission hint is conservative: it says the iPhone may ask, not that a sheet has already opened.
+
+A new Start can take over a stalled Health stage from either the editor or the watch and continue without Health, including skipping another access read. Notification checks, admission and the new thirty-second limit still apply. Taking over retires the older stalled intent before the new ticket is confirmed; if that ticket has expired, neither the old late Health continuation nor the new intent opens a timer. A local Start during another live watch intent is refused and its local button is freed; a stalled Health intent retains the existing start-without-Health rule.
+
+After accepted, the watch waits thirty seconds plus five seconds for publication, counted from receiving the reply. Sending, waiting and the outcome belong to the root: Back closes only the selection, and the status remains above the list or empty/unavailable/connection notice. The app going to the background ends only this local wait. A lost reply or a wait without a run says to check the iPhone, since the workout may have started. An accepted run, including one published after the local wait ended, replaces the status; a run too large to travel does the same with its existing notice. An incompatible app ends the wait and asks for an update. Start outcomes apply only to the matching request UUID, independently of state ordering; only a refresh reply can switch iPhone processes or open a confirmation lease.
 
 ## How it works
 
@@ -74,9 +86,9 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - A Pause sent from a stage the iPhone has already left pauses the iPhone's current stage: the command is fenced only by changes of the run's phase, as the Live Activity's button is.
 - A command that did not fit the iPhone timer's request queue reads as «Checking on iPhone…» although it never arrived.
 - Commands from the watch and the Live Activity at the same moment: one of them gets «Couldn't». A card update stuck on the iPhone for over 10 seconds makes every later command «Couldn't» until it ends.
-- A reply from another iPhone process is not shown; the watch asks for the state at most once per state, also with the wrist lowered, and a request already in flight may be followed by one more. A command during the run's renewal may cost one extra request too.
+- A Pause/Resume reply from another iPhone process shows no command outcome; the watch asks for the state at most once per state, also with the wrist lowered, and a request already in flight may be followed by one more. A command during the run's renewal may cost one extra request too.
 - Leaving the watch app, or closing the timer, while a command waits shows no outcome. A command the iPhone app had already taken when the system ended it reads as «Checking on iPhone…» and may have applied.
-- The full version will gate the watch app in CT-6-2; Pause and Resume are not gated yet.
+- The full version will gate the watch app in CT-6-2; Start, Pause and Resume are not gated yet.
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
 ## Device checklist
@@ -119,3 +131,10 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] iOS 26: swipe the iPhone app away in the App Switcher while a command waits.
 - [ ] Two quick taps on the Live Activity's button while its card is slow to update: the second says to try again shortly, after 10 seconds to check the timer in the app, and never applies.
 - [ ] A watch screen that does not redraw (O4): note when the time disappears after the confirmation ends; the accepted limit is that it goes at the next redraw.
+
+- [ ] Start with the iPhone active on Workouts and Settings; test the first notification and Health prompts on iOS 17.5 and iOS 26+.
+- [ ] Start while the iPhone app is cold, inactive, locked, showing a draft/purchase/timer, restoring a saved run or reloading iCloud: the watch shows the appropriate refusal and the draft survives.
+- [ ] Answer a system permission sheet after thirty seconds, including after background and return: access may update, but no expired timer opens.
+- [ ] Let Health stall while reading access and while its sheet is open; a new local/watch Start continues without another Health read or request.
+- [ ] Back while sending and while waiting; lose the accepted reply; change/remove/rename the selected workout, and publish a run before the reply or after the local wait: the root status and run remain truthful.
+- [ ] Start selection, disabled state, all messages and VoiceOver hints in English/Russian, on a 41 mm watch and at the largest text size; the screens scroll.

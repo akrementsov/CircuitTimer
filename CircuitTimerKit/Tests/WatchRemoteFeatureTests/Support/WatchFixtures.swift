@@ -54,7 +54,8 @@ func makeWatchStore(
     _ state: WatchRemoteFeature.State = WatchRemoteFeature.State(),
     sent: SentRequests = SentRequests(),
     clock: TestClock<Duration> = TestClock(),
-    status: LinkStatus = reachable
+    status: LinkStatus = reachable,
+    dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<WatchRemoteFeature> {
     TestStore(initialState: state) {
         WatchRemoteFeature()
@@ -66,6 +67,7 @@ func makeWatchStore(
             sent.requests.withValue { $0.append(request) }
             return try sent.answer.value(requestID)
         }
+        dependencies(&$0)
     }
 }
 

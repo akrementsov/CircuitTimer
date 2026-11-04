@@ -89,6 +89,10 @@ extension WatchRemoteFeature.State {
         case earlierList(updatedAt: Date)
     }
 
+    var selectionStatus: StatusLine? {
+        catalog.flatMap { statusLine(updatedAt: $0.updatedAt) }
+    }
+
     var screen: Screen {
         if case let .incompatible(side) = problem {
             return .update(side)

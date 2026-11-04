@@ -6,12 +6,14 @@ import SwiftUI
 struct WatchNoticeView: View {
     let title: Text
     let message: Text?
+    var startNote: WatchRemoteFeature.StartNote?
     var status: WatchRemoteFeature.State.StatusLine?
     var isLoading = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: .token(spacing: .xs)) {
+                if let startNote { WatchStartStatusView(note: startNote) }
                 if let status {
                     WatchStatusText(status: status)
                 }
