@@ -183,7 +183,7 @@ struct AppHealthPermissionTests {
         await store.receive(\.internal.healthAccessQueried) { $0.healthAccess = .notDetermined }
         #expect(requests.value == 0)
 
-        await store.send(.view(.scenePhaseChanged(.active))) {
+        await store.send(.view(.scenePhaseChanged(.active))) { $0.hasScenePhase = true
             $0.isSceneActive = true
             $0.isHealthRequestOutstanding = true
         }
@@ -448,8 +448,8 @@ struct AppHealthPermissionTests {
 
         read.continuation.yield(.notDetermined)
         await store.receive(\.internal.healthAccessQueried) { $0.healthAccess = .notDetermined }
-        await store.send(.view(.scenePhaseChanged(.background))) { $0.isSceneActive = false }
-        await store.send(.view(.scenePhaseChanged(.active))) { $0.isSceneActive = true }
+        await store.send(.view(.scenePhaseChanged(.background))) { $0.hasScenePhase = true; $0.isSceneActive = false }
+        await store.send(.view(.scenePhaseChanged(.active))) { $0.hasScenePhase = true; $0.isSceneActive = true }
         await clock.advance(by: .seconds(10))
 
         #expect(requests.value == 0)
@@ -476,9 +476,9 @@ struct AppHealthPermissionTests {
         }
 
         await clock.advance(by: .seconds(9))
-        await store.send(.view(.scenePhaseChanged(.background))) { $0.isSceneActive = false }
+        await store.send(.view(.scenePhaseChanged(.background))) { $0.hasScenePhase = true; $0.isSceneActive = false }
         await clock.advance(by: .seconds(10))
-        await store.send(.view(.scenePhaseChanged(.active))) { $0.isSceneActive = true }
+        await store.send(.view(.scenePhaseChanged(.active))) { $0.hasScenePhase = true; $0.isSceneActive = true }
         await clock.advance(by: .seconds(9))
         #expect(store.state.startIntent?.hasStalled == false)
 

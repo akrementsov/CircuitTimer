@@ -12,6 +12,7 @@ import WorkoutTimerFeature
 struct AppStartOriginTests {
     @Test
     func test_watchHealthAnswer_onSettingsWithoutEditor_opensCurrentSavedWorkout() async {
+        let clock = TestClock<Duration>()
         let workout = makeWorkout(1)
         var renamed = workout
         renamed.name = "Renamed"
@@ -19,7 +20,12 @@ struct AppStartOriginTests {
         state.selectedTab = .settings
         state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, origin: .watch(requestID: 7), workout: workout, stage: .health)
-        let store = makeStore(state) { $0.timerSession.end = { _ in } }
+        state.hasScenePhase = true
+        state.startIntent?.acceptedAt = MonotonicInstant(now: clock)
+        let store = makeStore(state) {
+            $0.timerSession.end = { _ in }
+            $0.continuousClock = clock
+        }
 
         await store.send(.internal(.healthPermissionAnswered(generation: 1, succeeded: true))) {
             $0.healthAccess = .determined
@@ -38,6 +44,7 @@ struct AppStartOriginTests {
 
     @Test
     func test_localStart_duringWatchIntent_freesLocalButtonAndKeepsWatchIntent() async throws {
+        let clock = TestClock<Duration>()
         let workout = makeWorkout(1)
         var state = loaded([workout])
         state.path.append(.editor(WorkoutEditorFeature.State(viewing: workout)))
@@ -45,7 +52,9 @@ struct AppStartOriginTests {
         state.path[id: id, case: \.editor]?.isStarting = true
         state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, origin: .watch(requestID: 7), workout: workout)
-        let store = makeStore(state)
+        state.hasScenePhase = true
+        state.startIntent?.acceptedAt = MonotonicInstant(now: clock)
+        let store = makeStore(state) { $0.continuousClock = clock }
 
         await store.send(.path(.element(id: id, action: .editor(.delegate(.startRequested(workout)))))) {
             $0.path[id: id, case: \.editor]?.isStarting = false
@@ -56,11 +65,14 @@ struct AppStartOriginTests {
 
     @Test
     func test_watchHealthAnswer_changedSchedule_cancelsInsteadOfOpeningTimer() async {
+        let clock = TestClock<Duration>()
         let workout = makeWorkout(1)
         var state = loaded([Workout(id: workout.id, name: workout.name)])
         state.startGeneration = 1
         state.startIntent = AppFeature.StartIntent(generation: 1, origin: .watch(requestID: 7), workout: workout, stage: .health)
-        let store = makeStore(state)
+        state.hasScenePhase = true
+        state.startIntent?.acceptedAt = MonotonicInstant(now: clock)
+        let store = makeStore(state) { $0.continuousClock = clock }
 
         await store.send(.internal(.healthPermissionAnswered(generation: 1, succeeded: true))) {
             $0.healthAccess = .determined

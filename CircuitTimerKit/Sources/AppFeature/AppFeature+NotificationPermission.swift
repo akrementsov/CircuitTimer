@@ -37,6 +37,7 @@ extension AppFeature {
 
     func notificationAccessQueried(_ access: NotificationAccess?, generation: Int, _ state: inout State) -> Effect<Action> {
         guard state.startIntent?.generation == generation, state.startIntent?.stage == .notifications else { return .none }
+        guard let intent = state.startIntent, startCanContinue(intent, state) else { return cancelStartIntent(&state) }
         guard let access else {
             state.destination = .permissionStalled(.permissionStalled)
             return .none
@@ -103,7 +104,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .notifications else {
             return .none
         }
-        guard state.destination == nil, isCurrentStart(intent.workout, origin: intent.origin, state) else {
+        guard state.destination == nil, startCanContinue(intent, state) else {
             return cancelStartIntent(&state)
         }
         // An outstanding system prompt may still answer after Start now; it can update the cache,

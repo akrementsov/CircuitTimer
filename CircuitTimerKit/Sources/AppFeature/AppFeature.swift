@@ -106,6 +106,8 @@ public struct AppFeature: Sendable {
         var startIntent: StartIntent?
         var startGeneration = 0
         var isSceneActive = true
+        /// The initial optimistic value is not evidence that the iPhone scene can accept a watch Start.
+        var hasScenePhase = false
         var isNotificationCleanupStalled = false
         /// Whether this Apple ID owns the full version, as the purchases client publishes it.
         public internal(set) var fullVersion: FullVersionStatus = .unknown
@@ -179,6 +181,9 @@ public struct AppFeature: Sendable {
             case healthAccessQueried(generation: Int, HealthAccess?)
             case healthPermissionAnswered(generation: Int, succeeded: Bool)
             case healthStalled(generation: Int)
+            case watchStartRequested(WatchStartRequest)
+            case watchStartAdmitted(generation: Int, Bool)
+            case watchStartExpired(generation: Int)
             case fullVersionChanged(FullVersionStatus)
             /// Sent after the purchase sheet or an alert has gone: what waited for a free presentation may show now.
             case presentationFreed
@@ -196,6 +201,8 @@ public struct AppFeature: Sendable {
         case healthPermission
         case fullVersion
         case healthStall
+        case watchStartRequests
+        case watchStartDeadline
     }
 
     static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "CircuitTimer", category: "AppFeature")
@@ -258,9 +265,7 @@ public struct AppFeature: Sendable {
             }
             Reduce { state, _ in
                 guard let intent = state.startIntent else { return .none }
-                guard isCurrentStart(intent.workout, origin: intent.origin, state),
-                      state.destination == nil || state.destination?.is(\.permissionStalled) == true
-                else { return cancelStartIntent(&state) }
+                guard startCanContinue(intent, state) else { return cancelStartIntent(&state) }
                 return .none
             }
         }
@@ -283,7 +288,8 @@ public struct AppFeature: Sendable {
                     cleanupNotifications(),
                     endLiveActivityOrphans(),
                     endHealthOrphans(),
-                    observeRemoteChanges()
+                    observeRemoteChanges(),
+                    observeWatchStarts()
                 )
             case let .tabSelected(tab):
                 if tab == state.selectedTab {
@@ -413,6 +419,12 @@ public struct AppFeature: Sendable {
                 return healthPermissionAnswered(succeeded: succeeded, generation: generation, &state)
             case let .healthStalled(generation):
                 return healthStalled(generation: generation, &state)
+            case let .watchStartRequested(request):
+                return watchStartRequested(request, &state)
+            case let .watchStartAdmitted(generation, admitted):
+                return watchStartAdmitted(admitted, generation: generation, &state)
+            case let .watchStartExpired(generation):
+                return watchStartExpired(generation, &state)
             case let .fullVersionChanged(status):
                 return fullVersionChanged(status, &state)
             case .presentationFreed:

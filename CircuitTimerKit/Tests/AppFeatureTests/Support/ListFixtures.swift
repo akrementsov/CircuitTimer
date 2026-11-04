@@ -82,6 +82,8 @@ func makeStore(
         }
         $0.watchCompanion.publishRun = { _, run in watch.runs.withValue { $0.append(run) } }
         $0.watchCompanion.end = { owner in watch.ended.withValue { $0.append(owner) } }
+        $0.watchCompanion.startRequests = { AsyncStream { $0.finish() } }
+        $0.watchCompanion.startHandled = { _, _ in false }
         $0.watchCompanion.controlRequests = { _ in AsyncStream { $0.finish() } }
         $0.watchCompanion.refreshHandled = { _, _, _ in }
         dependencies(&$0)

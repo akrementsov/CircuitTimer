@@ -38,7 +38,7 @@ struct AppNotificationCleanupTests {
         if mode == "retry" {
             await store.send(.view(.notificationCleanupRetryTapped))
         } else {
-            await store.send(.view(.scenePhaseChanged(.active)))
+            await store.send(.view(.scenePhaseChanged(.active))) { $0.hasScenePhase = true }
         }
         await store.receive(.internal(.notificationCleanupFinished(true))) {
             $0.isNotificationCleanupStalled = false

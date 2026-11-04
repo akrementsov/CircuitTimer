@@ -449,12 +449,12 @@ struct AppNotificationPermissionTests {
         let clock = TestClock()
         let store = makeStore(state, notificationsEnabled: true) { $0.continuousClock = clock }
         await store.send(.internal(.notificationPermissionWait))
-        await store.send(.view(.scenePhaseChanged(.inactive))) { $0.isSceneActive = false }
+        await store.send(.view(.scenePhaseChanged(.inactive))) { $0.hasScenePhase = true; $0.isSceneActive = false }
         await clock.advance(by: .seconds(10))
         await store.send(.view(.scenePhaseChanged(.background)))
         await clock.advance(by: .seconds(10))
         #expect(store.state.destination == nil)
-        await store.send(.view(.scenePhaseChanged(.active))) { $0.isSceneActive = true }
+        await store.send(.view(.scenePhaseChanged(.active))) { $0.hasScenePhase = true; $0.isSceneActive = true }
         await clock.advance(by: .seconds(10))
         await store.receive(.internal(.notificationPermissionStalled(generation: 1))) {
             $0.destination = .permissionStalled(.permissionStalled)
@@ -488,7 +488,7 @@ struct AppNotificationPermissionTests {
         await store.send(.destination(.dismiss)) { $0.destination = nil }
         await store.receive(.internal(.notificationPermissionWait))
         await store.send(.internal(.notificationPermissionStalled(generation: 1)))
-        await store.send(.view(.scenePhaseChanged(.inactive))) { $0.isSceneActive = false }
+        await store.send(.view(.scenePhaseChanged(.inactive))) { $0.hasScenePhase = true; $0.isSceneActive = false }
         await store.send(.internal(.notificationPermissionWait))
         await clock.advance(by: .seconds(10))
         #expect(store.state.destination == nil)

@@ -40,6 +40,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .health else {
             return .none
         }
+        guard startCanContinue(intent, state) else { return cancelStartIntent(&state) }
         // A failed read is not cached, so the next Start reads again.
         guard let access else { return openTimer(intent.workout, origin: intent.origin, &state) }
 
@@ -93,6 +94,7 @@ extension AppFeature {
         guard let intent = state.startIntent, intent.generation == generation, intent.stage == .health else {
             return .none
         }
+        guard startCanContinue(intent, state) else { return cancelStartIntent(&state) }
         state.startIntent?.hasStalled = true
         if case let .editor(editorID) = intent.origin { state.path[id: editorID, case: \.editor]?.cancelStart() }
         return .none

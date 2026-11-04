@@ -31,6 +31,7 @@ extension AppFeature {
         /// The Health stage has not finished in time and Start is free again; a new tap goes on without Health.
         var hasStalled = false
         var skipsHealth = false
+        var acceptedAt: MonotonicInstant?
 
         var isStalledHealth: Bool { stage == .health && hasStalled }
     }
@@ -75,12 +76,14 @@ extension AppFeature {
                       let editor = state.path[id: editorID, case: \.editor] else { return false }
                 return editor.phase == .viewing && editor.workout == workout
             case .watch:
-                guard case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
+                guard state.pendingMutations.isEmpty, !state.needsReload, !state.isReloading,
+                      state.purchaseRequest == nil, !state.hasPendingMutationAlert,
+                      case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
                       stored.isPlayable, WorkoutSchedule(workout: stored).fingerprint == WorkoutSchedule(workout: workout).fingerprint
                 else { return false }
                 return state.path.allSatisfy { element in
                     guard case let .editor(editor) = element else { return false }
-                    return editor.phase == .viewing && editor.destination == nil
+                    return editor.phase == .viewing && editor.destination == nil && !editor.isSaving
                 }
         }
     }
@@ -88,7 +91,9 @@ extension AppFeature {
     /// The one way to the timer after a Start. A Start that is no longer current is released, so its button works
     /// again even when no intent is left to cancel.
     func presentTimer(_ workout: Workout, origin: StartIntent.Origin, _ state: inout State) -> Bool {
-        guard state.destination == nil, isCurrentStart(workout, origin: origin, state) else {
+        guard state.destination == nil, isCurrentStart(workout, origin: origin, state),
+              !origin.isWatch || (state.isSceneActive && state.hasScenePhase
+                  && state.startIntent.map({ !isWatchStartExpired($0) }) == true) else {
             Self.logger.notice("A Start was no longer current when its timer was about to open")
             if case let .editor(editorID) = origin { state.path[id: editorID, case: \.editor]?.cancelStart() }
             return false
@@ -105,10 +110,21 @@ extension AppFeature {
 
     /// Opens the timer and ends the Start's intent, if it has one, either way.
     func openTimer(_ workout: Workout, origin: StartIntent.Origin, _ state: inout State) -> Effect<Action> {
+        if origin.isWatch {
+            guard let intent = state.startIntent, startCanContinue(intent, state) else { return cancelStartIntent(&state) }
+            guard state.hasScenePhase, state.isSceneActive else {
+                state.startIntent?.stage = .awaitingActiveScene
+                return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
+            }
+        }
         guard presentTimer(workout, origin: origin, &state) else { return cancelStartIntent(&state) }
 
         state.startIntent = nil
-        return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
+        return .merge(
+            .cancel(id: CancelID.notificationPermissionStall),
+            .cancel(id: CancelID.healthStall),
+            .cancel(id: CancelID.watchStartDeadline)
+        )
     }
 
     func cancelStartIntent(_ state: inout State) -> Effect<Action> {
@@ -119,21 +135,30 @@ extension AppFeature {
 
     /// Drops the intent without touching its Start: a new tap already holds it.
     func discardStartIntent(_ state: inout State) -> Effect<Action> {
+        if state.startIntent?.origin.isWatch == true, state.destination?.is(\.permissionStalled) == true {
+            state.destination = nil
+        }
         state.startIntent = nil
         state.startGeneration += 1
         return .merge(
             .cancel(id: CancelID.notificationPermission),
             .cancel(id: CancelID.notificationPermissionStall),
             .cancel(id: CancelID.healthPermission),
-            .cancel(id: CancelID.healthStall)
+            .cancel(id: CancelID.healthStall),
+            .cancel(id: CancelID.watchStartDeadline)
         )
     }
 
     /// The permission stages and a stalled notification cleanup go on only in an active scene.
     func sceneChanged(_ phase: ScenePhase, _ state: inout State) -> Effect<Action> {
+        state.hasScenePhase = true
         state.isSceneActive = phase == .active
+        if let intent = state.startIntent, !startCanContinue(intent, state) { return cancelStartIntent(&state) }
         guard phase == .active else {
             return .merge(.cancel(id: CancelID.notificationPermissionStall), .cancel(id: CancelID.healthStall))
+        }
+        if let intent = state.startIntent, intent.stage == .awaitingActiveScene {
+            return openTimer(intent.workout, origin: intent.origin, &state)
         }
         return .merge(
             permissionStallTimer(state),
