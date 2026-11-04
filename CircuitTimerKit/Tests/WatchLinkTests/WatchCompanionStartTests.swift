@@ -6,19 +6,19 @@ import Testing
 import TestSupport
 import WorkoutDomain
 
-private struct StartHarness: Sendable {
+struct StartHarness: Sendable {
     let link: FakeLink
     let clock: ManualClock
     let companion: WatchCompanion
 
-    init() {
+    init(now: @escaping @Sendable () -> Date = { linkNow }) {
         let link = FakeLink()
         let clock = ManualClock()
         let transport = link.transport
         let companion = WatchCompanion(
             ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
             transport: transport,
-            now: { linkNow },
+            now: now,
             clock: clock
         )
         self.link = link
@@ -43,6 +43,14 @@ private struct StartHarness: Sendable {
     private struct NotAStartReply: Error {}
 
     func ask(_ number: Int = 7) async throws -> Reply {
+        let answers = try await askRaw(number)
+        let first = try #require(answers.value.first)
+        let envelope = try WireCoding.decode(WatchReplyEnvelope.self, from: first)
+        guard case let .start(result, state) = envelope.reply else { throw NotAStartReply() }
+        return Reply(id: envelope.requestID, result: result, state: state, answers: answers)
+    }
+
+    func askRaw(_ number: Int = 7) async throws -> LockIsolated<[Data]> {
         let request = WatchRequest.start(workoutID: UUID(link: 1), scheduleFingerprint: "schedule", knownCatalogDigest: nil)
         let data = try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: number), request: request))
         let answers = LockIsolated<[Data]>([])
@@ -55,9 +63,7 @@ private struct StartHarness: Sendable {
                 if first { continuation.resume() }
             }))
         }
-        let envelope = try WireCoding.decode(WatchReplyEnvelope.self, from: answers.value[0])
-        guard case let .start(result, state) = envelope.reply else { throw NotAStartReply() }
-        return Reply(id: envelope.requestID, result: result, state: state, answers: answers)
+        return answers
     }
 }
 

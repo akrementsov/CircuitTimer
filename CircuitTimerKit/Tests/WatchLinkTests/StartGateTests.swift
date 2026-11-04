@@ -102,4 +102,52 @@ struct StartGateTests {
         }
         #expect(!gate.answer(requestID: 2, .accepted(asksOnPhone: false)))
     }
+
+    @Test
+    func test_endSubscription_currentTicket_returnsNilAndLeavesNoSubscriber() async throws {
+        let gate = StartGate()
+        let pair = AsyncStream<WatchStartRequest>.makeStream()
+        let subscription = gate.subscribe(pair.continuation)
+        let answer = try Self.admitted(gate, 1)
+        var iterator = pair.stream.makeAsyncIterator()
+        #expect(await iterator.next() == Self.request(1))
+
+        gate.endSubscription(subscription)
+
+        #expect(await iterator.next() == nil)
+        #expect(await answer.wait(timeout: .zero, clock: ManualClock(), otherwise: .busy) == nil)
+        #expect(!gate.answer(requestID: 1, .accepted(asksOnPhone: false)))
+        guard case .noSubscriber = gate.admit(Self.request(2)) else {
+            Issue.record("A request reached a terminated subscription")
+            return
+        }
+    }
+
+    @Test
+    func test_admit_terminatedContinuation_registersNoTicket() {
+        let gate = StartGate()
+        let pair = AsyncStream<WatchStartRequest>.makeStream()
+        _ = gate.subscribe(pair.continuation)
+        defer { gate.close() }
+        pair.continuation.finish()
+        guard case .terminated = gate.admit(Self.request(1)) else {
+            Issue.record("A terminated stream admitted a request")
+            return
+        }
+        #expect(!gate.answer(requestID: 1, .accepted(asksOnPhone: false)))
+    }
+
+    @Test
+    func test_answerAndWithdraw_foreignRequest_preserveCurrentTicket() async throws {
+        let gate = StartGate()
+        let pair = AsyncStream<WatchStartRequest>.makeStream()
+        _ = gate.subscribe(pair.continuation)
+        defer { gate.close() }
+        let answer = try Self.admitted(gate, 1)
+        #expect(!gate.answer(requestID: 2, .busy))
+        gate.withdraw(requestID: 2)
+        #expect(gate.answer(requestID: 1, .changed))
+        #expect(await answer.wait(timeout: .zero, clock: ManualClock(), otherwise: nil) == .changed)
+    }
+
 }
