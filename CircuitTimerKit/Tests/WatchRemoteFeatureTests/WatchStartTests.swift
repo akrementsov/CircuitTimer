@@ -113,6 +113,55 @@ struct WatchStartTests {
     }
 
     @Test
+    func test_start_equalSequenceReplyAfterLiveRefresh_keepsLeaseAndDoesNotRefreshAgain() async throws {
+        let clock = TestClock<Duration>()
+        let refreshID = UUID(watch: 70)
+        let request = WatchRemoteFeature.RefreshRequest.sent(refreshID, on: clock)
+        var state = stateShowing(catalog, digest: "A")
+        state.start = pending(clock)
+        state.refresh.inFlight = request
+        state.refresh.lastSerial = 1
+        let sent = SentRequests()
+        let store = makeWatchStore(state, sent: sent, clock: clock) { $0.date = .constant(earlier) }
+        let run = runningRun()
+        let confirmed = runState(sequence: 2, run: run)
+
+        await store.send(.internal(.refreshAnswered(sentID: refreshID, reply(refreshID, confirmed)))) {
+            _ = $0.order.receive(confirmed, from: .reply)
+            $0.refresh.inFlight = nil
+            $0.refresh.hasAnswered = true
+            $0.run = .init(run: run, isLive: true)
+            $0.runGeneration = 1
+            $0.lease = .init(serial: 1, sentAt: request.sentAt, openedAt: earlier, deadline: earlier.addingTimeInterval(10))
+            $0.start = nil
+        }
+        let lease = try #require(store.state.lease)
+        let notLive = runState(sequence: 2, run: run, live: false)
+        let accepted = WatchReplyEnvelope(requestID: UUID(0), reply: .start(.accepted(asksOnPhone: false), notLive))
+
+        await store.send(.internal(.startAnswered(sentID: UUID(0), accepted)))
+
+        #expect(store.state.lease == lease)
+        #expect(store.state.run?.isLive == true)
+        #expect(store.state.startStatus == nil)
+        #expect(store.state.refresh.inFlight == nil)
+        #expect(store.state.refresh.lastSerial == 1)
+        #expect(sent.requests.value.isEmpty)
+        guard case let .run(screen) = store.state.screen else {
+            Issue.record("The delayed Start reply replaced the running workout")
+            return
+        }
+        #expect(screen.showsDigits(at: earlier))
+        #expect(screen.digitsUntil == earlier.addingTimeInterval(10))
+        #expect(screen.note == nil)
+        await store.send(.view(.scenePhaseChanged(.background))) {
+            $0.isSceneActive = false
+            $0.lease = nil
+        }
+        await store.finish()
+    }
+
+    @Test
     func test_start_runOvertakesAccepted_keepsRunAndClearsWaitingWithoutOpeningLease() async {
         let clock = TestClock<Duration>()
         var state = stateShowing(catalog, digest: "A")
