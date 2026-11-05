@@ -110,16 +110,15 @@ struct TimerWatchAccessTests {
             Issue.record("The card was answered \(result) for request \(requestID)")
         }
 
-        // The drain the command waits for ends: this pass answers it.
+        // The drain the command waits for ends: this one pass answers it and publishes the run itself, so the missing
+        // publication in the answer comes from the gate, not from a pass that had nothing to publish.
         await timer.store.send(.internal(.activitySynchronized(revision: 5, LiveActivitySyncResult(outcome: .applied))))
-        await timer.watch.controls.wait { !$0.isEmpty }
-        await timer.store.send(.view(.notificationPreferencesChanged))
         await timer.store.finish()
 
         #expect(timer.store.state.activityControls?.pending == nil)
         #expect(timer.watch.controls.value == [
             WatchControlAnswer(owner: timerID, requestID: 9, result: .applied, publication: nil),
         ])
-        #expect(timer.watch.published.value.count == 2)
+        #expect(timer.watch.published.value.count == 1)
     }
 }

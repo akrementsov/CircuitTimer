@@ -54,6 +54,26 @@ struct PublicationLedgerAccessRunTests {
         #expect(granted.run == nil)
     }
 
+    /// The owner ends before StoreKit answered: nothing is numbered or sent, and the first decision publishes no run.
+    @Test
+    func test_end_beforeTheFirstDecision_dropsTheKeptRun_withoutNumberingAnything() async throws {
+        let ledger = await makeLedger(access: nil)
+        _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
+        _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
+        let offered = link.offered.value.count
+
+        // Without `markEnded`, so only `end` can be what keeps the run out of the first decision's state.
+        let ended = await ledger.end(owner: owner(1), at: linkNow)
+
+        #expect(ended == .skipped)
+        #expect(link.offered.value.count == offered)
+        #expect(link.messages.value.isEmpty)
+        _ = await ledger.publishAccess(revision: 2, access: .granted, at: linkNow)
+        let granted = try #require(try link.writtenStates().last)
+        #expect(granted.catalog == Self.four)
+        #expect(granted.run == nil)
+    }
+
     /// A run too large to travel stays hidden after a purchase while its owner is open, with the flag back; once its
     /// owner ended there is neither run nor flag.
     @Test(arguments: [false, true])
