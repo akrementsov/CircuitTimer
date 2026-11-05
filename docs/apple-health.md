@@ -19,6 +19,7 @@ Nothing is saved on iOS 17–25, when writing workouts is not allowed, when the 
 
 Check these on iOS 26 or later before release (CT-7):
 
+- [ ] A TestFlight build, which declares no `workout-processing` background mode (App Store Connect rejects it in an iOS app): a running timer keeps the app running for more than 3 minutes in the background, and an App Switcher swipe then removes its card and notifications. The earlier measurement declared the mode.
 - [ ] Finish after a manual pause, a schedule pause, the stage list and Stay with its countdown: one High Intensity Interval Training workout, indoors, with no samples, starting at the end of the start countdown, whose duration is the running time.
 - [ ] Close from a pause: the workout ends at the pause's start. Close from a running run: it ends at the tap on the close button, not at Finish.
 - [ ] An App Switcher swipe after more than 3 minutes in the background: the workout ends at the swipe, its save fits the termination deadline (the log's «Saved a workout to Health in …»), and the card and notifications still go.

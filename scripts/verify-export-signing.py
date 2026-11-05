@@ -31,7 +31,9 @@ WATCH_SUFFIX = ".watchkitapp"
 VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
 HEALTHKIT = "com.apple.developer.healthkit"
 HEALTH_TEXTS = ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription")
-BACKGROUND_MODES = ("remote-notification", "workout-processing")
+BACKGROUND_MODES = ("remote-notification",)
+# App Store Connect refuses an iOS app that declares these (error 90112); they belong to watchOS.
+REJECTED_BACKGROUND_MODES = ("workout-processing",)
 
 
 class Mismatch(Exception):
@@ -140,6 +142,10 @@ def verify_archive(path):
     for mode in BACKGROUND_MODES:
         if mode not in info.get("UIBackgroundModes", []):
             raise Mismatch(f"{APP}: UIBackgroundModes {info.get('UIBackgroundModes')!r} lack {mode}")
+    for mode in REJECTED_BACKGROUND_MODES:
+        if mode in info.get("UIBackgroundModes", []):
+            modes = info.get("UIBackgroundModes")
+            raise Mismatch(f"{APP}: UIBackgroundModes {modes!r} hold {mode}, which App Store Connect rejects")
     check_health_texts(APP, info)
     with open(app / "ru.lproj" / "InfoPlist.strings", "rb") as file:
         check_health_texts(f"{APP}/ru.lproj/InfoPlist.strings", plistlib.load(file))

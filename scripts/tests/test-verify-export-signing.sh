@@ -51,7 +51,7 @@ archive_fixture() {
 	app="$archive/Products/Applications/CircuitTimer.app"
 	write_plist "$app/Info.plist" "{\"CFBundleIdentifier\": \"$app_id\", \"NSSupportsLiveActivities\": true,
 		\"CFBundleShortVersionString\": \"1.2.3\", \"CFBundleVersion\": \"261031.120000\",
-		\"UIBackgroundModes\": [\"remote-notification\", \"workout-processing\"],
+		\"UIBackgroundModes\": [\"remote-notification\"],
 		\"CTCloudKitContainerIdentifier\": \"$container\",
 		\"NSHealthShareUsageDescription\": \"Reads nothing.\", \"NSHealthUpdateUsageDescription\": \"Runs a workout.\"}"
 	write_plist "$app/ru.lproj/InfoPlist.strings" '{"NSHealthShareUsageDescription": "Ничего не читает.",
@@ -136,7 +136,7 @@ while IFS='|' read -r description file key value message; do
 done <<EOF
 no remote-notification background mode|info|UIBackgroundModes|["audio"]|CircuitTimer.app: UIBackgroundModes ['audio'] lack remote-notification
 no background modes|info|UIBackgroundModes|null|CircuitTimer.app: UIBackgroundModes None lack remote-notification
-no workout-processing background mode|info|UIBackgroundModes|["remote-notification"]|CircuitTimer.app: UIBackgroundModes ['remote-notification'] lack workout-processing
+workout-processing background mode|info|UIBackgroundModes|["remote-notification", "workout-processing"]|CircuitTimer.app: UIBackgroundModes ['remote-notification', 'workout-processing'] hold workout-processing, which App Store Connect rejects
 a blank Health share text|info|NSHealthShareUsageDescription|" "|CircuitTimer.app: NSHealthShareUsageDescription is ' ', not a text
 no Health update text|info|NSHealthUpdateUsageDescription|null|CircuitTimer.app: NSHealthUpdateUsageDescription is None, not a text
 no Russian Health share text|russian|NSHealthShareUsageDescription|null|CircuitTimer.app/ru.lproj/InfoPlist.strings: NSHealthShareUsageDescription is None, not a text
