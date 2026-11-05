@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-6-2, the Apple Watch app only with the full version, and the TestFlight tag that closes CT-9; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: the TestFlight tag that closes CT-9, then CT-6-2, the Apple Watch app only with the full version; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -60,4 +60,4 @@ Next: CT-6-2, the Apple Watch app only with the full version, and the TestFlight
 - [x] **CT-14** — lint checks that the timer's snapshots set every key the timer reads
 - [x] **CT-15** — flaky CI tests: test clocks advance only once their sleepers wait, and `TestSupport` gives tests conditions to wait on
 - [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together once on CI (run 41304027831). Not reproduced in the matching-runtime investigation on 2026-11-02: four isolated tests, one full baseline and five diagnostic runs passed. Direct assertions now carry a per-test suite-change trace; the cause remains unproven ([investigation](testing.md#stored-preference-diagnostics-ct-16)).
-- [ ] AlarmKit on iOS 26 and later for one or two loud alerts that break through silent mode (the workout finished, a manual pause reached), with local notifications on iOS 17–25 and for every stage; after CT-4, as its own milestone
+- [ ] Backlog, no ticket yet: AlarmKit on iOS 26 and later for one or two loud alerts that break through silent mode (the workout finished, a manual pause reached), with local notifications on iOS 17–25 and for every stage

@@ -68,6 +68,8 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - [ ] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; this shows whether App Store Connect minds.
 - [ ] On that TestFlight build, the device checklist's items that only a live session can check pass: the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26.
 
+The tag goes to internal testers only, so the wire's version 1 stays open after it: a fix these checks call for, and CT-6-2, may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
+
 ## Accepted limits
 
 - WatchConnectivity documents no size limit; the iPhone keeps each transfer under 60,000 bytes, an assumption checked on a device.
