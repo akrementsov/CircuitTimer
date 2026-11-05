@@ -237,6 +237,12 @@ final class PublicationLedger: @unchecked Sendable {
         }
     }
 
+    private enum Numbering: Sendable {
+        case numbered
+        case refused
+        case withoutRun
+    }
+
     private enum WriteResult: Equatable {
         case written
         case pending
@@ -384,14 +390,25 @@ final class PublicationLedger: @unchecked Sendable {
                 return .skipped
             }
             // Numbered under the lock that marks owners ended and closes the gate: a state is numbered before the
-            // mark, and the owner's end section replaces it, or not at all.
-            let isNumbered = shared.withLock { shared in
-                guard isTerminal || !shared.isGateClosed else { return false }
-                if let run, shared.endedOwners.contains(run.owner) { return false }
+            // mark, and the owner's end section replaces it, or not at all. A terminal section that the gate closed
+            // under numbers the state without its run instead: no run is written after the gate.
+            let numbering = shared.withLock { shared -> Numbering in
+                guard isTerminal || !shared.isGateClosed else { return .refused }
+                if let run {
+                    if shared.isGateClosed { return .withoutRun }
+                    if shared.endedOwners.contains(run.owner) { return .refused }
+                }
                 self.sequence += 1
-                return true
+                return .numbered
             }
-            guard isNumbered else { return .skipped }
+            switch numbering {
+                case .numbered:
+                    break
+                case .refused:
+                    return .skipped
+                case .withoutRun:
+                    return commit(candidates(for: nil), run: nil, at: now, isTerminal: isTerminal)
+            }
             let state = PhoneState(
                 processID: processID,
                 sequence: sequence,
