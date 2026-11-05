@@ -46,7 +46,8 @@ public struct WatchRemoteFeature: Sendable {
         public init() {}
     }
 
-    /// The list the watch shows. A list the iPhone could not load keeps the last loaded one, dimmed.
+    /// The list the watch shows. A list the iPhone could not load keeps the last loaded one, dimmed; a locked watch app
+    /// keeps none.
     struct ShownCatalog: Equatable, Sendable {
         var lastLoaded: WatchCatalog?
         var unavailable: UnavailableReason?
@@ -325,6 +326,8 @@ public struct WatchRemoteFeature: Sendable {
         switch change {
             case let .replaced(.loaded(catalog)):
                 state.catalog = ShownCatalog(lastLoaded: catalog, unavailable: nil, updatedAt: publishedAt)
+            case .replaced(.unavailable(.locked)):
+                state.catalog = ShownCatalog(lastLoaded: nil, unavailable: .locked, updatedAt: publishedAt)
             case let .replaced(.unavailable(reason)):
                 state.catalog = ShownCatalog(lastLoaded: state.catalog?.lastLoaded, unavailable: reason, updatedAt: publishedAt)
             case .confirmed:

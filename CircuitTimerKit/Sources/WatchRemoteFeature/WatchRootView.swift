@@ -50,7 +50,7 @@ public struct WatchRootView: View {
                 Text(screen.display.title)
             case .notice(.runTooLarge):
                 Text(verbatim: "")
-            case .update, .list, .empty, .unavailable, .notice:
+            case .update, .list, .empty, .unavailable, .notice, .locked:
                 Text("watch.list.title", bundle: .module)
         }
     }
@@ -86,6 +86,12 @@ public struct WatchRootView: View {
                         ? Text("watch.catalog.tooLarge.message", bundle: .module)
                         : Text("watch.catalog.unavailable.message", bundle: .module),
                     startNote: store.startStatus,
+                    status: status
+                )
+            case let .locked(status):
+                WatchNoticeView(
+                    title: Text("watch.locked.title", bundle: .module),
+                    message: Text("watch.locked.message", bundle: .module),
                     status: status
                 )
             case let .notice(notice):
@@ -301,6 +307,17 @@ extension WorkoutActivityAttributes.Phase {
 
 #Preview("Too large") {
     previewView(.preview(catalog: .init(unavailable: .tooLarge, updatedAt: .previewDate)))
+}
+
+#Preview("Locked") {
+    previewView(.preview(catalog: .init(unavailable: .locked, updatedAt: .previewDate)))
+}
+
+#Preview("Locked, iPhone unreachable") {
+    previewView(.preview(
+        link: LinkStatus(isActivated: true, isReachable: false, needsUnlock: false),
+        catalog: .init(unavailable: .locked, updatedAt: .previewDate)
+    ))
 }
 
 #Preview("Connecting") {
