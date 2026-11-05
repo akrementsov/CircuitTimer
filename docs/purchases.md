@@ -50,12 +50,12 @@ Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» 
 
 ## App Store Connect checklist (owner)
 
-- [ ] The Paid Apps Agreement, banking and tax are active; without them no purchase works, not even in the sandbox.
-- [ ] In-App Purchases › Non-Consumable, reference name «Full Version», product ID `com.akrementsov.circuittimer.fullversion`.
-- [ ] Price about $0.99 / 59 ₽, available in every storefront of the app.
-- [ ] Family Sharing turned on. Apple does not let a developer turn it off again for a product; confirm before turning it on.
-- [ ] Display name and description in English and Russian.
-- [ ] Review Information: a screenshot of the purchase sheet and a note on what the purchase unlocks.
+- [x] The Paid Apps Agreement, banking and tax are active; without them no purchase works, not even in the sandbox.
+- [x] In-App Purchases › Non-Consumable, reference name «Full Version», product ID `com.akrementsov.circuittimer.fullversion`.
+- [x] Price $0.99 in the US and 99 ₽ in Russia (chosen over the planned 59 ₽), available in all 175 storefronts of the app.
+- [x] Family Sharing turned on. Apple does not let a developer turn it off again for a product; confirm before turning it on.
+- [x] Display name and description in English and Russian; App Store Connect allows 55 characters, so the descriptions are shorter than in `Configs/CircuitTimer.storekit`.
+- [x] Review Information: a screenshot of the purchase sheet and a note on what the purchase unlocks.
 - [ ] Submit the first purchase together with an app version.
 - [ ] Sandbox testers for the device checks: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline (listed under CT-7).
 - [ ] App Privacy: purchases are handled by Apple; the app collects nothing about them.

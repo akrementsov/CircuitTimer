@@ -2,9 +2,9 @@ import Foundation
 
 /// The version and the limits of the wire between the iPhone app and the watch app.
 ///
-/// Until the TestFlight tag at the end of CT-9 no build of either side ships, so version 1 may change freely. From
-/// that tag version 1 only gains optional fields; a required field or a new enum case other than an
-/// `UnavailableReason` raises `version`.
+/// Until the first build that leaves internal testing (external TestFlight or the App Store) only internal testers
+/// install either side, so version 1 may change freely. From that build version 1 only gains optional fields; a
+/// required field or a new enum case other than an `UnavailableReason` raises `version`.
 public enum WatchLinkSchema {
     public static let version = 1
     /// The largest encoded envelope the iPhone sends. WatchConnectivity documents no limit; this one is an assumption
