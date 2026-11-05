@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the watch gate after CT-9); then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-6-2, the Apple Watch app only with the full version, and the TestFlight tag that closes CT-9; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -32,8 +32,8 @@ Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the wa
   - [x] **CT-4-2** — pause and resume from the Live Activity
 - [x] **CT-5** — iCloud sync of workouts, with a Settings switch and a footnote when iCloud is unavailable (its [device checklist](icloud-sync.md#device-checklist) is listed under CT-7)
 - [ ] **CT-6** — the full version, one non-consumable purchase with StoreKit 2 that unlocks iCloud sync, more than two workouts and the Apple Watch app ([purchases](purchases.md)), in slices:
-  - [ ] **CT-6-1** — the purchase sheet, Settings rows and the locked iCloud switch, iCloud only with the full version, the free limit of two workouts
-  - [ ] **CT-6-2** — the Apple Watch app only with the full version, after CT-9
+  - [x] **CT-6-1** — the purchase sheet, Settings rows and the locked iCloud switch, iCloud only with the full version, the free limit of two workouts
+  - [ ] **CT-6-2** — the Apple Watch app only with the full version; it ships in the same app version as the purchase, whose App Store description names the Apple Watch app
 - [ ] **CT-7** — App Store release
   - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
   - [ ] Fill App Privacy for Apple Health (the app writes workouts to Health and reads nothing), add the App Review note on HealthKit and the workout session, and mention Apple Health in the Description
@@ -42,7 +42,8 @@ Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the wa
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
   - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
   - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
-  - [ ] Create the full version in App Store Connect and check purchases in the sandbox: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
+  - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
+  - [ ] Check purchases in the sandbox with sandbox testers: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
   - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
 - [ ] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
@@ -54,5 +55,9 @@ Next: CT-6, in-app purchase with StoreKit 2 (CT-6-1 on the iPhone, CT-6-2 the wa
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
+- [x] **CT-12** — Settings keeps the Background notifications switch alone, without the signal and notification footnotes
 - [x] **CT-13** — the timer's stage list at accessibility text sizes: a stage's name wraps, with its time under it, instead of being cut to a few letters
+- [x] **CT-14** — lint checks that the timer's snapshots set every key the timer reads
+- [x] **CT-15** — flaky CI tests: test clocks advance only once their sleepers wait, and `TestSupport` gives tests conditions to wait on
 - [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together once on CI (run 41304027831). Not reproduced in the matching-runtime investigation on 2026-11-02: four isolated tests, one full baseline and five diagnostic runs passed. Direct assertions now carry a per-test suite-change trace; the cause remains unproven ([investigation](testing.md#stored-preference-diagnostics-ct-16)).
+- [ ] AlarmKit on iOS 26 and later for one or two loud alerts that break through silent mode (the workout finished, a manual pause reached), with local notifications on iOS 17–25 and for every stage; after CT-4, as its own milestone

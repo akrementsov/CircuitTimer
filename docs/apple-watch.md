@@ -66,7 +66,7 @@ One tag after CT-9-5 checks what only App Store Connect can:
 
 - [ ] `testflight.yml` exports and verifies the IPA: the cloud signing creates the watch app's App ID and signs it for the App Store.
 - [ ] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; this shows whether App Store Connect minds.
-- [ ] Before the tag, the device checklist's items that only a live session can check pass on that build: the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26.
+- [ ] On that TestFlight build, the device checklist's items that only a live session can check pass: the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26.
 
 ## Accepted limits
 
