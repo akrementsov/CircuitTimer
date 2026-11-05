@@ -593,6 +593,246 @@
         }
       }
     },
+    "watch.start.asksOnPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check your iPhone: it may ask for permission."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте iPhone: он может запросить разрешение."
+          }
+        }
+      }
+    },
+    "watch.start.busy" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your iPhone is busy. Finish what is open, then try again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone занят. Завершите текущее действие и попробуйте снова."
+          }
+        }
+      }
+    },
+    "watch.start.button" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Начать"
+          }
+        }
+      }
+    },
+    "watch.start.changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This workout changed. Choose it again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка изменилась. Выберите её снова."
+          }
+        }
+      }
+    },
+    "watch.start.checkPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check your iPhone to see whether the workout started."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проверьте на iPhone, запустилась ли тренировка."
+          }
+        }
+      }
+    },
+    "watch.start.gone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This workout was removed from your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта тренировка удалена с iPhone."
+          }
+        }
+      }
+    },
+    "watch.start.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts this workout on your iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускает эту тренировку на iPhone"
+          }
+        }
+      }
+    },
+    "watch.start.listUnavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The workout list is unavailable. Check your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список тренировок недоступен. Проверьте iPhone."
+          }
+        }
+      }
+    },
+    "watch.start.notPlayable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add stages to this workout on your iPhone before starting."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перед запуском добавьте этапы тренировки на iPhone."
+          }
+        }
+      }
+    },
+    "watch.start.onPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The workout runs on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка выполняется на iPhone."
+          }
+        }
+      }
+    },
+    "watch.start.openPhoneApp" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open CircuitTimer on your iPhone, then try again."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте CircuitTimer на iPhone и попробуйте снова."
+          }
+        }
+      }
+    },
+    "watch.start.sending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending to iPhone…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отправляем на iPhone…"
+          }
+        }
+      }
+    },
+    "watch.start.starting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for the workout on iPhone…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ждём запуска тренировки на iPhone…"
+          }
+        }
+      }
+    },
+    "watch.start.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тренировка"
+          }
+        }
+      }
+    },
+    "watch.start.unconfirmed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The workout list is updating on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Список тренировок обновляется на iPhone."
+          }
+        }
+      }
+    },
     "watch.status.companionMissing" : {
       "localizations" : {
         "en" : {
@@ -669,6 +909,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iPhone не на связи · Обновлено: %@"
+          }
+        }
+      }
+    },
+    "watch.workout.choose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose this workout"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выбрать эту тренировку"
           }
         }
       }

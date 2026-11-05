@@ -11,7 +11,13 @@ extension UUID {
 }
 
 func makeEntry(_ number: Int, name: String? = nil, milliseconds: Int64 = 60_000) -> WatchCatalog.Entry {
-    WatchCatalog.Entry(id: UUID(link: number), name: name ?? "Workout \(number)", totalMilliseconds: milliseconds, isPlayable: true)
+    WatchCatalog.Entry(
+        id: UUID(link: number),
+        name: name ?? "Workout \(number)",
+        totalMilliseconds: milliseconds,
+        isPlayable: true,
+        scheduleFingerprint: String(repeating: "0", count: 64)
+    )
 }
 
 func makeCatalog(_ count: Int, name: (Int) -> String = { "Workout \($0)" }) -> WatchCatalog {

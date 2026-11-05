@@ -9,7 +9,7 @@ import WorkoutDomain
 /// The watch app's root: the iPhone's workouts, or why there are none.
 @ViewAction(for: WatchRemoteFeature.self)
 public struct WatchRootView: View {
-    public let store: StoreOf<WatchRemoteFeature>
+    @Bindable public var store: StoreOf<WatchRemoteFeature>
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
@@ -18,9 +18,19 @@ public struct WatchRootView: View {
     }
 
     public var body: some View {
-        NavigationStack {
+        NavigationStack(path: $store.scope(\.path, action: \.path)) {
             content
                 .navigationTitle(title)
+        } destination: { pathStore in
+            switch pathStore.case {
+                case .selected:
+                    WatchStartView(
+                        selection: store.selection ?? .gone,
+                        status: store.startStatus,
+                        linkStatus: store.selectionStatus,
+                        isEnabled: store.canStartSelected
+                    ) { send(.startButtonTapped) }
+            }
         }
         .background(.surface(.screen))
         .preferredColorScheme(.dark)
@@ -55,11 +65,16 @@ public struct WatchRootView: View {
                     message: Text("watch.link.update.message", bundle: .module)
                 )
             case let .list(catalog, dimmed, status):
-                WatchCatalogList(catalog: catalog, dimmed: dimmed, status: status)
+                WatchCatalogList(
+                    catalog: catalog, dimmed: dimmed, status: status, startNote: store.startStatus, isSelectionEnabled: store.start == nil
+                ) { id in
+                    send(.workoutTapped(id))
+                }
             case let .empty(status):
                 WatchNoticeView(
                     title: Text("watch.catalog.empty.title", bundle: .module),
                     message: Text("watch.catalog.empty.message", bundle: .module),
+                    startNote: store.startStatus,
                     status: status
                 )
             case let .unavailable(reason, status):
@@ -70,6 +85,7 @@ public struct WatchRootView: View {
                     message: reason == .tooLarge
                         ? Text("watch.catalog.tooLarge.message", bundle: .module)
                         : Text("watch.catalog.unavailable.message", bundle: .module),
+                    startNote: store.startStatus,
                     status: status
                 )
             case let .notice(notice):
@@ -84,24 +100,33 @@ public struct WatchRootView: View {
             case .unlock:
                 WatchNoticeView(
                     title: Text("watch.link.unlock.title", bundle: .module),
-                    message: Text("watch.link.unlock.message", bundle: .module)
+                    message: Text("watch.link.unlock.message", bundle: .module),
+                    startNote: store.startStatus
                 )
             case .companionMissing:
                 WatchNoticeView(
                     title: Text("watch.link.companionMissing.title", bundle: .module),
-                    message: Text("watch.link.companionMissing.message", bundle: .module)
+                    message: Text("watch.link.companionMissing.message", bundle: .module),
+                    startNote: store.startStatus
                 )
             case .connecting:
-                WatchNoticeView(title: Text("watch.connecting", bundle: .module), message: nil, isLoading: true)
+                WatchNoticeView(
+                    title: Text("watch.connecting", bundle: .module),
+                    message: nil,
+                    startNote: store.startStatus,
+                    isLoading: true
+                )
             case .unreachable:
                 WatchNoticeView(
                     title: Text("watch.link.unreachable.title", bundle: .module),
-                    message: Text("watch.link.unreachable.message", bundle: .module)
+                    message: Text("watch.link.unreachable.message", bundle: .module),
+                    startNote: store.startStatus
                 )
             case .noCatalog:
                 WatchNoticeView(
                     title: Text("watch.noCatalog.title", bundle: .module),
-                    message: Text("watch.noCatalog.message", bundle: .module)
+                    message: Text("watch.noCatalog.message", bundle: .module),
+                    startNote: store.startStatus
                 )
             case .runTooLarge:
                 WatchNoticeView(
@@ -161,9 +186,27 @@ extension WatchRemoteFeature.State {
 
 extension WatchCatalog {
     static let preview = WatchCatalog(entries: [
-        .init(id: previewID(1), name: "Morning circuit", totalMilliseconds: 1_260_000, isPlayable: true),
-        .init(id: previewID(2), name: " ", totalMilliseconds: 600_000, isPlayable: true),
-        .init(id: previewID(3), name: "Tabata", totalMilliseconds: 240_000, isPlayable: true),
+        .init(
+            id: previewID(1),
+            name: "Morning circuit",
+            totalMilliseconds: 1_260_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
+        .init(
+            id: previewID(2),
+            name: " ",
+            totalMilliseconds: 600_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
+        .init(
+            id: previewID(3),
+            name: "Tabata",
+            totalMilliseconds: 240_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        ),
     ])
 
     private static func previewID(_ last: UInt8) -> UUID {

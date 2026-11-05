@@ -19,7 +19,13 @@ extension UUID {
 
 func watchCatalog(_ names: String...) -> WatchCatalog {
     WatchCatalog(entries: names.enumerated().map {
-        WatchCatalog.Entry(id: UUID(watch: $0.offset + 1), name: $0.element, totalMilliseconds: 60_000, isPlayable: true)
+        WatchCatalog.Entry(
+            id: UUID(watch: $0.offset + 1),
+            name: $0.element,
+            totalMilliseconds: 60_000,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        )
     })
 }
 
@@ -48,7 +54,8 @@ func makeWatchStore(
     _ state: WatchRemoteFeature.State = WatchRemoteFeature.State(),
     sent: SentRequests = SentRequests(),
     clock: TestClock<Duration> = TestClock(),
-    status: LinkStatus = reachable
+    status: LinkStatus = reachable,
+    dependencies: (inout DependencyValues) -> Void = { _ in }
 ) -> TestStoreOf<WatchRemoteFeature> {
     TestStore(initialState: state) {
         WatchRemoteFeature()
@@ -60,6 +67,7 @@ func makeWatchStore(
             sent.requests.withValue { $0.append(request) }
             return try sent.answer.value(requestID)
         }
+        dependencies(&$0)
     }
 }
 

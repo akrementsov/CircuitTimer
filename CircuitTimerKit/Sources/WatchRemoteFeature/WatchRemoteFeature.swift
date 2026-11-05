@@ -9,6 +9,12 @@ import WorkoutDomain
 /// every workout; the watch only shows what the iPhone published.
 @Reducer
 public struct WatchRemoteFeature: Sendable {
+    @Reducer
+    public enum Path {
+        @ReducerCaseIgnored
+        case selected(id: UUID, fingerprint: String)
+    }
+
     @ObservableState
     public struct State: Equatable, Sendable {
         /// `nil` until the session reports itself.
@@ -31,6 +37,11 @@ public struct WatchRemoteFeature: Sendable {
         var command: CommandRequest?
         /// What became of the last command, while the run it is about shows.
         var commandNote: ShownCommandNote?
+
+        public internal(set) var path = StackState<Path.State>()
+        /// Sending and waiting belong to the root, so Back cannot cancel a delivered Start.
+        var start: StartRequest?
+        var startNote: StartNote?
 
         public init() {}
     }
@@ -79,6 +90,7 @@ public struct WatchRemoteFeature: Sendable {
     public enum Action: ViewAction, Equatable, Sendable {
         case view(View)
         case `internal`(Internal)
+        case path(StackActionOf<Path>)
 
         @CasePathable public enum View: Equatable, Sendable {
             case task
@@ -87,6 +99,8 @@ public struct WatchRemoteFeature: Sendable {
             /// The system clock was set; the reducer moves a lease's wall-clock end as every action does.
             case systemClockChanged
             case controlButtonTapped
+            case workoutTapped(UUID)
+            case startButtonTapped
         }
 
         @CasePathable public enum Internal: Equatable, Sendable {
@@ -103,6 +117,9 @@ public struct WatchRemoteFeature: Sendable {
             case commandAnswered(sentID: UUID, WatchReplyEnvelope)
             case commandFailed(sentID: UUID, PhoneLinkError)
             case commandTimedOut(sentID: UUID)
+            case startAnswered(sentID: UUID, WatchReplyEnvelope)
+            case startFailed(sentID: UUID, PhoneLinkError)
+            case startTimedOut(sentID: UUID, generation: Int)
         }
     }
 
@@ -117,6 +134,8 @@ public struct WatchRemoteFeature: Sendable {
         case stageEnd
         case command
         case commandTimeout
+        case start
+        case startTimeout
     }
 
     static let retryDelays: [Duration] = [.seconds(5), .seconds(10), .seconds(20)]
@@ -134,13 +153,18 @@ public struct WatchRemoteFeature: Sendable {
         Reduce { state, action in
             // A lease that ran out goes before anything else, so no action shows its digits.
             dropExpiredLease(&state)
-            return switch action {
+            let expired = dropExpiredStart(&state)
+            let effect: Effect<Action> = switch action {
                 case let .view(action):
                     reduce(into: &state, action)
                 case let .internal(action):
                     reduce(into: &state, action)
+                case .path:
+                    .none
             }
+            return .merge(expired, effect, reconcileSelectionAndStart(&state))
         }
+        .forEach(\.path, action: \.path)
     }
 
     private func reduce(into state: inout State, _ action: Action.View) -> Effect<Action> {
@@ -167,6 +191,7 @@ public struct WatchRemoteFeature: Sendable {
                 state.command = nil
                 state.commandNote = nil
                 return .merge(
+                    stopStart(note: nil, &state),
                     .cancel(id: CancelID.command),
                     .cancel(id: CancelID.commandTimeout),
                     .cancel(id: CancelID.retry),
@@ -210,6 +235,10 @@ public struct WatchRemoteFeature: Sendable {
                 return systemClockChanged(&state)
             case .controlButtonTapped:
                 return controlButtonTapped(&state)
+            case let .workoutTapped(id):
+                return workoutTapped(id, &state)
+            case .startButtonTapped:
+                return startButtonTapped(&state)
         }
     }
 
@@ -249,6 +278,13 @@ public struct WatchRemoteFeature: Sendable {
                 return commandFailed(sentID: sentID, error, &state)
             case let .commandTimedOut(sentID):
                 return commandTimedOut(sentID: sentID, &state)
+            case let .startAnswered(sentID, envelope):
+                return startAnswered(sentID: sentID, envelope, &state)
+            case let .startFailed(sentID, error):
+                return startFailed(sentID: sentID, error, &state)
+            case let .startTimedOut(sentID, generation):
+                guard state.start?.id == sentID, state.start?.timeoutGeneration == generation else { return .none }
+                return stopStart(note: .checkPhone, &state)
         }
     }
 
@@ -304,3 +340,6 @@ public struct WatchRemoteFeature: Sendable {
         return peerSchemaVersion > WatchLinkSchema.version ? .watch : .phone
     }
 }
+
+extension WatchRemoteFeature.Path.State: Equatable, Sendable {}
+extension WatchRemoteFeature.Path.Action: Equatable, Sendable {}

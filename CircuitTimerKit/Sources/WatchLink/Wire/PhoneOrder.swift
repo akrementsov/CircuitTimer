@@ -41,6 +41,12 @@ public struct PhoneOrder: Equatable, Sendable {
     public private(set) var catalogConfirmedBy: UUID?
     /// The states asked about lately, so two delayed processes taking turns do not wake the iPhone again and again.
     private var askedFor: [Asked] = []
+    /// A newer accepted state named a catalog the watch has not received yet.
+    public private(set) var hasNewerCatalogDigest = false
+
+    public var vouchesForCatalog: Bool {
+        processID != nil && catalogConfirmedBy == processID && !hasNewerCatalogDigest
+    }
 
     public init() {}
 
@@ -64,6 +70,7 @@ public struct PhoneOrder: Equatable, Sendable {
         if let catalog = state.catalog {
             catalogDigest = state.catalogDigest
             catalogConfirmedBy = state.processID
+            hasNewerCatalogDigest = false
             return Outcome(change: .replaced(catalog), asksAgain: false)
         }
         guard let digest = state.catalogDigest else {
@@ -71,8 +78,10 @@ public struct PhoneOrder: Equatable, Sendable {
         }
         if digest == catalogDigest {
             catalogConfirmedBy = state.processID
+            hasNewerCatalogDigest = false
             return Outcome(change: .confirmed, asksAgain: false)
         }
+        hasNewerCatalogDigest = true
         return Outcome(change: .unknown, asksAgain: ask(for: state))
     }
 

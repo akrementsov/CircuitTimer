@@ -1,10 +1,12 @@
 import Foundation
 import WorkoutActivity
 
-/// What the watch asks the iPhone. CT-9-5 adds the start.
+/// What the watch asks the iPhone.
 public enum WatchRequest: Codable, Equatable, Sendable {
     /// Send the current state; include the catalog only if its digest differs from this one.
     case refresh(knownCatalogDigest: String?)
+    /// Start the selected schedule through the iPhone app's usual permission flow.
+    case start(workoutID: UUID, scheduleFingerprint: String, knownCatalogDigest: String?)
     /// Pause or resume the owner's timer by the card's rules, fenced by the `controlGeneration` the watch showed; the
     /// reply carries the state as a refresh would.
     case control(owner: UUID, command: LiveActivityCommand, generation: Int, knownCatalogDigest: String?)
@@ -25,6 +27,7 @@ public struct WatchRequestEnvelope: Codable, Equatable, Sendable {
 public enum WatchReply: Codable, Equatable, Sendable {
     case state(PhoneState)
     case control(WatchControlResult, PhoneState)
+    case start(WatchStartResult, PhoneState)
 }
 
 /// What became of a command from the watch. `timedOut` means the iPhone does not know: the command may have applied.

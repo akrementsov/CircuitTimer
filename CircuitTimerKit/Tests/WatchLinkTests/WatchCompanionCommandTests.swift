@@ -492,11 +492,11 @@ struct CommandGateTests {
     }
 }
 
-/// The longest way a state travels is a command's reply: the ledger's budget measures that envelope.
+/// The budget covers every reply that can carry a state, including Start admission.
 @Suite
 struct PublicationLedgerBudgetTests {
     @Test
-    func test_fits_aStateThatFitsARefreshReplyButNotACommandReply_doesNotFit() throws {
+    func test_fits_matchesMaximumOfEveryControlAndStartReply() throws {
         let catalog: CatalogState = .loaded(makeCatalog(40))
         let probe = PhoneState(
             processID: UUID(link: 1),
@@ -511,15 +511,34 @@ struct PublicationLedgerBudgetTests {
         let commandSize = try WireCoding.encode(
             WatchReplyEnvelope(requestID: UUID(link: 1), reply: .control(.unavailable, probe))
         ).count
+        let startSize = try WireCoding.encode(
+            WatchReplyEnvelope(requestID: UUID(link: 1), reply: .start(.accepted(asksOnPhone: false), probe))
+        ).count
         #expect(refreshSize < commandSize)
+        #expect(commandSize < startSize)
 
         let fits = { (limit: Int) in
             PublicationLedger.fits(catalog: catalog, run: makeRun(), processID: UUID(link: 1), at: linkNow, limit: limit)
         }
         let fitsRefresh = fits(refreshSize)
         let fitsCommand = fits(commandSize)
+        let fitsStart = fits(startSize)
 
         #expect(!fitsRefresh)
-        #expect(fitsCommand)
+        #expect(!fitsCommand)
+        #expect(fitsStart)
+
+        let startResults: [WatchStartResult] = [
+            .accepted(asksOnPhone: false), .accepted(asksOnPhone: true), .openPhoneApp, .busy,
+            .listUnavailable, .changed, .gone, .notPlayable,
+        ]
+        let replies = startResults.map { WatchReply.start($0, probe) }
+            + WatchControlResult.allCases.map { WatchReply.control($0, probe) }
+        let sizes = try replies.map {
+            try WireCoding.encode(WatchReplyEnvelope(requestID: UUID(link: 1), reply: $0)).count
+        }
+        let maximum = try #require(sizes.max())
+        #expect(!fits(maximum - 1))
+        #expect(fits(maximum))
     }
 }

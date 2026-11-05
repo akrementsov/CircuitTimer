@@ -25,6 +25,7 @@ actor WatchCompanion {
 
     private let ledger: PublicationLedger
     private let commands = CommandGate()
+    private let starts = StartGate()
     private let transport: LinkTransport
     private let now: @Sendable () -> Date
     private let clock: any Clock<Duration>
@@ -32,6 +33,7 @@ actor WatchCompanion {
     private var tickets: [Int: Ticket] = [:]
     private var subscriptionSerial = 0
     private var requestSerial = 0
+    private var startArrival: (requestID: Int, at: MonotonicInstant)?
 
     init(
         ledger: PublicationLedger,
@@ -89,9 +91,10 @@ actor WatchCompanion {
         push(await ledger.end(owner: owner, at: now()), withCatalog: false)
     }
 
-    /// Stops every publication and every command synchronously, for termination.
+    /// Stops every publication, command and Start admission synchronously, for termination.
     nonisolated func closeGate() {
         commands.close()
+        starts.close()
         ledger.closeGate()
     }
 
@@ -118,6 +121,26 @@ actor WatchCompanion {
         }
         subscriptions[owner] = Subscription(id: subscriptionID, continuation: pair.continuation)
         return pair.stream
+    }
+
+    /// The app's one subscriber. Ending an older stream cannot end the replacement's pending Start.
+    func startRequests() -> AsyncStream<WatchStartRequest> {
+        let pair = AsyncStream<WatchStartRequest>.makeStream(bufferingPolicy: .bufferingOldest(1))
+        let subscriptionID = starts.subscribe(pair.continuation)
+        pair.continuation.onTermination = { [weak starts] _ in
+            starts?.endSubscription(subscriptionID)
+        }
+        return pair.stream
+    }
+
+    /// Acknowledges admission only within the request's original wait, even if its timeout task wakes late.
+    func startHandled(requestID: Int, result: WatchStartResult) -> Bool {
+        guard let arrival = startArrival, arrival.requestID == requestID else { return false }
+        guard remaining(since: arrival.at) > .zero else {
+            starts.withdraw(requestID: requestID)
+            return false
+        }
+        return starts.answer(requestID: requestID, result)
     }
 
     /// The timer's answer: its settled run, or `nil` when it cannot publish one. A request still waiting publishes it
@@ -199,6 +222,14 @@ actor WatchCompanion {
                         arrival: arrival
                     )
                     reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .control(result, state))
+                case let .start(workoutID, scheduleFingerprint, knownCatalogDigest):
+                    let (result, state) = await startState(
+                        workoutID: workoutID,
+                        scheduleFingerprint: scheduleFingerprint,
+                        knownCatalogDigest: knownCatalogDigest,
+                        arrival: arrival
+                    )
+                    reply = WatchReplyEnvelope(requestID: envelope.requestID, reply: .start(result, state))
             }
         } else {
             reply = .unreadable
@@ -209,6 +240,37 @@ actor WatchCompanion {
             Logger.watchLink.error("A reply did not encode: \(String(reflecting: error), privacy: .public)")
             ticket.reply(Data())
         }
+    }
+
+    /// Admission to the app's Start flow; permission requests and opening the timer outlive this short wait.
+    /// Internal so tests can pass an arrival already expired before the answering task starts.
+    func startState(
+        workoutID: UUID,
+        scheduleFingerprint: String,
+        knownCatalogDigest: String?,
+        arrival: MonotonicInstant
+    ) async -> (WatchStartResult, PhoneState) {
+        let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
+        guard remaining(since: arrival) > .zero else { return (.openPhoneApp, notLive()) }
+        requestSerial += 1
+        let request = WatchStartRequest(id: requestSerial, workoutID: workoutID, scheduleFingerprint: scheduleFingerprint)
+        let answer: OneAnswer<WatchStartResult?>
+        switch starts.admit(request) {
+            case let .admitted(admitted):
+                answer = admitted
+            case .busy:
+                return (.busy, notLive())
+            case .closed, .noSubscriber:
+                return (.openPhoneApp, notLive())
+            case .dropped, .terminated:
+                Logger.watchLink.notice("A Start request did not reach the app's subscriber")
+                return (.openPhoneApp, notLive())
+        }
+        startArrival = (request.id, arrival)
+        let result = await answer.wait(timeout: remaining(since: arrival), clock: clock, otherwise: nil)
+        starts.withdraw(requestID: request.id)
+        if startArrival?.requestID == request.id { startArrival = nil }
+        return (result ?? .openPhoneApp, notLive())
     }
 
     /// The reply to a refresh: live only when the run's own timer answered and its publication was numbered within

@@ -257,7 +257,7 @@ struct AppFeatureRemoteChangeTests {
         let id = try #require(state.path.ids.first)
         if situation == "startIntent" {
             // The editor's own Start flag stays down, so only the container's intent keeps the screen.
-            state.startIntent = AppFeature.StartIntent(generation: 1, editorID: id, workout: first)
+            state.startIntent = AppFeature.StartIntent(generation: 1, origin: .editor(id), workout: first)
         }
         let store = makeStore(state)
 

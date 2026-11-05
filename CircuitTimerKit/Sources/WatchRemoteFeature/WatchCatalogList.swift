@@ -3,16 +3,20 @@ import Foundation
 import SwiftUI
 import WatchLink
 
-/// The iPhone's workouts. The rows do nothing yet: Start from the watch comes in CT-9-5.
+/// The iPhone's workouts; choosing one opens its explicit Start screen.
 struct WatchCatalogList: View {
     let catalog: WatchCatalog
     /// Set when the iPhone could not load a newer list; this one is the last it had.
     let dimmed: UnavailableReason?
     let status: WatchRemoteFeature.State.StatusLine?
+    var startNote: WatchRemoteFeature.StartNote?
+    let isSelectionEnabled: Bool
+    let onSelect: (UUID) -> Void
 
     var body: some View {
         ScrollView {
             VStack(spacing: .token(spacing: .xs)) {
+                if let startNote { WatchStartStatusView(note: startNote) }
                 // Why the list may be old comes first; a dimmed list then says why the iPhone sent no newer one.
                 if let status {
                     WatchStatusText(status: status)
@@ -23,7 +27,12 @@ struct WatchCatalogList: View {
                         : Text("watch.catalog.loadFailed.note", bundle: .module))
                 }
                 ForEach(catalog.entries) { entry in
-                    WatchWorkoutRow(entry: entry, isDimmed: dimmed != nil)
+                    Button { onSelect(entry.id) } label: {
+                        WatchWorkoutRow(entry: entry, isDimmed: dimmed != nil || !isSelectionEnabled)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isSelectionEnabled)
+                    .accessibilityHint(Text("watch.workout.choose", bundle: .module))
                 }
                 if catalog.isTruncated {
                     note(Text("watch.catalog.truncated", bundle: .module))

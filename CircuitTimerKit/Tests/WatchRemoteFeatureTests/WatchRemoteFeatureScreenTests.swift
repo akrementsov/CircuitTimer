@@ -82,7 +82,13 @@ struct WatchRemoteFeatureScreenTests {
 
     @Test(arguments: [(" ", true), (" \n\t", true), ("", true), ("a ", false), ("Tabata", false)])
     func test_isUntitled_name_matchesTheIPhonesRule(name: String, expected: Bool) {
-        let entry = WatchCatalog.Entry(id: UUID(watch: 1), name: name, totalMilliseconds: 1, isPlayable: true)
+        let entry = WatchCatalog.Entry(
+            id: UUID(watch: 1),
+            name: name,
+            totalMilliseconds: 1,
+            isPlayable: true,
+            scheduleFingerprint: String(repeating: "0", count: 64)
+        )
 
         #expect(entry.isUntitled == expected)
     }

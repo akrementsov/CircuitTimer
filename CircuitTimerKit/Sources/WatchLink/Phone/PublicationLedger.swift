@@ -398,8 +398,8 @@ final class PublicationLedger: @unchecked Sendable {
         return [.loaded(refused.prefix(refused.entries.count / 2)), .unavailable(.tooLarge)]
     }
 
-    /// Whether the state fits in the longest way it travels: a command's reply envelope with the longest result, the
-    /// largest number and a full digest. A refresh's reply, the context and a message carry less around the same state.
+    /// Whether the state fits in every reply envelope, with the largest number and a full digest. A refresh's reply,
+    /// the context and a message carry less around the same state than the control and Start replies.
     static func fits(
         catalog: CatalogState?,
         run: WatchRun?,
@@ -417,8 +417,23 @@ final class PublicationLedger: @unchecked Sendable {
             isRunLive: run != nil
         )
         do {
-            let reply = WatchReplyEnvelope(requestID: processID, reply: .control(longestResult, probe))
-            return try WireCoding.encode(reply).count <= limit
+            let startResults: [WatchStartResult] = [
+                .accepted(asksOnPhone: false),
+                .accepted(asksOnPhone: true),
+                .openPhoneApp,
+                .busy,
+                .listUnavailable,
+                .changed,
+                .gone,
+                .notPlayable,
+            ]
+            // Every variant has the same outer envelope and PhoneState: only this small subtree changes size.
+            let longestStart = try startResults.map { (result: $0, size: try WireCoding.encode($0).count) }
+                .max { $0.size < $1.size }?.result ?? .accepted(asksOnPhone: false)
+            let replies = [WatchReply.control(longestResult, probe), .start(longestStart, probe)]
+            return try replies.allSatisfy {
+                try WireCoding.encode(WatchReplyEnvelope(requestID: processID, reply: $0)).count <= limit
+            }
         } catch {
             Logger.watchLink.error("A state did not encode: \(String(reflecting: error), privacy: .public)")
             return false

@@ -92,7 +92,7 @@ extension WatchRemoteFeature {
                 // The iPhone could not read the command.
                 state.problem = .incompatible(Self.side(toUpdate: envelope.schemaVersion))
                 return ended
-            case .control, .state:
+            case .control, .state, .start:
                 // Only a bug answers a command with another request's ID or a refresh's reply.
                 Self.logger.error("The iPhone answered a command with another request's reply")
                 state.problem = .incompatible(.phone)
