@@ -419,6 +419,11 @@ final class PublicationLedger: @unchecked Sendable {
                 isRunLive: run != nil,
                 isRunTooLarge: tooLargeOwner != nil
             )
+            if run != nil, isTerminal, isGateClosed {
+                // The gate closed after the number was taken: the number goes unused, and the state without the run
+                // is written instead. What is left is the moment between this check and the write, as for any write.
+                return commit(candidates(for: nil), run: nil, at: now, isTerminal: isTerminal)
+            }
             switch write(state, isTerminal: isTerminal) {
                 case .written:
                     adopt(state, isWritten: true, runRevision: runRevision, access: .granted)
