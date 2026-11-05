@@ -37,7 +37,7 @@ Next: the TestFlight tag that closes CT-9, then CT-6-2, the Apple Watch app only
 - [ ] **CT-7** — App Store release
   - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
   - [ ] Fill App Privacy for Apple Health (the app writes workouts to Health and reads nothing), add the App Review note on HealthKit and the workout session, and mention Apple Health in the Description
-  - [ ] Complete the [Apple Health device checklist](apple-health.md#device-checklist)
+  - [ ] Complete the [Apple Health device checklist](apple-health.md#device-checklist), first whether a workout session keeps the app running without the `workout-processing` background mode, which App Store Connect rejects
   - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
   - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device

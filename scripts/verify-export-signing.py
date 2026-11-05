@@ -32,7 +32,7 @@ VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
 HEALTHKIT = "com.apple.developer.healthkit"
 HEALTH_TEXTS = ("NSHealthShareUsageDescription", "NSHealthUpdateUsageDescription")
 BACKGROUND_MODES = ("remote-notification",)
-# App Store Connect refuses an iOS app that declares these (error 90112); they belong to watchOS.
+# App Store Connect refuses an iOS app that declares these at upload; they belong to watchOS.
 REJECTED_BACKGROUND_MODES = ("workout-processing",)
 
 

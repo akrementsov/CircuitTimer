@@ -1,6 +1,6 @@
 # Apple Health
 
-On iOS 26 and later a running timer holds a Health workout session, which keeps the app running in the background, so closing the app removes its Live Activity and notifications. When the session ends, the timer's workout is saved to Health. The implementation rules are in [AGENTS.md › Apple Health (CT-11)](../AGENTS.md#apple-health-ct-11); change this file and that section together.
+On iOS 26 and later a running timer holds a Health workout session, which keeps the app running in the background, so closing the app removes its Live Activity and notifications. That was measured with the `workout-processing` background mode, which App Store Connect rejects in an iOS app; without it the first item of the device checklist confirms it. When the session ends, the timer's workout is saved to Health. The implementation rules are in [AGENTS.md › Apple Health (CT-11)](../AGENTS.md#apple-health-ct-11); change this file and that section together.
 
 ## What is saved
 
