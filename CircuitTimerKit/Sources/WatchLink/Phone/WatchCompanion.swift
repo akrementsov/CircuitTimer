@@ -192,7 +192,9 @@ actor WatchCompanion {
     private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) async {
         switch outcome {
             case let .written(state), let .pending(state):
-                await ledger.send(withCatalog ? state : state.withoutCatalog)
+                // The lock always travels whole: without it a watch that has no lock yet would keep its list.
+                let keepsCatalog = withCatalog || state.catalog == .unavailable(.locked)
+                await ledger.send(keepsCatalog ? state : state.withoutCatalog)
             case .skipped:
                 break
         }

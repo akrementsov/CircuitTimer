@@ -24,7 +24,8 @@ public struct WatchCompanionClient: Sendable {
     /// Ends the owner's run at once: no later publication carries it. The state without it is written and sent
     /// without the caller waiting for the write.
     public var end: @Sendable (_ owner: UUID) async -> Void
-    /// Synchronous, for termination: closes every publication; only `finishTermination` writes after it.
+    /// Synchronous, for termination: closes every publication; only `finishTermination` and a change of access write
+    /// after it, without a run.
     public var beginTermination: @Sendable () -> Void
     /// Writes the state without any run. The caller bounds the wait.
     public var finishTermination: @Sendable () async -> Void

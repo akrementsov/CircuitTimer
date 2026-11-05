@@ -259,7 +259,8 @@ final class PublicationLedger: @unchecked Sendable {
         refusedForRun = nil
         // Without access the catalog waits for it; a locked state does not depend on it.
         guard access == .granted else { return .skipped }
-        return commit(catalogCandidates, run: publishableRun?.run, at: now)
+        let run = publishableRun
+        return commit(catalogCandidates, run: run?.run, runRevision: run?.revision, at: now)
     }
 
     private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
@@ -299,14 +300,15 @@ final class PublicationLedger: @unchecked Sendable {
             shared.withLock { $0.publishedAccess = .granted }
             return .skipped
         }
-        // After the gate closed the state is the process's last one and carries no run, whatever the access.
+        // Terminal whether or not the gate has closed yet: the decision is written in any order with `closeGate`. After
+        // it the run drops out, as no owner is open.
         let run = publishableRun
         return commit(
             candidates(for: run?.run.owner),
             run: run?.run,
             runRevision: run?.revision,
             at: now,
-            isTerminal: isGateClosed
+            isTerminal: true
         )
     }
 
@@ -426,7 +428,7 @@ final class PublicationLedger: @unchecked Sendable {
     /// leaves it pending rather than unnumbered, so replies answer with the lock at once.
     private func commitLocked(at now: Date, isTerminal: Bool) -> PublishOutcome {
         let catalog = CatalogState.unavailable(.locked)
-        let digest = Self.digest(of: catalog)
+        let digest = Self.lockedDigest
         if isWritten, preparedAccess == .locked, prepared?.catalogDigest == digest {
             return .skipped
         }
@@ -555,6 +557,8 @@ final class PublicationLedger: @unchecked Sendable {
     }
 
     private static let longestResult = WatchControlResult.allCases.max { $0.rawValue.count < $1.rawValue.count } ?? .unavailable
+
+    private static let lockedDigest = digest(of: .unavailable(.locked))
 
     private static func digest(of catalog: CatalogState) -> String? {
         do {

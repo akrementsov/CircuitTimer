@@ -29,7 +29,7 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 | The iPhone app was launched in the background and has not loaded its workouts | the last list under «Earlier list from … · Waiting for iPhone», or «Open CircuitTimer on your iPhone» |
 | The two apps speak different versions | «Update CircuitTimer on your iPhone» or «… on your watch» |
 | A workout runs whose names do not fit in a transfer | «A workout is running on your iPhone», until it closes |
-| The iPhone has no full version | «Full version needed», without a list, under «iPhone isn't connected» or «Unlock your iPhone» if one applies |
+| The iPhone has no full version | «Full version needed», without a list, under the connection's status line if there is one |
 | The iPhone app has not heard from the App Store yet | whatever the watch showed before, or «Open CircuitTimer on your iPhone» |
 
 ## Start from the watch
@@ -102,7 +102,9 @@ The tag goes to internal testers only, so the wire's version 1 stays open after 
 - A refund or a revoked Family Sharing grant while the iPhone app is closed: until a new iPhone process answers, the watch shows its last screen; then the list is marked as earlier and Start is off. The iPhone refuses Start and commands either way.
 - An iPhone app whose App Store answer does not come (offline, for example) refuses the watch's requests; the watch shows its earlier list or «Open CircuitTimer on your iPhone».
 - Between the iPhone learning of a refund and its link applying it, the watch can still get the list and the running workout; a Pause or Resume then reads «Couldn't. Try on iPhone» until the lock arrives. If the iPhone app ends in that moment, the watch may keep the old list until the next launch.
-- WatchConnectivity promises no order between messages: one sent before the lock may arrive after it and show, for a moment, a list or a stage the watch had not shown; once the watch has the lock it rejects anything older. A watch out of reach gets the lock from the context, or in the answer to its next request.
+- WatchConnectivity promises no order between messages: one sent before the lock may arrive after it and show, for a moment, a list or a stage the watch had not shown; once the watch has the lock it rejects anything older. A watch out of reach gets the lock from the context once its write succeeds, or in the answer to its next request from an iPhone process that knows the status.
+- A lock WatchConnectivity refuses to write stays the iPhone's answer to requests, but the context keeps the earlier state until a later write succeeds; if the iPhone app ends first, a watch that opens later shows that earlier state until the iPhone app runs again.
+- A purchase before the iPhone app has loaded its workouts for the first time: the watch keeps the lock (or shows the running workout) until the list is published.
 - A Pause or Resume the iPhone's timer handled before it learned of a refund applies.
 - Watch apps built before CT-6-2 read the lock as «Couldn't load workouts on iPhone».
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.

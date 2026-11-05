@@ -518,7 +518,7 @@ extension SnapshotCaptureContractTests {
                 try await assertTimerSnapshot(textSize: .large, function: "test_rejectedState()") { language in
                     states += 1
                     let workout = SnapshotFixtures.editorWorkout(language: language)
-                    var state = input == "factory" ? .paused(workout) : AppFeature().timerState(for: workout)
+                    var state = input == "factory" ? .paused(workout) : AppFeature().timerState(for: workout, allowsWatchControl: false)
                     state.destination = .closeConfirmation(AlertState { TextState("Probe") })
                     return state
                 }
@@ -545,7 +545,7 @@ extension SnapshotCaptureContractTests {
             do {
                 try await assertTimerSnapshot(textSize: .large, function: "test_rejectedState()") { language in
                     states += 1
-                    return AppFeature().timerState(for: SnapshotFixtures.editorWorkout(language: language))
+                    return AppFeature().timerState(for: SnapshotFixtures.editorWorkout(language: language), allowsWatchControl: false)
                 }
                 Issue.record("A state that has not appeared must be rejected")
             } catch {
