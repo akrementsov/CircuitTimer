@@ -253,7 +253,7 @@ struct AppFeatureFullVersionTests {
             $0.workouts = .loaded([first, second, renamed])
         }
         await store.send(.path(.element(id: id, action: .editor(.delegate(.startRequested(third)))))) {
-            $0.destination = .timer(timerState(for: third))
+            $0.destination = .timer(timerState(for: third, allowsWatchControl: false))
         }
         await store.send(.view(.timerCoverAppeared)) {
             $0.path = StackState()

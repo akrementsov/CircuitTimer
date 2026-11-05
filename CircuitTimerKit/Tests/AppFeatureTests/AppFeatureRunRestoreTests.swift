@@ -61,14 +61,7 @@ struct AppFeatureRunRestoreTests {
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
             $0.runRestore = .presenting(saved)
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0),
-                workoutID: workout.id,
-                title: workout.name,
-                workoutName: workout.name,
-                restoring: restored,
-                at: wall
-            ))
+            $0.destination = .timer(restoredTimerState(for: workout, restoring: restored, at: wall, allowsWatchControl: true))
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(4))
         #expect(store.state.destination?[case: \.timer]?.countdown == nil)
@@ -117,14 +110,7 @@ struct AppFeatureRunRestoreTests {
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
             $0.runRestore = .presenting(saved)
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0),
-                workoutID: workout.id,
-                title: workout.name,
-                workoutName: workout.name,
-                restoring: restored,
-                at: wall
-            ))
+            $0.destination = .timer(restoredTimerState(for: workout, restoring: restored, at: wall, allowsWatchControl: true))
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.status == .finished)
         await store.send(.view(.timerCoverAppeared)) {
@@ -259,9 +245,9 @@ struct AppFeatureRunRestoreTests {
             await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
             await store.receive(.internal(.resumeRunConfirmed)) {
                 $0.runRestore = .presenting(saved)
-                $0.destination = .timer(WorkoutTimerFeature.State(
-                    id: UUID(attempt), workoutID: workout.id, title: workout.name, workoutName: workout.name, restoring: run, at: date
-                ))
+                $0.destination = .timer(
+                    restoredTimerState(for: workout, id: UUID(attempt), restoring: run, at: date, allowsWatchControl: true)
+                )
             }
             #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(phase == .running ? elapsed : 3))
             #expect(store.state.destination?[case: \.timer]?.countdown == nil)
@@ -305,9 +291,7 @@ struct AppFeatureRunRestoreTests {
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
             $0.runRestore = .presenting(saved)
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0), workoutID: workout.id, title: workout.name, workoutName: workout.name, restoring: run, at: now
-            ))
+            $0.destination = .timer(restoredTimerState(for: workout, restoring: run, at: now, allowsWatchControl: true))
         }
         await store.send(.destination(.dismiss)) {
             $0.destination = nil
@@ -448,9 +432,7 @@ struct AppFeatureRunRestoreTests {
         await store.send(.destination(.presented(.resumeRun(.resume)))) { $0.destination = nil }
         await store.receive(.internal(.resumeRunConfirmed)) {
             $0.runRestore = .presenting(saved)
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0), workoutID: renamed.id, title: "Renamed", workoutName: "Renamed", restoring: run, at: now
-            ))
+            $0.destination = .timer(restoredTimerState(for: renamed, restoring: run, at: now, allowsWatchControl: true))
         }
         #expect(store.state.destination?[case: \.timer]?.snapshot.totalElapsed == .seconds(3))
 

@@ -155,7 +155,11 @@ struct AppWatchStartAdmissionTests {
         let clock = TestClock<Duration>()
         let requests = AsyncStream<WatchStartRequest>.makeStream()
         let subscriptions = LockIsolated(0)
-        let store = makeStore(AppFeature.State()) {
+        // StoreKit already answered: a Start from the watch needs the full version.
+        var state = AppFeature.State()
+        state.fullVersion = .full
+        state.settings.fullVersion = .full
+        let store = makeStore(state) {
             $0.continuousClock = clock
             $0.timerSession.end = { _ in }
             $0.workoutStorage.fetchAll = { StoredWorkouts(workouts: [workout]) }
@@ -271,12 +275,6 @@ struct AppWatchStartAdmissionTests {
     }
 
     private func timer() -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: UUID(0),
-            workoutID: workout.id,
-            title: workout.name,
-            workoutName: workout.name,
-            schedule: WorkoutSchedule(workout: workout)
-        )
+        timerState(for: workout, allowsWatchControl: true)
     }
 }

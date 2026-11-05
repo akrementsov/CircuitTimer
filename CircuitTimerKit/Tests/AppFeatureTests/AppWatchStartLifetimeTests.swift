@@ -35,13 +35,7 @@ struct AppWatchStartLifetimeTests {
             if expiresBeforeActive {
                 $0.startGeneration = 2
             } else {
-                $0.destination = .timer(WorkoutTimerFeature.State(
-                    id: UUID(0),
-                    workoutID: workout.id,
-                    title: workout.name,
-                    workoutName: workout.name,
-                    schedule: WorkoutSchedule(workout: workout)
-                ))
+                $0.destination = .timer(timerState(for: workout, allowsWatchControl: true))
             }
         }
         if !expiresBeforeActive { await store.send(.destination(.dismiss)) { $0.destination = nil } }

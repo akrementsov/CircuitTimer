@@ -27,6 +27,13 @@ struct WatchPublications: Sendable {
     /// The runs the timer published and the owners whose runs ended, in order.
     let runs = LockIsolated<[WatchRun]>([])
     let ended = LockIsolated<[UUID]>([])
+    /// Every access the app published, with its revision.
+    let accesses = LockIsolated<[WatchAccessPublication]>([])
+}
+
+struct WatchAccessPublication: Equatable, Sendable {
+    let revision: Int
+    let access: WatchAccess
 }
 
 struct WatchPublication: Equatable, Sendable {
@@ -82,6 +89,9 @@ func makeStore(
         }
         $0.watchCompanion.publishRun = { _, run in watch.runs.withValue { $0.append(run) } }
         $0.watchCompanion.end = { owner in watch.ended.withValue { $0.append(owner) } }
+        $0.watchCompanion.publishAccess = { revision, access in
+            watch.accesses.withValue { $0.append(WatchAccessPublication(revision: revision, access: access)) }
+        }
         $0.watchCompanion.startRequests = { AsyncStream { $0.finish() } }
         $0.watchCompanion.startHandled = { _, _ in false }
         $0.watchCompanion.controlRequests = { _ in AsyncStream { $0.finish() } }

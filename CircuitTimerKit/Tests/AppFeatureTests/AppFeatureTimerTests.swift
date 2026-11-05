@@ -71,17 +71,15 @@ struct AppFeatureTimerTests {
         }
 
         // `make test` runs in English, so the catalog's English variant applies.
-        await start(
-            untitled,
-            in: store,
-            timer: WorkoutTimerFeature.State(
-                id: UUID(0),
-                workoutID: untitled.id,
-                title: "Untitled workout",
-                workoutName: untitled.name,
-                schedule: WorkoutSchedule(workout: untitled)
-            )
+        var timer = WorkoutTimerFeature.State(
+            id: UUID(0),
+            workoutID: untitled.id,
+            title: "Untitled workout",
+            workoutName: untitled.name,
+            schedule: WorkoutSchedule(workout: untitled)
         )
+        timer.allowsWatchControl = true
+        await start(untitled, in: store, timer: timer)
 
         await closeTimer(store)
         #expect(ends.value == [UUID(0)])
@@ -328,14 +326,9 @@ struct AppFeatureTimerTests {
         await store.finish()
     }
 
+    /// The timer a Start opens with the full version, which `loaded()` has.
     private static func timer(_ id: UUID, for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: id,
-            workoutID: workout.id,
-            title: workout.name,
-            workoutName: workout.name,
-            schedule: WorkoutSchedule(workout: workout)
-        )
+        timerState(for: workout, id: id, allowsWatchControl: true)
     }
 }
 

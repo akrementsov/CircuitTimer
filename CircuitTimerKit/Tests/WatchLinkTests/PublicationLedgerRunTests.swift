@@ -10,8 +10,8 @@ import TestSupport
 @Suite(.timeLimit(.minutes(1)))
 struct PublicationLedgerRunTests {
     private let link = FakeLink()
-    private var ledger: PublicationLedger {
-        PublicationLedger(processID: UUID(link: 1), transport: link.transport)
+    private func makeLedger() async -> PublicationLedger {
+        await .make(link: link)
     }
 
     private static let four: CatalogState = .loaded(makeCatalog(4))
@@ -21,7 +21,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_numbersItWithTheCatalog_andALaterCatalogKeepsIt() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(2)), at: linkNow)
 
         let outcome = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
@@ -44,7 +44,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_reply_answeredBy_isLiveOnlyForTheOpenOwnerAtTheAnsweredRevisionOrNewer() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
         _ = await ledger.publishRun(revision: 5, run: makeRun(stage: "A"), at: linkNow)
         _ = await ledger.publishRun(revision: 6, run: makeRun(stage: "B"), at: linkNow)
@@ -74,7 +74,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_reply_gateClosed_isNotLive() async {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
 
         ledger.closeGate()
@@ -84,7 +84,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_sameContentNewerRevision_skipsAndStaysLiveForIt() async {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
 
         let again = await ledger.publishRun(revision: 2, run: makeRun(), at: linkNow)
@@ -96,7 +96,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_olderRevision_isSkipped_andCatalogRevisionsCountApart() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 3, run: makeRun(stage: "A"), at: linkNow)
 
         let older = await ledger.publishRun(revision: 2, run: makeRun(stage: "B"), at: linkNow)
@@ -114,7 +114,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_ordinaryRun_fitsWithTheWholeCut() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let large = makeCatalog(200) { "Workout \($0) " + String(repeating: "x", count: 400) }
         _ = await ledger.publish(revision: 1, catalog: .loaded(large), at: linkNow)
         let cut = try #require(try link.writtenStates().first?.catalog)
@@ -128,7 +128,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_runLargerThanTheReserve_takesAShorterCatalog_andTheListComesBackWhole() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let large = makeCatalog(200) { "Workout \($0) " + String(repeating: "x", count: 400) }
         _ = await ledger.publish(revision: 1, catalog: .loaded(large), at: linkNow)
         let cut = try #require(try link.writtenStates().first?.catalog)
@@ -151,7 +151,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_everyCandidateRefused_hidesTheRunUntilAnotherOwnerPublishes() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge, FakeLink.tooLarge, FakeLink.tooLarge])
 
@@ -175,7 +175,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_tooLargeRun_catalogChangeKeepsTheFlag_endClearsIt() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge, FakeLink.tooLarge, FakeLink.tooLarge])
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
@@ -196,7 +196,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_publishRun_everyWriteRefused_keepsTheOlderRunWhichIsNotLiveForTheNewRevision() async {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
         // Refused with the run, then the state without it is refused too.
         link.refusals.setValue([FakeLink.tooLarge, FakeLink.tooLarge])
@@ -209,8 +209,8 @@ struct PublicationLedgerRunTests {
     }
 
     @Test
-    func test_publishRun_failedWrite_isPendingAndLatest_untilWriteLatestWritesIt() async throws {
-        let ledger = ledger
+    func test_publishRun_failedWrite_isPendingAndLatest_untilWriteLatestAndSendWritesIt() async throws {
+        let ledger = await makeLedger()
         link.snapshot.withValue { $0.canPublish = false }
 
         let outcome = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
@@ -223,15 +223,18 @@ struct PublicationLedgerRunTests {
         #expect(link.contexts.value.isEmpty)
 
         link.snapshot.withValue { $0.canPublish = true }
-        #expect(await ledger.writeLatest() == nil)
+        ledger.writeLatestAndSend()
+        await ledger.settle()
+        // The pending state itself is written: nothing new is numbered or sent.
         #expect(try link.writtenStates() == [state])
+        #expect(link.messages.value.isEmpty)
     }
 
     // MARK: Memory of refusals
 
     @Test
     func test_refusalWithARun_skipsThatCandidateForTheOwnersNextStage_untilTheWatchChanges() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge])
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
@@ -249,7 +252,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_refusalWithARun_newCatalog_isOfferedWholeAgain() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge])
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
@@ -264,7 +267,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_end_numbersTheStateWithoutTheRun_andTheLedgerKnowsNoRunOwner() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
         #expect(ledger.runOwner() == owner(1))
 
@@ -281,7 +284,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_refusalWithARun_holdsOnlyForItsOwner() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge])
         _ = await ledger.publishRun(revision: 1, run: makeRun(owner: 1), at: linkNow)
@@ -299,7 +302,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_refusalWithoutARun_holdsForEveryLaterState() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         link.refusals.setValue([FakeLink.tooLarge])
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         #expect(try link.writtenStates().catalogs == [Self.half])
@@ -313,29 +316,29 @@ struct PublicationLedgerRunTests {
     // MARK: The owner's end and termination
 
     @Test
-    func test_writeLatest_ownerEndedBeforeItsEnd_writesTheStateWithoutTheRun() async throws {
-        let ledger = ledger
+    func test_writeLatestAndSend_ownerEndedBeforeItsEnd_writesAndSendsTheStateWithoutTheRun() async throws {
+        let ledger = await makeLedger()
         link.snapshot.withValue { $0.canPublish = false }
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
         ledger.markEnded(owner(1))
         link.snapshot.withValue { $0.canPublish = true }
 
-        let fallback = await ledger.writeLatest()
+        ledger.writeLatestAndSend()
         let end = await ledger.end(owner: owner(1), at: linkNow)
 
         let written = try link.writtenStates()
         #expect(written.count == 1)
         #expect(written.first?.run == nil)
         #expect(written.first?.catalog == Self.four)
-        #expect(fallback == written.first)
+        #expect(try link.sentStates() == written)
         // The state without the run is numbered once.
         #expect(end == .skipped)
     }
 
     @Test
     func test_finishTermination_unwrittenStateWithoutTheRun_isWritten() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
         link.snapshot.withValue { $0.canPublish = false }
         _ = await ledger.end(owner: owner(1), at: linkNow)
@@ -353,7 +356,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_finishTermination_writtenStateWithoutARun_isSkipped() async {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
 
         #expect(await ledger.finishTermination(at: linkNow) == .skipped)
@@ -362,7 +365,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_finishTermination_tooLargeRun_writesTheStateWithoutTheFlag() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge, FakeLink.tooLarge, FakeLink.tooLarge])
         _ = await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow)
@@ -376,15 +379,17 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_closeGate_skipsEveryPublication_andOnlyTheTerminalStateIsWritten() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
 
         ledger.closeGate()
 
         #expect(await ledger.publishRun(revision: 2, run: makeRun(stage: "A2"), at: linkNow) == .skipped)
         #expect(await ledger.publish(revision: 1, catalog: Self.four, at: linkNow) == .skipped)
-        #expect(await ledger.writeLatest() == nil)
+        ledger.writeLatestAndSend()
+        await ledger.settle()
         #expect(link.contexts.value.count == 1)
+        #expect(link.messages.value.isEmpty)
 
         _ = await ledger.finishTermination(at: linkNow)
         let written = try link.writtenStates()
@@ -398,7 +403,7 @@ struct PublicationLedgerRunTests {
     /// mark under the lock and the section starts again without the run.
     @Test
     func test_markEnded_whileACatalogSectionTriesTheRun_restartsItWithoutTheRun() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
         let five: CatalogState = .loaded(makeCatalog(5))
@@ -422,7 +427,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_markEnded_whileTheRunsWriteIsRefused_restartsWithTheWholeListWithoutTheRun() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         _ = await ledger.publishRun(revision: 1, run: makeRun(stage: "A1"), at: linkNow)
         let gate = WriteGate()
@@ -451,7 +456,7 @@ struct PublicationLedgerRunTests {
     /// and numbers nothing. The context already holds the state without the run, so termination has nothing to write.
     @Test
     func test_closeGate_whileASectionTriesACandidate_numbersNothing_andTerminationHasNothingToWrite() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         let gate = WriteGate()
         defer { gate.open() }
@@ -472,7 +477,7 @@ struct PublicationLedgerRunTests {
 
     @Test
     func test_heldWrite_replyReturnsWhileTheQueueIsBlocked_andRunsNumberInRevisionOrder() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let gate = WriteGate()
         defer { gate.open() }
         link.gate.setValue(gate)
@@ -493,8 +498,8 @@ struct PublicationLedgerRunTests {
     }
 
     @Test
-    func test_writeLatest_queuedBehindASection_runsAfterIt() async throws {
-        let ledger = ledger
+    func test_writeLatestAndSend_queuedBehindASection_runsAfterIt() async throws {
+        let ledger = await makeLedger()
         link.snapshot.withValue { $0.canPublish = false }
         _ = await ledger.publish(revision: 1, catalog: Self.four, at: linkNow)
         link.snapshot.withValue { $0.canPublish = true }
@@ -504,14 +509,14 @@ struct PublicationLedgerRunTests {
         let publication = Task { await ledger.publishRun(revision: 1, run: makeRun(), at: linkNow) }
         await gate.started.wait { $0 }
 
-        let rewritten = Observed<PhoneState??>(nil)
-        ledger.writeLatest { rewritten.setValue(.some($0)) }
+        ledger.writeLatestAndSend()
         gate.open()
         _ = await publication.value
-        await rewritten.wait { $0 != nil }
+        await ledger.settle()
 
-        // The run's section wrote the newer state first, so the queued rewrite found nothing left to write.
-        #expect(rewritten.value == .some(nil))
+        // The run's section wrote the newer state first, so the queued rewrite found nothing left to write or send.
         #expect(try link.writtenStates().map(\.run) == [makeRun()])
+        #expect(link.offered.value.count == 1)
+        #expect(link.messages.value.isEmpty)
     }
 }

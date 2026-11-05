@@ -24,12 +24,36 @@ func pausedRun(of workout: Workout, at date: Date) throws -> StoredRunRecord {
     return StoredRunRecord(record: try #require(WorkoutRunRecord(workoutID: workout.id, run: run)), savedAt: date)
 }
 
-func timerState(for workout: Workout, id: UUID = UUID(0)) -> WorkoutTimerFeature.State {
-    WorkoutTimerFeature.State(
+/// A timer as the app opens it: the watch controls it only with the full version.
+func timerState(for workout: Workout, id: UUID = UUID(0), allowsWatchControl: Bool) -> WorkoutTimerFeature.State {
+    var timer = WorkoutTimerFeature.State(
         id: id,
         workoutID: workout.id,
         title: workout.name,
         workoutName: workout.name,
         schedule: WorkoutSchedule(workout: workout)
     )
+    timer.allowsWatchControl = allowsWatchControl
+    return timer
+}
+
+/// A timer over a saved run as Continue opens it, titled `name`.
+func restoredTimerState(
+    for workout: Workout,
+    name: String? = nil,
+    id: UUID = UUID(0),
+    restoring run: WorkoutRun,
+    at date: Date,
+    allowsWatchControl: Bool
+) -> WorkoutTimerFeature.State {
+    var timer = WorkoutTimerFeature.State(
+        id: id,
+        workoutID: workout.id,
+        title: name ?? workout.name,
+        workoutName: name ?? workout.name,
+        restoring: run,
+        at: date
+    )
+    timer.allowsWatchControl = allowsWatchControl
+    return timer
 }

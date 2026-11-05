@@ -9,7 +9,7 @@ import WorkoutDomain
 struct WatchStartBoundaryTests {
     @Test
     func test_start_sequentialRequests_haveDistinctIDsAndRejectForeignAnswers() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         var iterator = stream.makeAsyncIterator()
@@ -31,7 +31,7 @@ struct WatchStartBoundaryTests {
 
     @Test
     func test_start_timeout_freesNextAdmissionAndLateAnswerCannotFinishIt() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         var iterator = stream.makeAsyncIterator()
@@ -51,7 +51,7 @@ struct WatchStartBoundaryTests {
 
     @Test
     func test_start_replyCannotEncode_answersOnceWithEmptyData() async throws {
-        let harness = StartHarness(now: { Date(timeIntervalSince1970: .nan) })
+        let harness = await StartHarness(now: { Date(timeIntervalSince1970: .nan) })
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         let reader = Task {
@@ -71,7 +71,7 @@ struct WatchStartBoundaryTests {
 
     @Test
     func test_start_cancelledConsumer_terminatesPendingAndNextRequestHasNoSubscriber() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         let taken = Observed<WatchStartRequest?>(nil)
@@ -88,7 +88,7 @@ struct WatchStartBoundaryTests {
 
     @Test
     func test_start_fullSubscriberBuffer_returnsOpenPhoneAppWithoutRegisteringDroppedTicket() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         let first = Task { try await harness.ask(70) }
@@ -109,12 +109,7 @@ struct WatchStartBoundaryTests {
     func test_startHandled_elapsedBeforeSleepWakes_refusesAndWithdrawsOldTicket() async throws {
         let link = FakeLink()
         let clock = DelayedWakeClock()
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 1), transport: link.transport),
-            transport: link.transport,
-            now: { linkNow },
-            clock: clock
-        )
+        let companion = await WatchCompanion.make(link: link, clock: clock)
         defer { companion.closeGate() }
         let stream = await companion.startRequests()
         var iterator = stream.makeAsyncIterator()

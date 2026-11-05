@@ -30,13 +30,7 @@ struct AppStartOriginTests {
         await store.send(.internal(.healthPermissionAnswered(generation: 1, succeeded: true))) {
             $0.healthAccess = .determined
             $0.startIntent = nil
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0),
-                workoutID: renamed.id,
-                title: renamed.name,
-                workoutName: renamed.name,
-                schedule: WorkoutSchedule(workout: renamed)
-            ))
+            $0.destination = .timer(timerState(for: renamed, allowsWatchControl: true))
         }
         await store.send(.destination(.dismiss)) { $0.destination = nil }
         await store.finish()

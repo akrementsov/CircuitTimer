@@ -58,13 +58,7 @@ struct AppHealthPermissionTests {
 
     private func timer(_ workout: Workout? = nil) -> WorkoutTimerFeature.State {
         let workout = workout ?? self.workout
-        return WorkoutTimerFeature.State(
-            id: UUID(0),
-            workoutID: workout.id,
-            title: workout.name,
-            workoutName: workout.name,
-            schedule: WorkoutSchedule(workout: workout)
-        )
+        return timerState(for: workout, allowsWatchControl: true)
     }
 
     private func closeTimer(_ store: TestStoreOf<AppFeature>) async {

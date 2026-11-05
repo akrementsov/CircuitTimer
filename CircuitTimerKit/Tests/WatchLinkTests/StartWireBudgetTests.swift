@@ -38,7 +38,7 @@ struct StartWireBudgetTests {
         #expect(try WatchControlResult.allCases.allSatisfy { try size(.control($0, state)) <= limit })
         #expect(try results.contains { try size(.start($0, state)) > limit })
         let link = FakeLink()
-        let ledger = PublicationLedger(processID: UUID(link: 1), transport: link.transport)
+        let ledger = await PublicationLedger.make(link: link)
         _ = await ledger.publish(revision: 1, catalog: .loaded(catalog), at: linkNow)
         let written = try #require(try link.writtenStates().last)
         guard case let .loaded(cut) = written.catalog else {
