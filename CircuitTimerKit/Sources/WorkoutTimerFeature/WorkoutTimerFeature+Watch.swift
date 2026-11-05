@@ -3,6 +3,13 @@ import Foundation
 import WatchLink
 import WorkoutActivity
 
+extension WorkoutTimerFeature.State {
+    /// Lets the watch control this timer, or stops it: only the screen's owner calls it, from the full version.
+    public mutating func setWatchControl(_ isAllowed: Bool) {
+        allowsWatchControl = isAllowed
+    }
+}
+
 extension WorkoutTimerFeature {
     /// Runs after every action, like the Live Activity's sync: the watch link drops a run it already published. A
     /// request from the watch is answered with the run settled for it, which the link numbers before it replies.

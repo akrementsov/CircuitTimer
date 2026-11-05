@@ -106,6 +106,7 @@ The tag goes to internal testers only, so the wire's version 1 stays open after 
 - A lock WatchConnectivity refuses to write stays the iPhone's answer to requests, but the context keeps the earlier state until a later write succeeds; if the iPhone app ends before its last write succeeds, at termination or earlier, a watch that opens later shows that earlier state until the iPhone app runs again.
 - A purchase before the iPhone app has loaded its workouts for the first time: the watch keeps the lock (or shows the running workout) until the list is published.
 - A Pause or Resume the iPhone's timer handled before it learned of a refund applies.
+- A Start from the watch the iPhone already accepted is cancelled by a refund before its timer opens, at the next check of the Start (also while a notification or Health sheet is open; the sheet itself stays). The watch ends its wait when the lock arrives; with the lock's write refused or the watch out of reach it says to check the iPhone after its 35-second wait.
 - Watch apps built before CT-6-2 read the lock as «Couldn't load workouts on iPhone».
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
@@ -158,6 +159,7 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] Start selection, disabled state, all messages and VoiceOver hints in English/Russian, on a 41 mm watch and at the largest text size; the screens scroll.
 
 - [ ] Without the full version (Xcode › Debug › StoreKit › Manage Transactions): «Full version needed» with the watch app open and when it opens later; Start, Pause and Resume change nothing on the iPhone.
+- [ ] A refund while a Start from the watch waits on the notification or Health sheet: no timer opens after the sheet is answered, and the watch shows «Full version needed».
 - [ ] A purchase in the purchase sheet, a restore and a Family Sharing grant bring the list back without editing it; a refund and a revoked grant take it away, with the watch app open and closed.
 - [ ] A refund during a workout started on the iPhone and during one started from the watch: the iPhone workout goes on, the watch loses it at once.
 - [ ] The full version arriving while the timer is open (an approved Ask to Buy, a purchase on another device, Family Sharing): Pause and Resume from the watch start to apply.

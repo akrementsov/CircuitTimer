@@ -33,7 +33,7 @@ func timerState(for workout: Workout, id: UUID = UUID(0), allowsWatchControl: Bo
         workoutName: workout.name,
         schedule: WorkoutSchedule(workout: workout)
     )
-    timer.allowsWatchControl = allowsWatchControl
+    timer.setWatchControl(allowsWatchControl)
     return timer
 }
 
@@ -54,6 +54,6 @@ func restoredTimerState(
         restoring: run,
         at: date
     )
-    timer.allowsWatchControl = allowsWatchControl
+    timer.setWatchControl(allowsWatchControl)
     return timer
 }

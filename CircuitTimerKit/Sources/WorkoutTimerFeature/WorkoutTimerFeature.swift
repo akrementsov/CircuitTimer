@@ -91,8 +91,8 @@ public struct WorkoutTimerFeature: Sendable {
         var isClosing = false
         /// The watch's commands and refreshes reach this timer only with the full version, which the watch app is part
         /// of. Off unless the screen's owner allows it, and changed by it in the pass that learns of a purchase or a
-        /// refund, so a request handled after that pass follows the new status.
-        public var allowsWatchControl = false
+        /// refund, so a request handled after that pass follows the new status. Set through `setWatchControl(_:)`.
+        public internal(set) var allowsWatchControl = false
         /// What the run did, for its Health workout; the session saves the newest track it received.
         public internal(set) var healthTrack = WorkoutHealthTrack()
         var sentHealthTrack = WorkoutHealthTrack()

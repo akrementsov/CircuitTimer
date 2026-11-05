@@ -56,8 +56,9 @@ struct AppFeatureWatchAccessTests {
         #expect(watch.revisions.value == (access == nil ? 0 : 1))
     }
 
-    /// The timer follows the status in place: the watch's subscription it started before the change still delivers,
-    /// and the run on the iPhone goes on after a refund.
+    /// The timer follows the status in place: the flag changes, the watch's subscription it started before the change
+    /// survives and still delivers, and the run on the iPhone goes on after a refund. The clock has not started, so the
+    /// answer carries no run whatever the flag; what the flag does to an answer is pinned in `TimerWatchAccessTests`.
     @Test(arguments: [
         (FullVersionStatus.full, FullVersionStatus.free),
         (.free, .full),

@@ -461,9 +461,14 @@ final class PublicationLedger: @unchecked Sendable {
         }
         guard isNumbered else { return .skipped }
         let state = PhoneState(processID: processID, sequence: sequence, publishedAt: now, catalog: catalog, catalogDigest: digest)
-        if write(state, isTerminal: isTerminal) == .written {
+        let result = write(state, isTerminal: isTerminal)
+        if result == .written {
             adopt(state, isWritten: true, access: .locked)
             return .written(state)
+        }
+        if result == .tooLarge {
+            // A payload of a few hundred bytes should never be refused; if it is, every activation numbers it again.
+            Logger.watchLink.error("WatchConnectivity refused the lock as too large; replies answer with it until a write succeeds")
         }
         adopt(state, isWritten: false, access: .locked)
         return .pending(state)

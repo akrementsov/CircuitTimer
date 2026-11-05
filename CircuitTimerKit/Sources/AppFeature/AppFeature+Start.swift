@@ -183,7 +183,7 @@ extension AppFeature {
             workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
-        timer.allowsWatchControl = allowsWatchControl
+        timer.setWatchControl(allowsWatchControl)
         return timer
     }
 
@@ -202,7 +202,7 @@ extension AppFeature {
             restoring: run,
             at: now
         )
-        timer.allowsWatchControl = allowsWatchControl
+        timer.setWatchControl(allowsWatchControl)
         return timer
     }
 }

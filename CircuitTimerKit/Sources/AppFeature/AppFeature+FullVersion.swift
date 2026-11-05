@@ -40,7 +40,7 @@ extension AppFeature {
         state.settings.fullVersion = status
         if state.destination?.is(\.timer) == true {
             // In place: replacing the destination would cancel the timer's effects.
-            state.destination?.modify(\.timer) { $0.allowsWatchControl = status == .full }
+            state.destination?.modify(\.timer) { $0.setWatchControl(status == .full) }
         }
         return isChanged ? publishWatchAccess(status) : .none
     }
