@@ -31,11 +31,18 @@ extension AppFeature {
         return .none
     }
 
+    /// This pass orders the change against the watch's requests: a command or a Start handled after it follows the new
+    /// status, the open timer included; the watch link learns of it from the effect.
     func fullVersionChanged(_ status: FullVersionStatus, _ state: inout State) -> Effect<Action> {
+        let isChanged = state.fullVersion != status
         state.fullVersion = status
         // One subscription for both tabs: Settings shows the status the list already knows on its first frame.
         state.settings.fullVersion = status
-        return .none
+        if state.destination?.is(\.timer) == true {
+            // In place: replacing the destination would cancel the timer's effects.
+            state.destination?.modify(\.timer) { $0.allowsWatchControl = status == .full }
+        }
+        return isChanged ? publishWatchAccess(status) : .none
     }
 
     /// Runs after every action. Shows a requested sheet once the launch's question about a saved run is settled and

@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Purchases
 import WatchLink
 import WorkoutDomain
 
@@ -28,6 +29,24 @@ extension AppFeature {
                 }
             case .idle, .loading, nil:
                 return .none
+        }
+    }
+
+    /// Lets the watch app in or locks it; the link keeps the list and the run meanwhile and publishes them with access.
+    /// Nothing while StoreKit has not answered: the watch keeps what it shows.
+    func publishWatchAccess(_ status: FullVersionStatus) -> Effect<Action> {
+        let access: WatchAccess
+        switch status {
+            case .full:
+                access = .granted
+            case .free:
+                access = .locked
+            case .unknown:
+                return .none
+        }
+        let revision = watchCompanion.nextRevision()
+        return .run { [watchCompanion] _ in
+            await watchCompanion.publishAccess(revision, access)
         }
     }
 }

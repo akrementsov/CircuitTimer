@@ -8,6 +8,8 @@ import WorkoutDomain
 /// that it knows no catalog, and the list reaches the watch when the app publishes it. A request about a running
 /// workout goes to its timer first, so a reply confirms a run only after its timer settled and published it. A command
 /// goes to the timer the same way and is answered once, with what the timer did and the state it published.
+/// Without the full version the ledger publishes the locked state and every request is refused before it reaches a
+/// timer or the app.
 actor WatchCompanion {
     /// How long a request waits for the timer, counted from its arrival; then the reply says the run is not live.
     static let timerWait: Duration = .seconds(5)
@@ -26,7 +28,6 @@ actor WatchCompanion {
     private let ledger: PublicationLedger
     private let commands = CommandGate()
     private let starts = StartGate()
-    private let transport: LinkTransport
     private let now: @Sendable () -> Date
     private let clock: any Clock<Duration>
     private var subscriptions: [UUID: Subscription] = [:]
@@ -37,12 +38,10 @@ actor WatchCompanion {
 
     init(
         ledger: PublicationLedger,
-        transport: LinkTransport,
         now: @escaping @Sendable () -> Date,
         clock: any Clock<Duration>
     ) {
         self.ledger = ledger
-        self.transport = transport
         self.now = now
         self.clock = clock
     }
@@ -54,9 +53,7 @@ actor WatchCompanion {
             for await event in events {
                 switch event {
                     case .activated, .statusChanged:
-                        ledger.writeLatest { [self] fallback in
-                            if let fallback { push(fallback) }
-                        }
+                        ledger.writeLatestAndSend()
                     case .watchChanged:
                         ledger.watchChanged()
                     case let .request(data, ticket):
@@ -72,11 +69,16 @@ actor WatchCompanion {
     }
 
     func publishCatalog(revision: Int, catalog: CatalogState) async {
-        push(await ledger.publish(revision: revision, catalog: catalog, at: now()))
+        await push(ledger.publish(revision: revision, catalog: catalog, at: now()))
     }
 
     func publishRun(revision: Int, run: WatchRun) async {
-        push(await ledger.publishRun(revision: revision, run: run, at: now()), withCatalog: false)
+        await push(ledger.publishRun(revision: revision, run: run, at: now()), withCatalog: false)
+    }
+
+    /// Lets the watch app in or locks it, and sends an open watch what follows.
+    func publishAccess(revision: Int, access: WatchAccess) async {
+        await push(ledger.publishAccess(revision: revision, access: access, at: now()))
     }
 
     /// Stops publishing the owner's run at once, without waiting for an actor hop or the queue.
@@ -88,7 +90,7 @@ actor WatchCompanion {
     /// open watch.
     func end(owner: UUID) async {
         endRequests(of: owner)
-        push(await ledger.end(owner: owner, at: now()), withCatalog: false)
+        await push(ledger.end(owner: owner, at: now()), withCatalog: false)
     }
 
     /// Stops every publication, command and Start admission synchronously, for termination.
@@ -100,7 +102,7 @@ actor WatchCompanion {
 
     /// Writes the last state, without any run, and sends it to an open watch.
     func finishTermination() async {
-        push(await ledger.finishTermination(at: now()), withCatalog: false)
+        await push(ledger.finishTermination(at: now()), withCatalog: false)
     }
 
     /// The timer's stream of requests. A new subscription of the same owner replaces the old one, whose waiting
@@ -186,22 +188,13 @@ actor WatchCompanion {
         commands.endSubscription(owner: owner, subscriptionID: subscriptionID)
     }
 
-    private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) {
+    /// An open watch app gets the state at once; a closed one reads the context when it opens.
+    private func push(_ outcome: PublishOutcome, withCatalog: Bool = true) async {
         switch outcome {
             case let .written(state), let .pending(state):
-                push(withCatalog ? state : state.withoutCatalog)
+                await ledger.send(withCatalog ? state : state.withoutCatalog)
             case .skipped:
                 break
-        }
-    }
-
-    /// An open watch app gets the state at once; a closed one reads the context when it opens.
-    nonisolated private func push(_ state: PhoneState) {
-        guard transport.status().isReachable else { return }
-        do {
-            transport.sendMessage(try WireCoding.encode(state))
-        } catch {
-            Logger.watchLink.error("A state did not encode: \(String(reflecting: error), privacy: .public)")
         }
     }
 
@@ -252,6 +245,15 @@ actor WatchCompanion {
     ) async -> (WatchStartResult, PhoneState) {
         let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
         guard remaining(since: arrival) > .zero else { return (.openPhoneApp, notLive()) }
+        switch ledger.publishedAccess() {
+            case .granted:
+                break
+            case .locked:
+                return (.listUnavailable, notLive())
+            case nil:
+                // The app does not know yet whether it has the full version.
+                return (.openPhoneApp, notLive())
+        }
         requestSerial += 1
         let request = WatchStartRequest(id: requestSerial, workoutID: workoutID, scheduleFingerprint: scheduleFingerprint)
         let answer: OneAnswer<WatchStartResult?>
@@ -277,8 +279,9 @@ actor WatchCompanion {
     /// `timerWait` of the request's arrival.
     private func refreshState(knownCatalogDigest: String?, arrival: MonotonicInstant) async -> PhoneState {
         let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
-        // A request whose 5 s already passed before its task ran goes to no timer.
-        guard remaining(since: arrival) > .zero, let owner = ledger.runOwner(), let subscription = subscriptions[owner] else {
+        // A request whose 5 s already passed before its task ran goes to no timer, nor one without access.
+        guard remaining(since: arrival) > .zero, ledger.publishedAccess() == .granted,
+              let owner = ledger.runOwner(), let subscription = subscriptions[owner] else {
             return notLive()
         }
 
@@ -320,7 +323,8 @@ actor WatchCompanion {
         arrival: MonotonicInstant
     ) async -> (WatchControlResult, PhoneState) {
         let notLive = { self.notLive(knownCatalogDigest: knownCatalogDigest) }
-        guard remaining(since: arrival) > .zero, let owner = ledger.runOwner(), owner == requested,
+        guard remaining(since: arrival) > .zero, ledger.publishedAccess() == .granted,
+              let owner = ledger.runOwner(), owner == requested,
               !ledger.isEnded(owner), let subscription = subscriptions[owner] else {
             return (.unavailable, notLive())
         }
@@ -373,7 +377,7 @@ actor WatchCompanion {
         Task {
             let outcome = await ledger.publishRun(revision: publication.revision, run: publication.run, at: publishedAt)
             published.give(true)
-            push(outcome, withCatalog: false)
+            await push(outcome, withCatalog: false)
         }
         // A wait with nothing left returns what was already given, so the bound is checked again after it.
         guard await published.wait(timeout: remaining(since: arrival), clock: clock, otherwise: false),

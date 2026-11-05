@@ -208,7 +208,9 @@ extension AppFeature {
 
         state.selectedTab = .workouts
         state.runRestore = .presenting(stored)
-        state.destination = .timer(restoredTimerState(for: workout, run: run, at: now))
+        state.destination = .timer(
+            restoredTimerState(for: workout, run: run, at: now, allowsWatchControl: state.fullVersion == .full)
+        )
         return .none
     }
 

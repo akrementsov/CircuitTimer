@@ -76,7 +76,8 @@ extension AppFeature {
                       let editor = state.path[id: editorID, case: \.editor] else { return false }
                 return editor.phase == .viewing && editor.workout == workout
             case .watch:
-                guard case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
+                // A refund or a revoked Family Sharing grant cancels a Start from the watch not yet presented.
+                guard state.fullVersion == .full, case let .loaded(workouts) = state.workouts, let stored = workouts[id: workout.id],
                       stored.isPlayable, WorkoutSchedule(workout: stored).fingerprint == WorkoutSchedule(workout: workout).fingerprint
                 else { return false }
                 return state.path.allSatisfy { element in
@@ -102,7 +103,7 @@ extension AppFeature {
         } else {
             current = workout
         }
-        state.destination = .timer(timerState(for: current))
+        state.destination = .timer(timerState(for: current, allowsWatchControl: state.fullVersion == .full))
         return true
     }
 
@@ -172,19 +173,28 @@ extension AppFeature {
 
     // A timer's state is built only here and in `restoredTimerState`, so both get the same identifiers and title.
 
-    func timerState(for workout: Workout) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
+    // Each caller decides whether the watch may control the timer: the full version, which the watch app is part of.
+
+    func timerState(for workout: Workout, allowsWatchControl: Bool) -> WorkoutTimerFeature.State {
+        var timer = WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
             workoutName: workout.name,
             schedule: WorkoutSchedule(workout: workout)
         )
+        timer.allowsWatchControl = allowsWatchControl
+        return timer
     }
 
     /// A timer over a saved run already settled at `now`.
-    func restoredTimerState(for workout: Workout, run: WorkoutRun, at now: Date) -> WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
+    func restoredTimerState(
+        for workout: Workout,
+        run: WorkoutRun,
+        at now: Date,
+        allowsWatchControl: Bool
+    ) -> WorkoutTimerFeature.State {
+        var timer = WorkoutTimerFeature.State(
             id: uuid(),
             workoutID: workout.id,
             title: workout.displayName,
@@ -192,5 +202,7 @@ extension AppFeature {
             restoring: run,
             at: now
         )
+        timer.allowsWatchControl = allowsWatchControl
+        return timer
     }
 }

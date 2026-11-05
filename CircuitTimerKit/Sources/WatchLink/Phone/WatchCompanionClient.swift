@@ -12,12 +12,15 @@ import WatchConnectivity
 public struct WatchCompanionClient: Sendable {
     /// Starts the session once per process, before the first scene: a request from the watch may have launched it.
     public var activate: @Sendable () -> Void
-    /// An increasing revision for the next `publishCatalog` or `publishRun`. Take it in the reducer: effects can start
-    /// out of order, and a publication older than one already handled is dropped.
+    /// An increasing revision for the next `publishCatalog`, `publishRun` or `publishAccess`. Take it in the reducer:
+    /// effects can start out of order, and a publication older than one already handled is dropped.
     public var nextRevision: @Sendable () -> Int = { 0 }
     public var publishCatalog: @Sendable (_ revision: Int, _ catalog: CatalogState) async -> Void
     /// Publishes the timer's settled run; its owner is `run.owner`.
     public var publishRun: @Sendable (_ revision: Int, _ run: WatchRun) async -> Void
+    /// Lets the watch app in or locks it, with a revision from `nextRevision`. Until the first call the watch gets
+    /// nothing and every request is refused.
+    public var publishAccess: @Sendable (_ revision: Int, _ access: WatchAccess) async -> Void
     /// Ends the owner's run at once: no later publication carries it. The state without it is written and sent
     /// without the caller waiting for the write.
     public var end: @Sendable (_ owner: UUID) async -> Void
@@ -62,7 +65,6 @@ extension WatchCompanionClient: DependencyKey {
                     let transport = WCSessionBridge().transport
                     let started = WatchCompanion(
                         ledger: PublicationLedger(processID: uuid(), transport: transport),
-                        transport: transport,
                         now: { date.now },
                         clock: clock
                     )
@@ -86,6 +88,9 @@ extension WatchCompanionClient: DependencyKey {
             },
             publishRun: { revision, run in
                 await companion.value?.publishRun(revision: revision, run: run)
+            },
+            publishAccess: { revision, access in
+                await companion.value?.publishAccess(revision: revision, access: access)
             },
             end: { owner in
                 guard let started = companion.value else { return }
@@ -132,6 +137,7 @@ extension WatchCompanionClient: DependencyKey {
             nextRevision: { 0 },
             publishCatalog: { _, _ in misuse() },
             publishRun: { _, _ in misuse() },
+            publishAccess: { _, _ in misuse() },
             end: { _ in misuse() },
             beginTermination: misuse,
             finishTermination: misuse,
@@ -159,6 +165,7 @@ extension WatchCompanionClient: DependencyKey {
         nextRevision: { 1 },
         publishCatalog: { _, _ in },
         publishRun: { _, _ in },
+        publishAccess: { _, _ in },
         end: { _ in },
         beginTermination: {},
         finishTermination: {},

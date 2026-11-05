@@ -9,8 +9,10 @@ extension WorkoutTimerFeature {
     func syncWatch(_ state: State, after action: Action, publication: WatchRunPublication?) -> Effect<Action> {
         // A command is answered with its result by `finishActivityControl`; this pass publishes as usual.
         if case let .internal(.watchRequestReceived(request)) = action, case .refresh = request.kind {
+            // Without the full version the reply confirms no run.
+            let answer = state.allowsWatchControl ? publication : nil
             return .run { [watchCompanion, id = state.id] _ in
-                await watchCompanion.refreshHandled(id, request.id, publication)
+                await watchCompanion.refreshHandled(id, request.id, answer)
             }
         }
         guard let publication else { return .none }
