@@ -27,9 +27,9 @@ struct AboutScreen: Screen {
         return LegalDocumentScreen(app, file: file, line: line)
     }
 
-    func tapUserAgreement(file: StaticString = #filePath, line: UInt = #line) -> LegalDocumentScreen {
-        app.buttons[AccessibilityID.About.userAgreement]
-            .waitUntilHittable("The User agreement button", file: file, line: line)
+    func tapTermsOfUse(file: StaticString = #filePath, line: UInt = #line) -> LegalDocumentScreen {
+        app.buttons[AccessibilityID.About.termsOfUse]
+            .waitUntilHittable("The Terms of use button", file: file, line: line)
             .tap()
         return LegalDocumentScreen(app, file: file, line: line)
     }

@@ -21,8 +21,8 @@ struct AboutView: View {
                 switch document {
                     case .privacyPolicy:
                         button.accessibilityIdentifier(AccessibilityID.About.privacyPolicy)
-                    case .userAgreement:
-                        button.accessibilityIdentifier(AccessibilityID.About.userAgreement)
+                    case .termsOfUse:
+                        button.accessibilityIdentifier(AccessibilityID.About.termsOfUse)
                 }
             }
             versionCard
