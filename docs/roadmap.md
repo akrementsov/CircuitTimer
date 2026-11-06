@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: the TestFlight tag that closes CT-9; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -45,13 +45,13 @@ Next: the TestFlight tag that closes CT-9; then CT-7, the App Store release with
   - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
   - [ ] Check purchases in the sandbox with sandbox testers: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
   - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
-- [ ] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
+- [x] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
   - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
   - [x] **CT-9-3** — the running stage and its time on the watch, shown only while the iPhone confirms them
   - [x] **CT-9-4** — Pause and Resume from the watch, under the Live Activity's command rules
-  - [x] **CT-9-5** — Start from the watch through the iPhone's usual Start (paired-device checks and the TestFlight tag below remain open)
-  - [ ] One [TestFlight tag](apple-watch.md#testflight-tag-at-the-end-of-ct-9) after CT-9-5: the cloud signing and TestFlight accept the watch app
+  - [x] **CT-9-5** — Start from the watch through the iPhone's usual Start (its paired-device checks are listed under CT-7)
+  - [x] One [TestFlight tag](apple-watch.md#testflight-tag-at-the-end-of-ct-9) after CT-9-5: the cloud signing and TestFlight accept the watch app (`v0.1.1-rc.4`, 2026-11-05)
 - [x] **CT-11** — Apple Health, in slices (its [device checklist](apple-health.md#device-checklist) is listed under CT-7):
   - [x] **CT-11-1** — a HealthKit workout session on iOS 26 and later, so that a workout keeps running in the background and closing the app ends its Live Activity and notifications
   - [x] **CT-11-2** — each timer's workout saved to Health, without its pauses
