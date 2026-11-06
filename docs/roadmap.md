@@ -35,8 +35,8 @@ Next: CT-7, the App Store release with its legal texts and device checklists. Ch
   - [x] **CT-6-1** — the purchase sheet, Settings rows and the locked iCloud switch, iCloud only with the full version, the free limit of two workouts
   - [x] **CT-6-2** — the Apple Watch app only with the full version; it ships in the same app version as the purchase, whose App Store description names the Apple Watch app
 - [ ] **CT-7** — App Store release
-  - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
-  - [ ] Fill App Privacy for Apple Health (the app writes workouts to Health and reads nothing), add the App Review note on HealthKit and the workout session, and mention Apple Health in the Description
+  - [ ] Privacy Policy and Terms of Use in English and Russian, in the app and on GitHub Pages ([texts](legal/privacy-policy.md)); checked once the four published pages open after the merge
+  - [ ] Enter in App Store Connect what [App Store Connect](app-store.md) lists: the privacy and support addresses, App Privacy (Data Not Collected), the App Review note on HealthKit and the workout session, and the Description paragraph on Apple Health and the Apple Watch app
   - [ ] Complete the [Apple Health device checklist](apple-health.md#device-checklist), first whether a workout session keeps the app running without the `workout-processing` background mode, which App Store Connect rejects
   - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
