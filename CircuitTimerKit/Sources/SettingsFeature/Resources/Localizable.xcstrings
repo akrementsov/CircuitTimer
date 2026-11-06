@@ -17,18 +17,18 @@
         }
       }
     },
-    "about.userAgreement" : {
+    "about.termsOfUse" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "User agreement"
+            "value" : "Terms of use"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пользовательское соглашение"
+            "value" : "Условия использования"
           }
         }
       }
@@ -61,6 +61,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Версия приложения неизвестна"
+          }
+        }
+      }
+    },
+    "legal.loadFailed" : {
+      "comment" : "A legal page whose text is missing from the app",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load this document."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось загрузить документ."
           }
         }
       }

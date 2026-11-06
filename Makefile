@@ -58,6 +58,7 @@ lint:
 	$(SWIFTLINT) lint --strict --quiet
 	scripts/check-scenario-dependencies.sh
 	python3 -I scripts/check-brand-colors.py
+	python3 -I scripts/check-legal-texts.py
 
 # Tests of the scripts and of the make targets around xcodebuild, with fixtures and stand-ins for xcodebuild and xcrun,
 # so CI's Linux lint job runs them too; a test that lints uses SWIFTLINT.

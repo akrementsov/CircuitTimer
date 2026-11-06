@@ -35,8 +35,8 @@ struct SettingsFeatureTests {
         await store.send(.view(.legalDocumentTapped(.privacyPolicy))) {
             $0.path[id: 1] = .legalDocument(.privacyPolicy)
         }
-        await store.send(.view(.legalDocumentTapped(.userAgreement))) {
-            $0.path[id: 2] = .legalDocument(.userAgreement)
+        await store.send(.view(.legalDocumentTapped(.termsOfUse))) {
+            $0.path[id: 2] = .legalDocument(.termsOfUse)
         }
     }
 
