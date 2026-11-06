@@ -7,13 +7,13 @@ import Testing
 @Suite
 struct PublicationLedgerTests {
     private let link = FakeLink()
-    private var ledger: PublicationLedger {
-        PublicationLedger(processID: UUID(link: 1), transport: link.transport)
+    private func makeLedger() async -> PublicationLedger {
+        await .make(link: link)
     }
 
     @Test
     func test_publish_twoCatalogs_numbersThemInTheOrderOfTheirWrites() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let first = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
         let second = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(2)), at: linkNow)
 
@@ -27,7 +27,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_reply_nothingPublishedSameOrOtherDigest_answersUnknownConfirmationOrState() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let unknown = ledger.reply(knownCatalogDigest: "X", answeredBy: nil, at: linkNow)
         #expect(unknown.sequence == 0)
         #expect(unknown.catalog == nil)
@@ -54,7 +54,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_catalogs_cutToTheEnvelopeLimitLessTheRunReserve() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         let large = makeCatalog(200) { "Workout \($0) " + String(repeating: "x", count: 400) }
         _ = await ledger.publish(revision: 1, catalog: .loaded(large), at: linkNow)
         let huge = makeCatalog(1) { _ in String(repeating: "y", count: 70_000) }
@@ -78,8 +78,8 @@ struct PublicationLedgerTests {
     }
 
     @Test
-    func test_publish_failedOrImpossibleWrite_isPendingUntilWriteLatest() async throws {
-        let ledger = ledger
+    func test_publish_failedOrImpossibleWrite_isPendingUntilWriteLatestAndSend() async throws {
+        let ledger = await makeLedger()
         link.refusals.setValue([FakeLink.unreachable])
         let failed = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
         guard case let .pending(state) = failed else {
@@ -88,10 +88,17 @@ struct PublicationLedgerTests {
         }
         #expect(link.contexts.value.isEmpty)
 
-        #expect(await ledger.writeLatest() == nil)
+        ledger.writeLatestAndSend()
+        await ledger.settle()
+        // The pending state itself is written: nothing new is numbered or sent.
         #expect(try link.writtenStates() == [state])
-        #expect(await ledger.writeLatest() == nil)
+        #expect(link.offeredStates() == [state, state])
+        #expect(link.messages.value.isEmpty)
+        ledger.writeLatestAndSend()
+        await ledger.settle()
+        #expect(link.offered.value.count == 2)
         #expect(link.contexts.value.count == 1)
+        #expect(link.messages.value.isEmpty)
 
         link.snapshot.withValue { $0.canPublish = false }
         let impossible = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(2)), at: linkNow)
@@ -102,7 +109,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_refusedAsTooLarge_fallsBackToHalfThenUnavailable() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         link.refusals.setValue([FakeLink.tooLarge])
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(4)), at: linkNow)
         #expect(try link.writtenStates().last?.catalog == .loaded(makeCatalog(4).prefix(2)))
@@ -122,7 +129,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_everyCandidateRefused_skipsAndKeepsThePreviousState() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
         link.refusals.setValue([FakeLink.tooLarge, FakeLink.tooLarge, FakeLink.tooLarge])
 
@@ -135,22 +142,23 @@ struct PublicationLedgerTests {
     }
 
     @Test
-    func test_writeLatest_refusedAsTooLarge_fallsBackLikeAPublication() async throws {
-        let ledger = ledger
+    func test_writeLatestAndSend_refusedAsTooLarge_fallsBackLikeAPublication_andSendsTheFallback() async throws {
+        let ledger = await makeLedger()
         link.snapshot.withValue { $0.canPublish = false }
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(4)), at: linkNow)
         link.snapshot.withValue { $0.canPublish = true }
         link.refusals.setValue([FakeLink.tooLarge])
 
-        let fallback = await ledger.writeLatest()
+        ledger.writeLatestAndSend()
+        await ledger.settle()
 
         #expect(try link.writtenStates().map(\.catalog) == [.loaded(makeCatalog(4).prefix(2))])
-        #expect(try fallback == link.writtenStates().last)
+        #expect(try link.sentStates() == link.writtenStates())
     }
 
     @Test
     func test_publish_sameDigest_skipsOnlyAfterASuccessfulWrite() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         link.refusals.setValue([FakeLink.unreachable])
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
         let retried = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(1)), at: linkNow)
@@ -166,13 +174,15 @@ struct PublicationLedgerTests {
 
     @Test
     func test_watchChanged_writesTheNewestStateAgain() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 1, catalog: .loaded(makeCatalog(1)), at: linkNow)
-        _ = await ledger.writeLatest()
+        ledger.writeLatestAndSend()
+        await ledger.settle()
         #expect(link.contexts.value.count == 1)
 
         ledger.watchChanged()
-        _ = await ledger.writeLatest()
+        ledger.writeLatestAndSend()
+        await ledger.settle()
 
         let written = try link.writtenStates()
         #expect(written.count == 2)
@@ -181,7 +191,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_olderRevision_isSkipped() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         _ = await ledger.publish(revision: 3, catalog: .loaded(makeCatalog(3)), at: linkNow)
         let older = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(2)), at: linkNow)
 
@@ -198,7 +208,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_olderRevisionAfterARefusedOne_keepsTheFallbackWritten() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         link.refusals.setValue([FakeLink.tooLarge])
         let refused = await ledger.publish(revision: 3, catalog: .loaded(makeCatalog(4)), at: linkNow)
         let older = await ledger.publish(revision: 2, catalog: .loaded(makeCatalog(6)), at: linkNow)
@@ -216,7 +226,7 @@ struct PublicationLedgerTests {
 
     @Test
     func test_publish_concurrentRevisions_writeIncreasingSequencesOfIncreasingRevisions() async throws {
-        let ledger = ledger
+        let ledger = await makeLedger()
         await withTaskGroup(of: Void.self) { group in
             for revision in 1...40 {
                 group.addTask {

@@ -9,15 +9,9 @@ struct WatchCompanionTests {
     private let link = FakeLink()
 
     /// Starts the actor on the fake's events, as the live client does.
-    private func start() -> WatchCompanion {
-        let transport = link.transport
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
-            transport: transport,
-            now: { linkNow },
-            clock: TestClock()
-        )
-        let events = transport.events()
+    private func start() async -> WatchCompanion {
+        let companion = await WatchCompanion.make(link: link, clock: TestClock())
+        let events = link.transport.events()
         Task { await companion.run(events) }
         return companion
     }
@@ -37,7 +31,7 @@ struct WatchCompanionTests {
 
     @Test
     func test_request_refresh_isAnsweredOnceWithItsID() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
         let request = try WireCoding.encode(WatchRequestEnvelope(requestID: UUID(link: 7), request: .refresh(knownCatalogDigest: nil)))
 
@@ -59,7 +53,7 @@ struct WatchCompanionTests {
         Data(#"{"schemaVersion":1,"request":"nonsense"}"#.utf8),
     ])
     func test_request_unreadable_isAnsweredUnreadable(request: Data) async throws {
-        _ = start()
+        _ = await start()
 
         let (data, count) = await ask(request)
 
@@ -69,7 +63,7 @@ struct WatchCompanionTests {
 
     @Test
     func test_publishCatalog_pushesWhatItPublishedToAReachableWatch() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
         #expect(try link.sentStates() == link.writtenStates())
 
@@ -91,7 +85,7 @@ struct WatchCompanionTests {
     /// A context write refused as too large on activation falls back, and an open watch gets the fallback at once.
     @Test
     func test_activation_refusedWrite_pushesTheFallback() async throws {
-        let companion = start()
+        let companion = await start()
         link.snapshot.withValue { $0.canPublish = false }
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(4)))
         link.snapshot.withValue { $0.canPublish = true }
@@ -108,7 +102,7 @@ struct WatchCompanionTests {
 
     @Test
     func test_watchChanged_thenActivation_writesTheNewestStateAgain() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
         let events = try #require(link.events.value)
 

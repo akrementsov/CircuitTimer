@@ -321,6 +321,38 @@
         }
       }
     },
+    "watch.locked.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Apple Watch app is part of the full version. Buy or restore it in CircuitTimer on your iPhone."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение для Apple Watch входит в полную версию. Купите или восстановите её в CircuitTimer на iPhone."
+          }
+        }
+      }
+    },
+    "watch.locked.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full version needed"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нужна полная версия"
+          }
+        }
+      }
+    },
     "watch.noCatalog.message" : {
       "localizations" : {
         "en" : {

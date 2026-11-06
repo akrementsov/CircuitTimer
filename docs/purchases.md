@@ -1,6 +1,6 @@
 # Purchases
 
-One non-consumable in-app purchase, the full version (`com.akrementsov.circuittimer.fullversion`), unlocks iCloud sync of workouts, more than two workouts and, from CT-6-2, the Apple Watch app. It is a one-time purchase with Family Sharing on. The price is always the App Store's `displayPrice` in the user's storefront; nothing in the app names an amount.
+One non-consumable in-app purchase, the full version (`com.akrementsov.circuittimer.fullversion`), unlocks iCloud sync of workouts, more than two workouts and the Apple Watch app. It is a one-time purchase with Family Sharing on. The price is always the App Store's `displayPrice` in the user's storefront; nothing in the app names an amount.
 
 ## How the app knows
 
@@ -19,7 +19,7 @@ The store mirrors to iCloud only with the full version. The launch decides once 
 
 - **Settings.** The tab reads the status `AppFeature` follows, so a buyer never sees the lock on its first frame. Without the full version the iCloud switch is a locked button (a lock next to its title, the switch drawn off) that opens the purchase sheet, and two rows offer «Buy the App» and «Restore Purchases»; Restore opens the sheet and restores at once. With it, the switch works as before and one row says «Full Version — Purchased». While StoreKit has not answered, neither rows nor footnote show.
 - **The workout list.** «+» and Duplicate open the sheet once the list shows two workouts; the «+» looks as always. Stored workouts stay visible, editable and playable whatever their number.
-- **The Apple Watch app** (CT-6-2): without the full version the iPhone will send the watch nothing and ignore its commands, and the watch will say to buy it on the iPhone. Until then the iPhone publishes its workouts to the watch whatever the status.
+- **The Apple Watch app.** Without the full version the iPhone sends the watch neither the workouts nor the running workout and refuses its Start, Pause and Resume; the watch says «Full version needed» and to buy or restore it on the iPhone. A purchase, a restore or a Family Sharing grant shows the list on the watch, a refund takes it away, without a change of the list ([Apple Watch › The full version](apple-watch.md#the-full-version-ct-6-2), with its accepted limits).
 
 ## The purchase sheet
 

@@ -11,6 +11,13 @@ import WorkoutDomain
 @MainActor
 @Suite
 struct TimerWatchTests {
+    /// A timer the watch may control, as one the app opens with the full version.
+    private static func harness(_ state: WorkoutTimerFeature.State, activity: Bool = false) -> TimerHarness {
+        var state = state
+        state.allowsWatchControl = true
+        return TimerHarness(state, activity: activity)
+    }
+
     private static func run(of state: WorkoutTimerFeature.State, at now: Date) -> WatchRun {
         WatchRun(
             owner: state.id,
@@ -23,7 +30,7 @@ struct TimerWatchTests {
 
     @Test
     func test_action_afterTheClockStarted_publishesTheRunWithARevisionTakenForEachAction() async {
-        let timer = TimerHarness(.fixture(.paused), activity: true)
+        let timer = Self.harness(.fixture(.paused), activity: true)
         let run = Self.run(of: timer.store.state, at: origin)
 
         await timer.send(.view(.notificationPreferencesChanged))
@@ -43,7 +50,7 @@ struct TimerWatchTests {
 
     @Test
     func test_action_beforeTheClockStarted_publishesNothing() async {
-        let timer = TimerHarness(.fresh())
+        let timer = Self.harness(.fresh())
 
         await timer.send(.view(.notificationPreferencesChanged))
         await timer.store.finish()
@@ -54,7 +61,7 @@ struct TimerWatchTests {
 
     @Test
     func test_watchRequest_answersWithTheRunSettledForIt_withoutAPublicationOfItsOwn() async {
-        let timer = TimerHarness(.fixture(.paused), activity: true)
+        let timer = Self.harness(.fixture(.paused), activity: true)
         await timer.advance(seconds: 2)
         let run = Self.run(of: timer.store.state, at: timer.now)
 
@@ -73,7 +80,7 @@ struct TimerWatchTests {
     /// stage changes neither the status nor an operation, so the running loop stays and nothing is written.
     @Test
     func test_watchRequest_runningPastTheStageEnd_commitsTheNextStageAndAnswersWithIt() async throws {
-        let timer = TimerHarness(.fixture(.running))
+        let timer = Self.harness(.fixture(.running))
         // No loop runs in the fixture, so nothing has moved the run past the work stage's end, 7 s from now.
         await timer.advance(seconds: 8)
 
@@ -96,7 +103,7 @@ struct TimerWatchTests {
     func test_watchRequest_beforeTheClockStartedOrWhileClosing_answersNil(closing: Bool) async {
         var state: WorkoutTimerFeature.State = closing ? .fixture(.paused) : .fresh()
         state.isClosing = closing
-        let timer = TimerHarness(state)
+        let timer = Self.harness(state)
 
         await timer.send(.internal(.watchRequestReceived(WatchControlRequest(id: 3, kind: .refresh))))
         await timer.store.finish()
@@ -111,7 +118,7 @@ struct TimerWatchTests {
     func test_watchTask_closeDialogOpen_subscribesAndAnswersTheWatch() async {
         var state = WorkoutTimerFeature.State.fixture(.paused)
         state.destination = .closeConfirmation(.closeConfirmation(restart: nil))
-        let timer = TimerHarness(state)
+        let timer = Self.harness(state)
 
         await timer.send(.view(.watchTask)) {
             $0.activityControls = WorkoutTimerFeature.ActivityControlState()
@@ -128,7 +135,7 @@ struct TimerWatchTests {
     /// A second subscription replaces the first, so one request is answered once.
     @Test
     func test_watchTask_again_replacesTheSubscription() async {
-        let timer = TimerHarness(.fixture(.paused))
+        let timer = Self.harness(.fixture(.paused))
 
         await timer.send(.view(.watchTask)) {
             $0.activityControls = WorkoutTimerFeature.ActivityControlState()

@@ -19,6 +19,8 @@ extension WatchRemoteFeature.State {
         case notice(Notice)
         /// The workout running on the iPhone.
         case run(RunScreen)
+        /// The iPhone has no full version, which the watch app is part of.
+        case locked(status: StatusLine?)
     }
 
     /// The running workout as the Live Activity draws it, with its digits only under a live lease.
@@ -89,6 +91,11 @@ extension WatchRemoteFeature.State {
         case earlierList(updatedAt: Date)
     }
 
+    /// The iPhone said the watch app is locked; the list is gone until it says otherwise.
+    var isLocked: Bool {
+        catalog?.unavailable == .locked
+    }
+
     var selectionStatus: StatusLine? {
         catalog.flatMap { statusLine(updatedAt: $0.updatedAt) }
     }
@@ -105,6 +112,11 @@ extension WatchRemoteFeature.State {
         }
         guard let catalog else { return .notice(notice) }
         let status = statusLine(updatedAt: catalog.updatedAt)
+        if isLocked {
+            // No list shows, so a line about an earlier list would mislead.
+            if case .earlierList = status { return .locked(status: nil) }
+            return .locked(status: status)
+        }
         if let loaded = catalog.lastLoaded, !loaded.entries.isEmpty {
             return .list(loaded, dimmed: catalog.unavailable, status: status)
         }

@@ -16,6 +16,11 @@ enum PublishOutcome: Equatable, Sendable {
 ///
 /// Every section is short and never waits for the main thread; callers await it without blocking a thread. What a
 /// reply and the gates need is also kept under a lock, so a reply never waits for a context write.
+///
+/// The watch app is part of the full version: only a section of the queue changes `access`, so every other section
+/// numbers, writes and sends under one value of it. Without access the catalog and the run are kept, not published;
+/// the locked state numbered at the change is newer than everything numbered before it, and no message numbered before
+/// the change is sent after it.
 final class PublicationLedger: @unchecked Sendable {
     /// What a reply reads and what closes publication, outside the queue.
     private struct Shared: Sendable {
@@ -26,6 +31,8 @@ final class PublicationLedger: @unchecked Sendable {
         var latestRunRevision: Int?
         var endedOwners: Set<UUID> = []
         var isGateClosed = false
+        /// The access `latest` was built for, changed with it, so a reply never pairs the new access with an old state.
+        var publishedAccess: WatchAccess?
     }
 
     // Unchecked: every stored variable below `shared` is touched only on `queue`.
@@ -49,6 +56,15 @@ final class PublicationLedger: @unchecked Sendable {
     private var refusedForRun: (owner: UUID, count: Int)?
     /// The owner whose run does not fit in a transfer; its runs are not published until it ends.
     private var tooLargeOwner: UUID?
+    /// `nil` until the app knows whether it has the full version: nothing is numbered then.
+    private var access: WatchAccess?
+    private var accessRevision = 0
+    /// The newest number given before `access` last changed: a message numbered up to it is not sent any more.
+    private var accessChangedAt = 0
+    /// The access `prepared` was built for.
+    private var preparedAccess: WatchAccess?
+    /// The newest run of an open owner and its revision, kept while access is locked so a purchase publishes it again.
+    private var currentRun: (run: WatchRun, revision: Int)?
 
     init(processID: UUID, transport: LinkTransport) {
         self.processID = processID
@@ -75,13 +91,18 @@ final class PublicationLedger: @unchecked Sendable {
     /// Numbers the state without the run of `owner`, if it is the one published.
     func end(owner: UUID, at now: Date) async -> PublishOutcome {
         await onQueue {
-            guard self.prepared?.run?.owner == owner || self.tooLargeOwner == owner else { return .skipped }
+            let isCurrent = self.currentRun?.run.owner == owner
+            guard isCurrent || self.prepared?.run?.owner == owner || self.tooLargeOwner == owner else { return .skipped }
+            if isCurrent { self.currentRun = nil }
             self.tooLargeOwner = nil
+            // A locked state carries no run: nothing to replace.
+            guard self.access == .granted else { return .skipped }
             return self.commit(self.candidates(for: nil), run: nil, at: now)
         }
     }
 
-    /// Closes publication synchronously, for termination: from now on only `finishTermination(at:)` writes.
+    /// Closes publication synchronously, for termination: from now on only `finishTermination(at:)` and a change of
+    /// access write, both without a run.
     func closeGate() {
         shared.withLock { $0.isGateClosed = true }
     }
@@ -90,38 +111,58 @@ final class PublicationLedger: @unchecked Sendable {
     func finishTermination(at now: Date) async -> PublishOutcome {
         await onQueue {
             // A state without a run that was never written counts too: the watch must not keep a run its context
-            // still holds.
-            guard let prepared = self.prepared, prepared.run != nil || self.tooLargeOwner != nil || !self.isWritten else {
+            // still holds. So does one built for another access than the current.
+            guard let prepared = self.prepared,
+                  prepared.run != nil || self.tooLargeOwner != nil || !self.isWritten || self.preparedAccess != self.access else {
                 return .skipped
             }
+            self.currentRun = nil
             self.tooLargeOwner = nil
             return self.commit(self.candidates(for: nil), run: nil, at: now, isTerminal: true)
         }
     }
 
-    /// Writes the newest state again if its write did not happen, after activation or a change of watch. A state
-    /// WatchConnectivity now refuses as too large falls back as a new publication would.
-    /// Returns the state a fallback numbered, so an open watch can get it at once; `nil` when nothing new was numbered.
-    func writeLatest() async -> PhoneState? {
-        await withCheckedContinuation { continuation in
-            writeLatest { continuation.resume(returning: $0) }
+    /// Writes the newest state again if its write did not happen, after activation or a change of watch, and sends an
+    /// open watch the state a fallback numbered. A state WatchConnectivity now refuses as too large falls back as a new
+    /// publication would. Enqueued in order with other events, without waiting.
+    func writeLatestAndSend() {
+        queue.async {
+            if let fallback = self.writeLatestOnQueue() { self.sendOnQueue(fallback) }
         }
     }
 
-    /// `writeLatest()` for a caller that must enqueue it in order with other events without waiting.
-    func writeLatest(then completion: @escaping @Sendable (PhoneState?) -> Void) {
-        queue.async { completion(self.writeLatestOnQueue()) }
+    /// Sends the state to an open watch, unless it was numbered before access last changed.
+    func send(_ state: PhoneState) async {
+        await onQueue { self.sendOnQueue(state) }
+    }
+
+    /// Changes the access of `revision` unless a newer revision was handled, and numbers the state it allows: the
+    /// kept catalog and run, or the locked state. Also after the gate closed, then without a run.
+    func publishAccess(revision: Int, access: WatchAccess, at now: Date) async -> PublishOutcome {
+        await onQueue { self.publishAccessOnQueue(revision: revision, access: access, at: now) }
+    }
+
+    /// The access the newest decided state was built for: what refuses a request before it reaches a timer or the app.
+    func publishedAccess() -> WatchAccess? {
+        shared.withLock { $0.publishedAccess }
     }
 
     private func writeLatestOnQueue() -> PhoneState? {
         guard !isGateClosed, let prepared, !isWritten else { return nil }
+        if preparedAccess != access {
+            // Built for another access than the current: never written again, the current one replaces it.
+            let run = publishableRun
+            return numbered(
+                commit(candidates(for: run?.run.owner), run: run?.run, runRevision: run?.revision, at: prepared.publishedAt)
+            )
+        }
         if let owner = prepared.run?.owner, !isOpen(for: owner) {
             // The owner ended before its own section ran: the state without its run replaces it.
             return numbered(commit(candidates(for: nil), run: nil, at: prepared.publishedAt))
         }
         switch write(prepared) {
             case .written:
-                adopt(prepared, isWritten: true)
+                if let preparedAccess { adopt(prepared, isWritten: true, access: preparedAccess) }
                 return nil
             case .pending:
                 return nil
@@ -196,6 +237,12 @@ final class PublicationLedger: @unchecked Sendable {
         }
     }
 
+    private enum Numbering: Sendable {
+        case numbered
+        case refused
+        case withoutRun
+    }
+
     private enum WriteResult: Equatable {
         case written
         case pending
@@ -216,12 +263,17 @@ final class PublicationLedger: @unchecked Sendable {
         catalogCandidates = Self.fitted(catalog, processID: processID, at: now)
         refusedCandidates = 0
         refusedForRun = nil
-        return commit(catalogCandidates, run: prepared?.run, at: now)
+        // Without access the catalog waits for it; a locked state does not depend on it.
+        guard access == .granted else { return .skipped }
+        let run = publishableRun
+        return commit(catalogCandidates, run: run?.run, runRevision: run?.revision, at: now)
     }
 
     private func publishRunOnQueue(revision: Int, run: WatchRun, at now: Date) -> PublishOutcome {
         guard revision > runRevision, isOpen(for: run.owner) else { return .skipped }
         runRevision = revision
+        currentRun = (run, revision)
+        guard access == .granted else { return .skipped }
         // The timer publishes after every action: the same run costs no encoding, written or not; a write that did
         // not happen is written again on activation or a status change.
         if run == prepared?.run {
@@ -235,6 +287,46 @@ final class PublicationLedger: @unchecked Sendable {
             self.tooLargeOwner = nil
         }
         return commit(candidates(for: run.owner), run: run, runRevision: revision, at: now)
+    }
+
+    /// The run a state with access carries: the newest of an open owner, unless that owner's run does not fit.
+    private var publishableRun: (run: WatchRun, revision: Int)? {
+        guard let currentRun, tooLargeOwner != currentRun.run.owner, isOpen(for: currentRun.run.owner) else { return nil }
+        return currentRun
+    }
+
+    private func publishAccessOnQueue(revision: Int, access: WatchAccess, at now: Date) -> PublishOutcome {
+        guard revision > accessRevision else { return .skipped }
+        accessRevision = revision
+        guard access != self.access else { return .skipped }
+        self.access = access
+        accessChangedAt = sequence
+        if access == .granted, prepared == nil, catalogRevision == 0, currentRun == nil {
+            // Nothing to publish yet: the first publication numbers the first state.
+            shared.withLock { $0.publishedAccess = .granted }
+            return .skipped
+        }
+        // Terminal whether or not the gate has closed yet: the decision is written in any order with `closeGate`. After
+        // it the run drops out, as no owner is open.
+        let run = publishableRun
+        return commit(
+            candidates(for: run?.run.owner),
+            run: run?.run,
+            runRevision: run?.revision,
+            at: now,
+            isTerminal: true
+        )
+    }
+
+    /// An open watch app gets the state at once; a closed one reads the context when it opens. On the queue, so no
+    /// message numbered before a change of access is sent after it.
+    private func sendOnQueue(_ state: PhoneState) {
+        guard state.sequence > accessChangedAt, transport.status().isReachable else { return }
+        do {
+            transport.sendMessage(try WireCoding.encode(state))
+        } catch {
+            Logger.watchLink.error("A state did not encode: \(String(reflecting: error), privacy: .public)")
+        }
     }
 
     private func noteRefused(_ catalog: CatalogState?, runOwner: UUID?) {
@@ -256,7 +348,8 @@ final class PublicationLedger: @unchecked Sendable {
     }
 
     /// Numbers and writes the first candidate WatchConnectivity does not refuse as too large; the run is dropped and
-    /// its owner marked as too large when even the last catalog does not fit with it.
+    /// its owner marked as too large when even the last catalog does not fit with it. Without access it numbers
+    /// nothing; a locked state carries neither catalog nor run, whatever the caller passes.
     private func commit(
         _ catalogs: [CatalogState?],
         run: WatchRun?,
@@ -264,7 +357,10 @@ final class PublicationLedger: @unchecked Sendable {
         at now: Date,
         isTerminal: Bool = false
     ) -> PublishOutcome {
-        guard isTerminal || !isGateClosed else { return .skipped }
+        guard isTerminal || !isGateClosed, let access else { return .skipped }
+        if access == .locked {
+            return commitLocked(at: now, isTerminal: isTerminal)
+        }
         if let owner = tooLargeOwner, !isOpen(for: owner) {
             tooLargeOwner = nil
         }
@@ -286,21 +382,33 @@ final class PublicationLedger: @unchecked Sendable {
                 guard let encoded = Self.digest(of: catalog) else { continue }
                 digest = encoded
             } else {
-                digest = prepared?.catalogDigest
+                // Never the locked state's digest: the watch would confirm the lock and keep it.
+                digest = preparedAccess == .granted ? prepared?.catalogDigest : nil
             }
-            if isWritten, let prepared, prepared.catalogDigest == digest, prepared.run == run,
+            if isWritten, preparedAccess == .granted, let prepared, prepared.catalogDigest == digest, prepared.run == run,
                prepared.isRunTooLarge == (tooLargeOwner != nil) {
                 return .skipped
             }
             // Numbered under the lock that marks owners ended and closes the gate: a state is numbered before the
-            // mark, and the owner's end section replaces it, or not at all.
-            let isNumbered = shared.withLock { shared in
-                guard isTerminal || !shared.isGateClosed else { return false }
-                if let run, shared.endedOwners.contains(run.owner) { return false }
+            // mark, and the owner's end section replaces it, or not at all. A terminal section that the gate closed
+            // under numbers the state without its run instead: no run is written after the gate.
+            let numbering = shared.withLock { shared -> Numbering in
+                guard isTerminal || !shared.isGateClosed else { return .refused }
+                if let run {
+                    if shared.isGateClosed { return .withoutRun }
+                    if shared.endedOwners.contains(run.owner) { return .refused }
+                }
                 self.sequence += 1
-                return true
+                return .numbered
             }
-            guard isNumbered else { return .skipped }
+            switch numbering {
+                case .numbered:
+                    break
+                case .refused:
+                    return .skipped
+                case .withoutRun:
+                    return commit(candidates(for: nil), run: nil, at: now, isTerminal: isTerminal)
+            }
             let state = PhoneState(
                 processID: processID,
                 sequence: sequence,
@@ -311,12 +419,17 @@ final class PublicationLedger: @unchecked Sendable {
                 isRunLive: run != nil,
                 isRunTooLarge: tooLargeOwner != nil
             )
+            if run != nil, isTerminal, isGateClosed {
+                // The gate closed after the number was taken: the number goes unused, and the state without the run
+                // is written instead. What is left is the moment between this check and the write, as for any write.
+                return commit(candidates(for: nil), run: nil, at: now, isTerminal: isTerminal)
+            }
             switch write(state, isTerminal: isTerminal) {
                 case .written:
-                    adopt(state, isWritten: true, runRevision: runRevision)
+                    adopt(state, isWritten: true, runRevision: runRevision, access: .granted)
                     return .written(state)
                 case .pending:
-                    adopt(state, isWritten: false, runRevision: runRevision)
+                    adopt(state, isWritten: false, runRevision: runRevision, access: .granted)
                     return .pending(state)
                 case .tooLarge:
                     noteRefused(catalog, runOwner: run?.owner)
@@ -333,11 +446,41 @@ final class PublicationLedger: @unchecked Sendable {
         return .skipped
     }
 
-    private func adopt(_ state: PhoneState, isWritten: Bool, runRevision: Int? = nil) {
+    /// The locked state: no catalog, no run, numbered whatever the context holds. A write WatchConnectivity refuses
+    /// leaves it pending rather than unnumbered, so replies answer with the lock at once.
+    private func commitLocked(at now: Date, isTerminal: Bool) -> PublishOutcome {
+        let catalog = CatalogState.unavailable(.locked)
+        let digest = Self.lockedDigest
+        if isWritten, preparedAccess == .locked, prepared?.catalogDigest == digest {
+            return .skipped
+        }
+        let isNumbered = shared.withLock { shared in
+            guard isTerminal || !shared.isGateClosed else { return false }
+            self.sequence += 1
+            return true
+        }
+        guard isNumbered else { return .skipped }
+        let state = PhoneState(processID: processID, sequence: sequence, publishedAt: now, catalog: catalog, catalogDigest: digest)
+        let result = write(state, isTerminal: isTerminal)
+        if result == .written {
+            adopt(state, isWritten: true, access: .locked)
+            return .written(state)
+        }
+        if result == .tooLarge {
+            // A payload of a few hundred bytes should never be refused; if it is, every activation numbers it again.
+            Logger.watchLink.error("WatchConnectivity refused the lock as too large; replies answer with it until a write succeeds")
+        }
+        adopt(state, isWritten: false, access: .locked)
+        return .pending(state)
+    }
+
+    private func adopt(_ state: PhoneState, isWritten: Bool, runRevision: Int? = nil, access: WatchAccess) {
         prepared = state
+        preparedAccess = access
         self.isWritten = isWritten
         shared.withLock { shared in
             shared.latest = state
+            shared.publishedAccess = access
             if state.run == nil {
                 shared.latestRunRevision = nil
             } else if let runRevision {
@@ -441,6 +584,8 @@ final class PublicationLedger: @unchecked Sendable {
     }
 
     private static let longestResult = WatchControlResult.allCases.max { $0.rawValue.count < $1.rawValue.count } ?? .unavailable
+
+    private static let lockedDigest = digest(of: .unavailable(.locked))
 
     private static func digest(of catalog: CatalogState) -> String? {
         do {

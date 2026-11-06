@@ -30,7 +30,7 @@ struct TimerSnapshotStatesContractTests {
         func stateBeforeAppearance() -> WorkoutTimerFeature.State {
             let workout = SnapshotFixtures.editorWorkout(language: .english)
             return switch self {
-                case .startCountdown: AppFeature().timerState(for: workout)
+                case .startCountdown: AppFeature().timerState(for: workout, allowsWatchControl: false)
                 case .paused, .stageList: .pausedRun(workout)
                 case .finished: .finishedRun(workout)
             }

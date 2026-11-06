@@ -23,7 +23,8 @@ struct TimerWatchCommandTests {
         .internal(.watchRequestReceived(WatchControlRequest(id: id, kind: .command(command, generation: generation))))
     }
 
-    /// A store whose state took the watch's subscription first: commands need no card.
+    /// A store whose state took the watch's subscription first: commands need no card. The watch may control the
+    /// timer, as one the app opens with the full version.
     private static func harness(
         _ state: WorkoutTimerFeature.State,
         generation: Int = 3,
@@ -32,6 +33,7 @@ struct TimerWatchCommandTests {
         notifications: Bool = false
     ) -> TimerHarness {
         var state = state
+        state.allowsWatchControl = true
         state.activityControls = WorkoutTimerFeature.ActivityControlState(
             isReady: cardReady, isEnding: isEnding, generation: generation
         )
@@ -207,6 +209,7 @@ struct TimerWatchCommandTests {
     func test_watchTaskThenActivityTask_keepsThePendingCommand_andSubscribesTheCardOnce() async {
         var state = WorkoutTimerFeature.State.fixture(.running)
         state.isClosing = false
+        state.allowsWatchControl = true
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
         Self.forbidCardAcknowledgements(timer)
@@ -474,6 +477,7 @@ struct TimerWatchCommandTests {
     func test_watchTask_ofAClosingTimer_createsTheControlsEnding() async {
         var state = WorkoutTimerFeature.State.fixture(.running)
         state.isClosing = true
+        state.allowsWatchControl = true
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
         Self.forbidCardAcknowledgements(timer)
@@ -557,6 +561,7 @@ struct TimerWatchCommandTests {
                 source: .watch(requestID: 9), result: .applied, admittedAt: MonotonicInstant(now: TestClock<Duration>())
             )
         )
+        state.allowsWatchControl = true
         let timer = TimerHarness(state)
         timer.store.exhaustivity = .off
         Self.forbidCardAcknowledgements(timer)

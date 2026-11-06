@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-6-2, the Apple Watch app only with the full version; then CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -31,9 +31,9 @@ Next: CT-6-2, the Apple Watch app only with the full version; then CT-7, the App
   - [x] **CT-4-1** — the running workout on the Lock Screen and in the Dynamic Island, and signing checks of both bundles on TestFlight
   - [x] **CT-4-2** — pause and resume from the Live Activity
 - [x] **CT-5** — iCloud sync of workouts, with a Settings switch and a footnote when iCloud is unavailable (its [device checklist](icloud-sync.md#device-checklist) is listed under CT-7)
-- [ ] **CT-6** — the full version, one non-consumable purchase with StoreKit 2 that unlocks iCloud sync, more than two workouts and the Apple Watch app ([purchases](purchases.md)), in slices:
+- [x] **CT-6** — the full version, one non-consumable purchase with StoreKit 2 that unlocks iCloud sync, more than two workouts and the Apple Watch app ([purchases](purchases.md)), in slices:
   - [x] **CT-6-1** — the purchase sheet, Settings rows and the locked iCloud switch, iCloud only with the full version, the free limit of two workouts
-  - [ ] **CT-6-2** — the Apple Watch app only with the full version; it ships in the same app version as the purchase, whose App Store description names the Apple Watch app
+  - [x] **CT-6-2** — the Apple Watch app only with the full version; it ships in the same app version as the purchase, whose App Store description names the Apple Watch app
 - [ ] **CT-7** — App Store release
   - [ ] Write the Privacy Policy and User Agreement in English and Russian; both pages are currently empty and must be filled before the first external build
   - [ ] Fill App Privacy for Apple Health (the app writes workouts to Health and reads nothing), add the App Review note on HealthKit and the workout session, and mention Apple Health in the Description

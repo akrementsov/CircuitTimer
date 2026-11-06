@@ -14,7 +14,7 @@ import WorkoutDomain
 extension WorkoutTimerFeature.State {
     /// The start 3-2-1 on its first digit.
     static func startCountdown(_ workout: Workout) -> Self {
-        var state = AppFeature().timerState(for: workout)
+        var state = AppFeature().timerState(for: workout, allowsWatchControl: false)
         state.markAppeared()
         return state
     }
@@ -51,7 +51,7 @@ extension WorkoutTimerFeature.State {
     static func pausedRun(_ workout: Workout) -> Self {
         let now = TimerSnapshotDependencies.now
         let stageStart = now.adding(.seconds(-20))
-        var state = AppFeature().timerState(for: workout)
+        var state = AppFeature().timerState(for: workout, allowsWatchControl: false)
         state.countdown = nil
         state.run.start(at: stageStart)
         // Jumping jacks → Arm circles → the pause after the warm-up → the first round's Burpees.
@@ -66,7 +66,7 @@ extension WorkoutTimerFeature.State {
     /// The finished run before the screen appeared.
     static func finishedRun(_ workout: Workout) -> Self {
         let now = TimerSnapshotDependencies.now
-        var state = AppFeature().timerState(for: workout)
+        var state = AppFeature().timerState(for: workout, allowsWatchControl: false)
         state.countdown = nil
         state.run.start(at: now)
         for _ in state.run.schedule.stages {

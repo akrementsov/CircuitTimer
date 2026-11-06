@@ -16,6 +16,15 @@ extension AppFeature {
     }
 
     func watchStartRequested(_ request: WatchStartRequest, _ state: inout State) -> Effect<Action> {
+        // The watch app is part of the full version; until StoreKit answers the app cannot tell.
+        switch state.fullVersion {
+            case .full:
+                break
+            case .free:
+                return answerWatchStart(request.id, .listUnavailable)
+            case .unknown:
+                return answerWatchStart(request.id, .openPhoneApp)
+        }
         guard state.hasScenePhase, state.isSceneActive else { return answerWatchStart(request.id, .openPhoneApp) }
         let takesOver = state.startIntent?.isStalledHealth == true
         guard state.destination == nil, state.purchaseRequest == nil, !state.hasPendingMutationAlert,

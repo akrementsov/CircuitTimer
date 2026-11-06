@@ -163,7 +163,7 @@ extension WatchRemoteFeature {
             state.path.removeAll()
             return stopStart(note: nil, &state)
         }
-        if state.run != nil || state.isRunTooLarge {
+        if state.run != nil || state.isRunTooLarge || state.isLocked {
             state.path.removeAll()
             if state.start != nil || state.startNote != nil { return stopStart(note: nil, &state) }
             return .none
