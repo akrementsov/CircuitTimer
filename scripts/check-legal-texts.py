@@ -5,7 +5,8 @@ uses Markdown the app does not draw.
 `docs/legal` holds the Privacy Policy and the Terms of Use in English and Russian; GitHub Pages publishes them, and
 SettingsFeature bundles copies that `LegalText` draws (AGENTS.md › Localization). It knows Jekyll front matter, one `#`
 title, `##` headings, `- ` bullets and paragraphs with inline links and bold, so any other block, such as `###`, a
-numbered list or a quote, would show its marks in the app. Run with `python3 -I`; it uses the standard library only and
+numbered list or a quote, would show its marks in the app, and indented lines, setext underlines, hard breaks, HTML,
+images and relative links would read differently on the web and in the app. Run with `python3 -I`; it uses the standard library only and
 finds the repository from its own place.
 """
 
@@ -21,8 +22,12 @@ TEXTS = (
     ("docs/legal/ru/terms-of-use.md", f"{RESOURCES}/ru.lproj/TermsOfUse.md"),
 )
 HEADING = re.compile(r"#{1,2} \S")
-# Block marks `LegalText` does not draw: deeper headings, other bullets, numbered lists, quotes, tables, code, HTML.
-UNSUPPORTED = re.compile(r"#|[*+] |\d+[.)] |>|\||```|~~~|<|    |\t")
+# Block marks `LegalText` does not draw: indentation, other bullets, numbered lists, quotes, tables, code, setext
+# underlines.
+UNSUPPORTED = re.compile(r"\s|[*+] |\d+[.)] |>|\||```|~~~|=+\s*$")
+# Inline marks that read differently in the app: HTML and images; links must be absolute, as the app has no base URL.
+INLINE_HTML = re.compile(r"<[A-Za-z/!]|!\[")
+LINK_TARGET = re.compile(r"\]\(([^)]*)\)")
 
 
 def syntax(path, text, failures):
@@ -44,6 +49,14 @@ def syntax(path, text, failures):
                 failures.append(f"{path}:{number}: only '- ' bullets are drawn in the app: {line!r}")
         elif UNSUPPORTED.match(line):
             failures.append(f"{path}:{number}: Markdown the app does not draw: {line!r}")
+            continue
+        if line.endswith("  "):
+            failures.append(f"{path}:{number}: a trailing hard break the app does not draw: {line!r}")
+        if INLINE_HTML.search(line):
+            failures.append(f"{path}:{number}: HTML or an image the app does not draw: {line!r}")
+        for target in LINK_TARGET.findall(line):
+            if not target.startswith(("https://", "mailto:")):
+                failures.append(f"{path}:{number}: a link to {target!r}, not https: or mailto:, is dead in the app")
 
 
 def main(root):

@@ -27,7 +27,7 @@ Change these answers, the Privacy Policy and this section together if the app ev
 
 Enter in App Review Information › Notes:
 
-> Circuit Timer is an interval timer. On iOS 26 and later, with the user's permission, it runs an HKWorkoutSession (high-intensity interval training, indoors) while a workout timer is open, and when the timer closes it asks Apple Health to save that workout without its pauses. It only writes workouts and never reads Health data. To see it: open the sample workout, tap Start workout, allow Health access in the sheet, let the timer run for a minute, then close it and tap Finish; once Health has saved it, the workout is in the Health app under Workouts.
+> Circuit Timer is an interval timer. On iOS 26 and later, with the user's permission, it runs an HKWorkoutSession (high-intensity interval training, indoors) while a workout timer is open, and when the timer closes it asks Apple Health to save that workout without its pauses. It only writes workouts and never reads Health data. To see it: open the sample workout, tap Start workout, allow notifications, then allow Health access in the sheet, let the timer run for a minute, then close it and tap Finish; once Health has saved it, the workout is in the Health app under Workouts.
 >
 > The full version is the non-consumable "Full Version". It unlocks iCloud sync, more than two workouts and the Apple Watch app; without it, the watch app shows that the full version is needed. Settings › Buy the App opens the purchase screen; Restore Purchases is on the same screen.
 

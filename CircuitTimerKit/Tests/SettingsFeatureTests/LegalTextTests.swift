@@ -65,7 +65,7 @@ struct LegalTextTests {
     }
 
     @Test
-    func test_init_unclosedMarkdown_keepsTheText() throws {
+    func test_init_bracketWithoutLink_keepsTheBracket() throws {
         let text = LegalText(markdown: "A [link without its end")
 
         let paragraph = try #require(text.blocks.first.flatMap(\.text))

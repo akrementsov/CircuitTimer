@@ -105,6 +105,13 @@ a quote|> quoted
 a table|| a | b |
 a code fence|\`\`\`
 an HTML tag|<br>
+an indented bullet|  - nested
+a setext underline|===
+a trailing hard break|A line  
+HTML inside a line|Text with <b>bold</b>
+an image|See ![logo](https://example.com/logo.png)
+a relative link|See [terms](terms-of-use.html)
+a plain http link|See [site](http://example.com)
 EOF
 
 describe "front matter without its closing line"

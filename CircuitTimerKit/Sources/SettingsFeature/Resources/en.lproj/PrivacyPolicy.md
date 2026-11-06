@@ -7,7 +7,7 @@ lang: en
 
 Last updated: November 6, 2026
 
-Circuit Timer: Interval HIIT ("the app") is published by Andrey Krementsov, an individual developer ("I"). This policy explains what the app does with your data. In short: the app sends nothing to me. Your workouts stay on your devices and, if you choose, in your own iCloud and Apple Health.
+Circuit Timer: Interval HIIT ("the app") is published by Andrey Krementsov, an individual developer ("I"). This policy explains what the app does with your data. In short: the app sends nothing to me. Your workouts stay on your devices, in your own iCloud with the full version, and in Apple Health if you allow it.
 
 ## What I receive
 
@@ -25,11 +25,11 @@ The app keeps on your iPhone:
 
 While a workout runs, the app schedules notifications on your device and shows a Live Activity on the Lock Screen and in the Dynamic Island. Spoken stage names are produced on the device.
 
-Deleting the app removes all of this from your iPhone.
+Deleting the app removes all of this from your iPhone. Your iPhone's backups, in iCloud or on a computer, include the app's workouts and settings under your own backup settings.
 
 ## iCloud
 
-If you buy the full version and turn on iCloud sync, the app stores your workouts, with their names and stages, in your private iCloud database. Only your Apple Account can read it; I have no access to it. If iCloud is unavailable, your workouts stay only on the device.
+With the full version, iCloud sync is on unless you turn it off in the app's Settings, and the app stores your workouts, with their names and stages, in your private iCloud database. Only your Apple Account can read it; I have no access to it. If iCloud is unavailable, your workouts stay only on the device.
 
 A workout you delete in the app is removed from iCloud when the deletion syncs; only a marker with the workout's internal identifier stays, so that your other devices delete it too. Turning iCloud sync off takes effect at the next launch and does not delete what iCloud already holds. To delete everything, markers included, remove the app's data in iOS Settings under your name › iCloud › Manage Storage, where iOS offers it.
 
@@ -45,7 +45,7 @@ The full version is sold through the App Store. Apple handles the payment; the a
 
 ## Apple Watch
 
-The watch app shows your workouts and the running workout and sends your commands to the iPhone. This passes only between your own iPhone and Apple Watch.
+The watch app shows your workouts and the running workout and sends your commands to the iPhone. This passes only between your own iPhone and Apple Watch. The watch keeps the last list of workouts it received until a newer one replaces it; deleting the watch app removes it.
 
 ## Apple services
 
