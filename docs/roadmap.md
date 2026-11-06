@@ -35,8 +35,8 @@ Next: CT-7, the App Store release with its legal texts and device checklists. Ch
   - [x] **CT-6-1** — the purchase sheet, Settings rows and the locked iCloud switch, iCloud only with the full version, the free limit of two workouts
   - [x] **CT-6-2** — the Apple Watch app only with the full version; it ships in the same app version as the purchase, whose App Store description names the Apple Watch app
 - [ ] **CT-7** — App Store release
-  - [ ] Privacy Policy and Terms of Use in English and Russian, in the app and on GitHub Pages ([texts](legal/privacy-policy.md)); checked once the four published pages open after the merge
-  - [ ] Enter in App Store Connect what [App Store Connect](app-store.md) lists: the privacy and support addresses, App Privacy (Data Not Collected), the App Review note on HealthKit and the workout session, and the Description paragraph on Apple Health and the Apple Watch app
+  - [x] Privacy Policy and Terms of Use in English and Russian, in the app and on GitHub Pages ([texts](legal/privacy-policy.md)); the four published pages and the support page opened on 2026-11-06
+  - [x] Fill in version 1.0 in App Store Connect, in English and Russian (2026-11-06): what [App Store Connect](app-store.md) lists (the privacy and support addresses, App Privacy as Data Not Collected, the App Review note on HealthKit and the workout session, the Description paragraph on Apple Health and the Apple Watch app), and the rest of the page: the whole Description, keywords, copyright, the categories Health & Fitness and Sports, the 4+ age rating, content rights, the App Review contact, and iPhone (6.3", 1206×2622) and Apple Watch (416×496) screenshots
   - [ ] Complete the [Apple Health device checklist](apple-health.md#device-checklist), first whether a workout session keeps the app running without the `workout-processing` background mode, which App Store Connect rejects
   - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
   - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
@@ -44,7 +44,8 @@ Next: CT-7, the App Store release with its legal texts and device checklists. Ch
   - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
   - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
   - [ ] Check purchases in the sandbox with sandbox testers: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
-  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
+  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist); first whether, after Start from the watch, the watch shows the running workout without its app being relaunched (on the simulators on 2026-11-06 it showed it only after a relaunch)
+  - [ ] Raise `MARKETING_VERSION` to 1.0, tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version
 - [x] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
   - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity

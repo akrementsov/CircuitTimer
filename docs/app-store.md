@@ -33,12 +33,55 @@ Enter in App Review Information › Notes:
 
 ## Description
 
-The paragraph that names Apple Health and the Apple Watch app; the rest of the Description is the owner's.
+What version 1.0 holds in App Store Connect, as entered on 2026-11-06. Its bullets on Apple Health and the Apple Watch app are the paragraph this page asked for; change them together with Apple Health and the watch app.
 
 English:
 
-> Saves your workouts to Apple Health on iOS 26 and later, without their pauses. With the full version, control the timer from Apple Watch: pick a workout, start it on the iPhone, pause and resume it from your wrist.
+```
+Circuit Timer runs interval and circuit workouts the way you build them: a warm-up, a training block repeated for as many rounds as you need, and a cool-down, each made of timed work and rest stages, with manual pauses wherever you want to stop and wait.
+
+• A full-screen timer you can read from across the room, with tones, haptics and spoken stage names; each signal has its own switch.
+• Keeps going in the background: notifications for each new stage, and a Live Activity on the Lock Screen and in the Dynamic Island with Pause and Resume.
+• Picks up where you left off if the app is closed mid-workout.
+• Saves your workouts to Apple Health on iOS 26 and later, without their pauses.
+• Dark design, in English and Russian.
+
+Full version, a one-time purchase:
+• more than two workouts;
+• iCloud sync between your devices;
+• the Apple Watch app: pick a workout, start it on the iPhone, pause and resume it from your wrist.
+
+No accounts, no ads, no tracking.
+```
 
 Russian:
 
-> На iOS 26 и новее сохраняет ваши тренировки в Apple Health, без пауз. С полной версией таймером можно управлять с Apple Watch: выбрать тренировку, запустить её на iPhone, поставить на паузу и продолжить с запястья.
+```
+Circuit Timer ведёт интервальные и круговые тренировки так, как вы их собрали: разминка, тренировочный блок на нужное число раундов и заминка — из этапов работы и отдыха по времени, с ручными паузами там, где нужно остановиться и подождать.
+
+• Полноэкранный таймер, который видно издалека: звуки, вибрация и названия этапов голосом, у каждого сигнала свой переключатель.
+• Работает в фоне: уведомления о каждом новом этапе и Live Activity на экране блокировки и в Dynamic Island с паузой и продолжением.
+• Если приложение закрылось посреди тренировки, предложит продолжить с того же места.
+• На iOS 26 и новее сохраняет ваши тренировки в Apple Health, без пауз.
+• Тёмное оформление, английский и русский языки.
+
+Полная версия, разовая покупка:
+• больше двух тренировок;
+• синхронизация через iCloud между вашими устройствами;
+• приложение для Apple Watch: выбрать тренировку, запустить её на iPhone, поставить на паузу и продолжить с запястья.
+
+Без аккаунтов, рекламы и слежки.
+```
+
+## Other fields
+
+| Field | Value |
+|---|---|
+| Keywords, English | `tabata,emom,workout,training,rounds,boxing,fitness,gym,exercise,cardio,stopwatch,countdown,rest` |
+| Keywords, Russian | `таймер,интервальный,тренировка,табата,круговая,раунды,хиит,фитнес,бокс,кардио,зал,упражнения,отдых` |
+| Copyright | `2026 Andrey Krementsov` |
+| Categories | Health & Fitness, then Sports |
+| Age rating | 4+: every content question answered None or No, Health or Wellness Topics included (the app gives no advice) |
+| Content rights | No third-party content |
+| App Review sign-in | Not required |
+| Screenshots | iPhone 6.1/6.3" (1206×2622) and Apple Watch (416×496) in both languages, taken on the simulators; App Store Connect asks for no larger iPhone size |
