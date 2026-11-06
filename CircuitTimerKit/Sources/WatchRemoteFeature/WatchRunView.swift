@@ -103,14 +103,15 @@ struct WatchRunView: View {
         .foregroundStyle(display.tone.ink)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.leading, .token(spacing: .s))
-        .padding(.trailing, hasControlStrip ? Self.controlStripWidth : .token(spacing: .s))
+        .padding(.trailing, hasControlStrip ? .zero : .token(spacing: .s))
         .padding(.vertical, .token(spacing: .s))
-        // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds. Pause
-        // or Resume over the strip is an element of its own.
+        // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds. It
+        // ends where the control's strip begins, so Pause or Resume over the strip is an element of its own.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(display.headline))
         .accessibilityValue(spokenTime(showsDigits))
         .accessibilityAddTraits(.updatesFrequently)
+        .padding(.trailing, hasControlStrip ? Self.controlStripWidth : .zero)
         .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
         .dynamicTypeSize(...Self.maxCardTextSize)
     }
