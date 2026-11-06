@@ -8,6 +8,9 @@ extension DesignSystem.Token {
     public enum WatchTypography: Sendable {
         /// The running stage's clock.
         case runningStageClock
+        /// The running stage's clock where the full size does not fit beside Pause/Resume: a 40 mm watch and a stage of
+        /// ten minutes or more.
+        case runningStageClockCompact
         /// The running stage's name.
         case runningStageName
         /// The next stage's name.
@@ -31,6 +34,8 @@ extension Font {
         switch style {
             case .runningStageClock:
                 StageClockText.Face.current.font(size: 56)
+            case .runningStageClockCompact:
+                StageClockText.Face.current.font(size: 48)
             case .runningStageName:
                 .system(.headline, weight: .heavy)
             case .nextStageName:
