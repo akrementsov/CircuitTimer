@@ -68,14 +68,14 @@ The watch app is part of the full version ([Purchases](purchases.md)). The iPhon
 
 ## TestFlight tag at the end of CT-9
 
-One tag after CT-9-5 checks what only App Store Connect can. `v0.1.1-rc.4` (build 0.1.1 (261105.155753), 2026-11-05) passed both:
+One tag after CT-9-5 checked what only App Store Connect can. `v0.1.1-rc.4` (build 0.1.1 (261105.155753), 2026-11-05) passed both:
 
 - [x] `testflight.yml` exports and verifies the IPA: the cloud signing creates the watch app's App ID and signs it for the App Store.
 - [x] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; App Store Connect does not mind: the build is ready to test on iOS and watchOS.
 
 The items only a live session can check (the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26) are in the [device checklist](#device-checklist), run on a TestFlight build under CT-7.
 
-The tag went to internal testers only, so the wire's version 1 stays open after it: a fix these checks call for may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
+The tag went to internal testers only, so the wire's version 1 stays open after it: a fix the device checks call for may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
 
 ## Accepted limits
 
