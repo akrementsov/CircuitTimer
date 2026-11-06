@@ -1,4 +1,3 @@
-import Foundation
 import XCTest
 
 @MainActor
@@ -24,12 +23,10 @@ struct LegalDocumentScreen: Screen {
         return self
     }
 
-    /// A text of the page whose label contains `part`, such as the contact line with its address.
+    /// A link of the page by its text, such as the contact address: a link, not plain text that only shows it.
     @discardableResult
-    func assertText(containing part: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
-        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", part))
-            .firstMatch
-            .waitUntilExists("A text with \"\(part)\"", file: file, line: line)
+    func assertLink(_ text: String, file: StaticString = #filePath, line: UInt = #line) -> Self {
+        app.links[text].waitUntilExists("The link \"\(text)\"", file: file, line: line)
         return self
     }
 

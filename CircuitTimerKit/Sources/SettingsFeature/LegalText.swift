@@ -2,9 +2,9 @@ import Foundation
 import os
 
 /// A legal document as the blocks its page draws. It reads the Markdown subset `scripts/check-legal-texts.py` allows:
-/// Jekyll front matter and the `# ` title are skipped, as the navigation bar shows the title; `## ` starts a heading,
-/// `- ` a bullet, an empty line ends a block, and the lines of one block are joined with spaces. Links and bold inside
-/// a block stay attributes of its text.
+/// Jekyll front matter and the `# ` title are skipped, as the navigation bar shows the title; a `## ` line is a heading,
+/// `- ` starts a bullet, an empty line ends a block, and the lines of a paragraph or a bullet are joined with spaces.
+/// Links and bold inside a block stay attributes of its text.
 struct LegalText: Equatable, Sendable {
     enum Block: Equatable, Sendable {
         case heading(AttributedString)
@@ -33,6 +33,8 @@ struct LegalText: Equatable, Sendable {
             } else if line.hasPrefix("## ") {
                 close()
                 open = (.heading, [String(line.dropFirst(3))])
+                // A heading is one line in Markdown, as GitHub Pages draws it.
+                close()
             } else if line.hasPrefix("- ") {
                 close()
                 open = (.bullet, [String(line.dropFirst(2))])

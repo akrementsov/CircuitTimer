@@ -45,6 +45,13 @@ struct LegalTextTests {
     }
 
     @Test
+    func test_init_textRightUnderHeading_startsParagraph() {
+        let text = LegalText(markdown: "## Heading\nParagraph\n- bullet\ncontinued")
+
+        #expect(text.blocks == [.heading("Heading"), .paragraph("Paragraph"), .bullet("bullet continued")])
+    }
+
+    @Test
     func test_init_linkAndBold_keepsThemAsAttributes() throws {
         let text = LegalText(markdown: "Write to [me](mailto:me@example.com), **now**.")
 

@@ -31,7 +31,7 @@ Deleting the app removes all of this from your iPhone.
 
 If you buy the full version and turn on iCloud sync, the app stores your workouts, with their names and stages, in your private iCloud database. Only your Apple Account can read it; I have no access to it. If iCloud is unavailable, your workouts stay only on the device.
 
-A workout you delete in the app is removed from iCloud when the deletion syncs. Turning iCloud sync off takes effect at the next launch and does not delete what iCloud already holds. To delete it, delete the workouts while sync is on, or remove the app's data in iOS Settings under your name › iCloud › Manage Storage, where iOS offers it.
+A workout you delete in the app is removed from iCloud when the deletion syncs; only a marker with the workout's internal identifier stays, so that your other devices delete it too. Turning iCloud sync off takes effect at the next launch and does not delete what iCloud already holds. To delete everything, markers included, remove the app's data in iOS Settings under your name › iCloud › Manage Storage, where iOS offers it.
 
 ## Apple Health
 
