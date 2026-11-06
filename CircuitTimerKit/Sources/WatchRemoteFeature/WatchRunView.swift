@@ -205,8 +205,8 @@ struct WatchRunView: View {
                     .foregroundStyle(display.tone.ink)
             }
             .frame(width: .token(size: .watchControl), height: .token(size: .watchControl))
-            .padding(.leading, .token(spacing: .xs))
-            .padding(.trailing, .token(spacing: .s))
+            // The strip's width is the card's reserved padding: one constant, so the two never drift apart.
+            .frame(width: Self.controlStripWidth)
             .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
         }
