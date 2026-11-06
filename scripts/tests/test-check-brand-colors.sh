@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests scripts/check-brand-colors.py on a tree of the three colour sets and the two logos that passes, each case
-# changing one of them.
+# Tests scripts/check-brand-colors.py on a tree of the three colour sets, the two logos and the two app icons that
+# passes, each case changing one of them.
 # The script finds the repository by its own place, so the tree gets a copy of it.
 . "$(dirname "$0")/lib.sh"
 
@@ -9,6 +9,21 @@ app_accent=CircuitTimer/Assets.xcassets/AccentColor.colorset/Contents.json
 watch_accent=CircuitTimerWatch/Assets.xcassets/AccentColor.colorset/Contents.json
 launch_logo=CircuitTimer/Assets.xcassets/LaunchLogo.imageset/LaunchLogo.svg
 app_logo=CircuitTimerKit/Sources/DesignSystem/Resources/Images.xcassets/AppLogo.imageset/AppLogo.svg
+app_icon=CircuitTimer/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+watch_icon=CircuitTimerWatch/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+# icon FILE [SIZE [COLOUR_TYPE]]: writes a PNG of only its IHDR and IEND chunks, by default 1024 px 8-bit RGB.
+icon() {
+	mkdir -p "$(dirname "$work/tree/$1")"
+	python3 -I -c '
+import struct, sys, zlib
+def chunk(kind, body):
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+size, kind = int(sys.argv[2]), int(sys.argv[3])
+header = struct.pack(">IIBBBBB", size, size, 8, kind, 0, 0, 0)
+open(sys.argv[1], "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IEND", b""))
+' "$work/tree/$1" "${2:-1024}" "${3:-2}"
+}
 
 # logo FILE [FILL]: writes a one-path SVG, by default in Brand's colour.
 logo() {
@@ -44,6 +59,8 @@ tree() {
 	colour_set "$watch_accent"
 	logo "$launch_logo"
 	logo "$app_logo"
+	icon "$app_icon"
+	icon "$watch_icon"
 }
 
 check() {
@@ -148,6 +165,49 @@ rm "$work/tree/$app_logo"
 check
 expect_status 1
 expect_in "$work/out" "check-brand-colors: $app_logo: "
+expect_not_in "$work/out" "Traceback"
+
+describe "a watch icon that differs from the app icon"
+tree
+icon "$watch_icon" 512
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $watch_icon: not an exact copy of $app_icon"
+expect_not_in "$work/out" "Traceback"
+
+describe "an app icon with alpha, copied to the watch"
+tree
+icon "$app_icon" 1024 6
+icon "$watch_icon" 1024 6
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_icon: IHDR (1024, 1024, 8, 6)"
+expect_not_in "$work/out" "not an exact copy"
+
+describe "an app icon of another size, copied to the watch"
+tree
+icon "$app_icon" 512
+icon "$watch_icon" 512
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_icon: IHDR (512, 512, 8, 2)"
+
+describe "an app icon that is not a PNG"
+tree
+printf 'not a png' > "$work/tree/$app_icon"
+cp "$work/tree/$app_icon" "$work/tree/$watch_icon"
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_icon: IHDR None"
+expect_not_in "$work/out" "Traceback"
+
+describe "the app icon missing"
+tree
+rm "$work/tree/$app_icon"
+check
+expect_status 1
+expect_in "$work/out" "check-brand-colors: $app_icon: "
+expect_not_in "$work/out" "not an exact copy"
 expect_not_in "$work/out" "Traceback"
 
 finish

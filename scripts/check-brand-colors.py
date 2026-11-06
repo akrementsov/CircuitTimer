@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Fails when an asset that mirrors the `Brand` colour token differs from it, or a copy of the launch logo from it.
+"""Fails when an asset that mirrors the `Brand` colour token differs from it, a copy of the launch logo or of the app
+icon from its original, or the app icon is not an opaque 1024 px PNG.
 
 AGENTS.md (core rule 3) keeps one universal value per colour, and the app's and the watch app's `AccentColor` repeat
-`Brand`; DesignSystem's `AppLogo.svg` is a byte-for-byte copy of the launch screen's `LaunchLogo.svg`. Each must hold exactly one universal colour without appearances, in the same colour space, and every
+`Brand`; DesignSystem's `AppLogo.svg` is a byte-for-byte copy of the launch screen's `LaunchLogo.svg`, and the watch
+app's `AppIcon.png` of the app's, which App Store Connect takes only as 1024×1024 without alpha (8-bit RGB here). Each must hold exactly one universal colour without appearances, in the same colour space, and every
 component must match `Brand`'s on the 0–255 scale: Xcode writes a component as a fraction ("0.906"), as hex ("0xE7")
 or as an integer ("231"). Run with `python3 -I`; it uses the standard library only and finds the repository from its
 own place.
@@ -20,6 +22,11 @@ MIRRORS = (
 COMPONENTS = ("red", "green", "blue", "alpha")
 LOGO = "CircuitTimer/Assets.xcassets/LaunchLogo.imageset/LaunchLogo.svg"
 LOGO_COPIES = ("CircuitTimerKit/Sources/DesignSystem/Resources/Images.xcassets/AppLogo.imageset/AppLogo.svg",)
+ICON = "CircuitTimer/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
+ICON_COPIES = ("CircuitTimerWatch/Assets.xcassets/AppIcon.appiconset/AppIcon.png",)
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+ICON_SIZE = 1024
+RGB = 2
 
 
 class Mismatch(Exception):
@@ -57,6 +64,31 @@ def colour(root, path):
     return value.get("color-space"), tuple(eight_bit(path, name, str(components.get(name))) for name in COMPONENTS)
 
 
+def icon_header(data):
+    """Returns the width, height, bit depth and colour type of a PNG's IHDR chunk, or None."""
+    if len(data) < 26 or not data.startswith(PNG_SIGNATURE) or data[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big"), data[24], data[25]
+
+
+def copies(root, original, paths, failures):
+    """Reads ORIGINAL and adds a failure for each of PATHS that is missing or not a byte-for-byte copy of it."""
+    try:
+        data = (root / original).read_bytes()
+    except OSError as error:
+        failures.append(f"{original}: {error}")
+        data = None
+    for path in paths:
+        try:
+            copy = (root / path).read_bytes()
+        except OSError as error:
+            failures.append(f"{path}: {error}")
+            continue
+        if data is not None and copy != data:
+            failures.append(f"{path}: not an exact copy of {original}; change them together (AGENTS.md, core rule 3)")
+    return data
+
+
 def main(root):
     failures = []
     try:
@@ -73,19 +105,11 @@ def main(root):
         if mirror != brand:
             failures.append(f"{path}: {mirror[0]} {mirror[1]} (red, green, blue, alpha), not Brand's {brand[0]} "
                             f"{brand[1]}; change them together (AGENTS.md, core rule 3)")
-    try:
-        logo = (root / LOGO).read_bytes()
-    except OSError as error:
-        failures.append(f"{LOGO}: {error}")
-        logo = None
-    for path in LOGO_COPIES:
-        try:
-            copy = (root / path).read_bytes()
-        except OSError as error:
-            failures.append(f"{path}: {error}")
-            continue
-        if logo is not None and copy != logo:
-            failures.append(f"{path}: not an exact copy of {LOGO}; change them together (AGENTS.md, core rule 3)")
+    copies(root, LOGO, LOGO_COPIES, failures)
+    icon = copies(root, ICON, ICON_COPIES, failures)
+    if icon is not None and icon_header(icon) != (ICON_SIZE, ICON_SIZE, 8, RGB):
+        failures.append(f"{ICON}: IHDR {icon_header(icon)} (width, height, bit depth, colour type), not an opaque "
+                        f"{ICON_SIZE} px 8-bit RGB PNG, which App Store Connect requires")
     for failure in failures:
         print(f"check-brand-colors: {failure}", file=sys.stderr)
     return 1 if failures else 0
