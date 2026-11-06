@@ -48,7 +48,8 @@ public struct PhoneState: Codable, Equatable, Sendable {
 /// The iPhone's workout list as the watch shows it.
 public enum CatalogState: Codable, Equatable, Sendable {
     case loaded(WatchCatalog)
-    /// The iPhone has no list to send; the watch keeps the last one it had, dimmed.
+    /// The iPhone has no list to send; the watch keeps the last one it had, dimmed. `.locked` is the exception: the
+    /// watch drops its list.
     case unavailable(UnavailableReason)
 }
 
@@ -57,6 +58,8 @@ public enum UnavailableReason: String, Codable, Equatable, Sendable {
     case loadFailed
     /// Even half the list does not fit in a context write.
     case tooLarge
+    /// The iPhone has no full version, which the watch app is part of. Watches built before it read it as `.loadFailed`.
+    case locked
 
     /// A reason a newer iPhone adds reads as a failed load, so a new reason never needs a new schema version.
     public init(from decoder: any Decoder) throws {

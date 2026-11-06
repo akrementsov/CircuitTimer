@@ -34,13 +34,8 @@ struct WatchStartFixture {
         return state
     }
 
+    /// The timer a Start opens: `ready()` has the full version, so the watch controls it.
     var timer: WorkoutTimerFeature.State {
-        WorkoutTimerFeature.State(
-            id: UUID(0),
-            workoutID: workout.id,
-            title: workout.name,
-            workoutName: workout.name,
-            schedule: WorkoutSchedule(workout: workout)
-        )
+        timerState(for: workout, allowsWatchControl: true)
     }
 }

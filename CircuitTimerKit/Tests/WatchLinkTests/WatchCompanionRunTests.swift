@@ -12,15 +12,9 @@ struct WatchCompanionRunTests {
     private let link = FakeLink()
     private let clock = ManualClock()
 
-    private func start() -> WatchCompanion {
-        let transport = link.transport
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
-            transport: transport,
-            now: { linkNow },
-            clock: clock
-        )
-        let events = transport.events()
+    private func start() async -> WatchCompanion {
+        let companion = await WatchCompanion.make(link: link, clock: clock)
+        let events = link.transport.events()
         Task { await companion.run(events) }
         return companion
     }
@@ -51,7 +45,7 @@ struct WatchCompanionRunTests {
 
     /// The companion with A's first stage published and A's timer subscribed.
     private func running() async -> (WatchCompanion, AsyncStream<WatchControlRequest>.AsyncIterator) {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
         let requests = await companion.controlRequests(owner: owner(1))
         return (companion, requests.makeAsyncIterator())
@@ -85,7 +79,7 @@ struct WatchCompanionRunTests {
 
     @Test
     func test_refresh_noTimerSubscribed_repliesNotLiveAtOnce() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun())
 
         // The clock never moves: a reply that waited for a timer would never come.
@@ -244,7 +238,7 @@ struct WatchCompanionRunTests {
 
     @Test
     func test_markEnded_isSynchronous_laterPublicationsAndSubscriptionsGetNothing() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
 
         companion.markEnded(owner(1))
@@ -257,7 +251,7 @@ struct WatchCompanionRunTests {
 
     @Test
     func test_activation_heldWrite_doesNotHoldTheReplyToARequest() async throws {
-        let companion = start()
+        let companion = await start()
         link.snapshot.withValue { $0.canPublish = false }
         await companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
         link.snapshot.withValue { $0.canPublish = true }

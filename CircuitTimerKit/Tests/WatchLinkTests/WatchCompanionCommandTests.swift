@@ -14,22 +14,16 @@ struct WatchCompanionCommandTests {
     private let link = FakeLink()
     private let clock = ManualClock()
 
-    private func start() -> WatchCompanion {
-        let transport = link.transport
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
-            transport: transport,
-            now: { linkNow },
-            clock: clock
-        )
-        let events = transport.events()
+    private func start() async -> WatchCompanion {
+        let companion = await WatchCompanion.make(link: link, clock: clock)
+        let events = link.transport.events()
         Task { await companion.run(events) }
         return companion
     }
 
     /// The companion with A's first stage published and A's timer subscribed.
     private func running() async -> (WatchCompanion, AsyncStream<WatchControlRequest>.AsyncIterator) {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
         let requests = await companion.controlRequests(owner: owner(1))
         return (companion, requests.makeAsyncIterator())
@@ -126,7 +120,7 @@ struct WatchCompanionCommandTests {
 
     @Test(arguments: Refusal.allCases)
     func test_command_noTimerCanTakeIt_isUnavailableAtOnce(refusal: Refusal) async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
         var commandOwner = owner(1)
         switch refusal {
@@ -240,7 +234,7 @@ struct WatchCompanionCommandTests {
 
     @Test
     func test_command_timersBufferFull_timesOutWithoutReachingIt() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
         var requests = await companion.controlRequests(owner: owner(1)).makeAsyncIterator()
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -276,7 +270,7 @@ struct WatchCompanionCommandTests {
 
     @Test
     func test_command_timersStreamTerminated_isUnavailable() async throws {
-        let companion = start()
+        let companion = await start()
         await companion.publishRun(revision: 1, run: makeRun(stage: "A1"))
         let requests = await companion.controlRequests(owner: owner(1))
         // The timer stops reading: its stream terminates before the actor hears of it.

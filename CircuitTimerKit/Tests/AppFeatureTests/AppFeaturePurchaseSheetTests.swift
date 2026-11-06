@@ -93,7 +93,7 @@ struct AppFeaturePurchaseSheetTests {
     @Test
     func test_request_underTheTimer_isDropped() async {
         var state = freeVersion([workout])
-        state.destination = .timer(timerState(for: workout))
+        state.destination = .timer(timerState(for: workout, allowsWatchControl: false))
         let store = makeStore(state)
 
         // Set and dropped in the same pass: nothing changes.
@@ -205,7 +205,7 @@ struct AppFeaturePurchaseSheetTests {
     @Test
     func test_timerCoverAppeared_pendingWriteAlert_isDropped() async {
         var state = freeVersion([workout])
-        state.destination = .timer(timerState(for: workout))
+        state.destination = .timer(timerState(for: workout, allowsWatchControl: false))
         state.hasPendingMutationAlert = true
         let store = makeStore(state)
 

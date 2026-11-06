@@ -51,13 +51,7 @@ struct AppWatchStartReloadTests {
             $0.isHealthRequestOutstanding = false
             if !changesSchedule {
                 $0.startIntent = nil
-                $0.destination = .timer(WorkoutTimerFeature.State(
-                    id: UUID(0),
-                    workoutID: workout.id,
-                    title: workout.name,
-                    workoutName: workout.name,
-                    schedule: WorkoutSchedule(workout: workout)
-                ))
+                $0.destination = .timer(timerState(for: workout, allowsWatchControl: true))
             }
         }
         if !changesSchedule { await store.send(.destination(.dismiss)) { $0.destination = nil } }
@@ -88,13 +82,7 @@ struct AppWatchStartReloadTests {
         await store.send(.view(.scenePhaseChanged(.active))) {
             $0.isSceneActive = true
             $0.startIntent = nil
-            $0.destination = .timer(WorkoutTimerFeature.State(
-                id: UUID(0),
-                workoutID: workout.id,
-                title: workout.name,
-                workoutName: workout.name,
-                schedule: WorkoutSchedule(workout: workout)
-            ))
+            $0.destination = .timer(timerState(for: workout, allowsWatchControl: true))
         }
         await store.receive(.internal(.notificationCleanupFinished(true)), timeout: .seconds(1)) {
             $0.isNotificationCleanupStalled = false

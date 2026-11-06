@@ -29,6 +29,8 @@ The list updates when the workouts change on the iPhone. When the watch has no f
 | The iPhone app was launched in the background and has not loaded its workouts | the last list under «Earlier list from … · Waiting for iPhone», or «Open CircuitTimer on your iPhone» |
 | The two apps speak different versions | «Update CircuitTimer on your iPhone» or «… on your watch» |
 | A workout runs whose names do not fit in a transfer | «A workout is running on your iPhone», until it closes |
+| The iPhone has no full version | «Full version needed», without a list, under the connection's status line if there is one |
+| The iPhone app has not heard from the App Store yet | whatever the watch showed before, or «Open CircuitTimer on your iPhone» |
 
 ## Start from the watch
 
@@ -43,6 +45,10 @@ For an already admitted Start, the notification authorization client may be call
 A new Start can take over a stalled Health stage from either the editor or the watch and continue without Health, including skipping another access read. Notification checks, admission and the new thirty-second limit still apply. Taking over retires the older stalled intent before the new ticket is confirmed; if that ticket has expired, neither the old late Health continuation nor the new intent opens a timer. If a Health access read stalls and later returns not determined, it does not show a new permission sheet automatically: the accepted watch intent waits until its original deadline or a new Start takes over without Health. A local Start during another live watch intent is refused and its local button is freed; a stalled Health intent retains the existing start-without-Health rule.
 
 After accepted, the watch waits thirty seconds plus five seconds for publication, counted from receiving the reply. Sending, waiting and the outcome belong to the root: Back closes only the selection, and the status remains above the list or empty/unavailable/connection notice. While Start is pending the list cannot open another workout; a new selection after it ends clears the earlier outcome. The app going to the background ends only this local wait. A lost reply or a wait without a run says to check the iPhone, since the workout may have started. An accepted run, including one published after the local wait ended, replaces the status; a run too large to travel does the same with its existing notice. An incompatible app ends the wait and asks for an update. Start outcomes apply only to the matching request UUID, independently of state ordering; only a refresh reply can switch iPhone processes or open a confirmation lease.
+
+## The full version (CT-6-2)
+
+The watch app is part of the full version ([Purchases](purchases.md)). The iPhone decides: the watch never asks the App Store. Without the full version the iPhone sends the watch neither its workouts nor the running workout, and refuses Start, Pause and Resume without changing anything on the iPhone; the watch drops its list and says «Full version needed». A purchase, a restore or a Family Sharing grant brings the list, and a running workout, back without a change of the list; a refund or a revoked grant takes them away. A workout running on the iPhone goes on after a refund: only the watch loses it. Until the App Store answers the iPhone app, the iPhone sends nothing new and refuses every request, and the watch keeps what it showed.
 
 ## How it works
 
@@ -68,7 +74,7 @@ One tag after CT-9-5 checks what only App Store Connect can:
 - [ ] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; this shows whether App Store Connect minds.
 - [ ] On that TestFlight build, the device checklist's items that only a live session can check pass: the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26.
 
-The tag goes to internal testers only, so the wire's version 1 stays open after it: a fix these checks call for, and CT-6-2, may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
+The tag goes to internal testers only, so the wire's version 1 stays open after it: a fix these checks call for may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
 
 ## Accepted limits
 
@@ -92,7 +98,16 @@ The tag goes to internal testers only, so the wire's version 1 stays open after 
 - Commands from the watch and the Live Activity at the same moment: one of them gets «Couldn't». A card update stuck on the iPhone for over 10 seconds makes every later command «Couldn't» until it ends.
 - A Pause/Resume reply from another iPhone process shows no command outcome; the watch asks for the state at most once per state, also with the wrist lowered, and a request already in flight may be followed by one more. A command during the run's renewal may cost one extra request too.
 - Leaving the watch app, or closing the timer, while a command waits shows no outcome. A command the iPhone app had already taken when the system ended it reads as «Checking on iPhone…» and may have applied.
-- The full version will gate the watch app in CT-6-2; Start, Pause and Resume are not gated yet.
+- A purchase, a restore or a Family Sharing grant made while the iPhone app is closed, or launched in the background by the watch, reaches the watch only when the iPhone app opens and the App Store answers it; a buyer whose watch kept the lock in its context sees it until then.
+- A refund or a revoked Family Sharing grant while the iPhone app is closed: until a new iPhone process answers, the watch shows its last screen; then the list is marked as earlier and Start is off. The iPhone refuses Start and commands either way.
+- An iPhone app whose App Store answer does not come (offline, for example) refuses the watch's requests; the watch shows its earlier list or «Open CircuitTimer on your iPhone».
+- Between the iPhone learning of a refund and its link applying it, the watch can still get the list and the running workout; a Pause or Resume then reads «Couldn't. Try on iPhone» until the lock arrives. If the iPhone app ends in that moment, the watch may keep the old list until the next launch.
+- WatchConnectivity promises no order between messages: one sent before the lock may arrive after it and show, for a moment, a list or a stage the watch had not shown; once the watch has the lock it rejects anything older. A watch out of reach gets the lock from the context once its write succeeds, or in the answer to its next request from an iPhone process that knows the status.
+- A lock WatchConnectivity refuses to write stays the iPhone's answer to requests, but the context keeps the earlier state until a later write succeeds; if the iPhone app ends before its last write succeeds, at termination or earlier, a watch that opens later shows that earlier state until the iPhone app runs again.
+- A purchase before the iPhone app has loaded its workouts for the first time: the watch keeps the lock (or shows the running workout) until the list is published.
+- A Pause or Resume the iPhone's timer handled before it learned of a refund applies.
+- A Start from the watch the iPhone already accepted is cancelled by a refund before its timer opens, at the next check of the Start (also while a notification or Health sheet is open; the sheet itself stays). The watch ends its wait when the lock arrives; with the lock's write refused or the watch out of reach it says to check the iPhone after its 35-second wait.
+- Watch apps built before CT-6-2 read the lock as «Couldn't load workouts on iPhone».
 - Return to Clock: by default watchOS goes back to the watch face about two minutes after the wrist is lowered, and the watch app asks again when it comes back. In the Watch app on the iPhone, CircuitTimer can stay in front for an hour.
 
 ## Device checklist
@@ -142,3 +157,12 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] Let Health stall while reading access and while its sheet is open; a new local/watch Start continues without another Health read or request.
 - [ ] Back while sending and while waiting; lose the accepted reply; change/remove/rename the selected workout, and publish a run before the reply or after the local wait: the root status and run remain truthful.
 - [ ] Start selection, disabled state, all messages and VoiceOver hints in English/Russian, on a 41 mm watch and at the largest text size; the screens scroll.
+
+- [ ] Without the full version (Xcode › Debug › StoreKit › Manage Transactions): «Full version needed» with the watch app open and when it opens later; Start, Pause and Resume change nothing on the iPhone.
+- [ ] A refund while a Start from the watch waits on the notification or Health sheet: no timer opens after the sheet is answered, and the watch shows «Full version needed».
+- [ ] A purchase in the purchase sheet, a restore and a Family Sharing grant bring the list back without editing it; a refund and a revoked grant take it away, with the watch app open and closed.
+- [ ] A refund during a workout started on the iPhone and during one started from the watch: the iPhone workout goes on, the watch loses it at once.
+- [ ] The full version arriving while the timer is open (an approved Ask to Buy, a purchase on another device, Family Sharing): Pause and Resume from the watch start to apply.
+- [ ] Force quit the iPhone app without the full version, then open the watch app: the watch is not unlocked by the background launch.
+- [ ] End the iPhone app right after a refund: the watch shows the lock when it opens.
+- [ ] «Full version needed» in English and Russian, at the largest text size, on a 41 mm watch and with VoiceOver (the status line, if any, then the title and the message).

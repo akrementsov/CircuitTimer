@@ -11,20 +11,14 @@ struct StartHarness: Sendable {
     let clock: ManualClock
     let companion: WatchCompanion
 
-    init(now: @escaping @Sendable () -> Date = { linkNow }) {
+    init(now: @escaping @Sendable () -> Date = { linkNow }, access: WatchAccess? = .granted) async {
         let link = FakeLink()
         let clock = ManualClock()
-        let transport = link.transport
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 1), transport: transport),
-            transport: transport,
-            now: now,
-            clock: clock
-        )
+        let companion = await WatchCompanion.make(link: link, access: access, now: now, clock: clock)
         self.link = link
         self.clock = clock
         self.companion = companion
-        let events = transport.events()
+        let events = link.transport.events()
         Task { await companion.run(events) }
     }
 
@@ -80,7 +74,7 @@ struct WatchStartAdmissionTests {
         .notPlayable,
     ])
     func test_start_subscriberAnswers_echoesResultAndChosenWorkout(result: WatchStartResult) async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         let taken = Observed<WatchStartRequest?>(nil)
@@ -110,7 +104,7 @@ struct WatchStartAdmissionTests {
 
     @Test
     func test_start_withoutSubscriber_returnsOpenPhoneAppWithTheCurrentCatalog() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         await harness.companion.publishCatalog(revision: 1, catalog: .loaded(makeCatalog(1)))
 
@@ -132,7 +126,7 @@ struct WatchCompanionStartTests {
 
     @Test(arguments: End.allCases)
     func test_start_endedAdmission_repliesOpenPhoneAppAndRefusesLateAcceptance(end: End) async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         var iterator = stream.makeAsyncIterator()
@@ -157,7 +151,7 @@ struct WatchCompanionStartTests {
 
     @Test
     func test_start_secondPendingRequest_returnsBusyWithoutReplacingTheFirst() async throws {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         var iterator = stream.makeAsyncIterator()
@@ -174,7 +168,7 @@ struct WatchCompanionStartTests {
 
     @Test
     func test_start_arrivalAlreadyExpired_handsNothingToTheSubscriber() async {
-        let harness = StartHarness()
+        let harness = await StartHarness()
         defer { harness.close() }
         let stream = await harness.companion.startRequests()
         var iterator = stream.makeAsyncIterator()

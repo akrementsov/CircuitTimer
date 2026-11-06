@@ -14,12 +14,14 @@ struct WatchRemoteFeatureScreenTests {
         catalog: WatchRemoteFeature.ShownCatalog? = nil,
         problem: WatchRemoteFeature.LinkProblem? = nil,
         hasAnswered: Bool = true,
-        inFlight: Bool = false
+        inFlight: Bool = false,
+        isRunTooLarge: Bool = false
     ) -> WatchRemoteFeature.State {
         var state = WatchRemoteFeature.State()
         state.link = link
         state.catalog = catalog
         state.problem = problem
+        state.isRunTooLarge = isRunTooLarge
         state.refresh.hasAnswered = hasAnswered
         state.refresh.inFlight = inFlight
             ? WatchRemoteFeature.RefreshRequest(id: UUID(watch: 1), serial: 1, sentAt: MonotonicInstant(now: ContinuousClock()))
@@ -30,6 +32,8 @@ struct WatchRemoteFeatureScreenTests {
     private static let activating = LinkStatus(isActivated: false, isReachable: false, needsUnlock: false, isActivating: true)
     private static let failedActivation = LinkStatus(isActivated: false, isReachable: false, needsUnlock: false)
     private static let locked = LinkStatus(isActivated: true, isReachable: false, needsUnlock: true)
+    /// What the watch keeps of a locked watch app: no list.
+    private static let lockedApp = WatchRemoteFeature.ShownCatalog(unavailable: .locked, updatedAt: earlier)
 
     @Test(arguments: [
         (state(problem: .incompatible(.phone), hasAnswered: true), WatchRemoteFeature.State.Screen.update(.phone)),
@@ -42,6 +46,11 @@ struct WatchRemoteFeatureScreenTests {
         (state(catalog: .init(lastLoaded: watchCatalog(), updatedAt: earlier)), .empty(status: nil)),
         (state(catalog: .init(unavailable: .loadFailed, updatedAt: earlier)), .unavailable(.loadFailed, status: nil)),
         (state(catalog: .init(unavailable: .tooLarge, updatedAt: earlier)), .unavailable(.tooLarge, status: nil)),
+        (state(catalog: lockedApp, problem: .incompatible(.watch)), .update(.watch)),
+        (state(catalog: lockedApp, isRunTooLarge: true), .notice(.runTooLarge)),
+        (state(catalog: lockedApp), .locked(status: nil)),
+        (state(link: unreachable, catalog: lockedApp), .locked(status: .unreachable(updatedAt: earlier))),
+        (state(link: locked, catalog: lockedApp, problem: .failed), .locked(status: .unlock)),
         (state(link: locked, problem: .companionMissing), .notice(.unlock)),
         (state(problem: .companionMissing), .notice(.companionMissing)),
         (state(link: nil, hasAnswered: false), .notice(.connecting)),
@@ -71,6 +80,31 @@ struct WatchRemoteFeatureScreenTests {
         expected: WatchRemoteFeature.State.StatusLine
     ) {
         #expect(state.screen == .list(Self.list, dimmed: nil, status: expected))
+    }
+
+    /// A run on the iPhone shows over the lock, as it does over any list.
+    @Test
+    func test_screen_runAndLock_showsTheRun() {
+        var state = Self.state(catalog: Self.lockedApp)
+        state.run = WatchRemoteFeature.ShownRun(run: runningRun(), isLive: false)
+
+        guard case .run = state.screen else {
+            Issue.record("The lock hid the run: \(state.screen)")
+            return
+        }
+    }
+
+    /// Nobody vouches for an earlier list, but the lock shows none: the line about it is left out.
+    @Test
+    func test_screen_lockFromAnEarlierProcess_showsNoEarlierListLine() {
+        var state = Self.state(catalog: Self.lockedApp)
+        _ = state.order.receive(phoneState(process: 1, sequence: 1, catalog: .unavailable(.locked), digest: "L"), from: .context)
+        _ = state.order.receive(phoneState(process: 2, sequence: 0), from: .reply)
+        var listed = state
+        listed.catalog = .init(lastLoaded: Self.list, updatedAt: earlier)
+
+        #expect(listed.screen == .list(Self.list, dimmed: nil, status: .earlierList(updatedAt: earlier)))
+        #expect(state.screen == .locked(status: nil))
     }
 
     @Test

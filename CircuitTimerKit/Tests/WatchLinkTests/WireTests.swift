@@ -103,7 +103,10 @@ struct WireTests {
 
         #expect(try decode("tooLarge") == .tooLarge)
         #expect(try decode("loadFailed") == .loadFailed)
+        #expect(try decode("locked") == .locked)
         #expect(try decode("watchUnplugged") == .loadFailed)
+        let locked = CatalogState.unavailable(.locked)
+        #expect(try WireCoding.decode(CatalogState.self, from: WireCoding.encode(locked)) == locked)
     }
 
     @Test(arguments: [

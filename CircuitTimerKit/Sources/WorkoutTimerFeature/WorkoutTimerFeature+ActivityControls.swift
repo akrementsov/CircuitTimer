@@ -119,6 +119,11 @@ extension WorkoutTimerFeature {
         at now: Date
     ) -> Effect<Action> {
         let published = state.activityControls?.generation
+        if case .watch = source, !state.allowsWatchControl {
+            // Refused before `advance`: a watch without the full version changes and writes nothing on the iPhone.
+            state.controlRefusal = ControlRefusal(source: source, result: .unavailable)
+            return .none
+        }
         // Even a rejected request commits elapsed time and reconciles a moved wall clock.
         let mustSync = advance(&state, at: now)
         guard isReady(for: source, state) else {
@@ -266,6 +271,8 @@ extension WorkoutTimerFeature {
                     await liveActivity.requestHandled(owner, requestID, result)
                 }
             case let .watch(requestID):
+                // Without the full version the watch is told nothing about the run.
+                let publication = state.allowsWatchControl ? publication : nil
                 return .run { [watchCompanion, owner = state.id] _ in
                     await watchCompanion.controlHandled(owner, requestID, result, publication)
                 }

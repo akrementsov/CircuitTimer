@@ -3,7 +3,6 @@
 
 import ComposableArchitecture
 import Foundation
-import PurchaseFeature
 import Testing
 import WatchLink
 import WorkoutDomain
@@ -113,21 +112,6 @@ struct AppWatchStartOwnershipTests {
             $0.startGeneration = 2
         }
         #expect(store.state.path[id: 0, case: \.editor]?.phase == .new)
-        await store.finish()
-    }
-
-    @Test
-    func test_purchaseDuringWatchStart_cancelsWithoutReplacingSheet() async {
-        let clock = TestClock<Duration>()
-        var state = fixture.pending(clock)
-        state.fullVersion = .free
-        state.settings.$isICloudSyncOn.withLock { $0 = true }
-        let store = makeStore(state) { $0.continuousClock = clock }
-        await store.send(.settings(.delegate(.fullVersionRequested(.buy)))) {
-            $0.startIntent = nil
-            $0.startGeneration = 2
-            $0.destination = .purchase(PurchaseFeature.State(entry: .browse, iCloudOutlook: .startsNextLaunch))
-        }
         await store.finish()
     }
 

@@ -85,12 +85,7 @@ struct PhoneCompanionClientTests {
     @Test
     func test_send_toTheIPhoneActor_getsUnknownThenTheCatalog() async throws {
         let phone = FakeLink()
-        let companion = WatchCompanion(
-            ledger: PublicationLedger(processID: UUID(link: 5), transport: phone.transport),
-            transport: phone.transport,
-            now: { linkNow },
-            clock: TestClock()
-        )
+        let companion = await WatchCompanion.make(processID: UUID(link: 5), link: phone, clock: TestClock())
         let events = phone.transport.events()
         Task { await companion.run(events) }
         watch.respond.setValue { data in

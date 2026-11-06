@@ -89,6 +89,10 @@ public struct WorkoutTimerFeature: Sendable {
         var controlRefusal: ControlRefusal?
         /// Set once the screen starts closing, also before the control subscription exists.
         var isClosing = false
+        /// The watch's commands and refreshes reach this timer only with the full version, which the watch app is part
+        /// of. Off unless the screen's owner allows it, and changed by it in the pass that learns of a purchase or a
+        /// refund, so a request handled after that pass follows the new status. Set through `setWatchControl(_:)`.
+        public internal(set) var allowsWatchControl = false
         /// What the run did, for its Health workout; the session saves the newest track it received.
         public internal(set) var healthTrack = WorkoutHealthTrack()
         var sentHealthTrack = WorkoutHealthTrack()
@@ -318,6 +322,8 @@ public struct WorkoutTimerFeature: Sendable {
                 let now = date()
                 switch request.kind {
                     case .refresh:
+                        // Without the full version the watch gets no run: answered without one, nothing settled.
+                        guard state.allowsWatchControl else { return .none }
                         // The watch asks for the run as it is now: settle it; the second reducer answers with it.
                         return advance(&state, at: now) ? syncClock(&state, at: now) : .none
                     case let .command(command, generation):
