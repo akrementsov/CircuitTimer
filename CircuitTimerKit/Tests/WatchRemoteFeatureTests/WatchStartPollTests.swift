@@ -26,12 +26,6 @@ struct WatchStartPollTests {
         return harness
     }
 
-    /// The refreshes the reducer started, counted synchronously: the send itself runs in an effect, which a busy
-    /// runner may not have reached yet.
-    private func refreshes(_ harness: RunHarness) -> Int {
-        harness.requests
-    }
-
     @Test
     func test_startPoll_noPublication_refreshReplyShowsRunAndEndsWait() async {
         let harness = await accepted()
@@ -39,7 +33,7 @@ struct WatchStartPollTests {
 
         await harness.advance(seconds: 5)
         await harness.store.receive(\.internal.startPollDue)
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         await harness.replies.answer(runState(sequence: 2, run: run))
         await harness.store.receive(\.internal.refreshAnswered)
 
@@ -57,7 +51,7 @@ struct WatchStartPollTests {
         for second in stride(from: 5, through: 30, by: 5) {
             await harness.advance(seconds: 5)
             await harness.store.receive(\.internal.startPollDue)
-            #expect(refreshes(harness) == second / 5)
+            #expect(harness.requests == second / 5)
             await harness.replies.answer(runState(sequence: 1 + second / 5, run: nil))
             await harness.store.receive(\.internal.refreshAnswered)
         }
@@ -67,7 +61,7 @@ struct WatchStartPollTests {
         #expect(harness.state.startNote == .checkPhone)
 
         await harness.advance(seconds: 20)
-        #expect(refreshes(harness) == 6)
+        #expect(harness.requests == 6)
         await harness.finish()
     }
 
@@ -80,7 +74,7 @@ struct WatchStartPollTests {
         await harness.advance(seconds: 5)
         await harness.store.receive(\.internal.startPollDue)
 
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         #expect(harness.state.start != nil)
         await harness.finish()
     }
@@ -98,7 +92,7 @@ struct WatchStartPollTests {
         // The retry and the poll come due together; whichever goes first, one request goes.
         await harness.store.receive(\.internal.retryDue)
 
-        #expect(refreshes(harness) == 2)
+        #expect(harness.requests == 2)
         await harness.finish()
     }
 
@@ -116,7 +110,7 @@ struct WatchStartPollTests {
         await harness.store.send(.internal(.event(.status(reachable))))
         await harness.advance(seconds: 5)
         await harness.store.receive(\.internal.startPollDue)
-        #expect(refreshes(harness) == 2)
+        #expect(harness.requests == 2)
         await harness.replies.answer(runState(sequence: 2, run: runningRun()))
         await harness.store.receive(\.internal.refreshAnswered)
 
@@ -137,7 +131,7 @@ struct WatchStartPollTests {
         await harness.advance(seconds: 5)
         await harness.store.receive(\.internal.startPollDue)
 
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         #expect(harness.state.start != nil)
         await harness.finish()
     }
@@ -150,7 +144,7 @@ struct WatchStartPollTests {
         await harness.advance(seconds: 5)
         await harness.store.receive(\.internal.startPollDue)
 
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         await harness.finish()
     }
 
@@ -164,7 +158,7 @@ struct WatchStartPollTests {
         await harness.store.send(.view(.startButtonTapped))
         await harness.advance(seconds: 9)
 
-        #expect(refreshes(harness) == 0)
+        #expect(harness.requests == 0)
         #expect(harness.state.start?.stage == .sending)
         await harness.finish()
     }
@@ -177,7 +171,7 @@ struct WatchStartPollTests {
         await harness.store.send(.internal(.startPollDue(sentID: UUID(watch: 99), generation: 1)))
         await harness.store.send(.internal(.startPollDue(sentID: UUID(0), generation: 0)))
 
-        #expect(refreshes(harness) == 0)
+        #expect(harness.requests == 0)
         #expect(harness.state.start == start)
         await harness.finish()
     }
@@ -190,10 +184,10 @@ struct WatchStartPollTests {
         await harness.store.send(.internal(.event(.message(runState(sequence: 2, run: runningRun())))))
         #expect(harness.state.start == nil)
         // The run without a lease asks once, as any shown run does; the poll adds nothing.
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         await harness.advance(seconds: 6)
 
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         await harness.finish()
     }
 
@@ -221,11 +215,11 @@ struct WatchStartPollTests {
         await harness.store.receive(\.internal.startPollDue)
         await harness.store.send(.internal(.event(.message(runState(sequence: 3, run: runningRun(stage: "Rest"))))))
         #expect(harness.state.start == nil)
-        #expect(refreshes(harness) == 1)
+        #expect(harness.requests == 1)
         await harness.replies.answer(runState(sequence: 2, run: runningRun()))
         await harness.store.receive(\.internal.refreshAnswered)
 
-        #expect(refreshes(harness) == 2)
+        #expect(harness.requests == 2)
         await harness.finish()
     }
 
@@ -244,12 +238,33 @@ struct WatchStartPollTests {
         await harness.store.send(.internal(.event(.message(runState(sequence: 9, run: runningRun(endsIn: 60))))))
         #expect(harness.state.run != nil)
         #expect(harness.state.startNote == nil)
-        let afterRun = refreshes(harness)
+        let afterRun = harness.requests
         await harness.replies.answer(runState(sequence: 10, run: runningRun(endsIn: 60)))
         await harness.store.receive(\.internal.refreshAnswered)
         await harness.advance(seconds: 4)
 
-        #expect(refreshes(harness) == afterRun)
+        #expect(harness.requests == afterRun)
+        await harness.finish()
+    }
+
+    @Test
+    func test_startPoll_dueAtTheEndOfTheWait_asksNothing() async {
+        var state = stateShowing(watchCatalog("Morning"), digest: "A")
+        state.start = WatchRemoteFeature.StartRequest(
+            id: UUID(0),
+            beganAt: MonotonicInstant(now: TestClock<Duration>()),
+            stage: .waiting(asksOnPhone: false),
+            timeoutGeneration: 1
+        )
+        let harness = RunHarness(state)
+
+        // A suspension past the wait: the poll arrives with the timeout already due.
+        await harness.clock.advance(by: .seconds(35))
+        await harness.store.send(.internal(.startPollDue(sentID: UUID(0), generation: 1)))
+
+        #expect(harness.state.start == nil)
+        #expect(harness.state.startNote == .checkPhone)
+        #expect(harness.requests == 0)
         await harness.finish()
     }
 
@@ -261,11 +276,11 @@ struct WatchStartPollTests {
         await harness.store.send(.view(.scenePhaseChanged(.background)))
         await harness.store.send(.view(.scenePhaseChanged(.active)))
         await harness.store.receive(\.internal.statusRead)
-        let afterReturn = refreshes(harness)
+        let afterReturn = harness.requests
         await harness.advance(seconds: 4)
 
         #expect(harness.state.start == nil)
-        #expect(refreshes(harness) == afterReturn)
+        #expect(harness.requests == afterReturn)
         await harness.finish()
     }
 }

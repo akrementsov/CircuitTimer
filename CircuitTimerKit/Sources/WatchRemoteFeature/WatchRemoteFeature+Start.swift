@@ -145,8 +145,13 @@ extension WatchRemoteFeature {
         return stopStart(note: .checkPhone, &state)
     }
 
+    /// Schedules the next poll only while it falls inside the wait, so it never comes due together with the timeout.
+    /// A poll that comes due late anyway, after a suspension, finds the wait already dropped by `dropExpiredStart`.
     private func schedulePoll(_ request: StartRequest) -> Effect<Action> {
-        .run { [clock] send in
+        guard let elapsed = request.beganAt.duration(toNowOf: clock), elapsed + Self.startRunPoll < request.timeout else {
+            return .none
+        }
+        return .run { [clock] send in
             try await clock.sleep(for: Self.startRunPoll)
             await send(.internal(.startPollDue(sentID: request.id, generation: request.timeoutGeneration)))
         }
