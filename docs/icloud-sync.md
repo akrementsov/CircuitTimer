@@ -73,7 +73,7 @@ Run on 2026-10-21/22 with a throwaway build, before the store code was written.
 
 ## Device checklist
 
-On the owner's iPhones on iOS 17 and 26.5, one Apple ID, builds of the same kind. The store mirrors only with the full version, so first buy it on each device and relaunch: through `Configs/CircuitTimer.storekit` in a Debug build run from Xcode, or with a sandbox account in TestFlight.
+Not run before 1.0 (see the [roadmap](roadmap.md)); check these before a later release on the owner's iPhones on iOS 17 and 26.5, one Apple ID, builds of the same kind. The store mirrors only with the full version, so first buy it on each device and relaunch: through `Configs/CircuitTimer.storekit` in a Debug build run from Xcode, or with a sandbox account in TestFlight.
 
 - [ ] An update from a CT-2 store: the sample shows once and no hidden-records footnote appears; the store migrates on iOS 17 too.
 - [ ] Create, edit, reorder and delete on one device appear on the other while its list stays open and active (E3b). If an import arrives without its event, the list needs a bounded refresh while active; if no import arrives at all, the owner decides.

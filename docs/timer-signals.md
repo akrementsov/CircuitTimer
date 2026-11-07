@@ -28,7 +28,7 @@ swift scripts/generate-cue-tones.swift
 
 ## Device checklist
 
-Simulator tests cover signal decisions, preference persistence, revision fences and session teardown. Check these native behaviors on iOS 17.5 and 26.x before release:
+Simulator tests cover signal decisions, preference persistence, revision fences and session teardown. Not run before 1.0 (see the [roadmap](roadmap.md)); check these native behaviors on iOS 17.5 and 26.x before a later release:
 
 - [ ] Play over music and a podcast: ducking recovers after the last cue and after closing, with no volume bounce between countdown beeps.
 - [ ] Close during a spoken name and immediately after the finish tone; neither audio output continues.
@@ -59,7 +59,7 @@ The client uses unique physical identifiers and revision fences. It verifies fut
 
 Suspension, force quit or another process death stops window refilling. Existing requests may still arrive, unless iOS reports the termination: then the app removes them (see `AGENTS.md` › Apple Health). Clock changes cannot be repaired until the app runs again. iOS controls timing, Focus, silent mode, sound and vibration; scheduling is not proof of exact delivery.
 
-Additional device checks on iOS 17.5 and 26.x before release:
+Not run before 1.0 (see the [roadmap](roadmap.md)); additional device checks on iOS 17.5 and 26.x before a later release:
 
 - [ ] First Start: allow, refuse, read the prompt slowly, and recover through Start now / Wait.
 - [ ] First Start on iOS 26.x: the Health sheet follows the notification prompt; allow, refuse, and leave it open for 10 s, then tap Start again.

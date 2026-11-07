@@ -12,7 +12,7 @@ App and UI-test builds check the compiled intent metadata in both hosts, includi
 
 ## Device checklist
 
-Check these before release (CT-7):
+Not run before 1.0 (see the [roadmap](roadmap.md)); check these before a later release:
 
 - [ ] Protected Lock Screen delivery and system error presentation on a physical device.
 - [ ] Real process suspension at the five-second wait bound.
