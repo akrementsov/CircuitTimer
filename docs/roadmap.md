@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-7, the App Store release with its legal texts and device checklists. Checked milestones record delivered functionality; the device checks under CT-7 remain open before release.
+Next: CT-7, the App Store release. Checked milestones record delivered functionality; the device checklists in their documents stay open for later releases.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -37,15 +37,10 @@ Next: CT-7, the App Store release with its legal texts and device checklists. Ch
 - [ ] **CT-7** — App Store release
   - [x] Privacy Policy and Terms of Use in English and Russian, in the app and on GitHub Pages ([texts](legal/privacy-policy.md)); the four published pages and the support page opened on 2026-11-06
   - [x] Fill in version 1.0 in App Store Connect, in English and Russian (2026-11-06): what [App Store Connect](app-store.md) lists (the privacy and support addresses, App Privacy as Data Not Collected, the App Review note on HealthKit and the workout session, the Description paragraph on Apple Health and the Apple Watch app), and the rest of the page: the whole Description, keywords, copyright, the categories Health & Fitness and Sports, the 4+ age rating, content rights, the App Review contact, and iPhone (6.3", 1206×2622) and Apple Watch (416×496) screenshots
-  - [ ] Complete the [Apple Health device checklist](apple-health.md#device-checklist), first whether a workout session keeps the app running without the `workout-processing` background mode, which App Store Connect rejects
-  - [ ] Complete the [foreground signal device checklist](timer-signals.md#device-checklist): audio mixing and interruptions, speech, VoiceOver and haptics
-  - [ ] Complete the [background notification device checks](timer-signals.md#background-notifications): permission flows, locked-screen delivery, manual pauses, relaunch cleanup and the rolling-window limits
-  - [ ] Complete the remaining [Live Activity system checks](live-activity.md#device-checklist), including Release on a physical device
-  - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
+  - [x] Device checklists not run before 1.0: the owner accepted the release on everyday use on a device (2026-11-07). They stay unchecked in their documents for later releases: [Apple Health](apple-health.md#device-checklist) (first whether a workout session keeps the app running without the `workout-processing` background mode), [foreground signals](timer-signals.md#device-checklist), [background notifications](timer-signals.md#background-notifications), [Live Activity](live-activity.md#device-checklist), [iCloud sync](icloud-sync.md#device-checklist), [Apple Watch](apple-watch.md#device-checklist); purchases in the sandbox are left to App Review ([checklist](purchases.md#app-store-connect-checklist-owner))
   - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
-  - [ ] Check purchases in the sandbox with sandbox testers: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
-  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
-  - [ ] Raise `MARKETING_VERSION` to 1.0, tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version
+  - [x] Raise `MARKETING_VERSION` to 1.0
+  - [ ] Tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version
 - [x] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
   - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity

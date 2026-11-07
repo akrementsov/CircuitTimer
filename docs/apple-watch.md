@@ -73,7 +73,7 @@ One tag after CT-9-5 checked what only App Store Connect can. `v0.1.1-rc.4` (bui
 - [x] `testflight.yml` exports and verifies the IPA: the cloud signing creates the watch app's App ID and signs it for the App Store.
 - [x] TestFlight's processing accepts the build with the watch app. Xcode adds `MinimumOSVersion~ipad` to the watch app's Info.plist on its own; App Store Connect does not mind: the build is ready to test on iOS and watchOS.
 
-The items only a live session can check (the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26) are in the [device checklist](#device-checklist), run on a TestFlight build under CT-7.
+The items only a live session can check (the force-quit launch by a request, switching watches, repeated wrist raises and the running workout on iOS 17.5 and 26) are in the [device checklist](#device-checklist), to run on a TestFlight build; it was not run before 1.0 (see the [roadmap](roadmap.md)).
 
 The tag went to internal testers only, so the wire's version 1 stays open after it: a fix the device checks call for may still change it. It freezes at the first build that leaves internal testing ([AGENTS.md › Apple Watch](../AGENTS.md#apple-watch-ct-9)).
 
@@ -113,7 +113,7 @@ The tag went to internal testers only, so the wire's version 1 stays open after 
 
 ## Device checklist
 
-Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before release (CT-7):
+Not run before 1.0 (see the [roadmap](roadmap.md)); check these on an iPhone with a paired Apple Watch on watchOS 10 or later before a later release:
 
 - [ ] A TestFlight build installs the watch app with the iPhone app (automatically, or from the Watch app's Available Apps).
 - [ ] The watch app's name is CircuitTimer, its icon the iPhone app's, and its screens show in English and Russian, their background filling the screen.
