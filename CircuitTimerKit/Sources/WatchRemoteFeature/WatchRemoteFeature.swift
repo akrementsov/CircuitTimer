@@ -121,6 +121,7 @@ public struct WatchRemoteFeature: Sendable {
             case startAnswered(sentID: UUID, WatchReplyEnvelope)
             case startFailed(sentID: UUID, PhoneLinkError)
             case startTimedOut(sentID: UUID, generation: Int)
+            case startPollDue(sentID: UUID, generation: Int)
         }
     }
 
@@ -137,6 +138,7 @@ public struct WatchRemoteFeature: Sendable {
         case commandTimeout
         case start
         case startTimeout
+        case startPoll
     }
 
     static let retryDelays: [Duration] = [.seconds(5), .seconds(10), .seconds(20)]
@@ -286,6 +288,8 @@ public struct WatchRemoteFeature: Sendable {
             case let .startTimedOut(sentID, generation):
                 guard state.start?.id == sentID, state.start?.timeoutGeneration == generation else { return .none }
                 return stopStart(note: .checkPhone, &state)
+            case let .startPollDue(sentID, generation):
+                return startPollDue(sentID: sentID, generation: generation, &state)
         }
     }
 

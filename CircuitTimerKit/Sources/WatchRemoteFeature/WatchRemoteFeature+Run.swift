@@ -171,7 +171,7 @@ extension WatchRemoteFeature {
                 state.run?.isStageOver = true
                 return askForRun(&state)
             case .event, .statusRead, .refreshAnswered, .refreshFailed, .refreshTimedOut, .retryDue, .commandAnswered,
-                 .commandFailed, .commandTimedOut, .startAnswered, .startFailed, .startTimedOut:
+                 .commandFailed, .commandTimedOut, .startAnswered, .startFailed, .startTimedOut, .startPollDue:
                 return .none
         }
     }
