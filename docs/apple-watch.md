@@ -153,6 +153,8 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] A watch screen that does not redraw (O4): note when the time disappears after the confirmation ends; the accepted limit is that it goes at the next redraw.
 
 - [ ] Start with the iPhone active on Workouts and Settings; test the first notification and Health prompts on iOS 17.5 and iOS 26+.
+- [ ] After Start from the watch, the watch shows the running workout within seconds, without its app being relaunched.
+- [ ] A pause on the iPhone in the last 2–3 seconds of a stage reaches the watch as «Pause», not as the stage without its time.
 - [ ] On the simulator pair with the watch app's install refused (`appInstalled: NO`, no context or message), Start from the watch shows the run with the first successful refresh after the iPhone's timer opens (about 5 s when it opens well inside the wait); note the time from accepted separately, and apart a timer that opens after the last poll (30 s) or a poll skipped for a request in flight or a scheduled retry.
 - [ ] Start while the iPhone app is cold, inactive, locked, showing a draft/purchase/timer, restoring a saved run or reloading iCloud: the watch shows the appropriate refusal and the draft survives.
 - [ ] Answer a system permission sheet after thirty seconds, including after background and return: access may update, but no expired timer opens.
