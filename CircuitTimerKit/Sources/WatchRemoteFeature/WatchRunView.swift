@@ -4,9 +4,9 @@ import SwiftUI
 import WorkoutActivity
 
 /// The workout running on the iPhone, drawn like the iPhone timer's cards, aligned to the leading edge: the running
-/// stage's clock and name on its stage colour, the next stage on a dark card under it. The workout's name is the
-/// screen's title. The digits count by themselves only until `digitsUntil`; the timeline hides them then even if no
-/// action arrives.
+/// stage's clock and name on its stage colour with Pause or Resume at its trailing edge, the next stage on a dark card
+/// under it. The workout's name is the screen's title. The digits count by themselves only until `digitsUntil`; the
+/// timeline hides them then even if no action arrives.
 ///
 /// The cards' text stops growing at `maxCardTextSize`, as the iPhone's card titles do, so on a 41 mm watch a stage
 /// whose name takes one line keeps the next stage on screen; a longer name shows whole and scrolls. The note under the
@@ -22,7 +22,6 @@ struct WatchRunView: View {
                 if let next = display.next {
                     nextCard(next)
                 }
-                control
                 if let note = screen.note {
                     noteText(note)
                 }
@@ -32,6 +31,11 @@ struct WatchRunView: View {
 
     private static let maxCardTextSize = DynamicTypeSize.xLarge
 
+    /// The control's strip at the stage card's trailing edge: the 44 pt target, the gap before it and the card's own
+    /// padding after it, all of it tappable.
+    private static let controlStripWidth: CGFloat =
+        .token(size: .watchControl) + .token(spacing: .xs) + .token(spacing: .s)
+
     private var display: WorkoutActivityDisplay {
         screen.display
     }
@@ -39,10 +43,20 @@ struct WatchRunView: View {
     /// The digits show only while the iPhone's confirmation holds: the timeline redraws the card at `digitsUntil`, and
     /// the screen and VoiceOver read the same answer for the same date. One timeline in every state keeps the card the
     /// same view, so VoiceOver's focus stays on it when a lease opens or ends.
+    ///
+    /// Pause or Resume lies over the card's trailing strip, the card's full height, as a separate element after it.
     private var card: some View {
         TimelineView(.explicit(digitsSchedule)) { context in
             stageCard(showsDigits: screen.showsDigits(at: context.date))
         }
+        .overlay(alignment: .trailing) {
+            control
+        }
+    }
+
+    /// The card keeps the strip whenever the phase has a control, so nothing on it moves as the button comes and goes.
+    private var hasControlStrip: Bool {
+        screen.controlSlot != .none
     }
 
     /// The first entry is always past, so the timeline draws at once, as SwiftUI documents for a past date; under a
@@ -56,7 +70,11 @@ struct WatchRunView: View {
         VStack(alignment: .leading, spacing: .zero) {
             switch display.clock {
                 case let .counting(range):
-                    digits(showsDigits, holding: WatchClockText.template(for: range)) { WatchClockText(range: range) }
+                    clock { style in
+                        digits(showsDigits, holding: WatchClockText.template(for: range), style: style) {
+                            WatchClockText(range: range, style: style)
+                        }
+                    }
                     headline
                 case .pauseGlyph:
                     // The glyph stands beside the word, so the time left fits under them.
@@ -66,9 +84,11 @@ struct WatchRunView: View {
                     }
                     if case let .fixed(remaining) = display.islandClock {
                         let reading = remaining.clockText(.timerRemaining)
-                        digits(showsDigits, holding: reading) {
-                            Text(verbatim: reading)
-                                .font(.token(.runningStageClock))
+                        clock { style in
+                            digits(showsDigits, holding: reading, style: style) {
+                                Text(verbatim: reading)
+                                    .font(.token(style))
+                            }
                         }
                     }
                 case .finishedGlyph:
@@ -82,15 +102,29 @@ struct WatchRunView: View {
         }
         .foregroundStyle(display.tone.ink)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, .token(spacing: .s))
+        .padding(.leading, .token(spacing: .s))
+        .padding(.trailing, hasControlStrip ? .zero : .token(spacing: .s))
         .padding(.vertical, .token(spacing: .s))
-        .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
-        .dynamicTypeSize(...Self.maxCardTextSize)
-        // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds.
+        // One element, as on the iPhone: the stage's name, then its time while the iPhone's confirmation holds. It
+        // ends where the control's strip begins, so Pause or Resume over the strip is an element of its own.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(display.headline))
         .accessibilityValue(spokenTime(showsDigits))
         .accessibilityAddTraits(.updatesFrequently)
+        .padding(.trailing, hasControlStrip ? Self.controlStripWidth : .zero)
+        .background(display.tone.fill, in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        .dynamicTypeSize(...Self.maxCardTextSize)
+    }
+
+    /// The clock at full size, or smaller where that does not fit beside the control's strip. Both candidates measure
+    /// the same template whether the digits show or not, so the size never changes when they come and go.
+    private func clock<Content: View>(
+        @ViewBuilder _ content: (DesignSystem.Token.WatchTypography) -> Content
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            content(.runningStageClock)
+            content(.runningStageClockCompact)
+        }
     }
 
     /// The time the card shows, for VoiceOver; nothing when the screen shows none.
@@ -137,52 +171,49 @@ struct WatchRunView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Under the cards, full width. Without a confirmation the button's place stays, hidden from sight and VoiceOver, so
-    /// nothing moves when it comes back.
+    /// Pause or Resume on the stage card's trailing strip. The card's padding keeps the strip, so without a confirmation
+    /// it stays empty and nothing on the card moves when the button comes back; a phase without a control has no
+    /// strip.
     @ViewBuilder private var control: some View {
-        switch screen.controlSlot {
-            case .none:
-                EmptyView()
-            case .reserved:
-                reservedControl
-            case let .button(control):
-                // Gone at the stage's or the lease's end even if no action redraws the screen then.
-                TimelineView(.explicit([.distantPast, control.until])) { context in
-                    if context.date < control.until {
-                        controlButton(control.command, isEnabled: control.isEnabled)
-                    } else {
-                        reservedControl
-                    }
-                }
-        }
-    }
-
-    @ViewBuilder private var reservedControl: some View {
-        if let command = display.control {
-            controlButton(command, isEnabled: false)
-                .opacity(0)
-                .accessibilityHidden(true)
-        }
-    }
-
-    private func controlButton(_ command: LiveActivityCommand, isEnabled: Bool) -> some View {
-        Button(action: onControl) {
-            HStack(spacing: .token(spacing: .xs)) {
-                Image(systemName: command == .pause ? "pause.fill" : "play.fill")
-                    .accessibilityHidden(true)
-                if command == .pause {
-                    Text("watch.run.control.pause", bundle: .module)
-                } else {
-                    Text("watch.run.control.resume", bundle: .module)
+        if case let .button(control) = screen.controlSlot {
+            // Gone at the stage's or the lease's end even if no action redraws the screen then.
+            TimelineView(.explicit([.distantPast, control.until])) { context in
+                if context.date < control.until {
+                    controlButton(control.command, isEnabled: control.isEnabled)
                 }
             }
-            .font(.token(.control))
-            .foregroundStyle(isEnabled ? .text(.primary) : .text(.secondary))
-            .frame(maxWidth: .infinity, minHeight: .token(size: .watchControl))
-            .background(.surface(.card), in: RoundedRectangle(cornerRadius: .token(radius: .m), style: .continuous))
+        }
+    }
+
+    private func controlName(_ command: LiveActivityCommand) -> Text {
+        switch command {
+            case .pause: Text("watch.run.control.pause", bundle: .module)
+            case .resume: Text("watch.run.control.resume", bundle: .module)
+        }
+    }
+
+    /// The whole strip is the button: its label fills the strip's width and the card's height, so a tap anywhere along
+    /// the card's trailing edge counts. The circle only marks it, in the card's ink, like the iPhone timer's round
+    /// buttons.
+    private func controlButton(_ command: LiveActivityCommand, isEnabled: Bool) -> some View {
+        Button(action: onControl) {
+            ZStack {
+                Circle()
+                    .strokeBorder(display.tone.ink, lineWidth: .token(size: .buttonBorder))
+                Image(systemName: command == .pause ? "pause.fill" : "play.fill")
+                    .font(.token(.control))
+                    .foregroundStyle(display.tone.ink)
+            }
+            .frame(width: .token(size: .watchControl), height: .token(size: .watchControl))
+            // The strip's width is the card's reserved padding: one constant, so the two never drift apart.
+            .frame(width: Self.controlStripWidth)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : .token(opacity: .disabled))
+        .accessibilityLabel(controlName(command))
         .dynamicTypeSize(...Self.maxCardTextSize)
     }
 
@@ -190,13 +221,14 @@ struct WatchRunView: View {
     @ViewBuilder private func digits(
         _ showsDigits: Bool,
         holding template: String,
+        style: DesignSystem.Token.WatchTypography,
         @ViewBuilder _ content: () -> some View
     ) -> some View {
         if showsDigits {
             content()
         } else {
             Text(verbatim: template)
-                .font(.token(.runningStageClock))
+                .font(.token(style))
                 .hidden()
         }
     }
@@ -234,6 +266,7 @@ struct WatchRunView: View {
 /// it one, as on the Live Activity.
 struct WatchClockText: View {
     let range: ClosedRange<Date>
+    var style = DesignSystem.Token.WatchTypography.runningStageClock
 
     var body: some View {
         Text(verbatim: Self.template(for: range))
@@ -242,7 +275,7 @@ struct WatchClockText: View {
                 Text(timerInterval: range, countsDown: true, showsHours: false)
                     .minimumScaleFactor(0.9)
             }
-            .font(.token(.runningStageClock))
+            .font(.token(style))
     }
 
     /// Ten minutes, from which the minutes take two digits.
