@@ -44,7 +44,7 @@ Next: CT-7, the App Store release with its legal texts and device checklists. Ch
   - [ ] Complete the [iCloud sync device checklist](icloud-sync.md#device-checklist) on two iPhones, iOS 17 and 26.5
   - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
   - [ ] Check purchases in the sandbox with sandbox testers: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline ([checklist](purchases.md#app-store-connect-checklist-owner))
-  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist). If the running workout ever takes long to reach the watch after a Start from it (the watch says to check the iPhone), make the watch ask the iPhone (`refresh`) while it waits for that Start's run, in `WatchRemoteFeature`, before the release; otherwise this goes to the backlog
+  - [ ] Complete the [Apple Watch device checklist](apple-watch.md#device-checklist)
   - [ ] Raise `MARKETING_VERSION` to 1.0, tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version
 - [x] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
