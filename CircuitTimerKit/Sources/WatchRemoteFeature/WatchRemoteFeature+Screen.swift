@@ -50,8 +50,8 @@ extension WatchRemoteFeature.State {
         case commandFailed
     }
 
-    /// The control under the cards. It shows only while the iPhone confirms the time and the stage has not ended: a
-    /// command is fenced by the content it was sent from, which must be what the iPhone runs.
+    /// The control on the stage card's trailing strip. It shows only while the iPhone confirms the time and the stage
+    /// has not ended: a command is fenced by the content it was sent from, which must be what the iPhone runs.
     enum ControlSlot: Equatable {
         /// The phase has no control: getting ready, or done.
         case none

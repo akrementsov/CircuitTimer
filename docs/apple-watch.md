@@ -8,7 +8,7 @@ The watch app shows the iPhone's workouts, in the iPhone's order, with their tot
 
 The time counts on the watch only while the iPhone confirmed the run at most 10 seconds ago; the watch asks again every 5 seconds while the run's screen shows. Without a fresh confirmation the stage stays on screen without its time, under «Waiting for iPhone…», «iPhone isn't connected» or «Unlock your iPhone». When a stage ends, its time goes until the iPhone confirms the next stage. With the wrist lowered (Always On) the time is hidden and nothing is asked about the run, though the list's own reasons still ask (a retry after a failure, the iPhone back in reach, a state the order asks to confirm, a command's reply from another iPhone process); raising the wrist shows the time again, or asks once.
 
-While the iPhone confirms the time, a Pause or Resume button stands under the cards; the iPhone's timer applies it as it applies the Live Activity's button, also with Live Activities off. Without a confirmation, at a stage's end and with the wrist lowered the button is gone, its place kept. Its outcome:
+While the iPhone confirms the time, a Pause or Resume button stands at the right edge of the stage's card, beside its time, and the whole strip along that edge takes the tap; the iPhone's timer applies it as it applies the Live Activity's button, also with Live Activities off. Without a confirmation, at a stage's end and with the wrist lowered the button is gone, its strip kept empty. Where the full-size clock does not fit beside it, as on a 40 mm watch with a stage of ten minutes or more, the clock takes a smaller size. Its outcome:
 
 | Outcome | The watch shows |
 |---|---|
@@ -147,7 +147,7 @@ Check these on an iPhone with a paired Apple Watch on watchOS 10 or later before
 - [ ] The button goes at a stage's end and with the iPhone out of reach, comes back with the confirmation, and the cards do not move; «Get ready» and «Done» have no empty space for it.
 - [ ] Bluetooth off on the iPhone while a command waits: «Checking on iPhone…», then the outcome once it is back.
 - [ ] Always On: no button, VoiceOver does not read it, nothing is asked.
-- [ ] The button in English and Russian, at the largest text size and on a 41 mm watch.
+- [ ] The button: VoiceOver reads «Pause» and «Resume» in English and Russian; a tap anywhere along the card's right edge, top to bottom, works; at the largest text size and on 40 and 41 mm watches the clock, `22:22` included, fits beside it uncut. With VoiceOver's focus on the button as it goes, note where the focus moves.
 - [ ] iOS 26: swipe the iPhone app away in the App Switcher while a command waits.
 - [ ] Two quick taps on the Live Activity's button while its card is slow to update: the second says to try again shortly, after 10 seconds to check the timer in the app, and never applies.
 - [ ] A watch screen that does not redraw (O4): note when the time disappears after the confirmation ends; the accepted limit is that it goes at the next redraw.
