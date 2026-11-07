@@ -7,6 +7,9 @@ extension WatchRemoteFeature {
     static let startSendTimeout: Duration = .seconds(10)
     /// The iPhone's thirty seconds, counted conservatively from the reply, plus five seconds for publication.
     static let startRunTimeout: Duration = .seconds(35)
+    /// How often an accepted Start asks for its run: a lost message or an unwritten context must not leave the watch
+    /// waiting for a run the iPhone already published.
+    static let startRunPoll: Duration = .seconds(5)
 
     struct StartRequest: Equatable, Sendable {
         enum Stage: Equatable, Sendable {
@@ -113,7 +116,7 @@ extension WatchRemoteFeature {
                     timeoutGeneration: pending.timeoutGeneration + 1
                 )
                 state.start = waiting
-                return .merge(received, .cancel(id: CancelID.startTimeout), startTimeout(waiting))
+                return .merge(received, .cancel(id: CancelID.startTimeout), startTimeout(waiting), schedulePoll(waiting))
             case .openPhoneApp:
                 return .merge(received, stopStart(note: .openPhoneApp, &state))
             case .busy:
@@ -142,11 +145,40 @@ extension WatchRemoteFeature {
         return stopStart(note: .checkPhone, &state)
     }
 
+    /// Schedules the next poll only while it falls inside the wait, so it never comes due together with the timeout.
+    /// A poll that comes due late anyway, after a suspension, finds the wait already dropped by `dropExpiredStart`.
+    private func schedulePoll(_ request: StartRequest) -> Effect<Action> {
+        guard let elapsed = request.beganAt.duration(toNowOf: clock), elapsed + Self.startRunPoll < request.timeout else {
+            return .none
+        }
+        return .run { [clock] send in
+            try await clock.sleep(for: Self.startRunPoll)
+            await send(.internal(.startPollDue(sentID: request.id, generation: request.timeoutGeneration)))
+        }
+        .cancellable(id: CancelID.startPoll, cancelInFlight: true)
+    }
+
+    /// Asks for the accepted Start's run. A wrist lowered to look at the iPhone's permission sheet does not stop it. A
+    /// request in flight answers with the newest state anyway and a scheduled retry asks at its own time; a missing
+    /// iPhone app does not come back by asking. An inactive session asks again: a status that reports it activated
+    /// again need not change `canSend`, so nothing else would ask. A failed poll joins the retry loop.
+    func startPollDue(sentID: UUID, generation: Int, _ state: inout State) -> Effect<Action> {
+        guard let waiting = state.start, waiting.id == sentID, waiting.timeoutGeneration == generation,
+              case .waiting = waiting.stage else { return .none }
+        let ask: Effect<Action> = if state.problem != .companionMissing, state.refresh.inFlight == nil,
+                                     !state.refresh.isRetryScheduled {
+            requestRefresh(&state)
+        } else {
+            .none
+        }
+        return .merge(ask, schedulePoll(waiting))
+    }
+
     /// Ends only the local wait: the iPhone may already have accepted and executed the request.
     func stopStart(note: StartNote?, _ state: inout State) -> Effect<Action> {
         state.start = nil
         state.startNote = note
-        return .merge(.cancel(id: CancelID.start), .cancel(id: CancelID.startTimeout))
+        return .merge(.cancel(id: CancelID.start), .cancel(id: CancelID.startTimeout), .cancel(id: CancelID.startPoll))
     }
 
     func dropExpiredStart(_ state: inout State) -> Effect<Action> {

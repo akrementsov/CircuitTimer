@@ -26,6 +26,8 @@ struct WatchStartTests {
         let held = HeldReplies()
         let store = makeWatchStore(state, sent: sent, clock: clock) {
             $0.phoneCompanion.send = { id, request in
+                // The wait's polls are answered at once without a run; only the Start's reply is held.
+                if case .refresh = request { return reply(id, current) }
                 sent.requests.withValue { $0.append(request) }
                 return try await held.send(id)
             }
@@ -42,6 +44,8 @@ struct WatchStartTests {
         #expect(sent.requests.value == [
             .start(workoutID: UUID(watch: 1), scheduleFingerprint: catalog.entries[0].scheduleFingerprint, knownCatalogDigest: "A"),
         ])
+        // The polls in between are `WatchStartPollTests`' subject; this test guards when the wait ends.
+        store.exhaustivity = .off(showSkippedAssertions: false)
         await clock.advance(by: .seconds(35))
         await store.receive(\.internal.startTimedOut) {
             $0.start = nil

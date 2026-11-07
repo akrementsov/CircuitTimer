@@ -169,7 +169,13 @@ struct WatchStartReconciliationTests {
         let catalog = watchCatalog("Morning")
         var state = stateShowing(catalog, digest: "A")
         state.path.append(.selected(id: UUID(watch: 1), fingerprint: catalog.entries[0].scheduleFingerprint))
-        let store = makeWatchStore(state, clock: clock) { $0.phoneCompanion.send = { id, _ in try await held.send(id) } }
+        // The wait's polls are answered at once without a run; only the Start's reply is held.
+        let store = makeWatchStore(state, clock: clock) {
+            $0.phoneCompanion.send = { id, request in
+                if case .refresh = request { return reply(id, phoneState(sequence: 1, digest: "A")) }
+                return try await held.send(id)
+            }
+        }
         await store.send(.view(.startButtonTapped)) {
             $0.start = .init(id: UUID(0), beganAt: MonotonicInstant(now: clock))
         }
@@ -182,6 +188,8 @@ struct WatchStartReconciliationTests {
             $0.start?.stage = .waiting(asksOnPhone: false)
             $0.start?.timeoutGeneration = 1
         }
+        // The polls in between are `WatchStartPollTests`' subject; this test guards when the wait ends.
+        store.exhaustivity = .off(showSkippedAssertions: false)
         await clock.advance(by: .seconds(34))
         #expect(store.state.startStatus == .starting)
         await clock.advance(by: .seconds(1))
