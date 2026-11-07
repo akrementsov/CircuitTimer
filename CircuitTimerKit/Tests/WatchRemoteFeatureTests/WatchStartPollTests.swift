@@ -26,8 +26,10 @@ struct WatchStartPollTests {
         return harness
     }
 
+    /// The refreshes the reducer started, counted synchronously: the send itself runs in an effect, which a busy
+    /// runner may not have reached yet.
     private func refreshes(_ harness: RunHarness) -> Int {
-        harness.sent.value.filter { if case .refresh = $0 { true } else { false } }.count
+        harness.requests
     }
 
     @Test
@@ -93,14 +95,38 @@ struct WatchStartPollTests {
         await harness.store.receive(\.internal.refreshFailed)
         #expect(harness.state.refresh.isRetryScheduled)
         await harness.advance(seconds: 5)
-
         // The retry and the poll come due together; whichever goes first, one request goes.
+        await harness.store.receive(\.internal.retryDue)
+
         #expect(refreshes(harness) == 2)
         await harness.finish()
     }
 
     @Test
-    func test_startPoll_linkProblemWithoutRetry_doesNotAsk() async {
+    func test_startPoll_sessionInactive_asksAgainAtTheNextPoll() async {
+        let harness = await accepted()
+
+        await harness.advance(seconds: 5)
+        await harness.store.receive(\.internal.startPollDue)
+        await harness.replies.fail(PhoneLinkError.inactive)
+        await harness.store.receive(\.internal.refreshFailed)
+        #expect(harness.state.problem == .unreachable)
+        #expect(!harness.state.refresh.isRetryScheduled)
+        // Activated again, the status still reads reachable: no change of `canSend` asks, so the poll must.
+        await harness.store.send(.internal(.event(.status(reachable))))
+        await harness.advance(seconds: 5)
+        await harness.store.receive(\.internal.startPollDue)
+        #expect(refreshes(harness) == 2)
+        await harness.replies.answer(runState(sequence: 2, run: runningRun()))
+        await harness.store.receive(\.internal.refreshAnswered)
+
+        #expect(harness.state.start == nil)
+        #expect(harness.state.run != nil)
+        await harness.finish()
+    }
+
+    @Test
+    func test_startPoll_companionMissing_doesNotAsk() async {
         let harness = await accepted()
 
         await harness.advance(seconds: 5)
@@ -138,7 +164,6 @@ struct WatchStartPollTests {
         await harness.store.send(.view(.startButtonTapped))
         await harness.advance(seconds: 9)
 
-        #expect(harness.sent.value.count == 1)
         #expect(refreshes(harness) == 0)
         #expect(harness.state.start?.stage == .sending)
         await harness.finish()

@@ -154,12 +154,14 @@ extension WatchRemoteFeature {
     }
 
     /// Asks for the accepted Start's run. A wrist lowered to look at the iPhone's permission sheet does not stop it. A
-    /// request in flight answers with the newest state anyway, a scheduled retry asks at its own time, and a known link
-    /// problem waits for its own way back, so the poll never asks into a failure; a failed poll joins the retry loop.
+    /// request in flight answers with the newest state anyway and a scheduled retry asks at its own time; a missing
+    /// iPhone app does not come back by asking. An inactive session asks again: a status that reports it activated
+    /// again need not change `canSend`, so nothing else would ask. A failed poll joins the retry loop.
     func startPollDue(sentID: UUID, generation: Int, _ state: inout State) -> Effect<Action> {
         guard let waiting = state.start, waiting.id == sentID, waiting.timeoutGeneration == generation,
               case .waiting = waiting.stage else { return .none }
-        let ask: Effect<Action> = if state.problem == nil, state.refresh.inFlight == nil, !state.refresh.isRetryScheduled {
+        let ask: Effect<Action> = if state.problem != .companionMissing, state.refresh.inFlight == nil,
+                                     !state.refresh.isRetryScheduled {
             requestRefresh(&state)
         } else {
             .none
