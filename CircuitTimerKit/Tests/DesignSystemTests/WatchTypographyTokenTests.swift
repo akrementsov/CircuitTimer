@@ -10,6 +10,7 @@ struct WatchTypographyTokenTests {
     @available(iOS 26, *)
     @Test(arguments: [
         DesignSystem.Token.WatchTypography.runningStageClock,
+        .runningStageClockCompact,
         .runningStageName,
         .nextStageName,
         .screenTitle,
@@ -28,6 +29,9 @@ struct WatchTypographyTokenTests {
         switch style {
             case .runningStageClock:
                 #expect(regular.pointSize == 56)
+                #expect(accessibility.pointSize == regular.pointSize)
+            case .runningStageClockCompact:
+                #expect(regular.pointSize == 48)
                 #expect(accessibility.pointSize == regular.pointSize)
             case .runningStageName:
                 Self.expectText(regular, accessibility, size: 17, weight: .heavy)
