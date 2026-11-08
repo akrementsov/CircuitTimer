@@ -1,6 +1,6 @@
 # Roadmap
 
-Next: CT-7, the App Store release. Checked milestones record delivered functionality; the device checklists in their documents stay open for later releases.
+Next: CT-7, the App Store release: version 1.0 is in App Review. Checked milestones record delivered functionality; the device checklists in their documents stay open for later releases.
 
 - [x] **CT-1 Foundation** — package, domain model, schedule, timer engine, design tokens, root feature, lint and CI
 - [x] **CT-8 Delivery** — TestFlight builds from GitHub Actions: a `v*` tag on `main` archives, signs in the cloud and uploads; the first build, 0.1.0, went through on 2026-10-14
@@ -40,7 +40,8 @@ Next: CT-7, the App Store release. Checked milestones record delivered functiona
   - [x] Device checklists not run before 1.0: the owner accepted the release on everyday use on a device (2026-11-07). They stay unchecked in their documents for later releases: [Apple Health](apple-health.md#device-checklist) (first whether a workout session keeps the app running without the `workout-processing` background mode), [foreground signals](timer-signals.md#device-checklist), [background notifications](timer-signals.md#background-notifications), [Live Activity](live-activity.md#device-checklist), [iCloud sync](icloud-sync.md#device-checklist), [Apple Watch](apple-watch.md#device-checklist); purchases in the sandbox are left to App Review ([checklist](purchases.md#app-store-connect-checklist-owner))
   - [x] Create the full version in App Store Connect: created on 2026-11-02, Ready to Submit with the next app version
   - [x] Raise `MARKETING_VERSION` to 1.0
-  - [ ] Tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version
+  - [x] Tag `v1.0` on `main`, attach its build to version 1.0 in App Store Connect and submit it for review together with the full version: build 1.0 (261107.223845), submitted on 2026-11-08 after the price, availability, DAC7 and medical device answers in [App Store Connect](app-store.md#other-fields)
+  - [ ] App Review approves version 1.0 and it is released on the App Store
 - [x] **CT-9** — Apple Watch app, a remote for the iPhone timer (watchOS 10+), in slices ([Apple Watch](apple-watch.md)):
   - [x] **CT-9-1** — the watch app built, embedded in the iPhone app and signed on the TestFlight path; it asks to open the iPhone app
   - [x] **CT-9-2** — the iPhone's workouts on the watch, over WatchConnectivity
@@ -55,7 +56,8 @@ Next: CT-7, the App Store release. Checked milestones record delivered functiona
 - [x] **CT-13** — the timer's stage list at accessibility text sizes: a stage's name wraps, with its time under it, instead of being cut to a few letters
 - [x] **CT-14** — lint checks that the timer's snapshots set every key the timer reads
 - [x] **CT-15** — flaky CI tests: test clocks advance only once their sleepers wait, and `TestSupport` gives tests conditions to wait on
-- [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together once on CI (run 41304027831). Not reproduced in the matching-runtime investigation on 2026-11-02: four isolated tests, one full baseline and five diagnostic runs passed. Direct assertions now carry a per-test suite-change trace; the cause remains unproven ([investigation](testing.md#stored-preference-diagnostics-ct-16)).
+- [ ] **CT-16** — find why the stored-preference checks of `TimerPreferencesTests` failed together on CI (run 41304027831, and again in run 42401177367 on 2026-11-07, together with `SettingsCloudSyncTests`). Not reproduced in the matching-runtime investigation on 2026-11-02: four isolated tests, one full baseline and five diagnostic runs passed. The second failure left the first suite-change traces; the cause remains unproven ([investigation](testing.md#stored-preference-diagnostics-ct-16)).
 - [x] **CT-17** — Pause and Resume on the watch at the right edge of the stage's card, beside its time, instead of a full-width button under the cards
 - [x] **CT-18** — the watch asks the iPhone for an accepted Start's run every 5 s while it waits, so with a lost message or an unwritten context the run still arrives with a successful answer inside the 35 s wait instead of «Check the iPhone» ([Apple Watch](apple-watch.md))
+- [ ] Backlog, no ticket yet: the Russian GitHub Pages declare `<html lang="en-US">`, since the Pages theme ignores the front matter's `lang`; a layout of our own in `docs/_layouts` would fix it
 - [ ] Backlog, no ticket yet: AlarmKit on iOS 26 and later for one or two loud alerts that break through silent mode (the workout finished, a manual pause reached), with local notifications on iOS 17–25 and for every stage

@@ -85,3 +85,8 @@ Circuit Timer ведёт интервальные и круговые трени
 | Content rights | No third-party content |
 | App Review sign-in | Not required |
 | Screenshots | iPhone 6.1/6.3" (1206×2622) and Apple Watch (416×496) in both languages, taken on the simulators; App Store Connect asks for no larger iPhone size |
+| Price | Free (USD 0.00, base country the United States); the full version is the only thing sold |
+| Availability | All 175 countries and regions offered, no pre-order; in Russia the app downloads, but App Store payments may not go through, so the full version may not be purchasable there |
+| Tax category | The default, App Store software |
+| Regulated medical device | No (App Information; asked for the EU/EEA, the UK and the US): the app writes workouts to Apple Health and measures or diagnoses nothing |
+| DAC7 | No app provides personal services (Business, for the whole account); App Store Connect refused the submission until it was answered |

@@ -1,11 +1,14 @@
 # Screenshots
 
-The four images at the top of the [README](../../README.md) are screenshots of the running app, taken by hand. Nothing checks them, unlike the snapshot tests' references: retake them when the look of the list, the workout screen, the timer or the Live Activity changes.
+The six images at the top of the [README](../../README.md) are screenshots of the running app, taken by hand. Nothing checks them, unlike the snapshot tests' references: retake them when the look of the list, the workout screen, the timer, the Live Activity, the purchase sheet or the watch's running workout changes.
 
-1. Set the `iPhone 17` simulator on iOS 27.0 to English and remove the app from it, so that it starts with no data: `xcrun simctl uninstall <udid> com.akrementsov.circuittimer`. Then build and run the app as in [README › Run the app](../../README.md#run-the-app).
+1. Set the `iPhone 17` simulator on iOS 27.0 to English and remove the app from it, so that it starts with no data: `xcrun simctl uninstall <udid> com.akrementsov.circuittimer`. Then run the `CircuitTimer` scheme from Xcode on it: the scheme serves `Configs/CircuitTimer.storekit`, the local store the full version needs. The unsigned build from [README › Run the app](../../README.md#run-the-app) has no local store, so it cannot get past the free limit of two workouts.
 2. Set the status bar: `xcrun simctl status_bar <udid> override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState discharging --batteryLevel 100`.
-3. Fill the list: the app seeds Morning HIIT on its first launch; add Tabata sprints (9:00), Core 15 (11:00), Kettlebell circuit (13:00) and Evening stretch (6:00) in the editor.
+3. Buy the full version in Settings › Buy the App; the local store approves it at once. Then fill the list: the app seeds Morning HIIT on its first launch; add Tabata sprints (9:00), Core 15 (11:00), Kettlebell circuit (13:00) and Evening stretch (6:00) in the editor.
 4. Turn off Background notifications in Settings before the timer shot: on the simulator iOS does not confirm the scheduled notifications, and the timer would show its footnote.
 5. Take each shot with `xcrun simctl io <udid> screenshot <file>.png`: the list as `list.png` and Morning HIIT's workout screen as `workout.png`; start it and take the timer during a work stage as `timer.png`; then lock the simulator with the side button of its frame in Device Hub and take the Lock Screen as `lock.png`.
 6. Scale the PNGs to 600 px wide: `sips --resampleWidth 600 <file>.png`. Save the Lock Screen as JPEG, which keeps its wallpaper near 100 KB, and delete `lock.png`: `sips --resampleWidth 600 -s format jpeg -s formatOptions 85 lock.png --out lock-screen.jpg && rm lock.png`.
-7. Turn Background notifications back on and run `xcrun simctl status_bar <udid> clear`.
+7. Turn Background notifications back on.
+8. Refund the purchase in Xcode's Debug › StoreKit › Manage Transactions, so the app is back to the free version, and tap «+» on the list, which holds more than two workouts: the purchase sheet opens with «The free version keeps two workouts». Take it as `purchase.png` and scale it like the others.
+9. The watch app shows workouts only with the full version, and the watch simulator's StoreKit asks for an Apple ID sign-in, so take its shot from a local, uncommitted Debug build whose `PurchaseClient` reports `.full`, on the watch simulator paired with `iPhone 17`: start a workout from the watch and take the running work stage with its Pause button as `watch.png` (`xcrun simctl io <watch udid> screenshot watch.png`), at the watch's own 416×496 px.
+10. Run `xcrun simctl status_bar <udid> clear`.
