@@ -56,6 +56,6 @@ Alerts: «Purchase Failed» for a failed payment, «Purchases Are Not Allowed» 
 - [x] Family Sharing turned on. Apple does not let a developer turn it off again for a product; confirm before turning it on.
 - [x] Display name and description in English and Russian; App Store Connect allows 55 characters, so the descriptions are shorter than in `Configs/CircuitTimer.storekit`.
 - [x] Review Information: a screenshot of the purchase sheet and a note on what the purchase unlocks.
-- [ ] Submit the first purchase together with an app version.
+- [x] Submit the first purchase together with an app version: with version 1.0 on 2026-11-08.
 - [ ] Sandbox testers for the device checks: purchase, refund, Ask to Buy, Family Sharing, restore on a second device, launch offline; not run before 1.0, which leaves purchases to App Review (see the [roadmap](roadmap.md)).
 - [x] App Privacy: purchases are handled by Apple; the app collects nothing about them (the answers for the whole app: [App Store Connect](app-store.md#app-privacy)); answered Data Not Collected on 2026-11-06.

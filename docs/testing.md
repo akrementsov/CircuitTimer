@@ -30,6 +30,8 @@ In the controlled output check on Xcode 27.1, the activity titles retained `CT16
 
 The recorder is retained to capture the source of writes in the next CI mismatch: the earlier failure message had only the final stored value. Capturing old values and symbolizing stacks adds synchronous work to writes and can hide a timing-dependent failure. Remove this recorder when a failing trace has been captured or the cause has been established; successful runs alone are not a removal criterion.
 
+CI run [42401177367](https://github.com/akrementsov/CircuitTimer/actions/runs/42401177367) (attempt 1, 2026-11-07) failed again; its re-run passed. In `test_toggle_eachSignal_persistsIndependently` the shared state held `false` for Vibration and Speak names while the suite held `1`, and `SettingsCloudSyncTests` read `iCloudSync` as `false` where `true` was expected. The trace of the first test is the first one captured: the six defaults arrive by KVO, the first toggle's send changes `signalSound` to `0`, and the next two sends (6 and 7) leave no KVO change at all, so the suite never saw those writes. The bundle with the traces is the run's `test-results` artifact, which GitHub keeps until 2026-11-21. Why the later writes did not reach the suite is still open.
+
 Source tracing confirmed synchronous `UserDefaults.set` calls within the process, including the save after a `TestStore` assertion closure. Recreating state with the same shared key reused its live reference; it is not an independent read of persistent storage. The temporary changes to Sharing were restored and are not part of the test harness. Keep the direct suite assertions and investigate a new mismatch before changing suite construction, adding waits or serializing these tests.
 
 ## UI tests
