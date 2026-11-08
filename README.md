@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml/badge.svg)](https://github.com/akrementsov/CircuitTimer/actions/workflows/ci.yml)
 
-An interval and circuit training timer for iPhone. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. Internal builds go out through TestFlight; an App Store release is planned.
+An interval and circuit training timer for iPhone. A workout is a warm-up, a training block repeated for several rounds and a cool-down, each made of timed work and rest stages, with optional manual pauses in between. Internal builds go out through TestFlight; version 1.0 went to App Review on 2026-11-08.
 
 <p>
   <img src="docs/images/list.png" width="200" alt="The workout list">
